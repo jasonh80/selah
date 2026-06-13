@@ -42,6 +42,14 @@ export async function loadGlobalChapterWorkup(slug: string): Promise<ChapterWork
   const cached = CACHE.get(slug);
   if (cached) return cached;
 
+  // MVP: missing chapters return null (the route renders 404).
+  // Production: this branch should
+  //   - create a generation job,
+  //   - persist a "generating" global workup record (status: "generating"),
+  //   - render <GeneratingChapterState/> to the user while it runs,
+  //   - call the AI generation pipeline ONCE for this chapter,
+  //   - store the completed result (status: "ready" → later "reviewed"),
+  //   - and serve the cached global workup to all future users.
   const generated = await generateChapterWorkup(slug);
   if (generated) CACHE.set(slug, generated); // save forever
   return generated;

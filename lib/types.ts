@@ -89,8 +89,13 @@ export interface DeeperGroup {
 export interface ChapterWorkup {
   // --- Global workup record (one canonical workup per chapter) ---
   // Generate once. Save forever. Personalize only when needed.
-  status?: "draft" | "reviewed" | "published";
-  version?: number;
+  // Generation is lazy: a chapter moves draft → generating → ready/failed the
+  // first time it is requested, then is cached forever.
+  status?: "draft" | "generating" | "ready" | "failed" | "reviewed";
+  version?: string;
+  generationStartedAt?: string;
+  generationCompletedAt?: string;
+  generationError?: string;
   updatedAt?: string;
   reviewedAt?: string;
 

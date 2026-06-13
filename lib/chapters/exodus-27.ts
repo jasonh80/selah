@@ -4,7 +4,8 @@ import type { ChapterWorkup } from "@/lib/types";
 // produced once by the generation service and cached forever.
 export const exodus27: ChapterWorkup = {
   status: "reviewed",
-  version: 1,
+  version: "1",
+  generationCompletedAt: "2026-06-13",
   updatedAt: "2026-06-13",
   reviewedAt: "2026-06-13",
 
