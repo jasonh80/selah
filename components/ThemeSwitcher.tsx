@@ -32,7 +32,7 @@ export function ThemeSwitcher({ inline = false }: { inline?: boolean }) {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-sm text-secondary shadow-hair transition hover:text-primary"
+        className="flex items-center gap-1.5 rounded-full bg-card-soft px-2.5 py-1.5 text-[13px] text-secondary transition hover:text-primary"
         aria-label="Change theme"
       >
         <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/5" style={{ background: active.swatch }} />

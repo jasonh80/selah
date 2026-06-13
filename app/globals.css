@@ -42,7 +42,9 @@
   --accent: #9b8fc7;
   --accent-strong: #5b3f91;
   --tint: #f3f1fa;
-  --line: #e9e8ee;
+  --line: #e5e5ea;
+  --purple-soft: #f3f1fa;
+  --purple-muted: #9b8fc7;
 }
 
 /* Sonrise — gold */
@@ -121,11 +123,11 @@ body {
     color 0.4s ease, fill 0.4s ease, stroke 0.4s ease;
 }
 
-/* SELAH wordmark — clean modern sans, letter-spaced */
+/* SELAH wordmark — luxury fashion-tech: refined, letter-spaced */
 .wordmark {
   font-family: var(--font-sans);
-  letter-spacing: 0.38em;
-  font-weight: 600;
+  letter-spacing: 0.42em;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
@@ -164,5 +166,15 @@ body {
   }
   .text-scripture {
     @apply font-display text-[17px] font-normal leading-[1.85];
+  }
+  .text-wordmark {
+    @apply font-sans text-[17px] font-medium uppercase;
+    letter-spacing: 0.42em;
+  }
+  .text-eyebrow {
+    @apply font-sans text-[11px] font-semibold uppercase tracking-[0.13em] text-accent-strong;
+  }
+  .text-section {
+    @apply font-display text-[20px] font-semibold tracking-[-0.01em];
   }
 }

@@ -56,8 +56,8 @@ export interface MetaChip {
 export interface NavCard {
   id: string;
   label: string;
-  thumb?: string; // image; omit for the mini-timeline card
-  miniTimeline?: boolean;
+  support: string; // one very short supporting line
+  thumb?: string;
   jesus?: boolean;
 }
 
@@ -76,9 +76,14 @@ export interface Insight {
   jesus?: boolean;
 }
 
-export interface DeeperPill {
-  icon: string;
-  label: string;
+export interface DeeperRow {
+  title: string;
+  desc: string;
+}
+
+export interface DeeperGroup {
+  label: string; // "Learn More" | "Dive Deeper" | "Grow Closer"
+  rows: DeeperRow[];
 }
 
 export interface ChapterWorkup {
@@ -100,7 +105,7 @@ export interface ChapterWorkup {
   navCards: NavCard[];
   timelineMini: TimelineMini;
   insights: Insight[];
-  deeperPills: DeeperPill[];
+  deeperGroups: DeeperGroup[];
 
   quickSummary: string;
   summary: string;

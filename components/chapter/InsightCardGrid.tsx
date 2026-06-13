@@ -2,14 +2,18 @@
 
 import { useState } from "react";
 import type { ChapterWorkup, Insight } from "@/lib/types";
+import { SectionHead } from "@/components/chapter/SectionHead";
 
 export function InsightCardGrid({ data }: { data: ChapterWorkup }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5">
-      {data.insights.map((insight) => (
-        <InsightCard key={insight.id} insight={insight} />
-      ))}
-    </div>
+    <section>
+      <SectionHead eyebrow="Understand" title="Deeper Study" />
+      <div className="grid grid-cols-2 gap-2.5">
+        {data.insights.map((insight) => (
+          <InsightCard key={insight.id} insight={insight} />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -31,7 +35,7 @@ function InsightCard({ insight }: { insight: Insight }) {
         >
           {insight.icon}
         </span>
-        <p className={`text-card-title ${insight.jesus ? "text-jesus-red" : "text-primary"}`}>
+        <p className={`text-card-title pt-0.5 ${insight.jesus ? "text-jesus-red" : "text-primary"}`}>
           {insight.title}
         </p>
       </div>

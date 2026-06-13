@@ -51,18 +51,15 @@ export const exodus27: ChapterWorkup = {
 
   metaChips: [
     { icon: "📅", text: "c. 1446 BC" },
-    { icon: "⛰", text: "Sinai wilderness" },
-    { icon: "✦", text: "Theme: Holy access to God" },
-    { icon: "✝", text: "Jesus: sacrifice • priesthood • light", jesus: true },
+    { icon: "📍", text: "Wilderness of Sinai" },
+    { icon: "✦", text: "Approaching a holy God" },
+    { icon: "✝", text: "The altar foreshadows the cross", jesus: true },
   ],
 
   navCards: [
-    { id: "timeline", label: "Timeline", miniTimeline: true },
-    { id: "modern-map", label: "Modern Map", thumb: "/img/exodus-27/map-modern.svg" },
-    { id: "historic-map", label: "Historic Map", thumb: "/img/exodus-27/map-historic.svg" },
-    { id: "key-object", label: "Key Object", thumb: "/img/exodus-27/detail.svg" },
-    { id: "key-person", label: "Key Person", thumb: "/img/exodus-27/person.svg" },
-    { id: "jesus", label: "Jesus", thumb: "/img/exodus-27/jesus.svg", jesus: true },
+    { id: "key-object", label: "Key Object", support: "Bronze altar", thumb: "/img/exodus-27/detail.svg" },
+    { id: "key-person", label: "Key Person", support: "Moses", thumb: "/img/exodus-27/person.svg" },
+    { id: "jesus", label: "Jesus", support: "The altar foreshadows the cross", thumb: "/img/exodus-27/jesus.svg", jesus: true },
   ],
 
   timelineMini: {
@@ -71,6 +68,13 @@ export const exodus27: ChapterWorkup = {
   },
 
   insights: [
+    {
+      id: "context",
+      icon: "🏛",
+      title: "Historical Context",
+      preview: "Israel is camped at Sinai, a tent people learning who their God is.",
+      body: "Israel has just been freed from Egypt and is camped at Mount Sinai — a people on the move, living in tents, learning who their God is. The tabernacle is a portable sanctuary: God choosing to dwell in the middle of the camp. Everything is measured in cubits and made of specific materials — bronze for the courtyard and altar, silver and gold deeper inside. The closer you move toward God's presence, the more precious the metal: a built-in lesson in holiness.",
+    },
     {
       id: "miss",
       icon: "🔍",
@@ -95,6 +99,13 @@ export const exodus27: ChapterWorkup = {
       body: "God is holy — utterly set apart — and people cannot approach on their own terms. Yet he provides the way: an altar, a sacrifice, an ordered space, a light that never goes out. This is a small, foundational principle; later chapters build the priesthood and the sacrificial system on top of it.",
     },
     {
+      id: "application",
+      icon: "🌱",
+      title: "Practical Application",
+      preview: "Begin the day at the altar — in gratitude, not performance.",
+      body: "Approaching God has never been casual or self-made; it runs through what he provides. Before rushing into the day, pause at the 'altar' — receive that the way to God is already opened, not earned. Let gratitude, not performance, be the doorway.",
+    },
+    {
       id: "prayer",
       icon: "🙏",
       title: "Prayer",
@@ -103,11 +114,28 @@ export const exodus27: ChapterWorkup = {
     },
   ],
 
-  deeperPills: [
-    { icon: "📖", label: "Read Hebrews 9–10" },
-    { icon: "✝", label: "Study sacrifice" },
-    { icon: "👥", label: "Explore priesthood" },
-    { icon: "🙏", label: "Pray about reverence" },
+  deeperGroups: [
+    {
+      label: "Learn More",
+      rows: [
+        { title: "Bronze altar", desc: "Understand the first object seen inside the courtyard." },
+        { title: "Tabernacle courtyard", desc: "See how sacred space taught Israel about access to God." },
+      ],
+    },
+    {
+      label: "Dive Deeper",
+      rows: [
+        { title: "Read Hebrews 9–10", desc: "See how sacrifice and priesthood are fulfilled in Christ." },
+        { title: "Study holiness", desc: "Learn why God's nearness is both gift and danger." },
+      ],
+    },
+    {
+      label: "Grow Closer",
+      rows: [
+        { title: "Pray about reverence", desc: "Ask God to make worship weighty again." },
+        { title: "Sit with the lamp imagery", desc: "Reflect on Christ as the true light." },
+      ],
+    },
   ],
 
   quickSummary:

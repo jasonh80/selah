@@ -11,13 +11,11 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
 
   return (
     <section id="chapter" className="scroll-mt-20 space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-[15px] font-bold text-primary">
-          <span className="text-accent-strong" aria-hidden>
-            📖
-          </span>
-          The Chapter
-        </h2>
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-eyebrow">Read</p>
+          <h2 className="text-section mt-0.5 text-primary">The Chapter</h2>
+        </div>
         <label className="relative">
           <select
             value={version}
