@@ -66,7 +66,7 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
                 <span className="w-5 shrink-0 pt-1 text-right text-xs font-semibold text-accent-strong">
                   {v.number}
                 </span>
-                <p className={`text-[16px] leading-7 ${v.redLetter ? "red-letter" : "text-primary"}`}>
+                <p className={`text-scripture ${v.redLetter ? "red-letter" : "text-primary"}`}>
                   {v.text}
                 </p>
               </div>
@@ -75,7 +75,7 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
           </div>
         ) : (
           <div>
-            <p className="font-display text-[17px] leading-8 text-primary">
+            <p className="text-scripture text-primary">
               {data.verses.map((v) => (
                 <span key={v.number} className={v.redLetter ? "red-letter" : ""}>
                   <sup className="mr-1 text-xs text-secondary">{v.number}</sup>

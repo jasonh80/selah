@@ -5,14 +5,12 @@ export function ChapterHero({ data }: { data: ChapterWorkup }) {
     <section className="pt-1">
       <div className="flex items-center gap-1.5 text-accent-strong">
         <span aria-hidden>☀︎</span>
-        <p className="text-sm font-semibold">Today&rsquo;s Chapter</p>
+        <p className="text-label">Today&rsquo;s Chapter</p>
       </div>
 
-      <h1 className="mt-1 font-display text-5xl font-semibold leading-none text-primary">
-        {data.title}
-      </h1>
-      <p className="mt-2 font-display text-xl italic text-primary/80">{data.subtitle}</p>
-      <p className="mt-2 text-sm text-secondary">{data.tagline}</p>
+      <h1 className="text-title mt-1.5 text-primary">{data.title}</h1>
+      <p className="text-subtitle mt-2 text-primary">{data.subtitle}</p>
+      <p className="text-body mt-2 text-secondary">{data.tagline}</p>
 
       {/* Read / Listen / Verse by Verse */}
       <div className="mt-4 flex gap-2">

@@ -31,20 +31,18 @@ function InsightCard({ insight }: { insight: Insight }) {
         >
           {insight.icon}
         </span>
-        <p
-          className={`text-sm font-bold leading-tight ${
-            insight.jesus ? "text-jesus-red" : "text-primary"
-          }`}
-        >
+        <p className={`text-card-title ${insight.jesus ? "text-jesus-red" : "text-primary"}`}>
           {insight.title}
         </p>
       </div>
 
       {insight.subtitle && (
-        <p className="mt-2 font-display text-base font-semibold text-primary">{insight.subtitle}</p>
+        <p className="mt-2 font-display text-lg font-semibold tracking-[-0.01em] text-primary">
+          {insight.subtitle}
+        </p>
       )}
 
-      <p className="mt-1.5 flex-1 text-[13px] leading-snug text-secondary">
+      <p className="mt-1.5 flex-1 text-[13px] leading-relaxed text-secondary">
         {open ? insight.body : insight.preview}
       </p>
 

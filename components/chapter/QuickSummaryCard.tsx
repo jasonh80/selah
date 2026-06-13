@@ -7,8 +7,8 @@ export function QuickSummaryCard({ data }: { data: ChapterWorkup }) {
         📜
       </div>
       <div className="min-w-0 flex-1">
-        <p className="font-display text-lg font-semibold text-primary">Quick Summary</p>
-        <p className="mt-0.5 text-[13px] leading-snug text-secondary">{data.quickSummary}</p>
+        <p className="font-display text-lg font-semibold tracking-[-0.01em] text-primary">Quick Summary</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-secondary">{data.quickSummary}</p>
       </div>
       <span className="shrink-0 text-secondary">›</span>
     </button>

@@ -28,7 +28,7 @@
   --shadow-card: 0 1px 2px rgba(16, 16, 20, 0.04), 0 8px 24px rgba(16, 16, 20, 0.05);
 
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
 }
 
 /* Air — default (purple) */
@@ -121,10 +121,10 @@ body {
     color 0.4s ease, fill 0.4s ease, stroke 0.4s ease;
 }
 
-/* SELAH wordmark */
+/* SELAH wordmark — clean modern sans, letter-spaced */
 .wordmark {
-  font-family: var(--font-display);
-  letter-spacing: 0.42em;
+  font-family: var(--font-sans);
+  letter-spacing: 0.38em;
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -140,4 +140,29 @@ body {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* ============================================================
+   TYPE SYSTEM — modern editorial.
+   Body/UI: Inter (sans). Titles & scripture: Newsreader (serif).
+   ============================================================ */
+@layer components {
+  .text-label {
+    @apply font-sans text-[11px] font-semibold uppercase tracking-[0.13em];
+  }
+  .text-title {
+    @apply font-display text-[44px] font-semibold leading-[1.0] tracking-[-0.015em];
+  }
+  .text-subtitle {
+    @apply font-display text-[20px] font-normal italic leading-snug;
+  }
+  .text-card-title {
+    @apply font-sans text-[15px] font-bold leading-tight tracking-[-0.01em];
+  }
+  .text-body {
+    @apply font-sans text-[15px] font-normal leading-[1.6];
+  }
+  .text-scripture {
+    @apply font-display text-[17px] font-normal leading-[1.85];
+  }
 }
