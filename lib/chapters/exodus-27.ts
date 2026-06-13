@@ -3,6 +3,11 @@ import type { ChapterWorkup } from "@/lib/types";
 // Placeholder content for the static prototype. In production this object is
 // produced once by the generation service and cached forever.
 export const exodus27: ChapterWorkup = {
+  status: "reviewed",
+  version: 1,
+  updatedAt: "2026-06-13",
+  reviewedAt: "2026-06-13",
+
   slug: "exodus-27",
   book: "Exodus",
   chapter: 27,

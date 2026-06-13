@@ -87,6 +87,13 @@ export interface DeeperGroup {
 }
 
 export interface ChapterWorkup {
+  // --- Global workup record (one canonical workup per chapter) ---
+  // Generate once. Save forever. Personalize only when needed.
+  status?: "draft" | "reviewed" | "published";
+  version?: number;
+  updatedAt?: string;
+  reviewedAt?: string;
+
   slug: string;
   book: string;
   chapter: number;
