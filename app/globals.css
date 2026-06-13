@@ -140,6 +140,19 @@ body {
     color 0.4s ease, fill 0.4s ease, stroke 0.4s ease;
 }
 
+/* Starlight — a soft purple starglow at the top, so it feels like night sky
+   rather than a flat inverted dark mode. */
+[data-theme="starlight"] body {
+  background-image: radial-gradient(
+      1100px 520px at 50% -8%,
+      rgba(142, 107, 232, 0.16),
+      transparent 62%
+    ),
+    radial-gradient(700px 380px at 85% 8%, rgba(167, 139, 250, 0.08), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
 /* SELAH wordmark — luxury fashion-tech: refined, letter-spaced */
 .wordmark {
   font-family: var(--font-sans);
@@ -170,7 +183,7 @@ body {
     @apply font-sans text-[11px] font-semibold uppercase tracking-[0.13em];
   }
   .text-title {
-    @apply font-display text-[40px] font-bold leading-[1.0] tracking-[-0.04em];
+    @apply font-display text-[42px] font-semibold leading-[0.98] tracking-[-0.035em];
   }
   .text-subtitle {
     @apply font-display text-[19px] font-medium leading-snug tracking-[-0.01em];

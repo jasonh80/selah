@@ -27,7 +27,7 @@ export default function Home() {
         {/* Phone-first: 480 → tablet 760 → desktop two-pane */}
         <div className="mx-auto max-w-[480px] md:max-w-[760px] lg:max-w-none lg:grid lg:grid-cols-[minmax(0,700px)_minmax(300px,360px)] lg:justify-center lg:gap-8">
           {/* Main chapter experience */}
-          <main className="min-w-0 space-y-6 pb-12 pt-3">
+          <main className="min-w-0 space-y-7 pb-12 pt-4 lg:pt-6">
             <ChapterHero data={data} />
 
             <div className="space-y-3">
