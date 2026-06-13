@@ -3,11 +3,12 @@
 import { useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
 import { VersionSelect } from "@/components/chapter/VersionSelect";
+import { VERSIONS, useVersion } from "@/components/VersionProvider";
 
 type Mode = "read" | "listen" | "verse";
 
 export function ScriptureReader({ data }: { data: ChapterWorkup }) {
-  const [version, setVersion] = useState(data.defaultVersion);
+  const { version, setVersion } = useVersion();
   const [mode, setMode] = useState<Mode>("read");
 
   return (
@@ -17,7 +18,7 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
           <p className="text-eyebrow">Scripture</p>
           <h2 className="text-section mt-0.5 text-primary">Read the Chapter</h2>
         </div>
-        <VersionSelect versions={data.versions} value={version} onChange={setVersion} prefix />
+        <VersionSelect versions={[...VERSIONS]} value={version} onChange={(v) => setVersion(v as typeof version)} prefix />
       </div>
 
       <div className="inline-flex gap-1 rounded-full border bg-card p-1 shadow-hair">

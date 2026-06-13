@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
 import { loadGlobalChapterWorkup } from "@/lib/chapters/registry";
 
@@ -17,5 +18,9 @@ export default async function ChapterPage({ params }: { params: { slug: string }
   // once on this first request and cached forever for everyone after.
   if (!data) notFound();
 
-  return <ChapterView data={data} />;
+  return (
+    <AppShell>
+      <ChapterView data={data} />
+    </AppShell>
+  );
 }

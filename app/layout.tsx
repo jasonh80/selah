@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { VersionProvider } from "@/components/VersionProvider";
 import { BUILD_ID } from "@/lib/build";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -23,7 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" data-theme="air" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="theme-transition">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <VersionProvider>{children}</VersionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

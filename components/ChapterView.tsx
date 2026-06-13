@@ -1,5 +1,4 @@
 import type { ChapterWorkup } from "@/lib/types";
-import { AppHeader } from "@/components/chapter/AppHeader";
 import { ChapterHero } from "@/components/chapter/ChapterHero";
 import { HeroImage } from "@/components/chapter/HeroImage";
 import { MetadataChips } from "@/components/chapter/MetadataChips";
@@ -24,10 +23,7 @@ import { CostDrawer } from "@/components/chapter/CostDrawer";
  */
 export function ChapterView({ data }: { data: ChapterWorkup }) {
   return (
-    <div className="min-h-screen">
-      <AppHeader versions={data.versions} defaultVersion={data.defaultVersion} />
-
-      <div className="mx-auto max-w-[1180px] px-4 lg:px-6">
+    <div className="mx-auto max-w-[1180px] px-4 lg:px-6">
         {/* Phone-first: 480 → tablet 760 → desktop two-pane */}
         <div className="mx-auto max-w-[480px] md:max-w-[760px] lg:max-w-none lg:grid lg:grid-cols-[minmax(0,700px)_minmax(300px,360px)] lg:justify-center lg:gap-8">
           {/* Main chapter experience */}
@@ -66,7 +62,6 @@ export function ChapterView({ data }: { data: ChapterWorkup }) {
             <CompanionColumn data={data} />
           </aside>
         </div>
-      </div>
     </div>
   );
 }
