@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { BUILD_ID } from "@/lib/build";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const spaceGrotesk = Space_Grotesk({
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
   title: "Selah — your daily Bible chapter",
   description:
     "Your daily Bible chapter, made visual, simple, and personal. Pause. Reflect. Lift up.",
+  other: { "selah-build": BUILD_ID },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

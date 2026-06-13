@@ -7,3 +7,11 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Never cache the HTML document (browser or Netlify edge), so deploys show
+# immediately. Hashed assets under /_next/* keep their own long cache.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-cache"

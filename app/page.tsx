@@ -14,6 +14,9 @@ import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { CompanionColumn } from "@/components/chapter/CompanionColumn";
 import { CostDrawer } from "@/components/chapter/CostDrawer";
 
+// Render fresh on every request so deploys are never masked by a stale HTML cache.
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   const data = exodus27;
   return (
