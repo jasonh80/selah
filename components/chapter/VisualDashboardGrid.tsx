@@ -6,7 +6,7 @@ export function VisualDashboardGrid({ data }: { data: ChapterWorkup }) {
   const jesus = data.navCards.find((c) => c.id === "jesus")!;
 
   return (
-    <div className="grid grid-cols-2 gap-2.5 min-[1100px]:grid-cols-3">
+    <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
       <TimelineCard data={data} />
       <MapCard title="Modern Map" caption={data.modernMap.caption} src={data.modernMap.src} alt={data.modernMap.alt} />
       <MapCard title="Historic Map" caption={data.historicMap.caption} src={data.historicMap.src} alt={data.historicMap.alt} />
@@ -40,7 +40,7 @@ function CardShell({
 function TimelineCard({ data }: { data: ChapterWorkup }) {
   const { labels, activeIndex } = data.timelineMini;
   return (
-    <CardShell spanClass="col-span-2 min-[1100px]:col-span-3">
+    <CardShell spanClass="col-span-2 lg:col-span-3">
       <div className="p-4">
         <div className="flex items-start justify-between">
           <div>
@@ -107,15 +107,15 @@ function MapCard({
 function ThumbCard({ card }: { card: NavCard }) {
   return (
     <CardShell>
-      <div className="flex items-center gap-3 p-3">
-        <span className="h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-card-soft">
+      <div className="flex items-center gap-3 p-3.5">
+        <span className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card-soft">
           <img src={card.thumb} alt="" className="h-full w-full object-cover" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-card-title text-primary">{card.label}</span>
-          <span className="block truncate text-[11px] text-secondary">{card.support}</span>
+          <span className="mt-0.5 block truncate text-[11px] text-secondary">{card.support}</span>
         </span>
-        <span className="text-secondary">›</span>
+        <span className="shrink-0 pl-1 text-secondary">›</span>
       </div>
     </CardShell>
   );
@@ -123,7 +123,7 @@ function ThumbCard({ card }: { card: NavCard }) {
 
 function JesusCard({ card }: { card: NavCard }) {
   return (
-    <CardShell spanClass="col-span-2 min-[1100px]:col-span-2" jesus>
+    <CardShell spanClass="col-span-2 lg:col-span-2" jesus>
       <div className="flex items-center gap-3 p-3.5">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-jesus-red-soft text-jesus-red">
           ✝

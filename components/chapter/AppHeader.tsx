@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Logo } from "@/components/Logo";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { VersionSelect } from "@/components/chapter/VersionSelect";
 
 export function AppHeader({
   versions,
@@ -25,23 +26,7 @@ export function AppHeader({
             Chapters
           </button>
 
-          <label className="relative">
-            <select
-              value={version}
-              onChange={(e) => setVersion(e.target.value)}
-              className="appearance-none rounded-full bg-card-soft py-1.5 pl-3 pr-6 text-[13px] font-medium text-primary"
-              aria-label="Bible version"
-            >
-              {versions.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-secondary">
-              ⌄
-            </span>
-          </label>
+          <VersionSelect versions={versions} value={version} onChange={setVersion} />
 
           <ThemeSwitcher />
         </div>

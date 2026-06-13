@@ -2,6 +2,7 @@ import { exodus27 } from "@/lib/chapters/exodus-27";
 import { AppHeader } from "@/components/chapter/AppHeader";
 import { ChapterHero } from "@/components/chapter/ChapterHero";
 import { HeroImage } from "@/components/chapter/HeroImage";
+import { MetadataChips } from "@/components/chapter/MetadataChips";
 import { VisualDashboardGrid } from "@/components/chapter/VisualDashboardGrid";
 import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { GeneratedImagesSection } from "@/components/chapter/GeneratedImagesSection";
@@ -21,13 +22,14 @@ export default function Home() {
 
       <div className="mx-auto max-w-[1180px] px-4 lg:px-6">
         {/* Phone-first: 480 → tablet 760 → desktop two-pane */}
-        <div className="mx-auto max-w-[480px] md:max-w-[760px] min-[1100px]:max-w-none min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,680px)_minmax(280px,340px)] min-[1100px]:justify-center min-[1100px]:gap-7">
+        <div className="mx-auto max-w-[480px] md:max-w-[760px] lg:max-w-none lg:grid lg:grid-cols-[minmax(0,700px)_minmax(300px,360px)] lg:justify-center lg:gap-8">
           {/* Main chapter experience */}
           <main className="min-w-0 space-y-6 pb-12 pt-3">
             <ChapterHero data={data} />
 
             <div className="space-y-3">
               <HeroImage data={data} />
+              <MetadataChips data={data} />
               <VisualDashboardGrid data={data} />
               <QuickSummaryCard data={data} />
             </div>
@@ -39,10 +41,10 @@ export default function Home() {
             <MapsSection data={data} />
 
             {/* Keep Going + transparency live in the companion on desktop */}
-            <div className="min-[1100px]:hidden">
+            <div className="lg:hidden">
               <GoDeeperSection data={data} />
             </div>
-            <div className="min-[1100px]:hidden">
+            <div className="lg:hidden">
               <CostDrawer />
             </div>
 
@@ -53,7 +55,7 @@ export default function Home() {
           </main>
 
           {/* Desktop companion column */}
-          <aside className="hidden min-w-0 pt-3 min-[1100px]:block">
+          <aside className="hidden min-w-0 pt-3 lg:block">
             <div className="sticky top-[84px]">
               <CompanionColumn data={data} />
             </div>

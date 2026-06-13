@@ -170,7 +170,7 @@ body {
     @apply font-sans text-[11px] font-semibold uppercase tracking-[0.13em];
   }
   .text-title {
-    @apply font-display text-[42px] font-semibold leading-[1.02] tracking-[-0.03em];
+    @apply font-display text-[40px] font-bold leading-[1.0] tracking-[-0.04em];
   }
   .text-subtitle {
     @apply font-display text-[19px] font-medium leading-snug tracking-[-0.01em];

@@ -13,7 +13,7 @@ export function ChapterHero({ data }: { data: ChapterWorkup }) {
       <p className="text-body mt-2 text-secondary">{data.tagline}</p>
 
       {/* Read / Listen / Verse by Verse */}
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex gap-2.5">
         <a
           href="#chapter"
           className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-accent-strong px-3 py-2.5 text-[13px] font-semibold text-white shadow-hair"

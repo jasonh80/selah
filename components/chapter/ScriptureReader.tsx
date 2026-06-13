@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
+import { VersionSelect } from "@/components/chapter/VersionSelect";
 
 type Mode = "read" | "listen" | "verse";
 
@@ -16,26 +17,10 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
           <p className="text-eyebrow">Scripture</p>
           <h2 className="text-section mt-0.5 text-primary">Read the Chapter</h2>
         </div>
-        <label className="relative">
-          <select
-            value={version}
-            onChange={(e) => setVersion(e.target.value)}
-            className="appearance-none rounded-full border bg-card py-1.5 pl-3 pr-7 text-sm font-medium text-primary shadow-hair"
-            aria-label="Bible version"
-          >
-            {data.versions.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-secondary">
-            ⌄
-          </span>
-        </label>
+        <VersionSelect versions={data.versions} value={version} onChange={setVersion} prefix />
       </div>
 
-      <div className="inline-flex rounded-full border bg-card p-1 shadow-hair">
+      <div className="inline-flex gap-1 rounded-full border bg-card p-1 shadow-hair">
         {(["read", "listen", "verse"] as Mode[]).map((m) => (
           <button
             key={m}

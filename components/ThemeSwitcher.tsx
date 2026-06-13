@@ -37,6 +37,7 @@ export function ThemeSwitcher({ inline = false }: { inline?: boolean }) {
       >
         <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/5" style={{ background: active.swatch }} />
         <span className="hidden sm:inline">{active.label}</span>
+        <span className="text-[10px]">▾</span>
       </button>
 
       {open && (
