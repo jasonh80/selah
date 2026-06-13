@@ -5,7 +5,7 @@ import { SectionHead } from "@/components/chapter/SectionHead";
 export function MapsSection({ data }: { data: ChapterWorkup }) {
   return (
     <section>
-      <SectionHead eyebrow="Where it happened" title="Maps" sub="Expanded from the previews above" />
+      <SectionHead eyebrow="Where it happened" title="Map Details" sub="Expanded from the previews above" />
       <div className="space-y-2.5">
         <BigMap title="Modern Map" map={data.modernMap} />
         <BigMap title="Historic Map" map={data.historicMap} />

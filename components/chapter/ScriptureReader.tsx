@@ -13,8 +13,8 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
     <section id="chapter" className="scroll-mt-20 space-y-3">
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-eyebrow">Read</p>
-          <h2 className="text-section mt-0.5 text-primary">The Chapter</h2>
+          <p className="text-eyebrow">Scripture</p>
+          <h2 className="text-section mt-0.5 text-primary">Read the Chapter</h2>
         </div>
         <label className="relative">
           <select

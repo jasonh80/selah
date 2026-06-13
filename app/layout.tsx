@@ -14,7 +14,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Selah — your daily Bible chapter",
   description:
-    "Your daily Bible chapter, made visual, simple, and personal. Learn more. Dive deeper. Grow closer to Jesus.",
+    "Your daily Bible chapter, made visual, simple, and personal. Pause. Reflect. Lift up.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
