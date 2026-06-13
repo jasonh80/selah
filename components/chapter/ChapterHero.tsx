@@ -16,21 +16,21 @@ export function ChapterHero({ data }: { data: ChapterWorkup }) {
       <div className="mt-4 flex gap-2">
         <a
           href="#chapter"
-          className="flex flex-1 items-center justify-center gap-2 rounded-full bg-accent-strong px-4 py-2.5 text-sm font-semibold text-white shadow-hair"
+          className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-accent-strong px-3 py-2.5 text-[13px] font-semibold text-white shadow-hair"
         >
-          📖 Read
+          Read
         </a>
         <a
           href="#chapter"
-          className="flex flex-1 items-center justify-center gap-2 rounded-full border bg-card px-4 py-2.5 text-sm font-medium text-primary"
+          className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3 py-2.5 text-[13px] font-medium text-primary"
         >
-          🎧 Listen
+          Listen
         </a>
         <a
           href="#chapter"
-          className="flex flex-1 items-center justify-center gap-2 rounded-full border bg-card px-4 py-2.5 text-sm font-medium text-primary"
+          className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3 py-2.5 text-[13px] font-medium text-primary"
         >
-          ☰ Verse
+          Verse by Verse
         </a>
       </div>
     </section>

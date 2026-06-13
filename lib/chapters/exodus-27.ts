@@ -9,7 +9,7 @@ export const exodus27: ChapterWorkup = {
   reference: "Exodus 27",
   title: "Exodus 27",
   subtitle: "The Bronze Altar, the Courtyard, and the Lamp",
-  tagline: "Learn more. Dive deeper. Grow closer to Jesus.",
+  tagline: "Pause. Reflect. Lift up.",
   theme: "Holy access to God",
 
   estimatedDate: "c. 1446 BC",
@@ -51,15 +51,15 @@ export const exodus27: ChapterWorkup = {
 
   metaChips: [
     { icon: "📅", text: "c. 1446 BC" },
-    { icon: "📍", text: "Wilderness of Sinai" },
-    { icon: "✦", text: "Approaching a holy God" },
-    { icon: "✝", text: "The altar foreshadows the cross", jesus: true },
+    { icon: "📍", text: "Sinai wilderness" },
+    { icon: "✦", text: "Holy access to God" },
+    { icon: "✝", text: "Jesus: sacrifice • priesthood • light", jesus: true },
   ],
 
   navCards: [
     { id: "key-object", label: "Key Object", support: "Bronze altar", thumb: "/img/exodus-27/detail.svg" },
-    { id: "key-person", label: "Key Person", support: "Moses", thumb: "/img/exodus-27/person.svg" },
-    { id: "jesus", label: "Jesus", support: "The altar foreshadows the cross", thumb: "/img/exodus-27/jesus.svg", jesus: true },
+    { id: "key-person", label: "Key Person", support: "Priest", thumb: "/img/exodus-27/person.svg" },
+    { id: "jesus", label: "Jesus", support: "Fulfillment", thumb: "/img/exodus-27/jesus.svg", jesus: true },
   ],
 
   timelineMini: {
@@ -166,7 +166,7 @@ export const exodus27: ChapterWorkup = {
   ],
 
   modernMap: {
-    caption: "Approximate region today",
+    caption: "Approximate today",
     src: "/img/exodus-27/map-modern.svg",
     alt: "Modern map of the Sinai Peninsula.",
     note: "The traditional location of Mount Sinai sits in the south of the peninsula, in present-day Egypt. Exact site debated.",

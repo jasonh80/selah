@@ -8,6 +8,7 @@ export const THEMES = [
   { id: "living-water", label: "Living Water", swatch: "#3f8794" },
   { id: "forest", label: "Forest", swatch: "#4f6f52" },
   { id: "sonset", label: "Sonset", swatch: "#c46a4a" },
+  { id: "starlight", label: "Starlight", swatch: "#8e6be8" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];

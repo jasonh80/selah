@@ -40,14 +40,19 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
           <button
             key={m}
             onClick={() => setMode(m)}
-            className={`rounded-full px-4 py-1.5 text-sm capitalize transition ${
+            className={`rounded-full px-3.5 py-1.5 text-[13px] transition ${
               mode === m ? "bg-accent-strong text-white" : "text-secondary"
             }`}
           >
-            {m === "verse" ? "Verse" : m}
+            {m === "verse" ? "Verse by Verse" : m === "read" ? "Read" : "Listen"}
           </button>
         ))}
       </div>
+
+      <p className="text-[12px] text-secondary">
+        Selected verses shown for the prototype — full chapter text comes from a licensed Bible
+        source later.
+      </p>
 
       <div className="rounded-md border bg-card p-5 shadow-hair">
         {mode === "listen" ? (
@@ -69,7 +74,6 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
                 </p>
               </div>
             ))}
-            <p className="pt-1 text-xs text-secondary">Selected verses · placeholder ({version})</p>
           </div>
         ) : (
           <div>
@@ -81,7 +85,6 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
                 </span>
               ))}
             </p>
-            <p className="pt-3 text-xs text-secondary">Placeholder text ({version})</p>
           </div>
         )}
       </div>

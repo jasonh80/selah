@@ -28,7 +28,7 @@
   --shadow-card: 0 1px 2px rgba(16, 16, 20, 0.04), 0 8px 24px rgba(16, 16, 20, 0.05);
 
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif;
 }
 
 /* Air — default (purple) */
@@ -99,6 +99,23 @@
   --line: #ece0da;
 }
 
+/* Starlight — sacred night, warm dark purple */
+[data-theme="starlight"] {
+  --background: #0d0b14;
+  --card: #15111f;
+  --card-soft: #1e182b;
+  --text-primary: #f7f4ff;
+  --text-secondary: #b9b1c8;
+  --line: #2a2338;
+  --accent: #a78bfa;
+  --accent-strong: #8e6be8;
+  --tint: #1a1328;
+  --purple-soft: #241b36;
+  --purple-muted: #a996d8;
+  --jesus-red: #e06a6a;
+  --jesus-red-soft: #351a22;
+}
+
 /* ============================================================ BASE */
 * {
   border-color: var(--line);
@@ -146,26 +163,26 @@ body {
 
 /* ============================================================
    TYPE SYSTEM — modern editorial.
-   Body/UI: Inter (sans). Titles & scripture: Newsreader (serif).
+   Body/UI & scripture: Inter. Titles/display: Space Grotesk.
    ============================================================ */
 @layer components {
   .text-label {
     @apply font-sans text-[11px] font-semibold uppercase tracking-[0.13em];
   }
   .text-title {
-    @apply font-display text-[44px] font-semibold leading-[1.0] tracking-[-0.015em];
+    @apply font-display text-[42px] font-semibold leading-[1.02] tracking-[-0.03em];
   }
   .text-subtitle {
-    @apply font-display text-[20px] font-normal italic leading-snug;
+    @apply font-display text-[19px] font-medium leading-snug tracking-[-0.01em];
   }
   .text-card-title {
-    @apply font-sans text-[15px] font-bold leading-tight tracking-[-0.01em];
+    @apply font-sans text-[15px] font-semibold leading-tight tracking-[-0.01em];
   }
   .text-body {
     @apply font-sans text-[15px] font-normal leading-[1.6];
   }
   .text-scripture {
-    @apply font-display text-[17px] font-normal leading-[1.85];
+    @apply font-sans text-[17px] font-normal leading-[1.8];
   }
   .text-wordmark {
     @apply font-sans text-[17px] font-medium uppercase;
@@ -175,6 +192,6 @@ body {
     @apply font-sans text-[11px] font-semibold uppercase tracking-[0.13em] text-accent-strong;
   }
   .text-section {
-    @apply font-display text-[20px] font-semibold tracking-[-0.01em];
+    @apply font-display text-[20px] font-semibold tracking-[-0.02em];
   }
 }

@@ -42,8 +42,11 @@ function TimelineCard({ data }: { data: ChapterWorkup }) {
   return (
     <CardShell span={2}>
       <div className="p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-label text-secondary">Timeline</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-card-title text-primary">Timeline</p>
+            <p className="text-[11px] text-secondary">Where this fits</p>
+          </div>
           <span className="text-secondary">›</span>
         </div>
         <div className="relative mt-4 flex items-center justify-between">

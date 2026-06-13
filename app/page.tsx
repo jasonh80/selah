@@ -7,6 +7,8 @@ import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { GeneratedImagesSection } from "@/components/chapter/GeneratedImagesSection";
 import { InsightCardGrid } from "@/components/chapter/InsightCardGrid";
 import { ScriptureReader } from "@/components/chapter/ScriptureReader";
+import { ChaptersSection } from "@/components/chapter/ChaptersSection";
+import { MapsSection } from "@/components/chapter/MapsSection";
 import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { CostDrawer } from "@/components/chapter/CostDrawer";
 
@@ -37,6 +39,10 @@ export default function Home() {
           {/* Scripture sits quieter, lower on the page */}
           <ScriptureReader data={data} />
 
+          <ChaptersSection />
+          <MapsSection data={data} />
+
+          {/* One Keep Going section */}
           <GoDeeperSection data={data} />
 
           <CostDrawer />
