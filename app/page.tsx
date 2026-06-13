@@ -54,11 +54,9 @@ export default function Home() {
             </footer>
           </main>
 
-          {/* Desktop companion column */}
+          {/* Desktop companion column — scrolls with the page (no separate scroll) */}
           <aside className="hidden min-w-0 pt-3 lg:block">
-            <div className="sticky top-[84px]">
-              <CompanionColumn data={data} />
-            </div>
+            <CompanionColumn data={data} />
           </aside>
         </div>
       </div>

@@ -2,7 +2,7 @@ import type { ChapterWorkup } from "@/lib/types";
 import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { CostDrawer } from "@/components/chapter/CostDrawer";
 
-// Desktop-only sticky companion. Summary/preview cards only — never long content.
+// Desktop-only companion. Scrolls with the page. Summary/preview cards only.
 export function CompanionColumn({ data }: { data: ChapterWorkup }) {
   return (
     <div className="space-y-4">
