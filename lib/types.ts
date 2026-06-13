@@ -5,8 +5,9 @@ export type ImageKind = "establishing" | "detail" | "human";
 
 export interface ChapterImage {
   kind: ImageKind;
+  index: number; // 1, 2, 3
   label: string; // "Establishing Shot" | "Detail Shot" | "Human Moment"
-  prompt: string; // the generation prompt (kept for transparency/regeneration)
+  prompt: string;
   caption: string;
   src: string;
   alt: string;
@@ -38,24 +39,46 @@ export interface KeyItem {
   blurb: string;
 }
 
-export interface TheologyPrinciple {
-  title: string;
-  body: string;
-  buildsOn: string; // how today's principle connects to the slow-build arc
-}
-
 export interface Verse {
   number: number;
   text: string;
-  redLetter?: boolean; // "Jesus said" / divine speech → semantic red accent
+  redLetter?: boolean;
 }
 
-export type DeeperGroup = "learn-more" | "dive-deeper" | "grow-closer";
+// --- Dashboard-specific shapes (drive the iOS-style hero) ---
 
-export interface DeeperLink {
-  group: DeeperGroup;
+export interface MetaChip {
+  icon: string;
+  text: string;
+  jesus?: boolean;
+}
+
+export interface NavCard {
+  id: string;
+  label: string;
+  thumb?: string; // image; omit for the mini-timeline card
+  miniTimeline?: boolean;
+  jesus?: boolean;
+}
+
+export interface TimelineMini {
+  labels: string[]; // e.g. Passover · Exodus · Sinai · Tabernacle
+  activeIndex: number;
+}
+
+export interface Insight {
+  id: string;
+  icon: string;
   title: string;
-  blurb: string;
+  subtitle?: string; // e.g. "Holiness" under "Theology Principle"
+  preview: string; // short text shown in the grid
+  body: string; // full text revealed on expand
+  jesus?: boolean;
+}
+
+export interface DeeperPill {
+  icon: string;
+  label: string;
 }
 
 export interface ChapterWorkup {
@@ -64,19 +87,26 @@ export interface ChapterWorkup {
   chapter: number;
   reference: string;
   title: string;
+  subtitle: string; // "The Bronze Altar, the Courtyard, and the Lamp"
+  tagline: string; // "Learn more. Dive deeper. Grow closer to Jesus."
   theme: string;
 
   estimatedDate: string;
   estimatedLocation: string;
   jesusConnectionShort: string;
 
-  images: ChapterImage[]; // exactly 3: establishing, detail, human
+  images: ChapterImage[];
+  metaChips: MetaChip[];
+  navCards: NavCard[];
+  timelineMini: TimelineMini;
+  insights: Insight[];
+  deeperPills: DeeperPill[];
 
+  quickSummary: string;
   summary: string;
   context: string;
   modernReadersMiss: string;
   jesusConnection: string;
-  theologyPrinciple: TheologyPrinciple;
   application: string;
   prayer: string;
 
@@ -89,8 +119,6 @@ export interface ChapterWorkup {
   versions: string[];
   defaultVersion: string;
   verses: Verse[];
-
-  deeper: DeeperLink[];
 }
 
 // Logged per AI request (Phase 1+). Here for design completeness.

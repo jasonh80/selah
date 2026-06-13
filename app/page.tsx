@@ -1,38 +1,46 @@
 import { exodus27 } from "@/lib/chapters/exodus-27";
-import { TopBar } from "@/components/chapter/TopBar";
+import { AppHeader } from "@/components/chapter/AppHeader";
 import { ChapterHero } from "@/components/chapter/ChapterHero";
-import { MetadataChips } from "@/components/chapter/MetadataChips";
-import { Dashboard } from "@/components/chapter/Dashboard";
-import { GeneratedImages } from "@/components/chapter/GeneratedImages";
-import { BibleText } from "@/components/chapter/BibleText";
-import { NarrativeSections } from "@/components/chapter/NarrativeSections";
-import { DeeperStudy } from "@/components/chapter/DeeperStudy";
+import { HeroImage } from "@/components/chapter/HeroImage";
+import { VisualNavGrid } from "@/components/chapter/VisualNavGrid";
+import { DashboardRow } from "@/components/chapter/DashboardRow";
+import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
+import { GeneratedImagesSection } from "@/components/chapter/GeneratedImagesSection";
+import { InsightCardGrid } from "@/components/chapter/InsightCardGrid";
+import { ScriptureReader } from "@/components/chapter/ScriptureReader";
+import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { CostDrawer } from "@/components/chapter/CostDrawer";
 
 export default function Home() {
   const data = exodus27;
   return (
     <div className="min-h-screen">
-      <TopBar reference={data.reference} />
+      <AppHeader versions={data.versions} defaultVersion={data.defaultVersion} />
 
-      <main className="mx-auto max-w-page space-y-12 px-4 py-6 md:px-6 md:py-10">
+      <main className="mx-auto max-w-app space-y-5 px-4 pb-12 pt-3">
         <ChapterHero data={data} />
 
-        {/* Visual dashboard, right under the headline */}
-        <section className="space-y-4">
-          <MetadataChips data={data} />
-          <Dashboard data={data} />
-        </section>
+        {/* Visual chapter briefing — the hero of the page */}
+        <HeroImage data={data} />
+        <VisualNavGrid data={data} />
+        <DashboardRow data={data} />
+        <QuickSummaryCard data={data} />
 
-        <GeneratedImages data={data} />
-        <BibleText data={data} />
-        <NarrativeSections data={data} />
-        <DeeperStudy data={data} />
+        <GeneratedImagesSection data={data} />
+
+        {/* Deeper-study insight cards (tap to expand) */}
+        <InsightCardGrid data={data} />
+
+        {/* Scripture sits quieter, lower on the page */}
+        <ScriptureReader data={data} />
+
+        <GoDeeperSection data={data} />
+
         <CostDrawer />
 
-        <footer className="flex flex-col items-center gap-2 py-8 text-center">
-          <span className="wordmark text-sm text-secondary">Selah</span>
-          <p className="text-xs text-secondary">Learn more. Dive deeper. Grow closer to Jesus.</p>
+        <footer className="flex flex-col items-center gap-2 pt-4 text-center">
+          <span className="wordmark text-xs text-secondary">Selah</span>
+          <p className="text-[11px] text-secondary">Learn more. Dive deeper. Grow closer to Jesus.</p>
         </footer>
       </main>
     </div>

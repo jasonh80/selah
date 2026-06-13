@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Jesus">
+  <rect width="200" height="200" fill="#fbecec"/>
+  <g stroke="#b23a3a" stroke-width="6" fill="none" opacity="0.9">
+    <circle cx="100" cy="104" r="52"/>
+  </g>
+  <g stroke="#b23a3a" stroke-width="4" opacity="0.55">
+    <path d="M60 70 l-14 -16 M140 70 l14 -16 M52 104 l-22 0 M148 104 l22 0 M64 142 l-14 16 M136 142 l14 16 M100 52 l0 -22 M100 156 l0 22"/>
+  </g>
+  <g stroke="#8f2c2c" stroke-width="5" fill="none">
+    <path d="M70 86 l10 10 M92 78 l10 12 M116 84 l8 12 M128 104 l12 6 M70 122 l12 -6 M96 130 l8 -12"/>
+  </g>
+</svg>

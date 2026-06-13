@@ -18,6 +18,14 @@
   --line-gray: #e5e5ea;
   --text-gray: #6e6a76;
   --jesus-red: #b23a3a;
+  --jesus-red-soft: #fbecec;
+
+  /* Shared radius + shadow scale */
+  --radius-lg: 24px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --shadow-soft: 0 12px 40px rgba(16, 16, 20, 0.08);
+  --shadow-card: 0 1px 2px rgba(16, 16, 20, 0.04), 0 8px 24px rgba(16, 16, 20, 0.05);
 
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
@@ -28,6 +36,7 @@
 [data-theme="air"] {
   --background: #fbfbfc;
   --card: #ffffff;
+  --card-soft: #f6f6f8;
   --text-primary: #101014;
   --text-secondary: #73717a;
   --accent: #9b8fc7;
@@ -40,6 +49,7 @@
 [data-theme="sonrise"] {
   --background: #fafafb;
   --card: #ffffff;
+  --card-soft: #f7f4ee;
   --text-primary: #15131a;
   --text-secondary: #6e6a76;
   --accent: #e6b35a;
@@ -52,6 +62,7 @@
 [data-theme="living-water"] {
   --background: #f8fafa;
   --card: #ffffff;
+  --card-soft: #f1f6f6;
   --text-primary: #111827;
   --text-secondary: #647076;
   --accent: #3f8794;
@@ -64,6 +75,7 @@
 [data-theme="forest"] {
   --background: #f8f9f6;
   --card: #ffffff;
+  --card-soft: #f1f4ee;
   --text-primary: #151a16;
   --text-secondary: #667064;
   --accent: #4f6f52;
@@ -76,6 +88,7 @@
 [data-theme="sonset"] {
   --background: #faf8f7;
   --card: #ffffff;
+  --card-soft: #f6f0ed;
   --text-primary: #17131a;
   --text-secondary: #756b72;
   --accent: #c46a4a;
@@ -118,4 +131,13 @@ body {
 
 .red-letter {
   color: var(--jesus-red);
+}
+
+/* Hide horizontal scrollbars on card rails */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

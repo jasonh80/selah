@@ -7,62 +7,123 @@ export const exodus27: ChapterWorkup = {
   book: "Exodus",
   chapter: 27,
   reference: "Exodus 27",
-  title: "The Altar and the Courtyard",
-  theme: "Approaching a holy God",
+  title: "Exodus 27",
+  subtitle: "The Bronze Altar, the Courtyard, and the Lamp",
+  tagline: "Learn more. Dive deeper. Grow closer to Jesus.",
+  theme: "Holy access to God",
 
   estimatedDate: "c. 1446 BC",
-  estimatedLocation: "Wilderness of Sinai",
-  jesusConnectionShort: "The altar foreshadows the cross",
+  estimatedLocation: "Sinai wilderness",
+  jesusConnectionShort: "sacrifice • priesthood • light",
 
   images: [
     {
       kind: "establishing",
+      index: 1,
       label: "Establishing Shot",
       prompt:
-        "Israelite wilderness camp at golden hour with the tabernacle courtyard at the center, linen curtains on bronze posts, tents arranged around it, Sinai mountains in the distance.",
-      caption:
-        "The wilderness camp, with the tabernacle courtyard set apart at its center.",
+        "Wide historically grounded view of the Israelite wilderness camp, many tents across a dry desert, the tabernacle courtyard at center with white linen curtains, the bronze altar near the entrance with smoke rising, priests moving, the tabernacle tent behind.",
+      caption: "The wilderness camp around the tabernacle courtyard.",
       src: "/img/exodus-27/establishing.svg",
       alt: "Wide view of the Israelite wilderness camp around the tabernacle courtyard.",
     },
     {
       kind: "detail",
+      index: 2,
       label: "Detail Shot",
       prompt:
-        "A bronze altar with four horns at its corners, bronze tools, grates, shovels and basins, ash and glowing embers, warm light.",
-      caption: "The bronze altar — horns at each corner, tools, ash, and embers.",
+        "Close realistic view of the bronze altar of acacia wood overlaid with bronze, horns on its corners, bronze utensils nearby, ash and embers inside, priests tending the fire.",
+      caption: "The bronze altar — horns, tools, ash, and embers.",
       src: "/img/exodus-27/detail.svg",
       alt: "Close view of the bronze altar with horns, tools, ash and embers.",
     },
     {
       kind: "human",
+      index: 3,
       label: "Human Moment",
       prompt:
-        "A priest in linen tending the lamp oil at dusk inside the courtyard, quiet and reverent, soft lamplight on his face.",
-      caption: "A priest tending the lamp oil at dusk — keeping the light.",
+        "A priest carefully pouring pure olive oil into a lamp at dusk, warm light beginning to glow against linen curtains and desert darkness outside.",
+      caption: "A priest tending the lamp oil at dusk.",
       src: "/img/exodus-27/human.svg",
       alt: "A priest tending lamp oil at dusk in the tabernacle courtyard.",
     },
   ],
 
+  metaChips: [
+    { icon: "📅", text: "c. 1446 BC" },
+    { icon: "⛰", text: "Sinai wilderness" },
+    { icon: "✦", text: "Theme: Holy access to God" },
+    { icon: "✝", text: "Jesus: sacrifice • priesthood • light", jesus: true },
+  ],
+
+  navCards: [
+    { id: "timeline", label: "Timeline", miniTimeline: true },
+    { id: "modern-map", label: "Modern Map", thumb: "/img/exodus-27/map-modern.svg" },
+    { id: "historic-map", label: "Historic Map", thumb: "/img/exodus-27/map-historic.svg" },
+    { id: "key-object", label: "Key Object", thumb: "/img/exodus-27/detail.svg" },
+    { id: "key-person", label: "Key Person", thumb: "/img/exodus-27/person.svg" },
+    { id: "jesus", label: "Jesus", thumb: "/img/exodus-27/jesus.svg", jesus: true },
+  ],
+
+  timelineMini: {
+    labels: ["Passover", "Exodus", "Sinai", "Tabernacle"],
+    activeIndex: 1,
+  },
+
+  insights: [
+    {
+      id: "miss",
+      icon: "🔍",
+      title: "What Most People Miss",
+      preview: "The tabernacle teaches theology through physical space and ritual.",
+      body: "To a modern reader an 'altar' is a quaint religious object. To Israel it was a place of blood, smoke, and cost — the visible price of drawing near to God. The four horns weren't decoration; they were grasped for mercy and used to bind the sacrifice. And the courtyard's single entrance mattered: there was one way in, not many. The space itself is doing theological work.",
+    },
+    {
+      id: "jesus",
+      icon: "✝",
+      title: "Jesus at the Center",
+      preview: "The altar and lamp point forward to Christ — our sacrifice and true light.",
+      body: "The bronze altar stands at the entrance — you cannot reach God's presence without first passing the place of sacrifice. Centuries later, Jesus becomes both the altar and the offering. The continually burning lamp points to the One who calls himself the light of the world, and the single courtyard entrance anticipates his words: 'I am the door; whoever enters through me will be saved.'",
+      jesus: true,
+    },
+    {
+      id: "theology",
+      icon: "🛡",
+      title: "Theology Principle",
+      subtitle: "Holiness",
+      preview: "God is set apart, and access to Him comes through what He ordained.",
+      body: "God is holy — utterly set apart — and people cannot approach on their own terms. Yet he provides the way: an altar, a sacrifice, an ordered space, a light that never goes out. This is a small, foundational principle; later chapters build the priesthood and the sacrificial system on top of it.",
+    },
+    {
+      id: "prayer",
+      icon: "🙏",
+      title: "Prayer",
+      preview: "Lord, teach me to approach You with reverence and live in the light of Your presence.",
+      body: "Father, thank you that you made a way to be near you when I could not make one myself. Like the altar at the entrance, let me begin here — at the cross, in gratitude. Keep the light of your presence burning in me today, and help me walk through the one door you opened in Jesus. Amen.",
+    },
+  ],
+
+  deeperPills: [
+    { icon: "📖", label: "Read Hebrews 9–10" },
+    { icon: "✝", label: "Study sacrifice" },
+    { icon: "👥", label: "Explore priesthood" },
+    { icon: "🙏", label: "Pray about reverence" },
+  ],
+
+  quickSummary:
+    "God gives Israel instructions for the bronze altar, the courtyard, and the lamp oil, teaching that worship is holy, ordered, and centered on access to God through sacrifice and His presence.",
+
   summary:
-    "God continues giving Moses the blueprint for the tabernacle. This chapter covers three things: the bronze altar where sacrifices are offered, the courtyard that surrounds the whole structure, and the oil for the lamp that must burn continually. Together they describe how a holy God makes a way to be approached — through sacrifice, within set-apart space, kept by a light that never goes out.",
+    "God continues giving Moses the blueprint for the tabernacle: the bronze altar where sacrifices are offered, the courtyard that surrounds the whole structure, and the oil for the lamp that must burn continually. Together they describe how a holy God makes a way to be approached.",
 
   context:
-    "Israel has just been freed from Egypt and is camped at Mount Sinai. They are a people on the move, living in tents, learning who their God is. The tabernacle is a portable sanctuary — God choosing to dwell in the middle of the camp. Everything here is measured in cubits and made of specific materials: bronze for the courtyard and altar (the place of judgment and sacrifice), silver and gold deeper inside. The closer you move toward God's presence, the more precious the metal — a built-in lesson in holiness.",
+    "Israel has just been freed from Egypt and is camped at Mount Sinai — a people on the move, living in tents, learning who their God is. The tabernacle is a portable sanctuary: God choosing to dwell in the middle of the camp. Everything is measured in cubits and made of specific materials — bronze for the courtyard and altar, silver and gold deeper inside. The closer you move toward God's presence, the more precious the metal: a built-in lesson in holiness.",
 
   modernReadersMiss:
-    "To a modern reader an 'altar' is a quaint religious object. To Israel it was a place of blood, smoke, and cost — the visible price of drawing near to God. The four horns weren't decoration; they were grasped for mercy and used to bind the sacrifice. And the courtyard's single entrance mattered: there was one way in, not many. That detail is doing theological work.",
+    "To a modern reader an 'altar' is a quaint religious object. To Israel it was a place of blood, smoke, and cost — the visible price of drawing near to God. The four horns weren't decoration; they were grasped for mercy and used to bind the sacrifice. And the single courtyard entrance mattered: there was one way in, not many.",
 
   jesusConnection:
     "The bronze altar stands at the entrance — you cannot reach God's presence without first passing the place of sacrifice. Centuries later, Jesus becomes both the altar and the offering. The continually burning lamp points to the One who calls himself the light of the world, and the single courtyard entrance anticipates his words: 'I am the door; whoever enters through me will be saved.'",
-
-  theologyPrinciple: {
-    title: "Atonement",
-    body: "Sin separates people from a holy God, and the gap is closed by substitution — a life given in place of another. The altar teaches this in physical form long before the cross explains it in full. Today's principle is small and foundational; later chapters build on it.",
-    buildsOn:
-      "Foundational — later chapters build the priesthood and sacrificial system on top of this.",
-  },
 
   application:
     "Approaching God has never been casual or self-made; it runs through what he provides. Before rushing into the day, pause at the 'altar' — receive that the way to God is already opened, not earned. Let gratitude, not performance, be the doorway.",
@@ -77,15 +138,15 @@ export const exodus27: ChapterWorkup = {
   ],
 
   modernMap: {
-    caption: "Sinai Peninsula, modern political borders",
+    caption: "Approximate region today",
     src: "/img/exodus-27/map-modern.svg",
     alt: "Modern map of the Sinai Peninsula.",
-    note: "The traditional location of Mount Sinai sits in the south of the peninsula, in present-day Egypt.",
+    note: "The traditional location of Mount Sinai sits in the south of the peninsula, in present-day Egypt. Exact site debated.",
   },
   historicMap: {
-    caption: "The wilderness route, c. 1446 BC",
+    caption: "Biblical world",
     src: "/img/exodus-27/map-historic.svg",
-    alt: "Historic map of Israel's wilderness route from Egypt to Sinai.",
+    alt: "Historic map of Egypt, Sinai, and Canaan.",
     note: "Israel camped at the foot of Sinai for roughly a year while receiving the law and building the tabernacle.",
   },
 
@@ -94,11 +155,7 @@ export const exodus27: ChapterWorkup = {
     { label: "Crossing the Red Sea", detail: "Deliverance from Pharaoh's army." },
     { label: "Arrival at Sinai", detail: "The people camp at the mountain." },
     { label: "The Ten Commandments", detail: "The covenant is given." },
-    {
-      label: "Tabernacle instructions",
-      detail: "Including the altar & courtyard of Exodus 27.",
-      current: true,
-    },
+    { label: "Tabernacle instructions", detail: "Including the altar & courtyard of Exodus 27.", current: true },
     { label: "The tabernacle is built", detail: "God's presence fills it." },
   ],
 
@@ -110,7 +167,7 @@ export const exodus27: ChapterWorkup = {
     { name: "Continual lamp", type: "custom", blurb: "Pure olive oil keeps the light burning from evening to morning." },
   ],
 
-  versions: ["ESV", "NIV", "KJV", "NLT", "CSB"],
+  versions: ["ESV", "NIV", "KJV", "NLT", "CSB", "NKJV", "NASB"],
   defaultVersion: "ESV",
   verses: [
     { number: 1, text: "“You shall make the altar of acacia wood, five cubits long and five cubits broad. The altar shall be square, and its height shall be three cubits.”", redLetter: true },
@@ -119,14 +176,5 @@ export const exodus27: ChapterWorkup = {
     { number: 8, text: "“You shall make it hollow, with boards. As it has been shown you on the mountain, so shall it be made.”", redLetter: true },
     { number: 20, text: "“You shall command the people of Israel that they bring to you pure beaten olive oil for the light, that a lamp may regularly be set up to burn.”", redLetter: true },
     { number: 21, text: "“It shall be a statute forever to be observed throughout their generations by the people of Israel.”", redLetter: true },
-  ],
-
-  deeper: [
-    { group: "learn-more", title: "Why bronze, silver, and gold?", blurb: "How the tabernacle's metals map the journey toward God's presence." },
-    { group: "learn-more", title: "What the horns of the altar meant", blurb: "Mercy, refuge, and the binding of the sacrifice." },
-    { group: "dive-deeper", title: "The altar and the cross", blurb: "Trace the line from Exodus 27 to Hebrews 9–10." },
-    { group: "dive-deeper", title: "One gate, one way in", blurb: "The single entrance and John 10:9." },
-    { group: "grow-closer", title: "A practice of approach", blurb: "A short daily rhythm of beginning at the altar in gratitude." },
-    { group: "grow-closer", title: "Keeping the light", blurb: "What 'a lamp that burns continually' asks of us today." },
   ],
 };

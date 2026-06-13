@@ -1,29 +1,39 @@
 import type { ChapterWorkup } from "@/lib/types";
 
 export function ChapterHero({ data }: { data: ChapterWorkup }) {
-  const establishing = data.images.find((i) => i.kind === "establishing")!;
   return (
-    <section className="space-y-5">
-      <div>
-        <p className="text-sm font-medium uppercase tracking-[0.14em] text-accent-strong">
-          Today · {data.reference}
-        </p>
-        <h1 className="mt-2 font-display text-4xl font-semibold leading-tight text-primary md:text-6xl">
-          {data.title}
-        </h1>
-        <p className="mt-3 max-w-2xl text-lg text-secondary">{data.theme}</p>
+    <section className="pt-1">
+      <div className="flex items-center gap-1.5 text-accent-strong">
+        <span aria-hidden>☀︎</span>
+        <p className="text-sm font-semibold">Today&rsquo;s Chapter</p>
       </div>
 
-      {/* Large establishing image */}
-      <div className="relative aspect-[21/9] w-full overflow-hidden rounded-card border shadow-card">
-        <img
-          src={establishing.src}
-          alt={establishing.alt}
-          className="h-full w-full object-cover"
-        />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-almost-black/55 to-transparent p-4 md:p-5">
-          <p className="text-sm text-white/90">{establishing.caption}</p>
-        </div>
+      <h1 className="mt-1 font-display text-5xl font-semibold leading-none text-primary">
+        {data.title}
+      </h1>
+      <p className="mt-2 font-display text-xl italic text-primary/80">{data.subtitle}</p>
+      <p className="mt-2 text-sm text-secondary">{data.tagline}</p>
+
+      {/* Read / Listen / Verse by Verse */}
+      <div className="mt-4 flex gap-2">
+        <a
+          href="#chapter"
+          className="flex flex-1 items-center justify-center gap-2 rounded-full bg-accent-strong px-4 py-2.5 text-sm font-semibold text-white shadow-hair"
+        >
+          📖 Read
+        </a>
+        <a
+          href="#chapter"
+          className="flex flex-1 items-center justify-center gap-2 rounded-full border bg-card px-4 py-2.5 text-sm font-medium text-primary"
+        >
+          🎧 Listen
+        </a>
+        <a
+          href="#chapter"
+          className="flex flex-1 items-center justify-center gap-2 rounded-full border bg-card px-4 py-2.5 text-sm font-medium text-primary"
+        >
+          ☰ Verse
+        </a>
       </div>
     </section>
   );
