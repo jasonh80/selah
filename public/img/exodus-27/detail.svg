@@ -8,5 +8,4 @@
   <rect x="240" y="420" width="320" height="40" fill="#9c7440"/>
   <g fill="#9c7440"><rect x="250" y="380" width="34" height="60"/><rect x="516" y="380" width="34" height="60"/><rect x="250" y="700" width="34" height="60"/><rect x="516" y="700" width="34" height="60"/></g>
   <g fill="#e89b3a"><circle cx="360" cy="640" r="10"/><circle cx="430" cy="660" r="8"/><circle cx="480" cy="630" r="9"/></g>
-  <text x="40" y="940" font-family="Georgia, serif" font-size="26" fill="#d9b27e" opacity="0.7">Detail · bronze altar</text>
 </svg>
