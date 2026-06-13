@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" role="img" aria-label="Modern map of Sinai">
+  <rect width="600" height="450" fill="#eaf1f4"/>
+  <path d="M120 60 L320 50 L360 180 L300 330 L200 360 L120 250 Z" fill="#dfe7d8" stroke="#9bb0a0" stroke-width="2"/>
+  <path d="M360 180 L520 150 L540 320 L360 360 L300 330 Z" fill="#e6ded0" stroke="#c2b69c" stroke-width="2"/>
+  <circle cx="300" cy="300" r="7" fill="#b23a3a"/>
+  <text x="312" y="305" font-family="Inter, sans-serif" font-size="16" fill="#3a4a52">Mt. Sinai</text>
+  <rect x="20" y="410" width="560" height="1" fill="#9bb0a0"/>
+  <text x="20" y="430" font-family="Inter, sans-serif" font-size="14" fill="#647076">Sinai Peninsula · modern borders</text>
+</svg>

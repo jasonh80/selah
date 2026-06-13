@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   SELAH TOKENS
+   Brand (purple / almost-black / white / gray) is CONSTANT.
+   Themes only shift accents + tints.
+   ============================================================ */
+
+:root {
+  /* Constant brand */
+  --selah-purple: #5b3f91;
+  --almost-black: #101014;
+  --soft-black: #1a1820;
+  --white: #ffffff;
+  --cloud-gray: #f5f5f7;
+  --line-gray: #e5e5ea;
+  --text-gray: #6e6a76;
+  --jesus-red: #b23a3a;
+
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+}
+
+/* Air — default (purple) */
+:root,
+[data-theme="air"] {
+  --background: #fbfbfc;
+  --card: #ffffff;
+  --text-primary: #101014;
+  --text-secondary: #73717a;
+  --accent: #9b8fc7;
+  --accent-strong: #5b3f91;
+  --tint: #f3f1fa;
+  --line: #e9e8ee;
+}
+
+/* Sonrise — gold */
+[data-theme="sonrise"] {
+  --background: #fafafb;
+  --card: #ffffff;
+  --text-primary: #15131a;
+  --text-secondary: #6e6a76;
+  --accent: #e6b35a;
+  --accent-strong: #c8923a;
+  --tint: #fff6e6;
+  --line: #efe9dc;
+}
+
+/* Living Water — teal */
+[data-theme="living-water"] {
+  --background: #f8fafa;
+  --card: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #647076;
+  --accent: #3f8794;
+  --accent-strong: #2c6873;
+  --tint: #eaf6f7;
+  --line: #dde9ea;
+}
+
+/* Forest — olive/green */
+[data-theme="forest"] {
+  --background: #f8f9f6;
+  --card: #ffffff;
+  --text-primary: #151a16;
+  --text-secondary: #667064;
+  --accent: #4f6f52;
+  --accent-strong: #3c573f;
+  --tint: #eef4ec;
+  --line: #e2e9de;
+}
+
+/* Sonset — warm clay */
+[data-theme="sonset"] {
+  --background: #faf8f7;
+  --card: #ffffff;
+  --text-primary: #17131a;
+  --text-secondary: #756b72;
+  --accent: #c46a4a;
+  --accent-strong: #a4502f;
+  --tint: #fff0ea;
+  --line: #ece0da;
+}
+
+/* ============================================================ BASE */
+* {
+  border-color: var(--line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+.theme-transition,
+.theme-transition * {
+  transition: background-color 0.4s ease, border-color 0.4s ease,
+    color 0.4s ease, fill 0.4s ease, stroke 0.4s ease;
+}
+
+/* SELAH wordmark */
+.wordmark {
+  font-family: var(--font-display);
+  letter-spacing: 0.42em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.red-letter {
+  color: var(--jesus-red);
+}

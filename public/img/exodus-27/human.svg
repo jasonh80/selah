@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" role="img" aria-label="Priest tending the lamp">
+  <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#3b3354"/><stop offset="1" stop-color="#1a1820"/>
+  </linearGradient>
+  <rect width="800" height="1000" fill="url(#dusk)"/>
+  <circle cx="400" cy="560" r="170" fill="#5b3f91" opacity="0.18"/>
+  <ellipse cx="430" cy="540" rx="22" ry="30" fill="#f6c45a"/>
+  <ellipse cx="430" cy="540" rx="10" ry="16" fill="#fff0c2"/>
+  <path d="M300 760 q100 -240 150 -250 q60 10 80 250 z" fill="#efe9dd"/>
+  <circle cx="392" cy="470" r="38" fill="#d8c3a6"/>
+  <rect x="420" y="520" width="14" height="60" fill="#9c7440"/>
+  <text x="40" y="940" font-family="Georgia, serif" font-size="26" fill="#cbb9e0" opacity="0.7">Human moment · keeping the light</text>
+</svg>
