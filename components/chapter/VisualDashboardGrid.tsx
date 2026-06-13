@@ -6,7 +6,7 @@ export function VisualDashboardGrid({ data }: { data: ChapterWorkup }) {
   const jesus = data.navCards.find((c) => c.id === "jesus")!;
 
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="grid grid-cols-2 gap-2.5 min-[1100px]:grid-cols-3">
       <TimelineCard data={data} />
       <MapCard title="Modern Map" caption={data.modernMap.caption} src={data.modernMap.src} alt={data.modernMap.alt} />
       <MapCard title="Historic Map" caption={data.historicMap.caption} src={data.historicMap.src} alt={data.historicMap.alt} />
@@ -19,18 +19,18 @@ export function VisualDashboardGrid({ data }: { data: ChapterWorkup }) {
 
 function CardShell({
   children,
-  span = 1,
+  spanClass = "col-span-1",
   jesus = false,
 }: {
   children: React.ReactNode;
-  span?: 1 | 2;
+  spanClass?: string;
   jesus?: boolean;
 }) {
   return (
     <button
-      className={`overflow-hidden rounded-md border bg-card text-left shadow-hair transition active:scale-[0.98] ${
-        span === 2 ? "col-span-2" : "col-span-1"
-      } ${jesus ? "ring-1 ring-[rgba(178,58,58,0.18)]" : ""}`}
+      className={`overflow-hidden rounded-md border bg-card text-left shadow-hair transition active:scale-[0.98] ${spanClass} ${
+        jesus ? "ring-1 ring-[rgba(178,58,58,0.18)]" : ""
+      }`}
     >
       {children}
     </button>
@@ -40,7 +40,7 @@ function CardShell({
 function TimelineCard({ data }: { data: ChapterWorkup }) {
   const { labels, activeIndex } = data.timelineMini;
   return (
-    <CardShell span={2}>
+    <CardShell spanClass="col-span-2 min-[1100px]:col-span-3">
       <div className="p-4">
         <div className="flex items-start justify-between">
           <div>
@@ -123,7 +123,7 @@ function ThumbCard({ card }: { card: NavCard }) {
 
 function JesusCard({ card }: { card: NavCard }) {
   return (
-    <CardShell span={2} jesus>
+    <CardShell spanClass="col-span-2 min-[1100px]:col-span-2" jesus>
       <div className="flex items-center gap-3 p-3.5">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-jesus-red-soft text-jesus-red">
           ✝

@@ -14,8 +14,8 @@ export function AppHeader({
   const [version, setVersion] = useState(defaultVersion);
 
   return (
-    <header className="sticky top-0 z-30 border-b bg-background/85 px-4 py-3 backdrop-blur-xl">
-      <div className="flex items-center justify-between gap-2">
+    <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-2 px-4 py-3 lg:px-6">
         {/* Brand has the presence */}
         <Logo className="text-[17px] text-accent-strong" />
 
