@@ -79,15 +79,27 @@ export async function generateChapterWorkup(input: {
       { role: "user", content: prompt },
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 20000,
+    max_completion_tokens: 12000,
     // GPT-5 series only support the default temperature, so we don't set it.
-    ...(isReasoningModel ? { reasoning_effort: "low" } : {}),
+    // "minimal" reasoning so the call finishes inside the function window.
+    ...(isReasoningModel ? { reasoning_effort: "minimal" } : {}),
   };
 
-  const resp = (await client.chat.completions.create(body as never)) as {
+  // HARD wall-clock abort — the SDK timeout alone didn't reliably stop a slow
+  // reasoning call, which once left a job zombied past the function limit.
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), 150_000);
+  let resp: {
     choices: { message?: { content?: string | null } }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
+  try {
+    resp = (await client.chat.completions.create(body as never, {
+      signal: controller.signal,
+    })) as typeof resp;
+  } finally {
+    clearTimeout(abortTimer);
+  }
 
   const content = resp.choices[0]?.message?.content ?? "";
   return {
