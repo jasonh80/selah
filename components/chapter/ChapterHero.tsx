@@ -6,25 +6,19 @@ export function ChapterHero({ data }: { data: ChapterWorkup }) {
       <h1 className="text-title text-primary lg:text-[48px]">{data.title}</h1>
       <p className="text-subtitle mt-2.5 text-primary">{data.subtitle}</p>
 
-      {/* Read / Listen / Verse by Verse */}
+      {/* Jump into the chapter */}
       <div className="mt-5 flex gap-2.5">
         <a
           href="#chapter"
           className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-accent-strong px-3 py-2.5 text-[13px] font-semibold text-white shadow-hair"
         >
-          Read
+          Read the Chapter
         </a>
         <a
-          href="#chapter"
+          href="#deeper-study"
           className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3 py-2.5 text-[13px] font-medium text-primary"
         >
-          Listen
-        </a>
-        <a
-          href="#chapter"
-          className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3 py-2.5 text-[13px] font-medium text-primary"
-        >
-          Verse by Verse
+          Deeper Study
         </a>
       </div>
     </section>

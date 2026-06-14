@@ -5,7 +5,7 @@ import type { ChapterWorkup } from "@/lib/types";
 import { VersionSelect } from "@/components/chapter/VersionSelect";
 import { VERSIONS, useVersion } from "@/components/VersionProvider";
 
-type Mode = "read" | "listen" | "verse";
+type Mode = "read" | "verse";
 type EsvState = { loading: boolean; found?: boolean; text?: string; copyright?: string };
 
 export function ScriptureReader({ data }: { data: ChapterWorkup }) {
@@ -47,7 +47,7 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
       </div>
 
       <div className="inline-flex gap-1 rounded-full border bg-card p-1 shadow-hair">
-        {(["read", "listen", "verse"] as Mode[]).map((m) => (
+        {(["read", "verse"] as Mode[]).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
@@ -55,26 +55,19 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
               mode === m ? "bg-accent-strong text-white" : "text-secondary"
             }`}
           >
-            {m === "verse" ? "Verse by Verse" : m === "read" ? "Read" : "Listen"}
+            {m === "verse" ? "Verse by Verse" : "Read"}
           </button>
         ))}
       </div>
 
-      {!showEsv && mode !== "listen" && version !== "ESV" && (
+      {!showEsv && version !== "ESV" && (
         <p className="text-[12px] text-secondary">
           {version} text isn’t available yet — switch to ESV for the full chapter.
         </p>
       )}
 
       <div className="rounded-md border bg-card p-5 shadow-hair">
-        {mode === "listen" ? (
-          <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-tint text-2xl text-accent-strong">
-              ▶
-            </div>
-            <p className="text-sm text-secondary">Audio reading — coming soon ({version})</p>
-          </div>
-        ) : version === "ESV" && (esv.loading || esv.found === undefined) ? (
+        {version === "ESV" && (esv.loading || esv.found === undefined) ? (
           <p className="py-6 text-center text-sm text-secondary">Loading ESV text…</p>
         ) : showEsv ? (
           <div>

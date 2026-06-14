@@ -1,8 +1,10 @@
 import type { ChapterWorkup } from "@/lib/types";
 
+// Static summary card — the summary is shown in full, so there's nothing to
+// open. No button/chevron affordance.
 export function QuickSummaryCard({ data }: { data: ChapterWorkup }) {
   return (
-    <button className="flex w-full items-center gap-3.5 rounded-md border bg-card p-4 text-left shadow-hair transition active:scale-[0.99]">
+    <div className="flex w-full items-center gap-3.5 rounded-md border bg-card p-4 text-left shadow-hair">
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-tint text-xl">
         📜
       </div>
@@ -10,7 +12,6 @@ export function QuickSummaryCard({ data }: { data: ChapterWorkup }) {
         <p className="font-display text-lg font-semibold tracking-[-0.01em] text-primary">Quick Summary</p>
         <p className="mt-1 text-[13px] leading-relaxed text-secondary">{data.quickSummary}</p>
       </div>
-      <span className="shrink-0 text-secondary">›</span>
-    </button>
+    </div>
   );
 }

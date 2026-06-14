@@ -7,7 +7,7 @@ export function GeneratedImagesSection({ data }: { data: ChapterWorkup }) {
 
   return (
     <section>
-      <SectionHead title="See the Chapter" sub={`Three generated views from ${data.reference}`} action="View All" />
+      <SectionHead title="See the Chapter" sub={`Three generated views from ${data.reference}`} />
       <div className="space-y-2.5">
         <ImageCard img={establishing} tall />
         <div className="grid grid-cols-2 gap-2.5">
@@ -20,10 +20,12 @@ export function GeneratedImagesSection({ data }: { data: ChapterWorkup }) {
   );
 }
 
+// Static figure — images are display only (no detail view yet), so no
+// button/chevron affordance that implies a click.
 function ImageCard({ img, tall = false }: { img: ChapterImage; tall?: boolean }) {
   return (
-    <button
-      className={`group relative block w-full overflow-hidden rounded-md border text-left shadow-hair transition active:scale-[0.99] ${
+    <figure
+      className={`relative block w-full overflow-hidden rounded-md border shadow-hair ${
         tall ? "aspect-[16/10]" : "aspect-[4/5]"
       }`}
     >
@@ -32,13 +34,10 @@ function ImageCard({ img, tall = false }: { img: ChapterImage; tall?: boolean })
       <span className="absolute left-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[rgba(16,16,20,0.55)] text-[10px] font-bold text-white backdrop-blur-sm">
         {img.index}
       </span>
-      <span className="absolute inset-x-2.5 bottom-2.5">
-        <span className="flex items-center justify-between gap-1">
-          <span className="text-[13px] font-semibold text-white">{img.label}</span>
-          <span className="text-white/80">›</span>
-        </span>
+      <figcaption className="absolute inset-x-2.5 bottom-2.5">
+        <span className="block text-[13px] font-semibold text-white">{img.label}</span>
         {tall && <span className="mt-0.5 block text-[11px] leading-snug text-white/80">{img.caption}</span>}
-      </span>
-    </button>
+      </figcaption>
+    </figure>
   );
 }

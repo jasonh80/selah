@@ -48,30 +48,32 @@
   --purple-muted: #8ea7c1;
 }
 
-/* Sonrise — first light, hope, morning mercy */
+/* Sonrise — golden dawn, warm peach, sunrise glow (richer) */
 [data-theme="sonrise"] {
-  --background: #fbf6ee;
+  --background: #fdf2e4;
   --card: #ffffff;
-  --card-soft: #f6ede2;
-  --text-primary: #3a2e26;
-  --text-secondary: #7a6c5f;
-  --accent: #dcb878;
-  --accent-strong: #a96f55;
-  --tint: #f8e9da;
-  --line: #ebddcb;
+  --card-soft: #fae3cd;
+  --text-primary: #422c1f;
+  --text-secondary: #876857;
+  --accent: #f2a857;
+  --accent-strong: #bd5f31;
+  --tint: #fbe0c8;
+  --line: #f0d3b6;
 }
 
-/* Living Water — flowing, layered cool tones, refreshment */
+/* Living Water — a bright day on the ocean: turquoise, aqua, cobalt depth */
 [data-theme="living-water"] {
-  --background: #eef6f8;
+  --background: #e3f7fb;
   --card: #ffffff;
-  --card-soft: #dcecf4;
-  --text-primary: #1e3a47;
-  --text-secondary: #57757f;
-  --accent: #5ebcc6;
-  --accent-strong: #2e7f88;
-  --tint: #e3f2f4;
-  --line: #c9e2e6;
+  --card-soft: #c9ecf4;
+  --text-primary: #06384a;
+  --text-secondary: #2f6678;
+  --accent: #12bcd4;
+  --accent-strong: #0a6f9e;
+  --tint: #ccf0f7;
+  --line: #9fd8e6;
+  --purple-soft: #ccf0f7;
+  --purple-muted: #12bcd4;
 }
 
 /* Garden — Gethsemane / Eden at dusk, intimate and prayerful (deep dusk) */
@@ -91,17 +93,17 @@
   --jesus-red-soft: #3a2228;
 }
 
-/* Sonset — evening glow, gratitude, reflection */
+/* Sonset — evening glow: stronger amber, clay, terracotta, evening gold */
 [data-theme="sonset"] {
-  --background: #faf3ea;
+  --background: #fbefe1;
   --card: #ffffff;
-  --card-soft: #f2e6d8;
-  --text-primary: #3a2a24;
-  --text-secondary: #7c6a60;
-  --accent: #c98c4a;
-  --accent-strong: #a45e44;
-  --tint: #f5e2d6;
-  --line: #ecdac9;
+  --card-soft: #f3ddc7;
+  --text-primary: #41261c;
+  --text-secondary: #84614f;
+  --accent: #e58a37;
+  --accent-strong: #b14c2a;
+  --tint: #f8dcc2;
+  --line: #eed0b4;
 }
 
 /* Starlight — sacred night, warm dark purple */
@@ -152,14 +154,16 @@ body {
   background-repeat: no-repeat;
 }
 [data-theme="sonrise"] body {
-  background-image: radial-gradient(1000px 480px at 50% -8%, rgba(246, 222, 200, 0.6), transparent 60%),
-    radial-gradient(700px 360px at 80% 4%, rgba(235, 200, 192, 0.4), transparent 62%);
+  background-image: radial-gradient(1000px 500px at 50% -8%, rgba(248, 188, 120, 0.7), transparent 60%),
+    radial-gradient(760px 400px at 82% 2%, rgba(242, 150, 138, 0.45), transparent 62%),
+    radial-gradient(680px 360px at 12% 8%, rgba(247, 206, 138, 0.5), transparent 60%);
   background-attachment: fixed;
   background-repeat: no-repeat;
 }
 [data-theme="living-water"] body {
-  background-image: radial-gradient(900px 520px at 18% -6%, rgba(94, 188, 198, 0.22), transparent 60%),
-    radial-gradient(820px 480px at 88% 14%, rgba(94, 110, 158, 0.16), transparent 62%);
+  background-image: radial-gradient(900px 540px at 14% -8%, rgba(18, 188, 212, 0.45), transparent 60%),
+    radial-gradient(840px 520px at 90% 6%, rgba(10, 111, 158, 0.34), transparent 62%),
+    radial-gradient(760px 480px at 60% 110%, rgba(30, 211, 190, 0.3), transparent 60%);
   background-attachment: fixed;
   background-repeat: no-repeat;
 }
@@ -170,8 +174,9 @@ body {
   background-repeat: no-repeat;
 }
 [data-theme="sonset"] body {
-  background-image: radial-gradient(1100px 560px at 50% 108%, rgba(201, 140, 74, 0.22), transparent 60%),
-    radial-gradient(700px 380px at 20% -6%, rgba(138, 111, 120, 0.14), transparent 62%);
+  background-image: radial-gradient(1100px 580px at 50% 108%, rgba(224, 138, 55, 0.42), transparent 60%),
+    radial-gradient(780px 440px at 16% -6%, rgba(177, 76, 42, 0.26), transparent 62%),
+    radial-gradient(720px 400px at 90% 4%, rgba(214, 150, 80, 0.3), transparent 60%);
   background-attachment: fixed;
   background-repeat: no-repeat;
 }
