@@ -1,9 +1,10 @@
 import type { ChapterWorkup, ChapterMap } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
+import { StylizedMap } from "@/components/chapter/StylizedMap";
 
-// The single place for location content. We don't have real map art yet, so this
-// is presented as polished text cards (Option B) rather than placeholder map
-// imagery that looks like missing content. No "coming later" cards.
+// The single place for location content. Real visual maps are drawn as elegant,
+// theme-aware inline SVG (StylizedMap) — never placeholder image files. There is
+// only ONE Maps & Places section; no map previews live anywhere else.
 export function MapsSection({ data }: { data: ChapterWorkup }) {
   const notes = [data.historicMap.note, data.modernMap.note].filter(Boolean) as string[];
 
@@ -11,31 +12,55 @@ export function MapsSection({ data }: { data: ChapterWorkup }) {
     <section id="maps" className="scroll-mt-20">
       <SectionHead eyebrow="Where it happened" title="Maps & Places" />
       <div className="space-y-2.5">
-        <PlaceCard title="Ancient World" map={data.historicMap} />
-        <PlaceCard title="Modern Location" map={data.modernMap} />
+        <MapCard title="Ancient World" variant="ancient" regionLabel="Judah" map={data.historicMap} />
+        <MapCard
+          title="Modern Region"
+          variant="modern"
+          regionLabel="Judean Hill Country"
+          map={data.modernMap}
+        />
 
-        {notes.length > 0 && (
-          <div className="rounded-md border bg-card p-4 shadow-hair">
-            <p className="text-label text-secondary">Location Notes</p>
-            <ul className="mt-2 space-y-1.5">
-              {notes.map((n) => (
-                <li key={n} className="text-[12px] leading-relaxed text-secondary">
-                  {n}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <div className="rounded-md border bg-card p-4 shadow-hair">
+          <p className="text-label text-secondary">Location Notes</p>
+          <ul className="mt-2 space-y-1.5">
+            {notes.map((n) => (
+              <li key={n} className="text-[12px] leading-relaxed text-secondary">
+                {n}
+              </li>
+            ))}
+            <li className="text-[12px] leading-relaxed text-secondary">
+              Representative location, not an exact event site — Psalm 23 does not name a specific
+              place; these maps show David’s traditional shepherding world near Bethlehem and Judah.
+            </li>
+          </ul>
+        </div>
       </div>
     </section>
   );
 }
 
-function PlaceCard({ title, map }: { title: string; map: ChapterMap }) {
+function MapCard({
+  title,
+  variant,
+  regionLabel,
+  map,
+}: {
+  title: string;
+  variant: "ancient" | "modern";
+  regionLabel: string;
+  map: ChapterMap;
+}) {
   return (
-    <div className="rounded-md border bg-card p-4 shadow-hair">
-      <p className="text-eyebrow">{title}</p>
-      <p className="text-card-title mt-1 text-primary">{map.caption}</p>
+    <div className="overflow-hidden rounded-md border bg-card shadow-hair">
+      <div className="relative">
+        <StylizedMap variant={variant} regionLabel={regionLabel} />
+        <span className="absolute left-2.5 top-2.5 rounded-full bg-[rgba(16,16,20,0.55)] px-2.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+          {title}
+        </span>
+      </div>
+      <div className="p-3.5">
+        <p className="text-card-title text-primary">{map.caption}</p>
+      </div>
     </div>
   );
 }

@@ -1,39 +1,28 @@
 import type { ChapterWorkup } from "@/lib/types";
 
-// One Big Story timeline: Creation → Today, with a fixed set of milestone
-// markers. Only the chapter PIN moves — it floats to its year, interpolated
-// between the two surrounding markers (so e.g. David-era Psalm 23 lands between
-// the 10 Commandments and the 1st Temple).
+// One Big Story timeline: Creation → Today. Markers AND the chapter pin are all
+// placed by ESTIMATED YEAR on a single linear time scale (not evenly spaced and
+// never hand-nudged). Creation/Ark use traditional/debated anchor years purely
+// for visual scale.
 type Marker = { key: string; label: string; year: number; cross?: boolean };
 
-// Fixed markers (negative = BC). Years are representative anchors used only to
-// place the moving pin; the labels themselves never change between chapters.
+const TODAY_YEAR = 2026;
+const SCALE_START = -4000; // configured traditional/debated start (Creation) — visual scale only
+const SCALE_END = TODAY_YEAR;
+
 const MARKERS: Marker[] = [
   { key: "creation", label: "Creation", year: -4000 },
   { key: "ark", label: "Ark", year: -2500 },
   { key: "commandments", label: "10 Commandments", year: -1446 },
-  { key: "temple", label: "1st Temple", year: -957 },
+  { key: "temple", label: "1st Temple", year: -960 },
   { key: "jesus", label: "Jesus", year: 30, cross: true },
-  { key: "today", label: "Today", year: 2025 },
+  { key: "today", label: "Today", year: TODAY_YEAR },
 ];
 
-// Evenly space the markers across 6%–94% of the line.
-function posForIndex(i: number): number {
-  return 6 + (i / (MARKERS.length - 1)) * 88;
-}
-
-// Continuous position for a year, interpolated between the surrounding markers.
-function pinPosForYear(year: number): number {
-  if (year <= MARKERS[0].year) return posForIndex(0);
-  for (let i = 0; i < MARKERS.length - 1; i++) {
-    const a = MARKERS[i];
-    const b = MARKERS[i + 1];
-    if (year >= a.year && year <= b.year) {
-      const f = (year - a.year) / (b.year - a.year);
-      return posForIndex(i) + f * (posForIndex(i + 1) - posForIndex(i));
-    }
-  }
-  return posForIndex(MARKERS.length - 1);
+// Linear time → horizontal position, padded to 6%–94% so edge labels don't clip.
+function posForYear(year: number): number {
+  const f = (year - SCALE_START) / (SCALE_END - SCALE_START);
+  return 6 + Math.max(0, Math.min(1, f)) * 88;
 }
 
 function parseYear(raw?: string): number | null {
@@ -53,16 +42,19 @@ function parseYear(raw?: string): number | null {
 
 export function TimelineSection({ data }: { data: ChapterWorkup }) {
   const bt = data.biblicalTimeline;
+  const range = bt?.dateRange;
 
   // Pin year: explicit estimate → midpoint of a date range → parsed estimate.
   const year =
     bt?.estimatedYear ??
-    (bt?.dateRange ? Math.round((bt.dateRange.startYear + bt.dateRange.endYear) / 2) : null) ??
+    (range ? Math.round((range.startYear + range.endYear) / 2) : null) ??
     parseYear(data.estimatedDate);
 
-  const pinPos = year != null ? pinPosForYear(year) : null;
+  const pinPos = year != null ? posForYear(year) : null;
+  // Honest uncertainty band: the chapter's full estimated range, by date math.
+  const bandStart = range ? posForYear(Math.min(range.startYear, range.endYear)) : null;
+  const bandEnd = range ? posForYear(Math.max(range.startYear, range.endYear)) : null;
 
-  const range = bt?.dateRange;
   const dateLabel = bt?.estimatedYearLabel ?? data.estimatedDate ?? "uncertain";
   const note = bt?.uncertaintyNote;
 
@@ -72,8 +64,16 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
       <h2 className="text-section mt-0.5 text-primary">Timeline</h2>
 
       <div className="no-scrollbar -mx-4 mt-4 overflow-x-auto px-4">
-        <div className="relative h-[96px] min-w-[560px]">
+        <div className="relative h-[96px] min-w-[600px]">
           <div className="absolute inset-x-0 top-[46px] h-0.5 bg-line" />
+
+          {/* Chapter estimated-range band (date math, not hand-placed) */}
+          {bandStart != null && bandEnd != null && bandEnd - bandStart > 0.4 && (
+            <div
+              className="absolute top-[42px] h-2 rounded-full bg-accent/25"
+              style={{ left: `${bandStart}%`, width: `${bandEnd - bandStart}%` }}
+            />
+          )}
 
           {MARKERS.map((m, i) => {
             const lowered = i % 2 === 1;
@@ -81,7 +81,7 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
               <div
                 key={m.key}
                 className="absolute top-[40px] flex -translate-x-1/2 flex-col items-center"
-                style={{ left: `${posForIndex(i)}%` }}
+                style={{ left: `${posForYear(m.year)}%` }}
               >
                 {m.cross ? (
                   <span className="text-[15px] leading-none text-jesus-red">✝</span>
@@ -100,7 +100,7 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
             );
           })}
 
-          {/* Moving chapter pin — the only thing that changes per chapter */}
+          {/* Moving chapter pin — placed by its estimated year */}
           {pinPos != null && (
             <div
               className="absolute top-[2px] flex -translate-x-1/2 flex-col items-center"
@@ -123,6 +123,10 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
             : `Estimated date: ${dateLabel}`}
         </p>
         {note && <p className="mt-1 text-[11px] leading-relaxed text-secondary">{note}</p>}
+        <p className="mt-1 text-[11px] leading-relaxed text-secondary">
+          Placed by estimated date. Creation and Ark follow traditional/debated chronology, not fixed
+          historical dates.
+        </p>
       </div>
     </section>
   );
