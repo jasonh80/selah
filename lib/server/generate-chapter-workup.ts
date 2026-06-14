@@ -33,7 +33,7 @@ export function generationAllowed(slug: string): boolean {
 }
 
 // "psalm-23" -> { book: "Psalm", chapter: 23 }
-function parseSlug(slug: string): { book: string; chapter: number } | null {
+export function parseSlug(slug: string): { book: string; chapter: number } | null {
   const m = slug.match(/^(.+)-(\d+)$/);
   if (!m) return null;
   const book = m[1]

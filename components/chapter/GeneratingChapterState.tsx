@@ -1,4 +1,5 @@
 import { Logo } from "@/components/Logo";
+import { AutoReload } from "@/components/chapter/AutoReload";
 
 // Placeholder shown while a chapter's FIRST shared workup is being generated.
 // Not wired to any AI pipeline yet — it exists so the lazy-generation flow can
@@ -14,6 +15,7 @@ const STEPS = [
 export function GeneratingChapterState({ chapterLabel }: { chapterLabel: string }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <AutoReload seconds={7} />
       <Logo className="text-[17px] text-accent-strong" />
 
       <div className="mt-10 w-full max-w-sm">

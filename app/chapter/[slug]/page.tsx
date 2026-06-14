@@ -1,28 +1,59 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
+import { GeneratingChapterState } from "@/components/chapter/GeneratingChapterState";
 import { resolveChapter } from "@/lib/chapters/registry";
+import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
+import {
+  getChapterStatus,
+  createGeneratingChapterWorkup,
+} from "@/lib/server/chapter-workups-repository";
+import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
 
-// Any chapter renders through the same ChapterView template, e.g. /chapter/exodus-27.
-// Supabase-first, then local fallback. Dynamic + no generateStaticParams on
-// purpose: chapters are generated lazily on first request, never pre-built.
 export const dynamic = "force-dynamic";
-// First-request generation can take a while; allow a longer function timeout
-// where the platform supports it.
-export const maxDuration = 60;
 
 export default async function ChapterPage({ params }: { params: { slug: string } }) {
-  const resolved = await resolveChapter(params.slug);
+  const slug = params.slug;
 
-  // MVP: no workup yet → 404.
-  // Production: replace this with the lazy-generation flow — create a generation
-  // job, render <GeneratingChapterState/> until status becomes "ready", then
-  // render <ChapterView />. Generated once on first request, cached forever.
-  if (!resolved) notFound();
+  // 1) Already available (Supabase ready/reviewed, or a local chapter)?
+  const resolved = await resolveChapter(slug);
+  if (resolved) {
+    return (
+      <AppShell>
+        <ChapterView data={resolved.workup} source={resolved.source} />
+      </AppShell>
+    );
+  }
 
-  return (
-    <AppShell>
-      <ChapterView data={resolved.workup} source={resolved.source} />
-    </AppShell>
-  );
+  // 2) Allowed to generate? Kick off a background job and show "Preparing…".
+  //    Generation runs in a 15-min background function (not the request), so it
+  //    isn't killed by the timeout. The page auto-refreshes until it's ready.
+  if (generationAllowed(slug)) {
+    const parsed = parseSlug(slug);
+    const label = parsed ? `${parsed.book} ${parsed.chapter}` : slug;
+    const status = await getChapterStatus(slug);
+
+    if (parsed && status !== "generating") {
+      // Mark generating first so refreshes don't re-trigger, then fire the job.
+      await createGeneratingChapterWorkup({
+        book: parsed.book,
+        chapter: parsed.chapter,
+        slug,
+        title: label,
+        source: "generated",
+      });
+      const host = headers().get("host") || "";
+      await triggerBackgroundGeneration(slug, host);
+    }
+
+    return (
+      <AppShell>
+        <GeneratingChapterState chapterLabel={label} />
+      </AppShell>
+    );
+  }
+
+  // 3) Not found.
+  notFound();
 }

@@ -56,6 +56,22 @@ export async function getChapterWorkupBySlug(slug: string): Promise<ChapterWorku
   return (data?.workup_json as ChapterWorkup | undefined) ?? null;
 }
 
+/** Raw status of a chapter row (any status), or null. */
+export async function getChapterStatus(slug: string): Promise<string | null> {
+  const db = getSupabaseAdmin();
+  if (!db) {
+    warnSupabaseMissing("getChapterStatus");
+    return null;
+  }
+  const { data, error } = await db
+    .from(TABLE)
+    .select("status,generation_started_at")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) return null;
+  return (data?.status as string | undefined) ?? null;
+}
+
 /** Insert a placeholder row with status 'generating' on first request. */
 export async function createGeneratingChapterWorkup(input: CreateGeneratingInput): Promise<void> {
   const db = getSupabaseAdmin();

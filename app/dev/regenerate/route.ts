@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { generationAllowed, generateAndStoreChapter } from "@/lib/server/generate-chapter-workup";
-import { getSupabaseAdmin } from "@/lib/server/supabase";
-import { CHAPTER_WORKUP_TEXT_MODEL } from "@/lib/server/openai";
+import { generationAllowed } from "@/lib/server/generate-chapter-workup";
+import { createGeneratingChapterWorkup } from "@/lib/server/chapter-workups-repository";
+import { parseSlug } from "@/lib/server/generate-chapter-workup";
+import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
 
-// DEV/admin: force-regenerate ONE allowlisted chapter (e.g. after a prompt/model
-// change). Gated by generationAllowed (flag + OpenAI + Supabase + allowlist) and,
-// if REGEN_TOKEN is set, a ?token= match. Costs an OpenAI call — use sparingly.
+// DEV/admin: force-regenerate ONE allowlisted chapter in the background (e.g.
+// after a prompt/model change). Returns immediately; poll /dev/db-status?slug=
+// until status is "ready". Gated by generationAllowed + optional REGEN_TOKEN.
 export const dynamic = "force-dynamic";
-export const maxDuration = 90;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -29,34 +29,22 @@ export async function GET(request: Request) {
     );
   }
 
-  const workup = await generateAndStoreChapter(slug);
-
-  // Read back the row so the response shows exactly what happened.
-  let status: string | null = null;
-  let generationError: string | null = null;
-  let imagesCount: number | null = null;
-  let sectionsCount: number | null = null;
-  const db = getSupabaseAdmin();
-  if (db) {
-    const { data } = await db
-      .from("chapter_workups")
-      .select("status,generation_error,workup_json")
-      .eq("slug", slug)
-      .maybeSingle();
-    status = data?.status ?? null;
-    generationError = data?.generation_error ? String(data.generation_error).slice(0, 300) : null;
-    const wj = data?.workup_json as { images?: unknown[]; insights?: unknown[] } | null;
-    imagesCount = Array.isArray(wj?.images) ? wj!.images!.length : null;
-    sectionsCount = Array.isArray(wj?.insights) ? wj!.insights!.length : null;
+  const parsed = parseSlug(slug);
+  if (parsed) {
+    await createGeneratingChapterWorkup({
+      book: parsed.book,
+      chapter: parsed.chapter,
+      slug,
+      title: `${parsed.book} ${parsed.chapter}`,
+      source: "generated",
+    });
   }
+  await triggerBackgroundGeneration(slug, url.host);
 
   return NextResponse.json({
-    ok: Boolean(workup),
+    ok: true,
     slug,
-    model: CHAPTER_WORKUP_TEXT_MODEL,
-    status,
-    imagesCount,
-    deeperCardsCount: sectionsCount,
-    generationError,
+    triggered: true,
+    note: "Generating in the background. Poll /dev/db-status?slug=" + slug + " until status is 'ready'.",
   });
 }
