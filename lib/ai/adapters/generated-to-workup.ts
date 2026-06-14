@@ -26,8 +26,9 @@ function firstSentence(text: string, max = 120): string {
   return sentence.length > max ? sentence.slice(0, max - 1).trimEnd() + "…" : sentence;
 }
 
-function imageFallback(slug: string, kind: ImageKind): string {
-  return `/img/${slug}/${kind}.svg`;
+// Generic placeholders that exist for ANY chapter (real images come later).
+function imageFallback(kind: ImageKind): string {
+  return `/img/placeholder/${kind}.svg`;
 }
 
 export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): ChapterWorkup {
@@ -44,7 +45,7 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
       label: img.title || IMAGE_LABEL[kind],
       prompt: img.prompt,
       caption: img.caption,
-      src: img.imageUrl || imageFallback(g.slug, kind),
+      src: img.imageUrl || imageFallback(kind),
       alt: img.alt,
       status: img.status,
     };
@@ -66,19 +67,19 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
       id: "key-object",
       label: "Key Object",
       support: keyObject?.title ?? "Key object",
-      thumb: keyObject?.imageUrl || imageFallback(g.slug, "detail"),
+      thumb: keyObject?.imageUrl || imageFallback("detail"),
     },
     {
       id: "key-person",
       label: "Key Person",
       support: keyPerson?.name ?? "Key person",
-      thumb: keyPerson?.imageUrl || `/img/${g.slug}/person.svg`,
+      thumb: keyPerson?.imageUrl || "/img/placeholder/person.svg",
     },
     {
       id: "jesus",
       label: "Jesus",
       support: g.jesusConnection.short,
-      thumb: `/img/${g.slug}/jesus.svg`,
+      thumb: "/img/placeholder/jesus.svg",
       jesus: true,
     },
   ];
@@ -191,14 +192,14 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
     characters: g.keyPeople.map((p) => ({ name: p.name, role: p.role })),
     modernMap: {
       caption: g.maps.modern.description,
-      src: g.maps.modern.imageUrl || `/img/${g.slug}/map-modern.svg`,
+      src: g.maps.modern.imageUrl || "/img/placeholder/map.svg",
       alt: g.maps.modern.description,
       note: g.maps.modern.uncertaintyNote,
       uncertaintyNote: g.maps.modern.uncertaintyNote,
     },
     historicMap: {
       caption: g.maps.historic.description,
-      src: g.maps.historic.imageUrl || `/img/${g.slug}/map-historic.svg`,
+      src: g.maps.historic.imageUrl || "/img/placeholder/map.svg",
       alt: g.maps.historic.description,
       note: g.maps.historic.uncertaintyNote,
       uncertaintyNote: g.maps.historic.uncertaintyNote,

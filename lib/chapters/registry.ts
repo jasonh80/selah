@@ -2,6 +2,7 @@ import type { ChapterWorkup } from "@/lib/types";
 import { exodus27Workup, LOCAL_SOURCE, type ChapterSource } from "@/lib/chapters/source";
 import { isSupabaseConfigured } from "@/lib/server/supabase";
 import { getChapterWorkupBySlug } from "@/lib/server/chapter-workups-repository";
+import { generationAllowed, generateAndStoreChapter } from "@/lib/server/generate-chapter-workup";
 
 /**
  * Resolves a global chapter workup with this priority:
@@ -48,7 +49,13 @@ export async function resolveChapter(slug: string): Promise<ResolvedChapter | nu
   const local = localChapterBySlug(slug);
   if (local) return { workup: local, source: LOCAL_SOURCE };
 
-  // 3) Not found (yet).
+  // 3) Generate on first request (gated by flag + allowlist; text only).
+  if (generationAllowed(slug)) {
+    const generated = await generateAndStoreChapter(slug);
+    if (generated) return { workup: generated, source: "Supabase" };
+  }
+
+  // 4) Not found (yet).
   return null;
 }
 

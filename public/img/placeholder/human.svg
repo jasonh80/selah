@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" role="img" aria-label="Human moment placeholder">
+  <rect width="800" height="1000" fill="#eceaf3"/>
+  <circle cx="400" cy="430" r="90" fill="#d4d0e6"/>
+  <path d="M250 760 q150 -190 300 0 z" fill="#d4d0e6"/>
+  <text x="400" y="860" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="30" fill="#8c87a3">Human Moment</text>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Jesus placeholder">
+  <rect width="200" height="200" fill="#fbecec"/>
+  <circle cx="100" cy="104" r="52" fill="none" stroke="#d79a9a" stroke-width="6"/>
+  <rect x="92" y="74" width="16" height="68" rx="3" fill="#c98c8c"/>
+  <rect x="74" y="96" width="52" height="16" rx="3" fill="#c98c8c"/>
+</svg>

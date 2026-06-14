@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" role="img" aria-label="Detail placeholder">
+  <rect width="800" height="1000" fill="#ecebf4"/>
+  <rect x="250" y="380" width="300" height="240" rx="14" fill="#d4d0e6"/>
+  <rect x="300" y="430" width="200" height="20" rx="10" fill="#c2bdda"/>
+  <rect x="300" y="480" width="160" height="20" rx="10" fill="#c2bdda"/>
+  <text x="400" y="700" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="30" fill="#8c87a3">Detail Shot</text>
+</svg>

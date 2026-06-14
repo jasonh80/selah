@@ -7,6 +7,9 @@ import { resolveChapter } from "@/lib/chapters/registry";
 // Supabase-first, then local fallback. Dynamic + no generateStaticParams on
 // purpose: chapters are generated lazily on first request, never pre-built.
 export const dynamic = "force-dynamic";
+// First-request generation can take a while; allow a longer function timeout
+// where the platform supports it.
+export const maxDuration = 60;
 
 export default async function ChapterPage({ params }: { params: { slug: string } }) {
   const resolved = await resolveChapter(params.slug);

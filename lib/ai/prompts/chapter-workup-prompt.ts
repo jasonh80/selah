@@ -32,6 +32,7 @@ VOICE & VALUES
   and be something later chapters can build on.
 
 REQUIRED CONTENT
+- theme: a single short line capturing the chapter's main idea (e.g. "Holy access to God")
 - summary, sceneSetter, historicalContext, whatHappens, whatPeopleMiss
 - estimatedDate, estimatedLocation, modernLocationNote, primaryCharacters
 - jesusConnection { short, full, relatedPassages }
