@@ -11,6 +11,7 @@ export interface ChapterImage {
   caption: string;
   src: string;
   alt: string;
+  status?: "placeholder" | "generating" | "complete" | "failed";
 }
 
 export interface Character {
@@ -23,6 +24,7 @@ export interface ChapterMap {
   src: string;
   alt: string;
   note?: string;
+  uncertaintyNote?: string;
 }
 
 export interface TimelineEvent {

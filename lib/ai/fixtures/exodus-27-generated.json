@@ -1,0 +1,125 @@
+{
+  "book": "Exodus",
+  "chapter": 27,
+  "slug": "exodus-27",
+  "title": "Exodus 27",
+  "subtitle": "The Bronze Altar, the Courtyard, and the Lamp",
+  "status": "reviewed",
+  "version": "1",
+  "reviewedAt": "2026-06-13",
+
+  "estimatedDate": "c. 1446 BC",
+  "estimatedLocation": "Wilderness of Sinai",
+  "modernLocationNote": "Traditionally placed in the south of the Sinai Peninsula (present-day Egypt). The exact site of Mount Sinai is debated.",
+  "primaryCharacters": ["Moses", "Aaron and his sons", "The people of Israel"],
+
+  "summary": "God gives Israel instructions for the bronze altar, the surrounding courtyard, and the oil for a lamp that must burn continually — together describing how a holy God makes a way to be approached.",
+  "sceneSetter": "Israel is camped at the foot of Mount Sinai, freshly freed from Egypt, receiving the blueprint for the tabernacle — a portable sanctuary where God will dwell in the middle of the camp.",
+  "historicalContext": "Everything here is measured in cubits and made of specific materials: bronze for the courtyard and altar (the place of judgment and sacrifice), with silver and gold deeper inside. The closer you move toward God's presence, the more precious the metal — a built-in lesson in holiness.",
+  "whatHappens": "Moses receives the design for the bronze altar with its four horns, the linen-curtained courtyard with a single eastern gate, and the command that the people bring pure olive oil so a lamp burns from evening to morning.",
+  "whatPeopleMiss": "To a modern reader an 'altar' is a quaint religious object. To Israel it was a place of blood, smoke, and cost — the visible price of drawing near to God. The horns were grasped for mercy, and the single gate meant there was one way in, not many.",
+
+  "jesusConnection": {
+    "short": "The altar foreshadows the cross",
+    "full": "The bronze altar stands at the entrance — you cannot reach God's presence without first passing the place of sacrifice. Jesus becomes both the altar and the offering. The continually burning lamp points to the One who calls himself the light of the world, and the single courtyard gate anticipates his words: 'I am the door; whoever enters through me will be saved.'",
+    "relatedPassages": ["Hebrews 9:1-14", "Hebrews 10:1-14", "John 8:12", "John 10:9"]
+  },
+  "theologyPrinciple": {
+    "name": "Holiness",
+    "level": "beginner",
+    "explanation": "God is holy — utterly set apart — and people cannot approach on their own terms. Yet he provides the way: an altar, a sacrifice, an ordered space, and a light that never goes out. Later chapters build the priesthood and sacrificial system on top of this."
+  },
+  "application": "Approaching God has never been casual or self-made; it runs through what he provides. Before rushing into the day, pause at the 'altar' — receive that the way to God is already opened, not earned. Let gratitude, not performance, be the doorway.",
+  "prayer": "Father, thank you that you made a way to be near you when I could not make one myself. Like the altar at the entrance, let me begin here — at the cross, in gratitude. Keep the light of your presence burning in me today, and help me walk through the one door you opened in Jesus. Amen.",
+
+  "timeline": {
+    "label": "From Egypt to the tabernacle",
+    "items": [
+      { "title": "Passover", "description": "Israel is spared and leaves Egypt." },
+      { "title": "Exodus", "description": "Crossing the Red Sea out of slavery." },
+      { "title": "Sinai", "description": "The covenant and the tabernacle instructions.", "active": true },
+      { "title": "Tabernacle", "description": "God's presence fills the completed sanctuary." }
+    ]
+  },
+  "maps": {
+    "modern": {
+      "title": "Modern Map",
+      "description": "The Sinai Peninsula with modern political borders.",
+      "uncertaintyNote": "Approximate region today; the exact site of Mount Sinai is debated."
+    },
+    "historic": {
+      "title": "Historic Map",
+      "description": "Egypt, Sinai, and Canaan in the biblical world, with Israel's wilderness route.",
+      "uncertaintyNote": "Possible route; details are traditional, not certain."
+    }
+  },
+  "keyObjects": [
+    { "title": "Bronze altar", "description": "5 cubits square with four horns and a bronze grating for sacrifices." },
+    { "title": "The courtyard", "description": "100x50 cubits of linen curtains on bronze posts enclosing the holy space." },
+    { "title": "Continual lamp", "description": "Pure beaten olive oil keeps the light burning from evening to morning." }
+  ],
+  "keyPeople": [
+    { "name": "Moses", "role": "Receiving the tabernacle plans on Sinai", "description": "Mediator between God and Israel." },
+    { "name": "Aaron and his sons", "role": "The priests who will tend the altar and lamp", "description": "Israel's first priesthood." }
+  ],
+  "generatedImages": [
+    {
+      "type": "establishing",
+      "title": "Establishing Shot",
+      "description": "The broad world of the chapter — the wilderness camp around the tabernacle courtyard.",
+      "prompt": "Wide historically grounded view of the Israelite wilderness camp, many tents across a dry desert, the tabernacle courtyard at center with white linen curtains, the bronze altar near the entrance with smoke rising, priests moving, Sinai mountains in the distance, golden hour.",
+      "alt": "Wide view of the Israelite wilderness camp around the tabernacle courtyard.",
+      "caption": "The wilderness camp around the tabernacle courtyard.",
+      "status": "placeholder"
+    },
+    {
+      "type": "detail",
+      "title": "Detail Shot",
+      "description": "The bronze altar a modern reader may not understand.",
+      "prompt": "Close realistic view of the bronze altar of acacia wood overlaid with bronze, horns on its corners, bronze utensils nearby, ash and glowing embers inside, warm light, priests tending the fire.",
+      "alt": "Close view of the bronze altar with horns, tools, ash and embers.",
+      "caption": "The bronze altar — horns, tools, ash, and embers.",
+      "status": "placeholder"
+    },
+    {
+      "type": "human",
+      "title": "Human Moment",
+      "description": "A quiet, human moment of devotion.",
+      "prompt": "A priest in linen carefully pouring pure olive oil into a lamp at dusk inside the courtyard, warm light beginning to glow against linen curtains and desert darkness outside, reverent and still.",
+      "alt": "A priest tending lamp oil at dusk in the tabernacle courtyard.",
+      "caption": "A priest tending the lamp oil at dusk — keeping the light.",
+      "status": "placeholder"
+    }
+  ],
+  "verseByVerse": [
+    { "range": "1-8", "title": "The bronze altar", "explanation": "The altar of sacrifice, with horns and bronze tools, stands at the entrance to the holy space.", "jesusConnection": "The place of sacrifice you meet first points to Christ's cross." },
+    { "range": "9-19", "title": "The courtyard", "explanation": "Linen curtains on bronze posts enclose the sanctuary, with one gate on the east side.", "application": "One way in, not many — approach is on God's terms." },
+    { "range": "20-21", "title": "Oil for the lamp", "explanation": "The people supply pure oil so a lamp burns continually before the Lord.", "jesusConnection": "A light that never goes out anticipates the light of the world." }
+  ],
+  "goDeeper": {
+    "learnMore": [
+      { "title": "Bronze altar", "description": "Understand the first object seen inside the courtyard." },
+      { "title": "Tabernacle courtyard", "description": "See how sacred space taught Israel about access to God." }
+    ],
+    "diveDeeper": [
+      { "title": "Read Hebrews 9-10", "description": "See how sacrifice and priesthood are fulfilled in Christ." },
+      { "title": "Study holiness", "description": "Learn why God's nearness is both gift and danger." }
+    ],
+    "growCloser": [
+      { "title": "Pray about reverence", "description": "Ask God to make worship weighty again." },
+      { "title": "Sit with the lamp imagery", "description": "Reflect on Christ as the true light." }
+    ]
+  },
+
+  "bibleText": {
+    "version": "ESV",
+    "source": "placeholder",
+    "note": "Selected verses only in the prototype. Full text comes from a licensed Bible source later."
+  },
+  "cost": {
+    "textEstimateUsd": 0.0178,
+    "imageEstimateUsd": 0.12,
+    "totalEstimateUsd": 0.1378,
+    "cached": true
+  }
+}
