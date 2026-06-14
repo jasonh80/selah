@@ -7,6 +7,7 @@
   "status": "reviewed",
   "version": "1",
   "reviewedAt": "2026-06-13",
+  "theme": "Holy access to God",
 
   "estimatedDate": "c. 1446 BC",
   "estimatedLocation": "Wilderness of Sinai",
@@ -20,7 +21,7 @@
   "whatPeopleMiss": "To a modern reader an 'altar' is a quaint religious object. To Israel it was a place of blood, smoke, and cost — the visible price of drawing near to God. The horns were grasped for mercy, and the single gate meant there was one way in, not many.",
 
   "jesusConnection": {
-    "short": "The altar foreshadows the cross",
+    "short": "sacrifice • priesthood • light",
     "full": "The bronze altar stands at the entrance — you cannot reach God's presence without first passing the place of sacrifice. Jesus becomes both the altar and the offering. The continually burning lamp points to the One who calls himself the light of the world, and the single courtyard gate anticipates his words: 'I am the door; whoever enters through me will be saved.'",
     "relatedPassages": ["Hebrews 9:1-14", "Hebrews 10:1-14", "John 8:12", "John 10:9"]
   },
@@ -114,7 +115,15 @@
   "bibleText": {
     "version": "ESV",
     "source": "placeholder",
-    "note": "Selected verses only in the prototype. Full text comes from a licensed Bible source later."
+    "note": "Selected verses only in the prototype. Full text comes from a licensed Bible source later.",
+    "verses": [
+      { "number": 1, "text": "“You shall make the altar of acacia wood, five cubits long and five cubits broad. The altar shall be square, and its height shall be three cubits.”", "redLetter": true },
+      { "number": 2, "text": "“And you shall make horns for it on its four corners; its horns shall be of one piece with it, and you shall overlay it with bronze.”", "redLetter": true },
+      { "number": 3, "text": "“You shall make pots for it to receive its ashes, and shovels and basins and forks and fire pans. You shall make all its utensils of bronze.”", "redLetter": true },
+      { "number": 8, "text": "“You shall make it hollow, with boards. As it has been shown you on the mountain, so shall it be made.”", "redLetter": true },
+      { "number": 20, "text": "“You shall command the people of Israel that they bring to you pure beaten olive oil for the light, that a lamp may regularly be set up to burn.”", "redLetter": true },
+      { "number": 21, "text": "“It shall be a statute forever to be observed throughout their generations by the people of Israel.”", "redLetter": true }
+    ]
   },
   "cost": {
     "textEstimateUsd": 0.0178,

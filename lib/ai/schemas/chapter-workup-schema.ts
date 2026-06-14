@@ -93,6 +93,17 @@ const BibleTextSchema = z.object({
   version: z.string(),
   source: z.string().optional(),
   note: z.string().optional(),
+  // Optional placeholder selected verses for the prototype (real text comes
+  // from a licensed Bible source later).
+  verses: z
+    .array(
+      z.object({
+        number: z.number().int(),
+        text: z.string(),
+        redLetter: z.boolean().optional(),
+      }),
+    )
+    .optional(),
 });
 
 const CostSchema = z
@@ -114,6 +125,7 @@ export const GeneratedChapterWorkupSchema = z.object({
   status: z.enum(["draft", "generating", "ready", "failed", "reviewed"]),
   version: z.string(),
   reviewedAt: z.string().optional(),
+  theme: z.string(), // one-line theme, e.g. "Holy access to God"
 
   // setting
   estimatedDate: z.string(),

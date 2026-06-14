@@ -138,6 +138,14 @@ export interface ChapterWorkup {
   versions: string[];
   defaultVersion: string;
   verses: Verse[];
+
+  // Optional generation cost metadata (placeholder; not shown in the UI).
+  cost?: {
+    textEstimateUsd?: number;
+    imageEstimateUsd?: number;
+    totalEstimateUsd?: number;
+    cached?: boolean;
+  };
 }
 
 // Logged per AI request (Phase 1+). Here for design completeness.

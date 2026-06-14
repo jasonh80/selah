@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "validate:workup": "tsx scripts/validate-workup.ts"
+    "validate:workup": "tsx scripts/validate-workup.ts",
+    "check:workup": "npm run validate:workup"
   },
   "dependencies": {
     "next": "14.2.5",
