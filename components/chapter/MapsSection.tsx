@@ -114,6 +114,18 @@ export function MapsSection({ data }: { data: ChapterWorkup }) {
           <span className="absolute left-2.5 top-2.5 rounded-full bg-[rgba(16,16,20,0.62)] px-2.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
             {mode === "today" ? "Modern view" : "Biblical context"}
           </span>
+
+          {/* north compass — map is north-up */}
+          <span
+            className="absolute right-2.5 top-2.5 flex h-9 w-9 flex-col items-center justify-center rounded-full bg-[rgba(16,16,20,0.62)] text-white shadow backdrop-blur-sm"
+            aria-label="North is up"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+              <path d="M12 3 L16 14 L12 11.5 L8 14 Z" fill="#ffffff" />
+              <path d="M12 3 L12 11.5 L8 14 Z" fill="#e0594a" />
+            </svg>
+            <span className="-mt-0.5 text-[8px] font-bold leading-none tracking-wide">N</span>
+          </span>
           <span className="absolute bottom-1.5 right-2 rounded bg-[rgba(16,16,20,0.5)] px-1.5 py-0.5 text-[9px] leading-none text-white/85 backdrop-blur-sm">
             {cfg.attribution}
           </span>
