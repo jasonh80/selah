@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     imagesStored: null as boolean | null,
     imageStatuses: null as (string | undefined)[] | null,
     generationError: null as string | null,
+    imageCostEvents: null as number | null,
     queryError: null as string | null,
   };
 
@@ -52,6 +53,16 @@ export async function GET(request: Request) {
       }
     } catch (e) {
       out.queryError = String((e as Error).message).slice(0, 200);
+    }
+
+    try {
+      const { count } = await db
+        .from("cost_events")
+        .select("*", { count: "exact", head: true })
+        .eq("request_type", "chapter_image_generation");
+      out.imageCostEvents = count ?? 0;
+    } catch {
+      /* non-fatal */
     }
   }
 
