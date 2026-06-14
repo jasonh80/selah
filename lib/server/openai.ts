@@ -20,6 +20,6 @@ export function getOpenAI(): OpenAI | null {
     cached = null;
     return null;
   }
-  cached = new OpenAI({ apiKey });
+  cached = new OpenAI({ apiKey, maxRetries: 1, timeout: 240000 });
   return cached;
 }

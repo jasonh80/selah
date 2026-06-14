@@ -66,7 +66,12 @@ export async function generateChapterWorkup(input: {
     bibleText: input.bibleText,
   });
 
-  const resp = await client.chat.completions.create({
+  // Reasoning models (GPT-5 / o-series) need low reasoning effort here — this is
+  // content writing, not hard reasoning — or they burn minutes of reasoning on
+  // the large prompt. Cap output tokens to avoid runaway. Built as a loose object
+  // + cast so it compiles across SDK versions that may not type these fields yet.
+  const isReasoningModel = /^(gpt-5|o\d)/i.test(CHAPTER_WORKUP_TEXT_MODEL);
+  const body = {
     model: CHAPTER_WORKUP_TEXT_MODEL,
     messages: [
       {
@@ -77,9 +82,15 @@ export async function generateChapterWorkup(input: {
       { role: "user", content: prompt },
     ],
     response_format: { type: "json_object" },
-    // Note: newer models (GPT-5 series) only support the default temperature,
-    // so we don't set it.
-  });
+    max_completion_tokens: 20000,
+    // GPT-5 series only support the default temperature, so we don't set it.
+    ...(isReasoningModel ? { reasoning_effort: "low" } : {}),
+  };
+
+  const resp = (await client.chat.completions.create(body as never)) as {
+    choices: { message?: { content?: string | null } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
 
   const content = resp.choices[0]?.message?.content ?? "";
   const workup = parseChapterWorkupJson(content);
