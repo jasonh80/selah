@@ -20,6 +20,8 @@ export async function GET(request: Request) {
     rowFound: false,
     status: null as string | null,
     imagesCount: null as number | null,
+    imagesStored: null as boolean | null,
+    imageStatuses: null as (string | undefined)[] | null,
     generationError: null as string | null,
     queryError: null as string | null,
   };
@@ -39,8 +41,14 @@ export async function GET(request: Request) {
         out.generationError = data.generation_error
           ? String(data.generation_error).slice(0, 250)
           : null;
-        const imgs = (data.workup_json as { images?: unknown[] } | null)?.images;
+        const imgs = (data.workup_json as { images?: { src?: string; status?: string }[] } | null)
+          ?.images;
         out.imagesCount = Array.isArray(imgs) ? imgs.length : null;
+        if (Array.isArray(imgs)) {
+          out.imageStatuses = imgs.map((i) => i?.status);
+          // "stored" = every image points at a real http(s) URL (Supabase Storage)
+          out.imagesStored = imgs.length > 0 && imgs.every((i) => /^https?:\/\//.test(i?.src ?? ""));
+        }
       }
     } catch (e) {
       out.queryError = String((e as Error).message).slice(0, 200);

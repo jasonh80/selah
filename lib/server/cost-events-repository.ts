@@ -11,6 +11,7 @@ export type CostRequestType =
   | "chapter_workup_text"
   | "image_prompt_generation"
   | "image_generation"
+  | "chapter_image_generation"
   | "personalized_reflection"
   | "user_question";
 

@@ -56,6 +56,21 @@ export async function getChapterWorkupBySlug(slug: string): Promise<ChapterWorku
   return (data?.workup_json as ChapterWorkup | undefined) ?? null;
 }
 
+/**
+ * Update ONLY workup_json on an existing row, leaving status/version untouched.
+ * Used by image generation to swap placeholder images for stored ones without
+ * touching the (already-reviewed) text. Never creates a row.
+ */
+export async function updateChapterWorkupJson(slug: string, workup: ChapterWorkup): Promise<void> {
+  const db = getSupabaseAdmin();
+  if (!db) {
+    warnSupabaseMissing("updateChapterWorkupJson");
+    return;
+  }
+  const { error } = await db.from(TABLE).update({ workup_json: workup }).eq("slug", slug);
+  if (error) console.error(`[selah] updateChapterWorkupJson(${slug}) failed:`, error.message);
+}
+
 /** Raw status of a chapter row (any status), or null. */
 export async function getChapterStatus(slug: string): Promise<string | null> {
   const db = getSupabaseAdmin();
