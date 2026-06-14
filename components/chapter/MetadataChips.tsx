@@ -1,5 +1,6 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { confident } from "@/lib/voice";
+import { getChipOverride } from "@/lib/content/chapter-content";
 
 export function MetadataChips({ data }: { data: ChapterWorkup }) {
   return (
@@ -16,7 +17,7 @@ export function MetadataChips({ data }: { data: ChapterWorkup }) {
           <span aria-hidden className={chip.jesus ? "" : "text-secondary"}>
             {chip.icon}
           </span>
-          {confident(chip.text)}
+          {getChipOverride(data.slug, i) ?? confident(chip.text)}
         </span>
       ))}
     </div>

@@ -12,7 +12,8 @@ import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { TransparencySection } from "@/components/chapter/TransparencySection";
-import { ReadingModeToggle } from "@/components/chapter/ReadingModeToggle";
+import { ChapterControls } from "@/components/chapter/ChapterControls";
+import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
 
 /**
  * Reusable chapter template. Renders any global chapter workup.
@@ -29,7 +30,7 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
       <main className="min-w-0 space-y-7 pb-12 pt-4 lg:pt-6">
         <ChapterHero data={data} />
 
-        <ReadingModeToggle />
+        <ChapterControls />
 
         <div className="space-y-3">
           <HeroImage data={data} />
@@ -40,6 +41,7 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
         </div>
 
         <GeneratedImagesSection data={data} />
+        <AuthorAudienceEvidence data={data} />
         <InsightCardGrid data={data} />
         <ScriptureReader data={data} />
         <MapsSection data={data} />
