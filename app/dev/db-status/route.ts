@@ -2,16 +2,23 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/server/supabase";
 
 // DEV diagnostic. Returns only booleans/status — never any key values.
+// Inspect a specific chapter row with ?slug=psalm-23
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const slug = new URL(request.url).searchParams.get("slug") || "exodus-27";
+
   const out: Record<string, unknown> = {
+    slug,
     supabaseUrlPresent: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    anonKeyPresent: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     serviceKeyPresent: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    openaiKeyPresent: Boolean(process.env.OPENAI_API_KEY),
+    generationEnabled: process.env.ENABLE_CHAPTER_GENERATION === "true",
     supabaseConfigured: isSupabaseConfigured(),
-    exodus27Found: false,
-    exodus27Status: null as string | null,
+    rowFound: false,
+    status: null as string | null,
+    imagesCount: null as number | null,
+    generationError: null as string | null,
     queryError: null as string | null,
   };
 
@@ -20,12 +27,19 @@ export async function GET() {
     try {
       const { data, error } = await db
         .from("chapter_workups")
-        .select("slug,status")
-        .eq("slug", "exodus-27")
+        .select("status,generation_error,workup_json")
+        .eq("slug", slug)
         .maybeSingle();
-      out.exodus27Found = Boolean(data);
-      out.exodus27Status = data?.status ?? null;
       if (error) out.queryError = String(error.message).slice(0, 200);
+      if (data) {
+        out.rowFound = true;
+        out.status = data.status ?? null;
+        out.generationError = data.generation_error
+          ? String(data.generation_error).slice(0, 250)
+          : null;
+        const imgs = (data.workup_json as { images?: unknown[] } | null)?.images;
+        out.imagesCount = Array.isArray(imgs) ? imgs.length : null;
+      }
     } catch (e) {
       out.queryError = String((e as Error).message).slice(0, 200);
     }
