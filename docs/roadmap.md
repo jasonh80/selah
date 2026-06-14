@@ -23,7 +23,29 @@ said about a verse or topic.
 - Proper attribution; copyright-safe quoting/summarizing only.
 - Curated/licensed sources — not scraped.
 
-## 4. More photorealistic chapter images
+## 4. Dramatic Scripture narration (voice)
+Future: a "Listen" / "Dramatic Reading" / "Spoken Scripture" mode that reads the
+chapter aloud.
+- Desired voice: deep, warm, resonant, cinematic, reverent, authoritative,
+  slow-paced biblical narration.
+- Do NOT imitate or clone any specific real actor's voice — describe the style,
+  don't mimic a person.
+- Labels to consider: Listen · Dramatic Reading · Spoken Scripture · Chapter Reading.
+- Roadmap only; not built.
+
+## 5. Character Repository ("Visual Bible")
+Future: a repository so recurring biblical figures stay visually consistent
+across chapters and generated images. Each character could carry:
+`characterId`, `name`, age range by chapter/era, historical setting,
+clothing/material references, hair/beard/face notes, physical build, emotional
+presence, approved base image references, negative prompts, continuity notes.
+- Characters can age/change by era but should still feel consistent when
+  appropriate (e.g. David as young shepherd vs David as king).
+- Examples: Moses, Aaron, David (shepherd / king), Peter, Paul, Mary, Pharaoh,
+  tabernacle priest.
+- Roadmap only; not built.
+
+## 6. More photorealistic chapter images
 Current Psalm 23 images are good enough for the showcase, but long-term the
 generated chapter images should feel more like a still from a high-end
 historical documentary:

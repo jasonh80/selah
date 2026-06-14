@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChapterWorkup, Insight } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
+import { useReadingMode } from "@/components/ReadingModeProvider";
 
 export function InsightCardGrid({ data }: { data: ChapterWorkup }) {
   return (
@@ -18,7 +19,13 @@ export function InsightCardGrid({ data }: { data: ChapterWorkup }) {
 }
 
 function InsightCard({ insight }: { insight: Insight }) {
-  const [open, setOpen] = useState(false);
+  const { mode } = useReadingMode();
+  // Deep Dive opens every card; Quick Dive collapses them. Switching mode resets
+  // all cards, but the user can still open/close individual cards within a mode.
+  const [open, setOpen] = useState(mode === "deep");
+  useEffect(() => {
+    setOpen(mode === "deep");
+  }, [mode]);
   return (
     <button
       onClick={() => setOpen((v) => !v)}

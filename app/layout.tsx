@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { VersionProvider } from "@/components/VersionProvider";
+import { ReadingModeProvider } from "@/components/ReadingModeProvider";
 import { BUILD_ID } from "@/lib/build";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -22,10 +23,26 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="air" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+    <html
+      lang="en"
+      data-theme="starlight"
+      suppressHydrationWarning
+      className={`${inter.variable} ${spaceGrotesk.variable}`}
+    >
+      <head>
+        {/* Apply saved theme (else Starlight) before paint — no flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('selah-theme')||'starlight';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();",
+          }}
+        />
+      </head>
       <body className="theme-transition">
         <ThemeProvider>
-          <VersionProvider>{children}</VersionProvider>
+          <VersionProvider>
+            <ReadingModeProvider>{children}</ReadingModeProvider>
+          </VersionProvider>
         </ThemeProvider>
       </body>
     </html>

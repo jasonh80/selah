@@ -2,19 +2,18 @@ import type { ChapterWorkup, ChapterImage } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
 
 export function GeneratedImagesSection({ data }: { data: ChapterWorkup }) {
-  const establishing = data.images.find((i) => i.kind === "establishing")!;
+  // The hero already shows the establishing shot, so we don't repeat it here —
+  // "See the Chapter" carries the complementary detail + human-moment views.
   const rest = data.images.filter((i) => i.kind !== "establishing");
+  if (rest.length === 0) return null;
 
   return (
     <section>
-      <SectionHead title="See the Chapter" sub={`Three generated views from ${data.reference}`} />
-      <div className="space-y-2.5">
-        <ImageCard img={establishing} tall />
-        <div className="grid grid-cols-2 gap-2.5">
-          {rest.map((img) => (
-            <ImageCard key={img.kind} img={img} />
-          ))}
-        </div>
+      <SectionHead title="See the Chapter" sub={`Scenes from ${data.reference}`} />
+      <div className="grid grid-cols-2 gap-2.5">
+        {rest.map((img) => (
+          <ImageCard key={img.kind} img={img} />
+        ))}
       </div>
     </section>
   );

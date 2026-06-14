@@ -124,8 +124,7 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
         </p>
         {note && <p className="mt-1 text-[11px] leading-relaxed text-secondary">{note}</p>}
         <p className="mt-1 text-[11px] leading-relaxed text-secondary">
-          Placed by estimated date. Creation and Ark follow traditional/debated chronology, not fixed
-          historical dates.
+          Placed by estimated date; Creation and Ark use traditional biblical chronology.
         </p>
       </div>
     </section>
