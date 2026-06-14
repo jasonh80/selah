@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
-import { imageGenAllowed, isImageGenEnabled, CHAPTER_IMAGE_MODEL, IMAGE_ALLOWED_SLUGS } from "@/lib/server/images";
+import {
+  imageGenAllowed,
+  isImageGenEnabled,
+  CHAPTER_IMAGE_MODEL,
+  IMAGE_ALLOWED_SLUGS,
+  generateAndStoreChapterImages,
+} from "@/lib/server/images";
 import { triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
 
 // DEV/ADMIN ONLY image generation trigger. ALL of these are required:
@@ -54,6 +60,21 @@ export async function GET(request: Request) {
       willGenerate: 3,
       note: "Preview only. Add &confirm=yes to generate 3 images and store them.",
     });
+  }
+
+  // Diagnostic: run inline and return the real error (an auth/verification
+  // error throws within seconds). May time out only if the model is genuinely
+  // slow — in which case the background path is the one to use.
+  if (url.searchParams.get("sync") === "1") {
+    try {
+      const result = await generateAndStoreChapterImages(slug);
+      return NextResponse.json(result, { status: result.ok ? 200 : 500 });
+    } catch (e) {
+      return NextResponse.json(
+        { ok: false, slug, model: CHAPTER_IMAGE_MODEL, error: String((e as Error)?.message ?? e) },
+        { status: 500 },
+      );
+    }
   }
 
   await triggerBackgroundImageGeneration(slug, url.host);
