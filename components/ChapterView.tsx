@@ -11,57 +11,45 @@ import { ScriptureReader } from "@/components/chapter/ScriptureReader";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
-import { CompanionColumn } from "@/components/chapter/CompanionColumn";
-import { CostDrawer } from "@/components/chapter/CostDrawer";
+import { TransparencySection } from "@/components/chapter/TransparencySection";
 
 /**
  * Reusable chapter template. Renders any global chapter workup.
- * Every section consumes `data` — no chapter content is hardcoded here, so the
- * same template serves Exodus 27 today and any future chapter unchanged.
+ * Every section consumes `data` — no chapter content is hardcoded here.
  *
- * Personalization (notes, "go deeper" threads, custom prayers) will later layer
- * on top of this via a separate per-user component — without changing this view.
+ * Single intentional column on every breakpoint (no desktop sidebar). The
+ * facts the old "Quick Info" sidebar repeated already live in the hero +
+ * MetadataChips, so they appear exactly once. Provenance sits once, quietly,
+ * at the bottom via TransparencySection.
  */
 export function ChapterView({ data, source }: { data: ChapterWorkup; source?: string }) {
   return (
-    <div className="mx-auto max-w-[1180px] px-4 lg:px-6">
-        {/* Phone-first: 480 → tablet 760 → desktop two-pane */}
-        <div className="mx-auto max-w-[480px] md:max-w-[760px] lg:max-w-none lg:grid lg:grid-cols-[minmax(0,700px)_minmax(300px,360px)] lg:justify-center lg:gap-8">
-          {/* Main chapter experience */}
-          <main className="min-w-0 space-y-7 pb-12 pt-4 lg:pt-6">
-            <ChapterHero data={data} />
+    <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
+      <main className="min-w-0 space-y-7 pb-12 pt-4 lg:pt-6">
+        <ChapterHero data={data} />
 
-            <div className="space-y-3">
-              <HeroImage data={data} />
-              <MetadataChips data={data} />
-              <VisualDashboardGrid data={data} />
-              <TimelineSection data={data} />
-              <QuickSummaryCard data={data} />
-            </div>
-
-            <GeneratedImagesSection data={data} />
-            <InsightCardGrid data={data} />
-            <ScriptureReader data={data} />
-            <MapsSection data={data} />
-            <ChaptersSection data={data} />
-            <GoDeeperSection />
-
-            {/* Transparency lives in the companion on desktop, here on mobile */}
-            <div className="lg:hidden">
-              <CostDrawer source={source} />
-            </div>
-
-            <footer className="flex flex-col items-center gap-2 pt-2 text-center">
-              <span className="wordmark text-xs text-secondary">Selah</span>
-              <p className="text-[11px] text-secondary">Pause. Reflect. Elevate.</p>
-            </footer>
-          </main>
-
-          {/* Desktop companion column — scrolls with the page (no separate scroll) */}
-          <aside className="hidden min-w-0 pt-3 lg:block">
-            <CompanionColumn data={data} source={source} />
-          </aside>
+        <div className="space-y-3">
+          <HeroImage data={data} />
+          <MetadataChips data={data} />
+          <VisualDashboardGrid data={data} />
+          <TimelineSection data={data} />
+          <QuickSummaryCard data={data} />
         </div>
+
+        <GeneratedImagesSection data={data} />
+        <InsightCardGrid data={data} />
+        <ScriptureReader data={data} />
+        <MapsSection data={data} />
+        <ChaptersSection data={data} />
+        <GoDeeperSection />
+
+        <TransparencySection data={data} source={source} />
+
+        <footer className="flex flex-col items-center gap-2 pt-2 text-center">
+          <span className="wordmark text-xs text-secondary">Selah</span>
+          <p className="text-[11px] text-secondary">Pause. Reflect. Elevate.</p>
+        </footer>
+      </main>
     </div>
   );
 }

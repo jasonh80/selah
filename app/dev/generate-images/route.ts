@@ -3,12 +3,12 @@ import { devRoutesEnabled } from "@/lib/server/dev-guard";
 import { imageGenAllowed, isImageGenEnabled, CHAPTER_IMAGE_MODEL, IMAGE_ALLOWED_SLUGS } from "@/lib/server/images";
 import { triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
 
-// DEV/ADMIN ONLY image generation trigger. Protected like /dev/regenerate:
-//   - ENABLE_DEV_ROUTES must be true (else 404)
-//   - ENABLE_CHAPTER_IMAGE_GENERATION must be true + OpenAI/Supabase configured
-//   - slug must be allowlisted (psalm-23 only)
-//   - confirm=yes required to actually generate
-//   - optional REGEN_TOKEN
+// DEV/ADMIN ONLY image generation trigger. ALL of these are required:
+//   - ENABLE_DEV_ROUTES=true (else 404)
+//   - correct DEV_ADMIN_TOKEN (query ?token= or header x-admin-token)
+//   - ENABLE_CHAPTER_IMAGE_GENERATION=true + OpenAI/Supabase configured
+//   - slug allowlisted (psalm-23 only)
+//   - confirm=yes to actually generate
 // No public page load can reach this. Generates IMAGES only — never text.
 export const dynamic = "force-dynamic";
 
@@ -18,10 +18,15 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") || "";
   const confirm = url.searchParams.get("confirm") === "yes";
-  const token = url.searchParams.get("token") || "";
 
-  if (process.env.REGEN_TOKEN && token !== process.env.REGEN_TOKEN) {
-    return NextResponse.json({ ok: false, error: "bad token" }, { status: 401 });
+  // Mandatory admin secret — a leaked/forgotten dev-routes flag is not enough.
+  const provided = url.searchParams.get("token") || request.headers.get("x-admin-token") || "";
+  const expected = process.env.DEV_ADMIN_TOKEN || "";
+  if (!expected || provided !== expected) {
+    return NextResponse.json(
+      { ok: false, error: "admin token required (set DEV_ADMIN_TOKEN and pass ?token= or x-admin-token header)" },
+      { status: 401 },
+    );
   }
 
   if (!imageGenAllowed(slug)) {
