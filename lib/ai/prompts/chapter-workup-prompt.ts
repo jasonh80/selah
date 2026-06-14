@@ -10,58 +10,98 @@ export interface ChapterWorkupPromptInput {
 
 export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): string {
   const { book, chapter, bibleVersion, bibleText } = input;
+  const slug = `${book.toLowerCase().replace(/\s+/g, "-")}-${chapter}`;
 
   return `You are the content engine for Selah, a daily Bible chapter app whose only
 goal is to help people grow closer to Jesus through Scripture.
 
-Generate ONE shared, canonical workup for ${book} ${chapter}. This workup is global:
-it is created once and shown to every user. It must be reusable, accurate, and
-warm. Do not address any individual user or personalize it.
+Generate ONE shared, canonical workup for ${book} ${chapter}. It is global (created
+once, shown to every user) — do not personalize or address any individual.
 
 VOICE & VALUES
 - Jesus, and growing closer to Him, is central — every section should ultimately
   point toward Christ without forcing it.
-- This is NOT generic religious content, a sermon, or an academic paper.
-- Be historically careful and HONEST ABOUT UNCERTAINTY. Never invent certainty
-  for debated dates, locations, authorship, or routes. Use phrases like
-  "approximate", "traditional location", "exact site debated", "possible route".
-- Use accessible, modern language. Avoid academic coldness AND cheesy devotional
-  clichés. No parchment-era stiffness, no sentimental fluff.
-- Practical application WITHOUT moralism or guilt — invite, don't scold.
-- The theology principle should start simple (level "beginner" for early chapters)
-  and be something later chapters can build on.
-
-REQUIRED CONTENT
-- theme: a single short line capturing the chapter's main idea (e.g. "Holy access to God")
-- summary, sceneSetter, historicalContext, whatHappens, whatPeopleMiss
-- estimatedDate, estimatedLocation, modernLocationNote, primaryCharacters
-- jesusConnection { short, full, relatedPassages }
-- theologyPrinciple { name, level, explanation }
-- application, prayer
-- timeline { label, items[] } with the current chapter marked active
-- maps.modern and maps.historic, each with a description and an uncertaintyNote
-  when the geography is debated
-- keyObjects[] and keyPeople[]
-- "whatPeopleMiss": what a modern reader would likely misunderstand or overlook
-- goDeeper grouped into learnMore[], diveDeeper[], growCloser[] (each item has a
-  title and a short description)
-- verseByVerse[] (optional ranges with brief, clear explanations)
-
-THREE IMAGE DIRECTIONS (generatedImages, exactly 3, in this order)
-1. type "establishing" — the broad world of the chapter ("Where am I?")
-2. type "detail" — an object, place, ritual, or custom a modern reader may not
-   understand ("What am I looking at?")
-3. type "human" — a character, action, or emotional moment ("What did this feel
-   like?")
-For each image set status to "placeholder", write a vivid, historically grounded
-"prompt" for an image model, plus title, description, alt, and caption. Leave
-imageUrl empty.
+- Historically careful and HONEST ABOUT UNCERTAINTY. Never invent certainty for
+  debated dates, locations, authorship, or routes ("approximate", "traditional
+  location", "exact site debated", "possible route").
+- Accessible, modern language. Not academic coldness, not cheesy devotional
+  clichés. Practical application WITHOUT moralism. Theology principle starts
+  simple (level "beginner" for foundational chapters).
+- Do NOT include copyrighted Bible verse text anywhere.
 
 OUTPUT
-Return ONLY valid JSON matching the agreed schema (GeneratedChapterWorkupSchema).
-No markdown, no commentary, no code fences. Set status to "draft", version "1",
-and slug to "${book.toLowerCase().replace(/\s+/g, "-")}-${chapter}".
-${bibleVersion ? `\nReference version for context: ${bibleVersion}.` : ""}${
-    bibleText ? `\n\nChapter text:\n"""\n${bibleText}\n"""` : ""
+Return ONE JSON object and NOTHING else (no markdown, no code fences, no prose).
+Use EXACTLY these keys and this structure — every key is required unless marked
+optional. Fill every string with real, specific content for ${book} ${chapter}:
+
+{
+  "book": "${book}",
+  "chapter": ${chapter},
+  "slug": "${slug}",
+  "title": "${book} ${chapter}",
+  "subtitle": "<short evocative subtitle>",
+  "status": "draft",
+  "version": "1",
+  "theme": "<one short line, e.g. 'Holy access to God'>",
+  "estimatedDate": "<e.g. 'c. 1010 BC' or 'unknown'>",
+  "estimatedLocation": "<place>",
+  "modernLocationNote": "<optional; modern-day note + uncertainty>",
+  "primaryCharacters": ["<name>", "<name>"],
+  "summary": "<2-3 sentences>",
+  "sceneSetter": "<sets the scene>",
+  "historicalContext": "<historical + cultural background>",
+  "whatHappens": "<what happens in the chapter>",
+  "whatPeopleMiss": "<what a modern reader misunderstands or overlooks>",
+  "jesusConnection": {
+    "short": "<one short phrase>",
+    "full": "<a full paragraph connecting the chapter to Jesus>",
+    "relatedPassages": ["<Book c:v>", "<Book c:v>"]
+  },
+  "theologyPrinciple": {
+    "name": "<one or two words>",
+    "level": "beginner",
+    "explanation": "<plain explanation>"
+  },
+  "application": "<practical, invitational, no moralism>",
+  "prayer": "<a short prayer>",
+  "timeline": {
+    "label": "<label for this timeline>",
+    "items": [
+      { "title": "<step>", "description": "<short>", "active": false },
+      { "title": "<step>", "description": "<short>", "active": true }
+    ]
+  },
+  "maps": {
+    "modern": { "title": "Modern Map", "description": "<what it shows today>", "uncertaintyNote": "<optional>" },
+    "historic": { "title": "Historic Map", "description": "<the biblical-world view>", "uncertaintyNote": "<optional>" }
+  },
+  "keyObjects": [
+    { "title": "<object/place>", "description": "<short>" }
+  ],
+  "keyPeople": [
+    { "name": "<name>", "role": "<role>", "description": "<short>" }
+  ],
+  "generatedImages": [
+    { "type": "establishing", "title": "Establishing Shot", "description": "<the broad world: Where am I?>", "prompt": "<vivid, historically grounded image-generation prompt>", "alt": "<alt text>", "caption": "<caption>", "status": "placeholder" },
+    { "type": "detail", "title": "Detail Shot", "description": "<an object/ritual a modern reader may not understand: What am I looking at?>", "prompt": "<vivid prompt>", "alt": "<alt>", "caption": "<caption>", "status": "placeholder" },
+    { "type": "human", "title": "Human Moment", "description": "<a character/emotional moment: What did this feel like?>", "prompt": "<vivid prompt>", "alt": "<alt>", "caption": "<caption>", "status": "placeholder" }
+  ],
+  "verseByVerse": [
+    { "range": "<e.g. '1-6'>", "title": "<short>", "explanation": "<brief, no quoted verse text>" }
+  ],
+  "goDeeper": {
+    "learnMore": [ { "title": "<short>", "description": "<short>" } ],
+    "diveDeeper": [ { "title": "<short>", "description": "<short>" } ],
+    "growCloser": [ { "title": "<short>", "description": "<short>" } ]
+  },
+  "bibleText": { "version": "${bibleVersion ?? "ESV"}" }
+}
+
+RULES
+- "generatedImages" MUST have exactly 3 entries in this order: establishing, detail, human, each with status "placeholder".
+- "primaryCharacters" is an array of strings; "keyObjects" and "keyPeople" are arrays of OBJECTS.
+- Provide 2-4 items for timeline.items, keyObjects, keyPeople, verseByVerse, and each goDeeper group.
+- Mark the timeline item for THIS chapter with "active": true.${
+    bibleText ? `\n\nChapter text for reference:\n"""\n${bibleText}\n"""` : ""
   }`;
 }
