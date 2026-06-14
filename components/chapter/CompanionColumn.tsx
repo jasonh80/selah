@@ -3,13 +3,13 @@ import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { CostDrawer } from "@/components/chapter/CostDrawer";
 
 // Desktop-only companion. Scrolls with the page. Summary/preview cards only.
-export function CompanionColumn({ data }: { data: ChapterWorkup }) {
+export function CompanionColumn({ data, source }: { data: ChapterWorkup; source?: string }) {
   return (
     <div className="space-y-4">
       <TodayCard data={data} />
       <MiniMaps data={data} />
       <GoDeeperSection data={data} />
-      <CostDrawer />
+      <CostDrawer source={source} />
     </div>
   );
 }

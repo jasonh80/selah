@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
 import { loadGlobalChapterWorkup } from "@/lib/chapters/registry";
+import { CHAPTER_SOURCE } from "@/lib/chapters/source";
 
 // Any chapter renders through the same ChapterView template, e.g. /chapter/exodus-27.
 // Dynamic + no generateStaticParams on purpose: chapters are generated lazily on
@@ -20,7 +21,7 @@ export default async function ChapterPage({ params }: { params: { slug: string }
 
   return (
     <AppShell>
-      <ChapterView data={data} />
+      <ChapterView data={data} source={CHAPTER_SOURCE} />
     </AppShell>
   );
 }

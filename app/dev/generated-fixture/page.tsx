@@ -21,7 +21,7 @@ export default function GeneratedFixturePage() {
           <code>exodus-27-generated.json</code> → parse → adapter → ChapterView
         </div>
       </div>
-      <ChapterView data={data} />
+      <ChapterView data={data} source="generated fixture" />
     </AppShell>
   );
 }

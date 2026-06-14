@@ -5,7 +5,7 @@ import { BUILD_ID } from "@/lib/build";
 
 // Quiet, collapsed-by-default transparency drawer. Placeholder numbers in
 // Phase 0; fed by real logged CostEvents later. Intentionally understated.
-export function CostDrawer() {
+export function CostDrawer({ source }: { source?: string }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -31,7 +31,10 @@ export function CostDrawer() {
         </div>
       )}
 
-      <p className="mt-2 text-center text-[10px] text-secondary/70">Build: {BUILD_ID}</p>
+      <p className="mt-2 text-center text-[10px] text-secondary/70">
+        Build: {BUILD_ID}
+        {source ? ` · Source: ${source}` : ""}
+      </p>
     </div>
   );
 }

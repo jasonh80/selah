@@ -3,6 +3,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { PageBody, ComingLater } from "@/components/shell/PageBody";
 import { ThemePicker, VersionPicker, TransparencyToggle } from "@/components/settings/controls";
 import { BUILD_ID } from "@/lib/build";
+import { CHAPTER_SOURCE } from "@/lib/chapters/source";
 
 const SOUNDS = [
   "None",
@@ -50,7 +51,9 @@ export default function SettingsPage() {
             </div>
           </Section>
 
-          <p className="pt-2 text-center text-[11px] text-secondary/70">Build: {BUILD_ID}</p>
+          <p className="pt-2 text-center text-[11px] text-secondary/70">
+            Build: {BUILD_ID} · Source: {CHAPTER_SOURCE}
+          </p>
         </div>
       </PageBody>
     </AppShell>

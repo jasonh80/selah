@@ -21,7 +21,7 @@ import { CostDrawer } from "@/components/chapter/CostDrawer";
  * Personalization (notes, "go deeper" threads, custom prayers) will later layer
  * on top of this via a separate per-user component — without changing this view.
  */
-export function ChapterView({ data }: { data: ChapterWorkup }) {
+export function ChapterView({ data, source }: { data: ChapterWorkup; source?: string }) {
   return (
     <div className="mx-auto max-w-[1180px] px-4 lg:px-6">
         {/* Phone-first: 480 → tablet 760 → desktop two-pane */}
@@ -48,7 +48,7 @@ export function ChapterView({ data }: { data: ChapterWorkup }) {
               <GoDeeperSection data={data} />
             </div>
             <div className="lg:hidden">
-              <CostDrawer />
+              <CostDrawer source={source} />
             </div>
 
             <footer className="flex flex-col items-center gap-2 pt-2 text-center">
@@ -59,7 +59,7 @@ export function ChapterView({ data }: { data: ChapterWorkup }) {
 
           {/* Desktop companion column — scrolls with the page (no separate scroll) */}
           <aside className="hidden min-w-0 pt-3 lg:block">
-            <CompanionColumn data={data} />
+            <CompanionColumn data={data} source={source} />
           </aside>
         </div>
     </div>

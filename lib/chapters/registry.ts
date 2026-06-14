@@ -1,5 +1,5 @@
 import type { ChapterWorkup } from "@/lib/types";
-import { exodus27 } from "@/lib/chapters/exodus-27";
+import { exodus27Workup } from "@/lib/chapters/source";
 
 /**
  * Global, shared chapter workups — one canonical Selah workup per chapter.
@@ -13,6 +13,9 @@ import { exodus27 } from "@/lib/chapters/exodus-27";
 
 // Workups that already exist (seeded + anything generated this runtime).
 // In Phase 1+ this read-through cache sits over a `chapter_workups` table.
+// The Exodus 27 seed comes from the active source (hand-authored or the
+// generated fixture) via the dogfood switch in ./source.
+const exodus27 = exodus27Workup();
 const CACHE = new Map<string, ChapterWorkup>([[exodus27.slug, exodus27]]);
 
 export function getChapterBySlug(slug: string): ChapterWorkup | null {
