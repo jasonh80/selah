@@ -94,14 +94,47 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     "diveDeeper": [ { "title": "<short>", "description": "<short>" } ],
     "growCloser": [ { "title": "<short>", "description": "<short>" } ]
   },
+  "chapterSpecificTopics": [
+    { "title": "<a topic THIS chapter is really about>", "reason": "<why it matters here>", "priority": 1 }
+  ],
+  "sections": [
+    { "id": "big-idea", "title": "Big Idea", "type": "big_idea", "priority": 1, "isCore": true, "cardSummary": "<1-2 sentence hook>", "fullContent": "<2-4 rich paragraphs>" },
+    { "id": "chapter-flow", "title": "Chapter Flow", "type": "chapter_flow", "priority": 2, "isCore": true, "cardSummary": "<short>", "fullContent": "<walk the movement of the chapter, verse by verse where helpful>", "verseRefs": ["<c:v>"] },
+    { "id": "historical-world", "title": "The World Behind It", "type": "historical_world", "priority": 3, "isCore": true, "cardSummary": "<short>", "fullContent": "<historical imagination, customs, setting>" },
+    { "id": "what-most-miss", "title": "What Most People Miss", "type": "what_most_people_miss", "priority": 4, "isCore": true, "cardSummary": "<short>", "fullContent": "<the overlooked detail doing real work>" },
+    { "id": "jesus", "title": "Jesus at the Center", "type": "jesus_connection", "priority": 5, "isCore": true, "cardSummary": "<short>", "fullContent": "<rich, careful Christ connection>" },
+    { "id": "theology", "title": "Theology Principle", "type": "theology", "priority": 6, "isCore": true, "cardSummary": "<short>", "fullContent": "<the principle, started simple>" },
+    { "id": "application", "title": "Live It", "type": "application", "priority": 7, "isCore": true, "cardSummary": "<short>", "fullContent": "<practical, invitational, no moralism>" },
+    { "id": "prayer", "title": "Prayer", "type": "prayer", "priority": 8, "isCore": true, "cardSummary": "<short>", "fullContent": "<a fuller prayer>" },
+    { "id": "image-plan", "title": "Image Plan", "type": "image_plan", "priority": 20, "isCore": false, "cardSummary": "<short>", "fullContent": "<describe the 3 images: establishing, detail, human>" }
+  ],
   "bibleText": { "version": "${bibleVersion ?? "ESV"}" }
 }
 
+CHOOSING TOPICS FIRST
+Before writing, identify in "chapterSpecificTopics" what THIS chapter is actually
+about (e.g. for Psalm 23: shepherding world, green pastures & still waters, valley
+of the shadow, rod & staff, table before enemies, goodness & mercy, the Good
+Shepherd). Let those topics shape the sections. Do NOT fill the same generic
+sections for every chapter.
+
+SECTION DEPTH (this is the heart of Selah)
+- Include all 8 core sections above (isCore true). Also add helpful non-core
+  sections when the passage warrants: "verse_by_verse" (movement through the
+  chapter), "original_language" (only when a Hebrew/Greek word genuinely
+  illuminates), "map_notes" (when geography matters), "custom" (a chapter-specific
+  topic from your list).
+- "cardSummary" is short and polished (1-2 sentences). "fullContent" is the real
+  daily-rundown: multiple paragraphs, specific to THIS chapter, with historical
+  imagination, verse-by-verse movement, and a warm, accurate Jesus connection.
+- Be specific, not generic. If a section could apply to almost any chapter, rewrite it.
+
 RULES
 - "generatedImages" MUST have exactly 3 entries in this order: establishing, detail, human, each with status "placeholder".
-- "primaryCharacters" is an array of strings; "keyObjects" and "keyPeople" are arrays of OBJECTS.
-- Provide 2-4 items for timeline.items, keyObjects, keyPeople, verseByVerse, and each goDeeper group.
-- Mark the timeline item for THIS chapter with "active": true.${
-    bibleText ? `\n\nChapter text for reference:\n"""\n${bibleText}\n"""` : ""
+- "primaryCharacters" is an array of strings; "keyObjects", "keyPeople", "sections", "chapterSpecificTopics" are arrays of OBJECTS.
+- Provide 2-4 items for timeline.items, keyObjects, keyPeople, verseByVerse, and each goDeeper group; 3-7 chapterSpecificTopics.
+- Mark the timeline item for THIS chapter with "active": true.
+- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${
+    bibleText ? `\n\nUse this chapter text as your source (do not quote it verbatim in output):\n"""\n${bibleText}\n"""` : ""
   }`;
 }

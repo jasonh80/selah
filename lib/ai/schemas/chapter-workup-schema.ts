@@ -88,6 +88,44 @@ const VerseByVerseSchema = z.object({
   application: z.string().optional(),
 });
 
+// Rich daily-rundown sections: a short card summary + the full expanded content,
+// revealed progressively in the UI. The model chooses chapter-specific topics
+// first, then writes these.
+export const SECTION_TYPES = [
+  "big_idea",
+  "chapter_flow",
+  "historical_world",
+  "verse_by_verse",
+  "what_most_people_miss",
+  "original_language",
+  "jesus_connection",
+  "theology",
+  "application",
+  "prayer",
+  "map_notes",
+  "image_plan",
+  "custom",
+] as const;
+
+const SectionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  type: z.enum(SECTION_TYPES),
+  priority: z.number(),
+  cardSummary: z.string(), // short, polished, for the UI card
+  fullContent: z.string(), // the complete expanded daily-rundown section
+  verseRefs: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+  isCore: z.boolean(),
+});
+export type WorkupSection = z.infer<typeof SectionSchema>;
+
+const ChapterTopicSchema = z.object({
+  title: z.string(),
+  reason: z.string(),
+  priority: z.number(),
+});
+
 const BibleTextSchema = z.object({
   // Placeholder/source metadata only — Selah does not store licensed text yet.
   version: z.string(),
@@ -156,6 +194,11 @@ export const GeneratedChapterWorkupSchema = z.object({
     .length(3, "Exactly 3 images: establishing, detail, human"),
   verseByVerse: z.array(VerseByVerseSchema),
   goDeeper: GoDeeperSchema,
+
+  // Rich two-layer content (optional so older fixtures still validate; required
+  // for newly generated chapters via the prompt).
+  chapterSpecificTopics: z.array(ChapterTopicSchema).optional(),
+  sections: z.array(SectionSchema).optional(),
 
   // metadata placeholders
   bibleText: BibleTextSchema,

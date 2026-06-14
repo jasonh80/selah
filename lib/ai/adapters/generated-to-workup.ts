@@ -1,5 +1,26 @@
-import type { GeneratedChapterWorkup, GeneratedImage } from "../schemas/chapter-workup-schema";
+import type {
+  GeneratedChapterWorkup,
+  GeneratedImage,
+  WorkupSection,
+} from "../schemas/chapter-workup-schema";
 import type { ChapterWorkup, ChapterImage, Insight, ImageKind, KeyItem } from "../../types";
+
+// Icon per rich-section type for the expandable Deeper Study cards.
+const SECTION_ICON: Record<WorkupSection["type"], string> = {
+  big_idea: "💡",
+  chapter_flow: "🧭",
+  historical_world: "🏛",
+  verse_by_verse: "📖",
+  what_most_people_miss: "🔍",
+  original_language: "🔤",
+  jesus_connection: "✝",
+  theology: "🛡",
+  application: "🌱",
+  prayer: "🙏",
+  map_notes: "🗺",
+  image_plan: "🎨",
+  custom: "✦",
+};
 
 /**
  * Maps the canonical generated workup (AI output, Zod-validated) into the
@@ -94,8 +115,21 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
     activeIndex,
   };
 
-  // Deeper-study expandable cards.
-  const insights: Insight[] = [
+  // Deeper-study expandable cards. Prefer the rich two-layer sections; fall back
+  // to the legacy field derivation for older workups without sections.
+  const insights: Insight[] = g.sections?.length
+    ? [...g.sections]
+        .filter((s) => s.type !== "image_plan")
+        .sort((a, b) => a.priority - b.priority)
+        .map((s) => ({
+          id: s.id,
+          icon: SECTION_ICON[s.type] ?? "✦",
+          title: s.title,
+          preview: s.cardSummary,
+          body: s.fullContent,
+          jesus: s.type === "jesus_connection",
+        }))
+    : [
     {
       id: "context",
       icon: "🏛",
