@@ -1,15 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
 import { VersionSelect } from "@/components/chapter/VersionSelect";
 import { VERSIONS, useVersion } from "@/components/VersionProvider";
 
 type Mode = "read" | "listen" | "verse";
+type EsvState = { loading: boolean; found?: boolean; text?: string; copyright?: string };
 
 export function ScriptureReader({ data }: { data: ChapterWorkup }) {
   const { version, setVersion } = useVersion();
   const [mode, setMode] = useState<Mode>("read");
+  const [esv, setEsv] = useState<EsvState>({ loading: false });
+
+  // Fetch real ESV text server-side (key stays private) when ESV is selected.
+  useEffect(() => {
+    if (version !== "ESV") {
+      setEsv({ loading: false });
+      return;
+    }
+    let cancelled = false;
+    setEsv({ loading: true });
+    fetch(`/api/scripture?ref=${encodeURIComponent(data.reference)}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setEsv({ loading: false, found: j.found, text: j.text, copyright: j.copyright });
+      })
+      .catch(() => {
+        if (!cancelled) setEsv({ loading: false, found: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [version, data.reference]);
+
+  const showEsv = version === "ESV" && esv.found && Boolean(esv.text);
 
   return (
     <section id="chapter" className="scroll-mt-20 space-y-3">
@@ -35,10 +60,13 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
         ))}
       </div>
 
-      <p className="text-[12px] text-secondary">
-        Selected verses shown for the prototype — full chapter text comes from a licensed Bible
-        source later.
-      </p>
+      {!showEsv && mode !== "listen" && (
+        <p className="text-[12px] text-secondary">
+          {version === "ESV"
+            ? "Selected verses shown for the prototype."
+            : `${version} text isn't wired up yet — switch to ESV for the full chapter.`}
+        </p>
+      )}
 
       <div className="rounded-md border bg-card p-5 shadow-hair">
         {mode === "listen" ? (
@@ -48,6 +76,13 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
             </div>
             <p className="text-sm text-secondary">Audio reading — coming soon ({version})</p>
           </div>
+        ) : version === "ESV" && esv.loading ? (
+          <p className="py-6 text-center text-sm text-secondary">Loading ESV text…</p>
+        ) : showEsv ? (
+          <div>
+            <div className="text-scripture whitespace-pre-line text-primary">{esv.text}</div>
+            <p className="mt-4 border-t pt-3 text-[11px] leading-relaxed text-secondary">{esv.copyright}</p>
+          </div>
         ) : mode === "verse" ? (
           <div className="space-y-4">
             {data.verses.map((v) => (
@@ -55,23 +90,19 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
                 <span className="w-5 shrink-0 pt-1 text-right text-xs font-semibold text-accent-strong">
                   {v.number}
                 </span>
-                <p className={`text-scripture ${v.redLetter ? "red-letter" : "text-primary"}`}>
-                  {v.text}
-                </p>
+                <p className={`text-scripture ${v.redLetter ? "red-letter" : "text-primary"}`}>{v.text}</p>
               </div>
             ))}
           </div>
         ) : (
-          <div>
-            <p className="text-scripture text-primary">
-              {data.verses.map((v) => (
-                <span key={v.number} className={v.redLetter ? "red-letter" : ""}>
-                  <sup className="mr-1 text-xs text-secondary">{v.number}</sup>
-                  {v.text}{" "}
-                </span>
-              ))}
-            </p>
-          </div>
+          <p className="text-scripture text-primary">
+            {data.verses.map((v) => (
+              <span key={v.number} className={v.redLetter ? "red-letter" : ""}>
+                <sup className="mr-1 text-xs text-secondary">{v.number}</sup>
+                {v.text}{" "}
+              </span>
+            ))}
+          </p>
         )}
       </div>
     </section>
