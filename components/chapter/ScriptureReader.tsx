@@ -60,11 +60,9 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
         ))}
       </div>
 
-      {!showEsv && mode !== "listen" && (
+      {!showEsv && mode !== "listen" && version !== "ESV" && (
         <p className="text-[12px] text-secondary">
-          {version === "ESV"
-            ? "Selected verses shown for the prototype."
-            : `${version} text isn't wired up yet — switch to ESV for the full chapter.`}
+          {version} text isn’t available yet — switch to ESV for the full chapter.
         </p>
       )}
 
@@ -76,7 +74,7 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
             </div>
             <p className="text-sm text-secondary">Audio reading — coming soon ({version})</p>
           </div>
-        ) : version === "ESV" && esv.loading ? (
+        ) : version === "ESV" && (esv.loading || esv.found === undefined) ? (
           <p className="py-6 text-center text-sm text-secondary">Loading ESV text…</p>
         ) : showEsv ? (
           <div>
