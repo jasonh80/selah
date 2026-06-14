@@ -1,31 +1,39 @@
 import type { ChapterWorkup } from "@/lib/types";
 
-// One timeline: where this chapter fits in the full biblical story.
-// Eras are evenly spaced along a line; the chapter is pinned at its era.
-type Era = {
-  key: string;
-  label: string;
-  dateLabel: string;
-  lo: number; // year range used to place a chapter (negative = BC)
-  hi: number;
-  match: RegExp;
-  cross?: boolean;
-};
+// One Big Story timeline: Creation → Today, with a fixed set of milestone
+// markers. Only the chapter PIN moves — it floats to its year, interpolated
+// between the two surrounding markers (so e.g. David-era Psalm 23 lands between
+// the 10 Commandments and the 1st Temple).
+type Marker = { key: string; label: string; year: number; cross?: boolean };
 
-const ERAS: Era[] = [
-  { key: "creation", label: "Creation", dateLabel: "date debated", lo: -6000, hi: -3000, match: /creation|adam|eden|garden/ },
-  { key: "patriarchs", label: "Patriarchs", dateLabel: "c. 2000 BC", lo: -2200, hi: -1500, match: /patriarch|abraham|isaac|jacob|joseph/ },
-  { key: "exodus", label: "Exodus", dateLabel: "c. 1446 BC", lo: -1500, hi: -1100, match: /exodus|wilderness|sinai|moses|tabernacle|commandment|law/ },
-  { key: "kingdom", label: "David / Kingdom", dateLabel: "c. 1000 BC", lo: -1100, hi: -586, match: /david|kingdom|monarchy|solomon|psalm|temple/ },
-  { key: "exile", label: "Exile", dateLabel: "c. 586 BC", lo: -605, hi: -430, match: /exile|babylon|captivity/ },
-  { key: "jesus", label: "Jesus", dateLabel: "c. AD 30", lo: -6, hi: 36, match: /jesus|christ|ministry|gospel/, cross: true },
-  { key: "church", label: "Early Church", dateLabel: "c. AD 33–100", lo: 37, hi: 400, match: /church|apostl|acts|epistle|paul|revelation/ },
-  { key: "today", label: "Today", dateLabel: "present", lo: 1000, hi: 3000, match: /today|present|modern/ },
+// Fixed markers (negative = BC). Years are representative anchors used only to
+// place the moving pin; the labels themselves never change between chapters.
+const MARKERS: Marker[] = [
+  { key: "creation", label: "Creation", year: -4000 },
+  { key: "ark", label: "Ark", year: -2500 },
+  { key: "commandments", label: "10 Commandments", year: -1446 },
+  { key: "temple", label: "1st Temple", year: -957 },
+  { key: "jesus", label: "Jesus", year: 30, cross: true },
+  { key: "today", label: "Today", year: 2025 },
 ];
 
-// Evenly space the eras across 6%–94% of the line.
+// Evenly space the markers across 6%–94% of the line.
 function posForIndex(i: number): number {
-  return 6 + (i / (ERAS.length - 1)) * 88;
+  return 6 + (i / (MARKERS.length - 1)) * 88;
+}
+
+// Continuous position for a year, interpolated between the surrounding markers.
+function pinPosForYear(year: number): number {
+  if (year <= MARKERS[0].year) return posForIndex(0);
+  for (let i = 0; i < MARKERS.length - 1; i++) {
+    const a = MARKERS[i];
+    const b = MARKERS[i + 1];
+    if (year >= a.year && year <= b.year) {
+      const f = (year - a.year) / (b.year - a.year);
+      return posForIndex(i) + f * (posForIndex(i + 1) - posForIndex(i));
+    }
+  }
+  return posForIndex(MARKERS.length - 1);
 }
 
 function parseYear(raw?: string): number | null {
@@ -43,29 +51,16 @@ function parseYear(raw?: string): number | null {
   return isBC ? -avg : avg;
 }
 
-function eraIndexForYear(year: number): number {
-  const idx = ERAS.findIndex((e) => year >= e.lo && year <= e.hi);
-  if (idx >= 0) return idx;
-  let best = 0;
-  let bestD = Infinity;
-  ERAS.forEach((e, i) => {
-    const d = Math.abs(year - (e.lo + e.hi) / 2);
-    if (d < bestD) {
-      bestD = d;
-      best = i;
-    }
-  });
-  return best;
-}
-
 export function TimelineSection({ data }: { data: ChapterWorkup }) {
   const bt = data.biblicalTimeline;
-  const eraStr = bt?.era?.toLowerCase();
-  const year = bt?.estimatedYear ?? parseYear(data.estimatedDate);
 
-  let activeIndex = -1;
-  if (eraStr) activeIndex = ERAS.findIndex((e) => e.match.test(eraStr));
-  if (activeIndex < 0 && year != null) activeIndex = eraIndexForYear(year);
+  // Pin year: explicit estimate → midpoint of a date range → parsed estimate.
+  const year =
+    bt?.estimatedYear ??
+    (bt?.dateRange ? Math.round((bt.dateRange.startYear + bt.dateRange.endYear) / 2) : null) ??
+    parseYear(data.estimatedDate);
+
+  const pinPos = year != null ? pinPosForYear(year) : null;
 
   const range = bt?.dateRange;
   const dateLabel = bt?.estimatedYearLabel ?? data.estimatedDate ?? "uncertain";
@@ -77,44 +72,39 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
       <h2 className="text-section mt-0.5 text-primary">Timeline</h2>
 
       <div className="no-scrollbar -mx-4 mt-4 overflow-x-auto px-4">
-        <div className="relative h-[96px] min-w-[680px]">
+        <div className="relative h-[96px] min-w-[560px]">
           <div className="absolute inset-x-0 top-[46px] h-0.5 bg-line" />
 
-          {ERAS.map((era, i) => {
-            const active = i === activeIndex;
+          {MARKERS.map((m, i) => {
             const lowered = i % 2 === 1;
             return (
               <div
-                key={era.key}
+                key={m.key}
                 className="absolute top-[40px] flex -translate-x-1/2 flex-col items-center"
                 style={{ left: `${posForIndex(i)}%` }}
               >
-                {era.cross ? (
+                {m.cross ? (
                   <span className="text-[15px] leading-none text-jesus-red">✝</span>
                 ) : (
-                  <span
-                    className={`h-3 w-3 rounded-full ${
-                      active ? "bg-accent-strong ring-4 ring-accent/20" : "border-2 border-line bg-card"
-                    }`}
-                  />
+                  <span className="h-3 w-3 rounded-full border-2 border-line bg-card" />
                 )}
                 {lowered && <span className="mt-0.5 h-3 w-px bg-line" />}
                 <span
-                  className={`whitespace-nowrap text-[10px] font-medium leading-tight ${
-                    active ? "text-accent-strong" : "text-secondary"
-                  } ${lowered ? "mt-0.5" : "mt-1.5"}`}
+                  className={`whitespace-nowrap text-[10px] font-medium leading-tight text-secondary ${
+                    lowered ? "mt-0.5" : "mt-1.5"
+                  }`}
                 >
-                  {era.label}
+                  {m.label}
                 </span>
               </div>
             );
           })}
 
-          {/* Chapter pin above its era */}
-          {activeIndex >= 0 && (
+          {/* Moving chapter pin — the only thing that changes per chapter */}
+          {pinPos != null && (
             <div
               className="absolute top-[2px] flex -translate-x-1/2 flex-col items-center"
-              style={{ left: `${posForIndex(activeIndex)}%` }}
+              style={{ left: `${pinPos}%` }}
             >
               <span className="whitespace-nowrap rounded-full bg-accent-strong px-2 py-0.5 text-[10px] font-semibold text-white shadow-hair">
                 {data.reference}

@@ -61,19 +61,19 @@
   --line: #f0d3b6;
 }
 
-/* Living Water — a bright day on the ocean: turquoise, aqua, cobalt depth */
+/* Living Water — bright day on the ocean: saturated ocean blue, cobalt, aqua */
 [data-theme="living-water"] {
-  --background: #e3f7fb;
+  --background: #aee4f6;
   --card: #ffffff;
-  --card-soft: #c9ecf4;
-  --text-primary: #06384a;
-  --text-secondary: #2f6678;
-  --accent: #12bcd4;
-  --accent-strong: #0a6f9e;
-  --tint: #ccf0f7;
-  --line: #9fd8e6;
-  --purple-soft: #ccf0f7;
-  --purple-muted: #12bcd4;
+  --card-soft: #9ddcf2;
+  --text-primary: #04293f;
+  --text-secondary: #1f5d7a;
+  --accent: #06b6d4;
+  --accent-strong: #0a63c4;
+  --tint: #b6e6f7;
+  --line: #74c8e6;
+  --purple-soft: #b6e6f7;
+  --purple-muted: #06b6d4;
 }
 
 /* Garden — Gethsemane / Eden at dusk, intimate and prayerful (deep dusk) */
@@ -161,9 +161,10 @@ body {
   background-repeat: no-repeat;
 }
 [data-theme="living-water"] body {
-  background-image: radial-gradient(900px 540px at 14% -8%, rgba(18, 188, 212, 0.45), transparent 60%),
-    radial-gradient(840px 520px at 90% 6%, rgba(10, 111, 158, 0.34), transparent 62%),
-    radial-gradient(760px 480px at 60% 110%, rgba(30, 211, 190, 0.3), transparent 60%);
+  background-image: radial-gradient(1200px 760px at 10% -12%, rgba(6, 182, 212, 0.72), transparent 60%),
+    radial-gradient(1100px 760px at 94% -2%, rgba(10, 99, 196, 0.66), transparent 62%),
+    radial-gradient(1000px 720px at 50% 118%, rgba(14, 150, 222, 0.6), transparent 60%),
+    radial-gradient(700px 520px at 78% 50%, rgba(34, 211, 215, 0.4), transparent 60%);
   background-attachment: fixed;
   background-repeat: no-repeat;
 }
