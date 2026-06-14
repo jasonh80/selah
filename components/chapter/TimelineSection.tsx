@@ -11,7 +11,7 @@ const AXIS_MAX = 2026; // Today
 type Anchor = { label: string; year: number; cross?: boolean };
 const ANCHORS: Anchor[] = [
   { label: "Creation", year: -4000 },
-  { label: "Commandments", year: -1446 },
+  { label: "10 Commandments", year: -1446 },
   { label: "1st Temple", year: -957 },
   { label: "Jesus", year: 30, cross: true },
   { label: "Today", year: 2026 },
@@ -127,7 +127,7 @@ function BigStoryRail({ data }: { data: ChapterWorkup }) {
   return (
     <div className="mt-4">
       <div className="no-scrollbar -mx-4 overflow-x-auto px-4">
-        <div className="relative h-[86px] min-w-[560px]">
+        <div className="relative h-[96px] min-w-[620px]">
           {/* axis line */}
           <div className="absolute inset-x-0 top-[46px] h-0.5 bg-line" />
 
@@ -139,23 +139,31 @@ function BigStoryRail({ data }: { data: ChapterWorkup }) {
             />
           )}
 
-          {/* anchor markers */}
-          {ANCHORS.map((a) => (
-            <div
-              key={a.label}
-              className="absolute top-[40px] flex -translate-x-1/2 flex-col items-center"
-              style={{ left: `${pos(a.year)}%` }}
-            >
-              {a.cross ? (
-                <span className="text-[15px] leading-none text-jesus-red">✝</span>
-              ) : (
-                <span className="h-3 w-3 rounded-full border-2 border-line bg-card" />
-              )}
-              <span className="mt-1.5 whitespace-nowrap text-[10px] font-medium text-secondary">
-                {a.label}
-              </span>
-            </div>
-          ))}
+          {/* anchor markers — labels alternate rows so close ones don't collide */}
+          {ANCHORS.map((a, i) => {
+            const lowered = i % 2 === 1;
+            return (
+              <div
+                key={a.label}
+                className="absolute top-[40px] flex -translate-x-1/2 flex-col items-center"
+                style={{ left: `${pos(a.year)}%` }}
+              >
+                {a.cross ? (
+                  <span className="text-[15px] leading-none text-jesus-red">✝</span>
+                ) : (
+                  <span className="h-3 w-3 rounded-full border-2 border-line bg-card" />
+                )}
+                {lowered && <span className="mt-0.5 h-3 w-px bg-line" />}
+                <span
+                  className={`whitespace-nowrap text-[10px] font-medium text-secondary ${
+                    lowered ? "mt-0.5" : "mt-1.5"
+                  }`}
+                >
+                  {a.label}
+                </span>
+              </div>
+            );
+          })}
 
           {/* chapter key marker (pill + pointer + dot on the line) */}
           {markerYear != null && (
