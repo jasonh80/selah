@@ -19,7 +19,7 @@ export function MapsSection({ data }: { data: ChapterWorkup }) {
           <MapPanel
             title="Ancient World"
             src="/img/maps/ancient-judah.jpg"
-            objectPosition="50% 72%"
+            objectPosition="50% 84%"
             caption={data.historicMap.caption}
             attribution="Public domain · Shepherd Historical Atlas, 1911"
           />
