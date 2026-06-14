@@ -42,13 +42,11 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
             <GeneratedImagesSection data={data} />
             <InsightCardGrid data={data} />
             <ScriptureReader data={data} />
-            <ChaptersSection />
             <MapsSection data={data} />
+            <ChaptersSection />
+            <GoDeeperSection />
 
-            {/* Keep Going + transparency live in the companion on desktop */}
-            <div className="lg:hidden">
-              <GoDeeperSection data={data} />
-            </div>
+            {/* Transparency lives in the companion on desktop, here on mobile */}
             <div className="lg:hidden">
               <CostDrawer source={source} />
             </div>

@@ -1,14 +1,12 @@
 import type { ChapterWorkup } from "@/lib/types";
-import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { CostDrawer } from "@/components/chapter/CostDrawer";
 
-// Desktop-only companion. Scrolls with the page. Summary/preview cards only.
+// Desktop-only companion. Scrolls with the page. Summary card + transparency
+// only — maps and Go Deeper live once in the main column (no duplicates).
 export function CompanionColumn({ data, source }: { data: ChapterWorkup; source?: string }) {
   return (
     <div className="space-y-4">
       <TodayCard data={data} />
-      <MiniMaps data={data} />
-      <GoDeeperSection data={data} />
       <CostDrawer source={source} />
     </div>
   );
@@ -37,24 +35,3 @@ function TodayCard({ data }: { data: ChapterWorkup }) {
   );
 }
 
-function MiniMaps({ data }: { data: ChapterWorkup }) {
-  const maps = [
-    { title: "Modern Map", ...data.modernMap },
-    { title: "Historic Map", ...data.historicMap },
-  ];
-  return (
-    <div>
-      <p className="text-eyebrow mb-2">Maps</p>
-      <div className="grid grid-cols-2 gap-2.5">
-        {maps.map((m) => (
-          <div key={m.title} className="overflow-hidden rounded-md border bg-card shadow-hair">
-            <div className="relative aspect-[4/3] w-full bg-card-soft">
-              <img src={m.src} alt={m.alt} className="h-full w-full object-cover" />
-            </div>
-            <p className="px-2.5 py-2 text-[11px] text-secondary">{m.title}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

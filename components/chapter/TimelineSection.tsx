@@ -1,26 +1,31 @@
-"use client";
-
-import { useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
 
-// Linear big-story axis from Creation to Today. Years are rough anchors for
-// positioning; labels stay honest about uncertainty.
-const AXIS_MIN = -4000; // Creation (debated; used only for placement)
-const AXIS_MAX = 2026; // Today
+// One timeline: where this chapter fits in the full biblical story.
+// Eras are evenly spaced along a line; the chapter is pinned at its era.
+type Era = {
+  key: string;
+  label: string;
+  dateLabel: string;
+  lo: number; // year range used to place a chapter (negative = BC)
+  hi: number;
+  match: RegExp;
+  cross?: boolean;
+};
 
-type Anchor = { label: string; year: number; cross?: boolean };
-const ANCHORS: Anchor[] = [
-  { label: "Creation", year: -4000 },
-  { label: "10 Commandments", year: -1446 },
-  { label: "1st Temple", year: -957 },
-  { label: "Jesus", year: 30, cross: true },
-  { label: "Today", year: 2026 },
+const ERAS: Era[] = [
+  { key: "creation", label: "Creation", dateLabel: "date debated", lo: -6000, hi: -3000, match: /creation|adam|eden|garden/ },
+  { key: "patriarchs", label: "Patriarchs", dateLabel: "c. 2000 BC", lo: -2200, hi: -1500, match: /patriarch|abraham|isaac|jacob|joseph/ },
+  { key: "exodus", label: "Exodus", dateLabel: "c. 1446 BC", lo: -1500, hi: -1100, match: /exodus|wilderness|sinai|moses|tabernacle|commandment|law/ },
+  { key: "kingdom", label: "David / Kingdom", dateLabel: "c. 1000 BC", lo: -1100, hi: -586, match: /david|kingdom|monarchy|solomon|psalm|temple/ },
+  { key: "exile", label: "Exile", dateLabel: "c. 586 BC", lo: -605, hi: -430, match: /exile|babylon|captivity/ },
+  { key: "jesus", label: "Jesus", dateLabel: "c. AD 30", lo: -6, hi: 36, match: /jesus|christ|ministry|gospel/, cross: true },
+  { key: "church", label: "Early Church", dateLabel: "c. AD 33–100", lo: 37, hi: 400, match: /church|apostl|acts|epistle|paul|revelation/ },
+  { key: "today", label: "Today", dateLabel: "present", lo: 1000, hi: 3000, match: /today|present|modern/ },
 ];
 
-// Map a year onto 6%–94% of the axis (leaves room for edge labels).
-function pos(year: number): number {
-  const p = (year - AXIS_MIN) / (AXIS_MAX - AXIS_MIN);
-  return 6 + Math.max(0, Math.min(1, p)) * 88;
+// Evenly space the eras across 6%–94% of the line.
+function posForIndex(i: number): number {
+  return 6 + (i / (ERAS.length - 1)) * 88;
 }
 
 function parseYear(raw?: string): number | null {
@@ -38,138 +43,78 @@ function parseYear(raw?: string): number | null {
   return isBC ? -avg : avg;
 }
 
-function fmtYear(y: number): string {
-  return y < 0 ? `${-y} BC` : `AD ${y}`;
+function eraIndexForYear(year: number): number {
+  const idx = ERAS.findIndex((e) => year >= e.lo && year <= e.hi);
+  if (idx >= 0) return idx;
+  let best = 0;
+  let bestD = Infinity;
+  ERAS.forEach((e, i) => {
+    const d = Math.abs(year - (e.lo + e.hi) / 2);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
 }
 
 export function TimelineSection({ data }: { data: ChapterWorkup }) {
-  const [tab, setTab] = useState<"chapter" | "story">("chapter");
-
-  return (
-    <section className="rounded-md border bg-card p-4 shadow-hair">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-eyebrow">Where it fits</p>
-          <h2 className="text-section mt-0.5 text-primary">Timeline</h2>
-        </div>
-        <div className="inline-flex shrink-0 rounded-full border bg-card-soft p-0.5 text-[12px]">
-          {(["chapter", "story"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`rounded-full px-3 py-1 transition ${
-                tab === t ? "bg-accent-strong text-white" : "text-secondary"
-              }`}
-            >
-              {t === "chapter" ? "Chapter" : "Big Story"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {tab === "chapter" ? <ChapterRail data={data} /> : <BigStoryRail data={data} />}
-    </section>
-  );
-}
-
-function ChapterRail({ data }: { data: ChapterWorkup }) {
-  const { labels, activeIndex } = data.timelineMini;
-  return (
-    <div className="mt-5">
-      <div className="relative flex items-center justify-between">
-        <span className="absolute left-1 right-1 top-1.5 h-0.5 bg-line" />
-        {labels.map((label, i) => (
-          <span
-            key={label}
-            className={`relative z-10 h-3 w-3 rounded-full ${
-              i <= activeIndex ? "bg-accent-strong" : "border-2 border-line bg-card"
-            }`}
-          />
-        ))}
-      </div>
-      <div className="mt-2 flex items-center justify-between">
-        {labels.map((label, i) => (
-          <span
-            key={label}
-            className={`text-center text-[11px] ${
-              i === activeIndex ? "font-semibold text-accent-strong" : "text-secondary"
-            }`}
-            style={{ width: `${100 / labels.length}%` }}
-          >
-            {label}
-          </span>
-        ))}
-      </div>
-      <p className="mt-3 text-[11px] text-secondary">Where this moment sits within the chapter.</p>
-    </div>
-  );
-}
-
-function BigStoryRail({ data }: { data: ChapterWorkup }) {
   const bt = data.biblicalTimeline;
+  const eraStr = bt?.era?.toLowerCase();
   const year = bt?.estimatedYear ?? parseYear(data.estimatedDate);
-  const confidence = bt?.confidence ?? (year != null ? "low" : "debated");
-  const range = bt?.dateRange ?? null;
-  const dateLabel = bt?.estimatedYearLabel ?? data.estimatedDate ?? "uncertain";
 
-  // Visual band: explicit range, or a soft uncertainty band for estimated dates.
-  let bandStart: number | null = null;
-  let bandEnd: number | null = null;
-  if (range) {
-    bandStart = range.startYear;
-    bandEnd = range.endYear;
-  } else if (year != null && (confidence === "low" || confidence === "debated")) {
-    bandStart = year - 150;
-    bandEnd = year + 150;
-  }
-  const markerYear = year ?? (range ? Math.round((range.startYear + range.endYear) / 2) : null);
+  let activeIndex = -1;
+  if (eraStr) activeIndex = ERAS.findIndex((e) => e.match.test(eraStr));
+  if (activeIndex < 0 && year != null) activeIndex = eraIndexForYear(year);
+
+  const range = bt?.dateRange;
+  const dateLabel = bt?.estimatedYearLabel ?? data.estimatedDate ?? "uncertain";
+  const note = bt?.uncertaintyNote;
 
   return (
-    <div className="mt-4">
-      <div className="no-scrollbar -mx-4 overflow-x-auto px-4">
-        <div className="relative h-[96px] min-w-[620px]">
-          {/* axis line */}
+    <section id="timeline" className="scroll-mt-20 rounded-md border bg-card p-4 shadow-hair">
+      <p className="text-eyebrow">Where it fits</p>
+      <h2 className="text-section mt-0.5 text-primary">Timeline</h2>
+
+      <div className="no-scrollbar -mx-4 mt-4 overflow-x-auto px-4">
+        <div className="relative h-[96px] min-w-[680px]">
           <div className="absolute inset-x-0 top-[46px] h-0.5 bg-line" />
 
-          {/* chapter date band (range / estimate) */}
-          {bandStart != null && bandEnd != null && (
-            <div
-              className="absolute top-[43px] h-[6px] rounded-full bg-accent/30"
-              style={{ left: `${pos(bandStart)}%`, width: `${Math.max(1.5, pos(bandEnd) - pos(bandStart))}%` }}
-            />
-          )}
-
-          {/* anchor markers — labels alternate rows so close ones don't collide */}
-          {ANCHORS.map((a, i) => {
+          {ERAS.map((era, i) => {
+            const active = i === activeIndex;
             const lowered = i % 2 === 1;
             return (
               <div
-                key={a.label}
+                key={era.key}
                 className="absolute top-[40px] flex -translate-x-1/2 flex-col items-center"
-                style={{ left: `${pos(a.year)}%` }}
+                style={{ left: `${posForIndex(i)}%` }}
               >
-                {a.cross ? (
+                {era.cross ? (
                   <span className="text-[15px] leading-none text-jesus-red">✝</span>
                 ) : (
-                  <span className="h-3 w-3 rounded-full border-2 border-line bg-card" />
+                  <span
+                    className={`h-3 w-3 rounded-full ${
+                      active ? "bg-accent-strong ring-4 ring-accent/20" : "border-2 border-line bg-card"
+                    }`}
+                  />
                 )}
                 {lowered && <span className="mt-0.5 h-3 w-px bg-line" />}
                 <span
-                  className={`whitespace-nowrap text-[10px] font-medium text-secondary ${
-                    lowered ? "mt-0.5" : "mt-1.5"
-                  }`}
+                  className={`whitespace-nowrap text-[10px] font-medium leading-tight ${
+                    active ? "text-accent-strong" : "text-secondary"
+                  } ${lowered ? "mt-0.5" : "mt-1.5"}`}
                 >
-                  {a.label}
+                  {era.label}
                 </span>
               </div>
             );
           })}
 
-          {/* chapter key marker (pill + pointer + dot on the line) */}
-          {markerYear != null && (
+          {/* Chapter pin above its era */}
+          {activeIndex >= 0 && (
             <div
               className="absolute top-[2px] flex -translate-x-1/2 flex-col items-center"
-              style={{ left: `${pos(markerYear)}%` }}
+              style={{ left: `${posForIndex(activeIndex)}%` }}
             >
               <span className="whitespace-nowrap rounded-full bg-accent-strong px-2 py-0.5 text-[10px] font-semibold text-white shadow-hair">
                 {data.reference}
@@ -181,17 +126,14 @@ function BigStoryRail({ data }: { data: ChapterWorkup }) {
         </div>
       </div>
 
-      {/* honest date callout */}
       <div className="mt-3 rounded-sm bg-tint px-3 py-2.5">
         <p className="text-[12px] text-secondary">
           {range
-            ? `Estimated date range: ${fmtYear(range.startYear)} – ${fmtYear(range.endYear)}`
+            ? `Estimated date range: ${range.startYear < 0 ? `${-range.startYear} BC` : `AD ${range.startYear}`} – ${range.endYear < 0 ? `${-range.endYear} BC` : `AD ${range.endYear}`}`
             : `Estimated date: ${dateLabel}`}
         </p>
-        {bt?.uncertaintyNote && (
-          <p className="mt-1 text-[11px] leading-relaxed text-secondary">{bt.uncertaintyNote}</p>
-        )}
+        {note && <p className="mt-1 text-[11px] leading-relaxed text-secondary">{note}</p>}
       </div>
-    </div>
+    </section>
   );
 }

@@ -6,9 +6,7 @@ export function VisualDashboardGrid({ data }: { data: ChapterWorkup }) {
   const jesus = data.navCards.find((c) => c.id === "jesus")!;
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-      <MapCard title="Modern Map" caption={data.modernMap.caption} src={data.modernMap.src} alt={data.modernMap.alt} />
-      <MapCard title="Historic Map" caption={data.historicMap.caption} src={data.historicMap.src} alt={data.historicMap.alt} />
+    <div className="grid grid-cols-2 gap-3">
       <ThumbCard card={obj} />
       <ThumbCard card={person} />
       <JesusCard card={jesus} />
@@ -33,33 +31,6 @@ function CardShell({
     >
       {children}
     </button>
-  );
-}
-
-function MapCard({
-  title,
-  caption,
-  src,
-  alt,
-}: {
-  title: string;
-  caption: string;
-  src: string;
-  alt: string;
-}) {
-  return (
-    <CardShell>
-      <div className="relative aspect-[5/3] w-full bg-card-soft">
-        <img src={src} alt={alt} className="h-full w-full object-cover" />
-        <span className="absolute left-2 top-2 rounded-full bg-[rgba(16,16,20,0.55)] px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
-          {title}
-        </span>
-      </div>
-      <div className="flex items-center justify-between px-3.5 py-3">
-        <p className="text-[11px] text-secondary">{caption}</p>
-        <span className="text-xs text-secondary">›</span>
-      </div>
-    </CardShell>
   );
 }
 

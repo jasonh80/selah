@@ -2,7 +2,7 @@ import { SectionHead } from "@/components/chapter/SectionHead";
 
 export function ChaptersSection() {
   return (
-    <section>
+    <section id="chapters" className="scroll-mt-20">
       <SectionHead eyebrow="Browse" title="Chapters" />
       <div className="overflow-hidden rounded-md border bg-card shadow-hair">
         <Row label="Exodus 26" sub="The Tabernacle" />

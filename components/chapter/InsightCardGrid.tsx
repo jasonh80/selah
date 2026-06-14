@@ -6,7 +6,7 @@ import { SectionHead } from "@/components/chapter/SectionHead";
 
 export function InsightCardGrid({ data }: { data: ChapterWorkup }) {
   return (
-    <section>
+    <section id="deeper-study" className="scroll-mt-20">
       <SectionHead eyebrow="Understand" title="Deeper Study" />
       <div className="grid grid-cols-2 gap-2.5">
         {data.insights.map((insight) => (

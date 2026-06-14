@@ -1,14 +1,36 @@
 import type { ChapterWorkup, ChapterMap } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
 
-// Expanded detail for the map previews in the dashboard above.
+// The single place for location content. No maps are repeated elsewhere.
 export function MapsSection({ data }: { data: ChapterWorkup }) {
+  const notes = [data.historicMap.note, data.modernMap.note].filter(Boolean) as string[];
+
   return (
-    <section>
-      <SectionHead eyebrow="Where it happened" title="Map Details" sub="Expanded from the previews above" />
+    <section id="maps" className="scroll-mt-20">
+      <SectionHead eyebrow="Where it happened" title="Maps & Places" />
       <div className="space-y-2.5">
-        <BigMap title="Modern Map" map={data.modernMap} />
-        <BigMap title="Historic Map" map={data.historicMap} />
+        <BigMap title="Ancient World" map={data.historicMap} />
+        <BigMap title="Modern Location" map={data.modernMap} />
+
+        {notes.length > 0 && (
+          <div className="rounded-md border bg-card p-4 shadow-hair">
+            <p className="text-label text-secondary">Location Notes</p>
+            <ul className="mt-2 space-y-1.5">
+              {notes.map((n) => (
+                <li key={n} className="text-[12px] leading-relaxed text-secondary">
+                  {n}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between rounded-md border border-dashed bg-card-soft px-4 py-3">
+          <span className="text-[13px] text-secondary">Standing there today</span>
+          <span className="rounded-full bg-tint px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-accent-strong">
+            Coming later
+          </span>
+        </div>
       </div>
     </section>
   );
@@ -25,7 +47,6 @@ function BigMap({ title, map }: { title: string; map: ChapterMap }) {
       </div>
       <div className="p-3.5">
         <p className="text-card-title text-primary">{map.caption}</p>
-        {map.note && <p className="mt-1 text-[12px] leading-relaxed text-secondary">{map.note}</p>}
       </div>
     </div>
   );
