@@ -32,7 +32,7 @@ const SECTION_ICON: Record<WorkupSection["type"], string> = {
  * prompts/captions/alt/status are preserved from the generated data.
  */
 
-const TAGLINE = "Pause. Reflect. Lift up.";
+const TAGLINE = "Pause. Reflect. Elevate.";
 const IMAGE_ORDER: ImageKind[] = ["establishing", "detail", "human"];
 const IMAGE_LABEL: Record<ImageKind, string> = {
   establishing: "Establishing Shot",

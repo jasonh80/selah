@@ -1,15 +1,10 @@
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
 import { GeneratingChapterState } from "@/components/chapter/GeneratingChapterState";
 import { resolveChapter } from "@/lib/chapters/registry";
 import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
-import {
-  getChapterStatus,
-  createGeneratingChapterWorkup,
-} from "@/lib/server/chapter-workups-repository";
-import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
+import { getChapterStatus } from "@/lib/server/chapter-workups-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -26,34 +21,18 @@ export default async function ChapterPage({ params }: { params: { slug: string }
     );
   }
 
-  // 2) Allowed to generate? Kick off a background job and show "Preparing…".
-  //    Generation runs in a 15-min background function (not the request), so it
-  //    isn't killed by the timeout. The page auto-refreshes until it's ready.
-  if (generationAllowed(slug)) {
+  // 2) Page loads NEVER start generation (cost safety). We only show the
+  //    "Preparing…" screen if a manual job (via /dev/regenerate) is already
+  //    in progress, and it auto-refreshes until that job saves a ready workup.
+  if (generationAllowed(slug) && (await getChapterStatus(slug)) === "generating") {
     const parsed = parseSlug(slug);
-    const label = parsed ? `${parsed.book} ${parsed.chapter}` : slug;
-    const status = await getChapterStatus(slug);
-
-    if (parsed && status !== "generating") {
-      // Mark generating first so refreshes don't re-trigger, then fire the job.
-      await createGeneratingChapterWorkup({
-        book: parsed.book,
-        chapter: parsed.chapter,
-        slug,
-        title: label,
-        source: "generated",
-      });
-      const host = headers().get("host") || "";
-      await triggerBackgroundGeneration(slug, host);
-    }
-
     return (
       <AppShell>
-        <GeneratingChapterState chapterLabel={label} />
+        <GeneratingChapterState chapterLabel={parsed ? `${parsed.book} ${parsed.chapter}` : slug} />
       </AppShell>
     );
   }
 
-  // 3) Not found.
+  // 3) Not found / not generated.
   notFound();
 }

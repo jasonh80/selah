@@ -15,7 +15,7 @@ export const exodus27: ChapterWorkup = {
   reference: "Exodus 27",
   title: "Exodus 27",
   subtitle: "The Bronze Altar, the Courtyard, and the Lamp",
-  tagline: "Pause. Reflect. Lift up.",
+  tagline: "Pause. Reflect. Elevate.",
   theme: "Holy access to God",
 
   estimatedDate: "c. 1446 BC",

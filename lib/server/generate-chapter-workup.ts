@@ -2,10 +2,7 @@
 // No image generation. Gated behind a flag + allowlist so it never runs by
 // accident. Generate once → validate → adapt → save → record cost → serve.
 import type { ChapterWorkup } from "../types";
-import {
-  parseChapterWorkupJson,
-  type GeneratedChapterWorkup,
-} from "../ai/schemas/chapter-workup-schema";
+import { parseChapterWorkupJson } from "../ai/schemas/chapter-workup-schema";
 import { buildChapterWorkupPrompt } from "../ai/prompts/chapter-workup-prompt";
 import { generatedToRenderWorkup } from "../ai/adapters/generated-to-workup";
 import { estimateChapterWorkupCost } from "../ai/costs";
@@ -44,7 +41,7 @@ export function parseSlug(slug: string): { book: string; chapter: number } | nul
 }
 
 interface GenOutput {
-  workup: GeneratedChapterWorkup;
+  content: string; // raw model JSON (parsed by the orchestrator, so we can log cost first)
   inputTokens: number;
   outputTokens: number;
 }
@@ -93,9 +90,8 @@ export async function generateChapterWorkup(input: {
   };
 
   const content = resp.choices[0]?.message?.content ?? "";
-  const workup = parseChapterWorkupJson(content);
   return {
-    workup,
+    content,
     inputTokens: resp.usage?.prompt_tokens ?? 0,
     outputTokens: resp.usage?.completion_tokens ?? 0,
   };
@@ -110,6 +106,7 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   if (!parsed) return null;
   const { book, chapter } = parsed;
   const bibleVersion = "ESV";
+  let costLogged = false;
 
   try {
     await createGeneratingChapterWorkup({
@@ -121,23 +118,17 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
       bibleVersion,
     });
 
-    const { workup: generated, inputTokens, outputTokens } = await generateChapterWorkup({
+    // OpenAI call (tokens spent here).
+    const { content, inputTokens, outputTokens } = await generateChapterWorkup({
       book,
       chapter,
       slug,
       bibleVersion,
     });
 
-    const render = generatedToRenderWorkup(generated);
-    // Saved as "ready" (not "reviewed") — an admin can promote it later.
-    await saveReadyChapterWorkup({
-      slug,
-      workup: render,
-      status: "ready",
-      version: generated.version,
-      bibleVersion,
-    });
-
+    // Log the text cost immediately — tokens are spent regardless of whether the
+    // JSON parses. This is what was missing before (failed runs cost money but
+    // weren't recorded).
     const est = estimateChapterWorkupCost({ inputTokens, outputTokens, imageCount: 0 });
     await recordCostEvent({
       requestType: "chapter_workup_text",
@@ -148,12 +139,37 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
       estimatedCostUsd: est.totalEstimateUsd,
       metadata: { slug, book, chapter, estimated: true },
     });
+    costLogged = true;
+
+    const generated = parseChapterWorkupJson(content);
+    const render = generatedToRenderWorkup(generated);
+    // Saved as "ready" (not "reviewed") — an admin can promote it later.
+    await saveReadyChapterWorkup({
+      slug,
+      workup: render,
+      status: "ready",
+      version: generated.version,
+      bibleVersion,
+    });
 
     return render;
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 300);
     console.error(`[selah] generation failed for ${slug}:`, msg);
     await markChapterWorkupFailed(slug, msg);
+    // If we never logged usage (OpenAI threw before returning, e.g. quota/timeout),
+    // record an error event so failed spend/issues are still visible.
+    if (!costLogged) {
+      await recordCostEvent({
+        requestType: "chapter_workup_text",
+        provider: "openai",
+        model: CHAPTER_WORKUP_TEXT_MODEL,
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCostUsd: 0,
+        metadata: { slug, book, chapter, failed: true, error: msg },
+      });
+    }
     return null;
   }
 }

@@ -20,7 +20,7 @@ export function AppHeader() {
           <Logo className="text-[17px] text-accent-strong" />
           <span className="flex items-baseline gap-2 text-[11px] text-secondary">
             <span className="hidden text-secondary/50 sm:inline">·</span>
-            Pause. Reflect. Lift up.
+            Pause. Reflect. Elevate.
           </span>
         </div>
 

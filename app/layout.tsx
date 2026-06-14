@@ -16,7 +16,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Selah — your daily Bible chapter",
   description:
-    "Your daily Bible chapter, made visual, simple, and personal. Pause. Reflect. Lift up.",
+    "Your daily Bible chapter, made visual, simple, and personal. Pause. Reflect. Elevate.",
   other: { "selah-build": BUILD_ID },
 };
 

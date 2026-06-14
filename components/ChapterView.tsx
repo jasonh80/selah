@@ -53,7 +53,7 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
 
             <footer className="flex flex-col items-center gap-2 pt-2 text-center">
               <span className="wordmark text-xs text-secondary">Selah</span>
-              <p className="text-[11px] text-secondary">Pause. Reflect. Lift up.</p>
+              <p className="text-[11px] text-secondary">Pause. Reflect. Elevate.</p>
             </footer>
           </main>
 
