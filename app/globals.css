@@ -17,8 +17,9 @@
   --cloud-gray: #f5f5f7;
   --line-gray: #e5e5ea;
   --text-gray: #6e6a76;
-  --jesus-red: #b23a3a;
-  --jesus-red-soft: #fbecec;
+  /* Refined Jesus-word accent — wine/pomegranate, not alert red */
+  --jesus-red: #8d3942;
+  --jesus-red-soft: #f6e7e9;
 
   /* Shared radius + shadow scale */
   --radius-lg: 24px;
@@ -31,72 +32,76 @@
   --font-display: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif;
 }
 
-/* Air — default (purple) */
+/* Air — open sky, clarity, breath (airy blue-slate) */
 :root,
 [data-theme="air"] {
-  --background: #fbfbfc;
+  --background: #f8f9fb;
   --card: #ffffff;
-  --card-soft: #f6f6f8;
-  --text-primary: #101014;
-  --text-secondary: #73717a;
-  --accent: #9b8fc7;
-  --accent-strong: #5b3f91;
-  --tint: #f3f1fa;
-  --line: #e5e5ea;
-  --purple-soft: #f3f1fa;
-  --purple-muted: #9b8fc7;
+  --card-soft: #eef2f6;
+  --text-primary: #2e3642;
+  --text-secondary: #6b7787;
+  --accent: #8ea7c1;
+  --accent-strong: #4a6076;
+  --tint: #e9f0f7;
+  --line: #d9e2ec;
+  --purple-soft: #e9f0f7;
+  --purple-muted: #8ea7c1;
 }
 
-/* Sonrise — gold */
+/* Sonrise — first light, hope, morning mercy */
 [data-theme="sonrise"] {
-  --background: #fafafb;
+  --background: #fbf6ee;
   --card: #ffffff;
-  --card-soft: #f7f4ee;
-  --text-primary: #15131a;
-  --text-secondary: #6e6a76;
-  --accent: #e6b35a;
-  --accent-strong: #c8923a;
-  --tint: #fff6e6;
-  --line: #efe9dc;
+  --card-soft: #f6ede2;
+  --text-primary: #3a2e26;
+  --text-secondary: #7a6c5f;
+  --accent: #dcb878;
+  --accent-strong: #a96f55;
+  --tint: #f8e9da;
+  --line: #ebddcb;
 }
 
-/* Living Water — teal */
+/* Living Water — flowing, layered cool tones, refreshment */
 [data-theme="living-water"] {
-  --background: #f8fafa;
+  --background: #eef6f8;
   --card: #ffffff;
-  --card-soft: #f1f6f6;
-  --text-primary: #111827;
-  --text-secondary: #647076;
-  --accent: #3f8794;
-  --accent-strong: #2c6873;
-  --tint: #eaf6f7;
-  --line: #dde9ea;
+  --card-soft: #dcecf4;
+  --text-primary: #1e3a47;
+  --text-secondary: #57757f;
+  --accent: #5ebcc6;
+  --accent-strong: #2e7f88;
+  --tint: #e3f2f4;
+  --line: #c9e2e6;
 }
 
-/* Forest — olive/green */
-[data-theme="forest"] {
-  --background: #f8f9f6;
-  --card: #ffffff;
-  --card-soft: #f1f4ee;
-  --text-primary: #151a16;
-  --text-secondary: #667064;
-  --accent: #4f6f52;
-  --accent-strong: #3c573f;
-  --tint: #eef4ec;
-  --line: #e2e9de;
+/* Garden — Gethsemane / Eden at dusk, intimate and prayerful (deep dusk) */
+[data-theme="garden"] {
+  --background: #1f2b25;
+  --card: #26342c;
+  --card-soft: #2e3d33;
+  --text-primary: #ecf1e8;
+  --text-secondary: #aebba8;
+  --accent: #7e9270;
+  --accent-strong: #5f7153;
+  --tint: #2c3a30;
+  --line: #36473b;
+  --purple-soft: #2c3a30;
+  --purple-muted: #7e9270;
+  --jesus-red: #b14e58;
+  --jesus-red-soft: #3a2228;
 }
 
-/* Sonset — warm clay */
+/* Sonset — evening glow, gratitude, reflection */
 [data-theme="sonset"] {
-  --background: #faf8f7;
+  --background: #faf3ea;
   --card: #ffffff;
-  --card-soft: #f6f0ed;
-  --text-primary: #17131a;
-  --text-secondary: #756b72;
-  --accent: #c46a4a;
-  --accent-strong: #a4502f;
-  --tint: #fff0ea;
-  --line: #ece0da;
+  --card-soft: #f2e6d8;
+  --text-primary: #3a2a24;
+  --text-secondary: #7c6a60;
+  --accent: #c98c4a;
+  --accent-strong: #a45e44;
+  --tint: #f5e2d6;
+  --line: #ecdac9;
 }
 
 /* Starlight — sacred night, warm dark purple */
@@ -138,6 +143,37 @@ body {
 .theme-transition * {
   transition: background-color 0.4s ease, border-color 0.4s ease,
     color 0.4s ease, fill 0.4s ease, stroke 0.4s ease;
+}
+
+/* Per-theme atmospheres — subtle scene glows, kept refined (not loud). */
+[data-theme="air"] body {
+  background-image: radial-gradient(1100px 520px at 50% -10%, rgba(201, 216, 232, 0.5), transparent 62%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+[data-theme="sonrise"] body {
+  background-image: radial-gradient(1000px 480px at 50% -8%, rgba(246, 222, 200, 0.6), transparent 60%),
+    radial-gradient(700px 360px at 80% 4%, rgba(235, 200, 192, 0.4), transparent 62%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+[data-theme="living-water"] body {
+  background-image: radial-gradient(900px 520px at 18% -6%, rgba(94, 188, 198, 0.22), transparent 60%),
+    radial-gradient(820px 480px at 88% 14%, rgba(94, 110, 158, 0.16), transparent 62%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+[data-theme="garden"] body {
+  background-image: radial-gradient(1100px 540px at 50% -8%, rgba(51, 72, 99, 0.4), transparent 62%),
+    radial-gradient(700px 420px at 80% 100%, rgba(112, 90, 73, 0.18), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+[data-theme="sonset"] body {
+  background-image: radial-gradient(1100px 560px at 50% 108%, rgba(201, 140, 74, 0.22), transparent 60%),
+    radial-gradient(700px 380px at 20% -6%, rgba(138, 111, 120, 0.14), transparent 62%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 /* Starlight — a soft purple starglow at the top, so it feels like night sky

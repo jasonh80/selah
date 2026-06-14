@@ -15,7 +15,7 @@ export function CompanionColumn({ data, source }: { data: ChapterWorkup; source?
 function TodayCard({ data }: { data: ChapterWorkup }) {
   return (
     <div className="rounded-md border bg-card p-4 shadow-hair">
-      <p className="text-eyebrow">Today</p>
+      <p className="text-eyebrow">Quick Info</p>
       <p className="text-section mt-0.5 text-primary">{data.reference}</p>
       <p className="mt-0.5 text-[13px] text-secondary">{data.subtitle}</p>
       <div className="mt-3 flex flex-wrap gap-1.5">

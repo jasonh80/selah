@@ -3,11 +3,11 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 export const THEMES = [
-  { id: "air", label: "Air", swatch: "#5b3f91" },
-  { id: "sonrise", label: "Sonrise", swatch: "#e6b35a" },
-  { id: "living-water", label: "Living Water", swatch: "#3f8794" },
-  { id: "forest", label: "Forest", swatch: "#4f6f52" },
-  { id: "sonset", label: "Sonset", swatch: "#c46a4a" },
+  { id: "air", label: "Air", swatch: "#7e97b5" },
+  { id: "sonrise", label: "Sonrise", swatch: "#e0b878" },
+  { id: "living-water", label: "Living Water", swatch: "#5ebcc6" },
+  { id: "garden", label: "Garden", swatch: "#5f7153" },
+  { id: "sonset", label: "Sonset", swatch: "#c98c4a" },
   { id: "starlight", label: "Starlight", swatch: "#8e6be8" },
 ] as const;
 
