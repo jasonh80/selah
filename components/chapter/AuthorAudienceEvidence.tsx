@@ -17,7 +17,7 @@ export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
 
   return (
     <section id="author-audience-evidence" className="scroll-mt-20">
-      <SectionHead eyebrow="Behind the chapter" title="Author, Audience & Evidence" />
+      <SectionHead title="Behind the Chapter" />
       <div className={deep ? "space-y-2.5" : "grid gap-2.5 sm:grid-cols-2"}>
         {cards.map((c) => (
           <Card key={c.key} card={c} deep={deep} />

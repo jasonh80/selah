@@ -27,17 +27,18 @@ import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvide
 export function ChapterView({ data, source }: { data: ChapterWorkup; source?: string }) {
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
-      <main className="min-w-0 space-y-7 pb-12 pt-4 lg:pt-6">
-        <ChapterHero data={data} />
-
-        <ChapterControls />
+      <main className="min-w-0 space-y-6 pb-12 pt-3 lg:pt-5">
+        <div className="space-y-3">
+          <ChapterHero data={data} />
+          <ChapterControls />
+        </div>
 
         <div className="space-y-3">
           <HeroImage data={data} />
+          <QuickSummaryCard data={data} />
           <MetadataChips data={data} />
           <VisualDashboardGrid data={data} />
           <TimelineSection data={data} />
-          <QuickSummaryCard data={data} />
         </div>
 
         <GeneratedImagesSection data={data} />

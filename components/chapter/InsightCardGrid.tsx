@@ -8,7 +8,7 @@ import { useReadingMode } from "@/components/ReadingModeProvider";
 export function InsightCardGrid({ data }: { data: ChapterWorkup }) {
   return (
     <section id="deeper-study" className="scroll-mt-20">
-      <SectionHead eyebrow="Understand" title="Deeper Study" />
+      <SectionHead title="Deeper Study" />
       <div className="grid grid-cols-2 gap-2.5">
         {data.insights.map((insight) => (
           <InsightCard key={insight.id} insight={insight} />

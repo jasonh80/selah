@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
 import { VersionSelect } from "@/components/chapter/VersionSelect";
 import { VERSIONS, useVersion } from "@/components/VersionProvider";
+import { getVerseNotes } from "@/lib/content/chapter-content";
 
 type Mode = "read" | "verse";
 type EsvState = { loading: boolean; found?: boolean; text?: string; copyright?: string };
@@ -35,14 +36,12 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
   }, [version, data.reference]);
 
   const showEsv = version === "ESV" && esv.found && Boolean(esv.text);
+  const verseNotes = getVerseNotes(data.slug);
 
   return (
     <section id="chapter" className="scroll-mt-20 space-y-3">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-eyebrow">Scripture</p>
-          <h2 className="text-section mt-0.5 text-primary">Read the Chapter</h2>
-        </div>
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="text-section text-primary">Read the Chapter</h2>
         <VersionSelect versions={[...VERSIONS]} value={version} onChange={(v) => setVersion(v as typeof version)} prefix />
       </div>
 
@@ -66,9 +65,11 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
         </p>
       )}
 
-      <div className="rounded-md border bg-card p-5 shadow-hair">
+      <div className="rounded-md border bg-card p-4 shadow-hair">
         {version === "ESV" && (esv.loading || esv.found === undefined) ? (
           <p className="py-6 text-center text-sm text-secondary">Loading ESV text…</p>
+        ) : mode === "verse" && showEsv ? (
+          <VerseByVerse text={esv.text!} notes={verseNotes} copyright={esv.copyright} />
         ) : showEsv ? (
           <div>
             <div className="text-scripture whitespace-pre-line text-primary">{esv.text}</div>
@@ -97,5 +98,46 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
         )}
       </div>
     </section>
+  );
+}
+
+// Verse-by-verse: the real ESV text (parsed from the licensed API response) with
+// a brief, static Selah explanation under each verse. No generated content.
+function parseEsvVerses(text: string): { num: number; text: string }[] {
+  const out: { num: number; text: string }[] = [];
+  const re = /\[(\d+)\]\s*([\s\S]*?)(?=\s*\[\d+\]|$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) out.push({ num: parseInt(m[1], 10), text: m[2].trim() });
+  return out;
+}
+
+function VerseByVerse({
+  text,
+  notes,
+  copyright,
+}: {
+  text: string;
+  notes: Record<number, string> | null;
+  copyright?: string;
+}) {
+  const heading = text.split(/\[\d+\]/)[0].trim();
+  const verses = parseEsvVerses(text);
+
+  return (
+    <div className="space-y-3.5">
+      {heading && <p className="whitespace-pre-line text-[13px] font-semibold leading-snug text-primary">{heading}</p>}
+      {verses.map((v) => (
+        <div key={v.num} className="border-l-2 border-tint pl-3">
+          <div className="flex gap-2.5">
+            <span className="shrink-0 pt-px text-[11px] font-bold text-accent-strong">{v.num}</span>
+            <p className="text-scripture whitespace-pre-line text-primary">{v.text}</p>
+          </div>
+          {notes?.[v.num] && (
+            <p className="mt-1 pl-[26px] text-[12px] leading-relaxed text-secondary">{notes[v.num]}</p>
+          )}
+        </div>
+      ))}
+      {copyright && <p className="border-t pt-3 text-[11px] leading-relaxed text-secondary">{copyright}</p>}
+    </div>
   );
 }

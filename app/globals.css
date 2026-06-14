@@ -239,7 +239,7 @@ body {
     @apply font-sans text-[15px] font-normal leading-[1.6];
   }
   .text-scripture {
-    @apply font-sans text-[17px] font-normal leading-[1.8];
+    @apply font-sans text-[15px] font-normal leading-[1.7];
   }
   .text-wordmark {
     @apply font-sans text-[17px] font-medium uppercase;

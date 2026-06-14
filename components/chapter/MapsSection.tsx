@@ -68,10 +68,7 @@ export function MapsSection({ data }: { data: ChapterWorkup }) {
   return (
     <section id="maps" className="scroll-mt-20">
       <div className="mb-3 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-eyebrow">Where it happened</p>
-          <h2 className="text-section mt-0.5 text-primary">Maps &amp; Places</h2>
-        </div>
+        <h2 className="text-section text-primary">Maps &amp; Places</h2>
         <div className="inline-flex shrink-0 gap-1 rounded-full border bg-card p-1 shadow-hair">
           {(["today", "biblical"] as ContextMode[]).map((m) => (
             <button

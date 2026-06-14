@@ -81,3 +81,34 @@ export const CHAPTER_TIMELINE_NOTE: Record<string, string> = {
 export function getTimelineNote(slug: string): string | null {
   return CHAPTER_TIMELINE_NOTE[slug] ?? null;
 }
+
+// ---- Scene (image) titles --------------------------------------------------
+// Short, useful scene titles instead of generic "Detail Shot" / "Human Moment".
+export const CHAPTER_IMAGE_TITLES: Record<string, Record<string, string>> = {
+  "psalm-23": {
+    establishing: "The Shepherd’s World",
+    detail: "Still Waters",
+    human: "Through the Valley",
+  },
+};
+
+export function getImageTitle(slug: string, kind: string, fallback: string): string {
+  return CHAPTER_IMAGE_TITLES[slug]?.[kind] ?? fallback;
+}
+
+// ---- Verse-by-verse notes --------------------------------------------------
+// Brief, static, Selah-voiced explanations per verse. No generated content.
+export const CHAPTER_VERSE_NOTES: Record<string, Record<number, string>> = {
+  "psalm-23": {
+    1: "David names the Lord as his shepherd — the one who leads, feeds, and protects. Under that care, he lacks nothing that truly matters.",
+    2: "Green pastures and still waters: the Shepherd brings rest and refreshment, not endless striving.",
+    3: "God revives what is worn down and guides onto the right path — for the honor of His own name.",
+    4: "Even through danger and grief, the Shepherd is present. His rod and staff mean protection and comfort, not distance.",
+    5: "A table set in the open, in full view of enemies: God honors, provides, and overflows His grace even amid threat.",
+    6: "Confident hope — God’s goodness and covenant love pursue David all his days, leading him home to dwell with the Lord forever.",
+  },
+};
+
+export function getVerseNotes(slug: string): Record<number, string> | null {
+  return CHAPTER_VERSE_NOTES[slug] ?? null;
+}

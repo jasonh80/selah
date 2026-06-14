@@ -20,7 +20,7 @@ const TOPICS: Topic[] = [
 export function GoDeeperSection() {
   return (
     <section>
-      <SectionHead eyebrow="Keep going" title="Go Deeper" />
+      <SectionHead title="Go Deeper" />
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         {TOPICS.map((t) => (
           <a
