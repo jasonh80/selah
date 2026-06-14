@@ -77,7 +77,8 @@ export async function generateChapterWorkup(input: {
       { role: "user", content: prompt },
     ],
     response_format: { type: "json_object" },
-    temperature: 0.7,
+    // Note: newer models (GPT-5 series) only support the default temperature,
+    // so we don't set it.
   });
 
   const content = resp.choices[0]?.message?.content ?? "";
