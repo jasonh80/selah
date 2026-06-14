@@ -92,6 +92,7 @@ export async function createGeneratingChapterWorkup(input: CreateGeneratingInput
       bible_version: input.bibleVersion ?? null,
       workup_json: {},
       generation_started_at: new Date().toISOString(),
+      generation_error: null,
     },
     { onConflict: "slug" },
   );
