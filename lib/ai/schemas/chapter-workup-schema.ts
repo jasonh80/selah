@@ -126,6 +126,18 @@ const ChapterTopicSchema = z.object({
   priority: z.number(),
 });
 
+// Honest placement in the big biblical story. Uncertain dates stay uncertain.
+const BiblicalTimelineSchema = z.object({
+  era: z.string(),
+  estimatedYear: z.number().optional(), // negative = BC/BCE
+  estimatedYearLabel: z.string(),
+  dateRange: z.object({ startYear: z.number(), endYear: z.number() }).optional(),
+  confidence: z.enum(["high", "medium", "low", "debated"]),
+  chronologyBasis: z.string(),
+  uncertaintyNote: z.string(),
+  placementReason: z.string(),
+});
+
 const BibleTextSchema = z.object({
   // Placeholder/source metadata only — Selah does not store licensed text yet.
   version: z.string(),
@@ -199,6 +211,7 @@ export const GeneratedChapterWorkupSchema = z.object({
   // for newly generated chapters via the prompt).
   chapterSpecificTopics: z.array(ChapterTopicSchema).optional(),
   sections: z.array(SectionSchema).optional(),
+  biblicalTimeline: BiblicalTimelineSchema.optional(),
 
   // metadata placeholders
   bibleText: BibleTextSchema,

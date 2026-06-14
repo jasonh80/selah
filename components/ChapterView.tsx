@@ -4,6 +4,7 @@ import { HeroImage } from "@/components/chapter/HeroImage";
 import { MetadataChips } from "@/components/chapter/MetadataChips";
 import { VisualDashboardGrid } from "@/components/chapter/VisualDashboardGrid";
 import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
+import { BiblicalTimelineCard } from "@/components/chapter/BiblicalTimelineCard";
 import { GeneratedImagesSection } from "@/components/chapter/GeneratedImagesSection";
 import { InsightCardGrid } from "@/components/chapter/InsightCardGrid";
 import { ScriptureReader } from "@/components/chapter/ScriptureReader";
@@ -35,6 +36,7 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
               <MetadataChips data={data} />
               <VisualDashboardGrid data={data} />
               <QuickSummaryCard data={data} />
+              <BiblicalTimelineCard data={data} />
             </div>
 
             <GeneratedImagesSection data={data} />

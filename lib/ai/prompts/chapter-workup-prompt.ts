@@ -108,8 +108,27 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     { "id": "prayer", "title": "Prayer", "type": "prayer", "priority": 8, "isCore": true, "cardSummary": "<short>", "fullContent": "<a fuller prayer>" },
     { "id": "image-plan", "title": "Image Plan", "type": "image_plan", "priority": 20, "isCore": false, "cardSummary": "<short>", "fullContent": "<describe the 3 images: establishing, detail, human>" }
   ],
+  "biblicalTimeline": {
+    "era": "<one of: Creation/Adam & Eve, Patriarchs, Exodus & Wilderness, David/Kingdom, Exile, Life of Jesus, Early Church, Today>",
+    "estimatedYear": -1000,
+    "estimatedYearLabel": "<honest label, e.g. 'traditionally c. 1000 BC' — never a false-precise date>",
+    "dateRange": { "startYear": -1100, "endYear": -900 },
+    "confidence": "<high | medium | low | debated>",
+    "chronologyBasis": "<e.g. 'traditional/event date' or 'likely composition date'>",
+    "uncertaintyNote": "<what is uncertain and why>",
+    "placementReason": "<why you placed it here>"
+  },
   "bibleText": { "version": "${bibleVersion ?? "ESV"}" }
 }
+
+DATES — BE HONEST
+- estimatedYear is internal (negative = BC). The visible label (estimatedYearLabel)
+  must NOT pretend uncertain dates are certain — use "traditionally c. ...",
+  "approximate", or "debated".
+- Narrative chapters: place the marker at the EVENT date. Psalms/Proverbs/epistles/
+  poetry: place at the likely COMPOSITION/context date and say it's uncertain.
+  Prophecy: use the date spoken/written, and note fulfillment separately in prose.
+- Never claim a precise Creation year.
 
 CHOOSING TOPICS FIRST
 Before writing, identify in "chapterSpecificTopics" what THIS chapter is actually

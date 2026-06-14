@@ -88,6 +88,19 @@ export interface DeeperGroup {
   rows: DeeperRow[];
 }
 
+// Where a chapter sits in the big biblical story (Creation → Today). Dates are
+// handled honestly — uncertain dates are never shown as certain years.
+export interface BiblicalTimeline {
+  era: string;
+  estimatedYear?: number; // negative = BC/BCE
+  estimatedYearLabel: string;
+  dateRange?: { startYear: number; endYear: number };
+  confidence: "high" | "medium" | "low" | "debated";
+  chronologyBasis: string;
+  uncertaintyNote: string;
+  placementReason: string;
+}
+
 export interface ChapterWorkup {
   // --- Global workup record (one canonical workup per chapter) ---
   // Generate once. Save forever. Personalize only when needed.
@@ -138,6 +151,8 @@ export interface ChapterWorkup {
   versions: string[];
   defaultVersion: string;
   verses: Verse[];
+
+  biblicalTimeline?: BiblicalTimeline;
 
   // Optional generation cost metadata (placeholder; not shown in the UI).
   cost?: {

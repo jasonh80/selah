@@ -253,6 +253,7 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
       redLetter: v.redLetter,
     })),
 
+    biblicalTimeline: g.biblicalTimeline,
     cost: g.cost,
   };
 }
