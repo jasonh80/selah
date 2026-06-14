@@ -125,15 +125,17 @@ export function MapsSection({ data }: { data: ChapterWorkup }) {
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
               {overlay.regions.map((r, i) =>
                 r.variant === "territory" ? (
+                  // Modern regional border (approx:false) reads more defined/cool;
+                  // biblical territory (approx:true) is softer + dashed + warm.
                   <ellipse
                     key={`t${i}`}
                     cx={r.cx}
                     cy={r.cy}
                     rx={r.rx}
                     ry={r.ry}
-                    fill="rgba(255,221,128,0.16)"
-                    stroke="rgba(255,224,138,0.92)"
-                    strokeWidth={2}
+                    fill={r.approx ? "rgba(255,221,128,0.15)" : "rgba(130,210,255,0.12)"}
+                    stroke={r.approx ? "rgba(255,224,138,0.92)" : "rgba(150,225,255,0.95)"}
+                    strokeWidth={r.approx ? 2 : 2.25}
                     strokeDasharray={r.approx ? "6 4" : undefined}
                     vectorEffect="non-scaling-stroke"
                   />
@@ -172,7 +174,7 @@ export function MapsSection({ data }: { data: ChapterWorkup }) {
                 <Overlay key={`rl${i}`} x={r.lx ?? r.cx} y={r.ly ?? r.cy} inv={inv}>
                   <span
                     className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em] ${
-                      r.variant === "territory" ? "text-[#ffe08a]" : "text-[#bfe4ff]"
+                      r.variant === "territory" && r.approx ? "text-[#ffe08a]" : "text-[#bfe4ff]"
                     }`}
                     style={{ background: "rgba(12,14,20,0.6)", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}
                   >

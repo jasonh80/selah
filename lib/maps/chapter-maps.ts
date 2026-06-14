@@ -78,7 +78,6 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
           { x: BETHLEHEM[0], y: BETHLEHEM[1], label: "Bethlehem" },
         ],
         labels: [
-          { x: 22, y: 47, text: "Judean hill country", tone: "region" },
           { x: 86, y: 48, text: "Wilderness / valley", tone: "region" },
           { x: 88, y: 86, text: "Dead Sea", tone: "water" },
         ],
@@ -92,7 +91,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
             label: "Judean Hills region",
             lx: 21,
             ly: 30,
-            approx: true,
+            approx: false,
           },
         ],
         paths: [SIX_MILE],
