@@ -43,7 +43,7 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
             <InsightCardGrid data={data} />
             <ScriptureReader data={data} />
             <MapsSection data={data} />
-            <ChaptersSection />
+            <ChaptersSection data={data} />
             <GoDeeperSection />
 
             {/* Transparency lives in the companion on desktop, here on mobile */}
