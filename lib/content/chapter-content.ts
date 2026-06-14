@@ -71,3 +71,13 @@ export const CHAPTER_CHIP_OVERRIDES: Record<string, Record<number, string>> = {
 export function getChipOverride(slug: string, index: number): string | null {
   return CHAPTER_CHIP_OVERRIDES[slug]?.[index] ?? null;
 }
+
+// Confident main-view timeline note. Deeper authorship/manuscript nuance lives
+// in the Author, Audience & Evidence section and Transparency, not here.
+export const CHAPTER_TIMELINE_NOTE: Record<string, string> = {
+  "psalm-23": "Psalm 23 belongs naturally in David’s world, around 1000 BC.",
+};
+
+export function getTimelineNote(slug: string): string | null {
+  return CHAPTER_TIMELINE_NOTE[slug] ?? null;
+}

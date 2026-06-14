@@ -1,4 +1,5 @@
 import type { ChapterWorkup } from "@/lib/types";
+import { getTimelineNote } from "@/lib/content/chapter-content";
 
 // One Big Story timeline: Creation → Today. Markers AND the chapter pin are all
 // placed by ESTIMATED YEAR on a single linear time scale (not evenly spaced and
@@ -56,7 +57,7 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
   const bandEnd = range ? posForYear(Math.max(range.startYear, range.endYear)) : null;
 
   const dateLabel = bt?.estimatedYearLabel ?? data.estimatedDate ?? "uncertain";
-  const note = bt?.uncertaintyNote;
+  const note = getTimelineNote(data.slug) ?? bt?.uncertaintyNote;
 
   return (
     <section id="timeline" className="scroll-mt-20 rounded-md border bg-card p-4 shadow-hair">
