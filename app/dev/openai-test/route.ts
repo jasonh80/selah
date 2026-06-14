@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOpenAI, CHAPTER_WORKUP_TEXT_MODEL } from "@/lib/server/openai";
+import { devRoutesEnabled } from "@/lib/server/dev-guard";
 
 // DEV: tiny synchronous probe of the configured text model. Reveals the model
 // id, whether json_object works, latency, and token usage — without keys.
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET() {
+  if (!devRoutesEnabled()) return new NextResponse("Not found", { status: 404 });
   const client = getOpenAI();
   if (!client) {
     return NextResponse.json({ ok: false, error: "OpenAI not configured" });

@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/chapter-workups-repository";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
 import { CHAPTER_WORKUP_TEXT_MODEL } from "@/lib/server/openai";
+import { devRoutesEnabled } from "@/lib/server/dev-guard";
 
 // DEV/admin: the ONLY way to start a chapter generation. Two steps for safety:
 //   1. GET /dev/regenerate?slug=psalm-23           → PREVIEW (no generation)
@@ -22,6 +23,7 @@ function estimatedCostRange(model: string): string {
 }
 
 export async function GET(request: Request) {
+  if (!devRoutesEnabled()) return NextResponse.json({ error: "not found" }, { status: 404 });
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") || "";
   const token = url.searchParams.get("token") || "";

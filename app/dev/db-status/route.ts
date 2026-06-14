@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/server/supabase";
+import { devRoutesEnabled } from "@/lib/server/dev-guard";
 
 // DEV diagnostic. Returns only booleans/status — never any key values.
 // Inspect a specific chapter row with ?slug=psalm-23
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  if (!devRoutesEnabled()) return new NextResponse("Not found", { status: 404 });
   const slug = new URL(request.url).searchParams.get("slug") || "exodus-27";
 
   const out: Record<string, unknown> = {

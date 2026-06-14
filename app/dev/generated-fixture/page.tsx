@@ -1,7 +1,9 @@
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
 import { parseChapterWorkupJson } from "@/lib/ai/schemas/chapter-workup-schema";
 import { generatedToRenderWorkup } from "@/lib/ai/adapters/generated-to-workup";
+import { devRoutesEnabled } from "@/lib/server/dev-guard";
 import fixture from "@/lib/ai/fixtures/exodus-27-generated.json";
 
 // DEV ONLY: proves the generated-AI contract can render the real chapter page.
@@ -10,6 +12,7 @@ import fixture from "@/lib/ai/fixtures/exodus-27-generated.json";
 export const dynamic = "force-dynamic";
 
 export default function GeneratedFixturePage() {
+  if (!devRoutesEnabled()) notFound();
   const generated = parseChapterWorkupJson(JSON.stringify(fixture));
   const data = generatedToRenderWorkup(generated);
 
