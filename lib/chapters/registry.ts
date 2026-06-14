@@ -1,70 +1,64 @@
 import type { ChapterWorkup } from "@/lib/types";
-import { exodus27Workup } from "@/lib/chapters/source";
+import { exodus27Workup, LOCAL_SOURCE, type ChapterSource } from "@/lib/chapters/source";
+import { isSupabaseConfigured } from "@/lib/server/supabase";
+import { getChapterWorkupBySlug } from "@/lib/server/chapter-workups-repository";
 
 /**
- * Global, shared chapter workups — one canonical Selah workup per chapter.
- * Product rule: Generate once. Save forever. Personalize only when needed.
+ * Resolves a global chapter workup with this priority:
+ *   1. Supabase, if configured and a ready/reviewed workup exists.
+ *   2. Local source (generated fixture or hand-authored) for known chapters.
+ *   3. null → the route 404s (lazy generation comes later).
  *
- * Generation is LAZY: we never pre-generate or batch all chapters. A chapter's
- * workup is created the first time someone opens it, then cached forever and
- * served to every future user. MVP ships Exodus 27 as a seeded workup; the
- * generate-on-first-request branch is stubbed until Phase 1.
+ * Safe by design: Supabase being unconfigured or erroring never crashes the
+ * app — it falls back to the local source and only logs a server warning.
+ * No OpenAI / generation here yet.
  */
 
-// Workups that already exist (seeded + anything generated this runtime).
-// In Phase 1+ this read-through cache sits over a `chapter_workups` table.
-// The Exodus 27 seed comes from the active source (hand-authored or the
-// generated fixture) via the dogfood switch in ./source.
-const exodus27 = exodus27Workup();
-const CACHE = new Map<string, ChapterWorkup>([[exodus27.slug, exodus27]]);
+const TODAY_SLUG = "exodus-27";
 
-export function getChapterBySlug(slug: string): ChapterWorkup | null {
-  return CACHE.get(slug) ?? null;
+// Known local chapters (seed for fallback + chapter listing).
+const seed = exodus27Workup();
+const LOCAL = new Map<string, ChapterWorkup>([[seed.slug, seed]]);
+
+export function localChapterBySlug(slug: string): ChapterWorkup | null {
+  return LOCAL.get(slug) ?? null;
 }
 
 export function listChapterSlugs(): string[] {
-  return Array.from(CACHE.keys());
+  return Array.from(LOCAL.keys());
 }
 
-/** Today's chapter. MVP: fixed sample. Later: driven by a reading plan + date. */
-export function getTodaysChapter(): ChapterWorkup {
-  return exodus27;
+export interface ResolvedChapter {
+  workup: ChapterWorkup;
+  source: ChapterSource;
 }
 
-/**
- * The single entry point pages use to open a chapter. Loading behavior:
- *   1. If the global workup is already cached, serve it.            ← MVP path
- *   2. Otherwise this is the FIRST request for this chapter:
- *        generate it ONCE, cache it (save forever), then serve it.  ← Phase 1+
- *   3. Future users get the cached workup — no regeneration.
- *
- * We never generate chapters ahead of time; generation is on demand only.
- * Personalized content (user_chapter_layers) resolves separately, on request.
- */
-export async function loadGlobalChapterWorkup(slug: string): Promise<ChapterWorkup | null> {
-  const cached = CACHE.get(slug);
-  if (cached) return cached;
+export async function resolveChapter(slug: string): Promise<ResolvedChapter | null> {
+  // 1) Supabase read-through (ready/reviewed only).
+  if (isSupabaseConfigured()) {
+    try {
+      const fromDb = await getChapterWorkupBySlug(slug);
+      if (fromDb) return { workup: fromDb, source: "Supabase" };
+    } catch (e) {
+      console.warn(`[selah] Supabase read failed for ${slug}, falling back:`, (e as Error).message);
+    }
+  }
 
-  // MVP: missing chapters return null (the route renders 404).
-  // Production: this branch should
-  //   - create a generation job,
-  //   - persist a "generating" global workup record (status: "generating"),
-  //   - render <GeneratingChapterState/> to the user while it runs,
-  //   - call the AI generation pipeline ONCE for this chapter,
-  //   - store the completed result (status: "ready" → later "reviewed"),
-  //   - and serve the cached global workup to all future users.
-  const generated = await generateChapterWorkup(slug);
-  if (generated) CACHE.set(slug, generated); // save forever
-  return generated;
-}
+  // 2) Local fallback.
+  const local = localChapterBySlug(slug);
+  if (local) return { workup: local, source: LOCAL_SOURCE };
 
-/**
- * Generate one chapter's global workup on first request (OpenAI structured
- * output + 3 images, persisted to Supabase). Not built in MVP — unknown
- * chapters simply 404 for now. This is the ONLY place generation happens, and
- * it runs per-chapter, on demand — never in bulk.
- */
-async function generateChapterWorkup(_slug: string): Promise<ChapterWorkup | null> {
-  // TODO(phase-1): generate → store → return.
+  // 3) Not found (yet).
   return null;
+}
+
+export async function resolveTodaysChapter(): Promise<ResolvedChapter> {
+  // Exodus 27 always exists locally, so this never returns null.
+  return (await resolveChapter(TODAY_SLUG))!;
+}
+
+/** Back-compat: workup only (used where the source isn't needed). */
+export async function loadGlobalChapterWorkup(slug: string): Promise<ChapterWorkup | null> {
+  const resolved = await resolveChapter(slug);
+  return resolved?.workup ?? null;
 }

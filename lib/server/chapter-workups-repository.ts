@@ -1,5 +1,5 @@
-import type { ChapterWorkup } from "@/lib/types";
-import { getSupabaseAdmin, warnSupabaseMissing } from "@/lib/server/supabase";
+import type { ChapterWorkup } from "../types";
+import { getSupabaseAdmin, warnSupabaseMissing } from "./supabase";
 
 /**
  * The ONLY place that knows about the chapter_workups table.
@@ -19,7 +19,7 @@ export interface CreateGeneratingInput {
   slug: string;
   title: string;
   subtitle?: string;
-  source?: "generated" | "hand-authored";
+  source?: string; // e.g. "generated", "generated-fixture", "hand-authored"
   bibleVersion?: string;
 }
 

@@ -10,12 +10,14 @@ import fixture from "@/lib/ai/fixtures/exodus-27-generated.json";
 // Set NEXT_PUBLIC_USE_GENERATED_FIXTURE=false to fall back to hand-authored.
 //
 // NOTE: keep this module SERVER-side only — it pulls in the Zod schema/adapter.
-// Pass CHAPTER_SOURCE down as a plain string prop to client components.
+// Pass the resolved source down as a plain string prop to client components.
 export const USE_GENERATED_FIXTURE =
   process.env.NEXT_PUBLIC_USE_GENERATED_FIXTURE !== "false";
 
-export type ChapterSource = "generated fixture" | "hand-authored";
-export const CHAPTER_SOURCE: ChapterSource = USE_GENERATED_FIXTURE
+export type ChapterSource = "Supabase" | "generated fixture" | "hand-authored";
+
+// The LOCAL source used when Supabase has no ready/reviewed workup.
+export const LOCAL_SOURCE: ChapterSource = USE_GENERATED_FIXTURE
   ? "generated fixture"
   : "hand-authored";
 

@@ -1,4 +1,4 @@
-import { getSupabaseAdmin, warnSupabaseMissing } from "@/lib/server/supabase";
+import { getSupabaseAdmin, warnSupabaseMissing } from "./supabase";
 
 /**
  * The ONLY place that knows about the cost_events table. Safe no-op when

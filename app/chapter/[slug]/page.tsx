@@ -1,27 +1,25 @@
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
-import { loadGlobalChapterWorkup } from "@/lib/chapters/registry";
-import { CHAPTER_SOURCE } from "@/lib/chapters/source";
+import { resolveChapter } from "@/lib/chapters/registry";
 
 // Any chapter renders through the same ChapterView template, e.g. /chapter/exodus-27.
-// Dynamic + no generateStaticParams on purpose: chapters are generated lazily on
-// first request, never pre-built in bulk.
+// Supabase-first, then local fallback. Dynamic + no generateStaticParams on
+// purpose: chapters are generated lazily on first request, never pre-built.
 export const dynamic = "force-dynamic";
 
 export default async function ChapterPage({ params }: { params: { slug: string } }) {
-  const data = await loadGlobalChapterWorkup(params.slug);
+  const resolved = await resolveChapter(params.slug);
 
   // MVP: no workup yet → 404.
-  // Production: replace this with the lazy-generation flow — kick off the global
-  // generation job and render <GeneratingChapterState chapterLabel={...} /> until
-  // status becomes "ready", then render <ChapterView />. The chapter is generated
-  // once on this first request and cached forever for everyone after.
-  if (!data) notFound();
+  // Production: replace this with the lazy-generation flow — create a generation
+  // job, render <GeneratingChapterState/> until status becomes "ready", then
+  // render <ChapterView />. Generated once on first request, cached forever.
+  if (!resolved) notFound();
 
   return (
     <AppShell>
-      <ChapterView data={data} source={CHAPTER_SOURCE} />
+      <ChapterView data={resolved.workup} source={resolved.source} />
     </AppShell>
   );
 }

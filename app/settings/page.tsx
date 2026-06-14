@@ -3,7 +3,9 @@ import { AppShell } from "@/components/shell/AppShell";
 import { PageBody, ComingLater } from "@/components/shell/PageBody";
 import { ThemePicker, VersionPicker, TransparencyToggle } from "@/components/settings/controls";
 import { BUILD_ID } from "@/lib/build";
-import { CHAPTER_SOURCE } from "@/lib/chapters/source";
+import { resolveTodaysChapter } from "@/lib/chapters/registry";
+
+export const dynamic = "force-dynamic";
 
 const SOUNDS = [
   "None",
@@ -17,7 +19,8 @@ const SOUNDS = [
   "Soft worship",
 ];
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const { source } = await resolveTodaysChapter();
   return (
     <AppShell>
       <PageBody eyebrow="Preferences" title="Settings">
@@ -52,7 +55,7 @@ export default function SettingsPage() {
           </Section>
 
           <p className="pt-2 text-center text-[11px] text-secondary/70">
-            Build: {BUILD_ID} · Source: {CHAPTER_SOURCE}
+            Build: {BUILD_ID} · Source: {source}
           </p>
         </div>
       </PageBody>
