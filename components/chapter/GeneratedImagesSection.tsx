@@ -7,7 +7,7 @@ export function GeneratedImagesSection({ data }: { data: ChapterWorkup }) {
 
   return (
     <section>
-      <SectionHead title="See the Chapter" sub="Three generated views from Exodus 27" action="View All" />
+      <SectionHead title="See the Chapter" sub={`Three generated views from ${data.reference}`} action="View All" />
       <div className="space-y-2.5">
         <ImageCard img={establishing} tall />
         <div className="grid grid-cols-2 gap-2.5">
