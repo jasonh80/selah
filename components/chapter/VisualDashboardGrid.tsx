@@ -7,7 +7,6 @@ export function VisualDashboardGrid({ data }: { data: ChapterWorkup }) {
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-      <TimelineCard data={data} />
       <MapCard title="Modern Map" caption={data.modernMap.caption} src={data.modernMap.src} alt={data.modernMap.alt} />
       <MapCard title="Historic Map" caption={data.historicMap.caption} src={data.historicMap.src} alt={data.historicMap.alt} />
       <ThumbCard card={obj} />
@@ -34,46 +33,6 @@ function CardShell({
     >
       {children}
     </button>
-  );
-}
-
-function TimelineCard({ data }: { data: ChapterWorkup }) {
-  const { labels, activeIndex } = data.timelineMini;
-  return (
-    <CardShell spanClass="col-span-2 lg:col-span-3">
-      <div className="p-[18px]">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-card-title text-primary">Timeline</p>
-            <p className="text-[11px] text-secondary">Where this fits</p>
-          </div>
-          <span className="text-secondary">›</span>
-        </div>
-        <div className="relative mt-4 flex items-center justify-between">
-          <span className="absolute left-1 right-1 top-1.5 h-0.5 bg-line" />
-          {labels.map((label, i) => (
-            <span
-              key={label}
-              className={`relative z-10 h-3 w-3 rounded-full ${
-                i <= activeIndex ? "bg-accent-strong" : "border-2 border-line bg-card"
-              }`}
-            />
-          ))}
-        </div>
-        <div className="mt-2 flex items-center justify-between">
-          {labels.map((label, i) => (
-            <span
-              key={label}
-              className={`w-[24%] text-center text-[10px] ${
-                i === activeIndex ? "font-semibold text-accent-strong" : "text-secondary"
-              }`}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
-      </div>
-    </CardShell>
   );
 }
 
