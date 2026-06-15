@@ -19,12 +19,13 @@ type Step = "big" | "local" | "street";
 
 export function MapsSection({ data }: { data: ChapterWorkup }) {
   const cfg = getChapterMap(data.slug);
-  const steps: { id: Step; label: string; show: boolean }[] = [
+  const allSteps: { id: Step; label: string; show: boolean }[] = [
     { id: "big", label: "Big Picture", show: Boolean(cfg?.bigPicture) },
     { id: "local", label: "Local Map", show: Boolean(cfg?.local) },
     { id: "street", label: "Standing There", show: Boolean(cfg?.streetView) },
-  ].filter((s) => s.show);
-  const [step, setStep] = useState<Step>((steps[0]?.id as Step) ?? "local");
+  ];
+  const steps = allSteps.filter((s) => s.show);
+  const [step, setStep] = useState<Step>(steps[0]?.id ?? "local");
 
   if (!cfg || steps.length === 0) return null;
 
