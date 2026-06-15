@@ -40,11 +40,37 @@ export interface MapPath {
   lx?: number;
   ly?: number;
 }
+// Curated boundary/territory layer. Coordinates are authored in IMAGE space
+// (percent of the base image) for now; the same shape maps cleanly to GeoJSON
+// lat/lng later (a geo→image projection using the map's bbox is all that's
+// needed to move these to a Google/Mapbox/Esri Data Layer).
+export type BoundaryCertainty = "known" | "approximate" | "traditional" | "representative";
+export type BoundaryStyle =
+  | "modern-border" // crisp cool line — modern regional context
+  | "biblical-territory" // warm dashed/glowing line — kingdom/region (approx.)
+  | "tribal-allotment" // thin dotted line
+  | "empire" // broad translucent region
+  | "soft-region"; // soft translucent area
+
+export interface BoundaryOverlay {
+  id: string;
+  label: string;
+  era?: string;
+  certainty: BoundaryCertainty;
+  geometryType: "polygon" | "line" | "region";
+  /** Authored as [x%, y%] of the base image. (Swap for GeoJSON lat/lng later.) */
+  coordinates: Array<[number, number]>;
+  style: BoundaryStyle;
+  labelAt?: [number, number];
+  caption?: string;
+}
+
 export interface MapOverlay {
   pins: MapPin[];
   labels: MapLabel[];
   regions: MapRegion[];
   paths: MapPath[];
+  boundaries?: BoundaryOverlay[];
 }
 
 export interface BigPictureConfig {
@@ -124,10 +150,21 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
             { x: 86, y: 48, text: "Wilderness / valley", tone: "region" },
             { x: 88, y: 86, text: "Dead Sea", tone: "water" },
           ],
-          regions: [
-            { cx: 42, cy: 55, rx: 34, ry: 33, variant: "territory", label: "Judean Hills region", lx: 21, ly: 30, approx: false },
-          ],
+          regions: [],
           paths: [SIX_MILE],
+          boundaries: [
+            {
+              id: "judean-highlands",
+              label: "Judean Highlands",
+              certainty: "representative",
+              geometryType: "region",
+              style: "modern-border",
+              labelAt: [22, 28],
+              coordinates: [
+                [26, 30], [52, 24], [64, 34], [66, 58], [54, 76], [30, 78], [18, 54],
+              ],
+            },
+          ],
         },
         biblical: {
           pins: [
@@ -135,11 +172,25 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
             { x: BETHLEHEM[0], y: BETHLEHEM[1], label: "Bethlehem" },
           ],
           labels: [{ x: 86, y: 48, text: "Wilderness / valley", tone: "region" }],
+          // soft filled circle — David's shepherding world (distinct from territory)
           regions: [
-            { cx: 46, cy: 60, rx: 42, ry: 37, variant: "territory", label: "Judah (approx.)", lx: 67, ly: 82, approx: true },
-            { cx: 33, cy: 64, rx: 22, ry: 17, variant: "glow", label: "David’s shepherding world", lx: 30, ly: 80 },
+            { cx: 33, cy: 64, rx: 22, ry: 17, variant: "glow", label: "David’s shepherding world", lx: 30, ly: 81 },
           ],
           paths: [SIX_MILE],
+          boundaries: [
+            {
+              id: "davidic-judah",
+              label: "Davidic Judah · approx.",
+              era: "c. 1000 BC",
+              certainty: "approximate",
+              geometryType: "polygon",
+              style: "biblical-territory",
+              labelAt: [63, 27],
+              coordinates: [
+                [28, 28], [50, 22], [66, 30], [72, 55], [66, 82], [45, 92], [22, 84], [14, 55],
+              ],
+            },
+          ],
         },
       },
     },

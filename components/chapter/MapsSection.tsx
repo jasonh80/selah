@@ -5,6 +5,7 @@ import type { ChapterWorkup } from "@/lib/types";
 import {
   getChapterMap,
   type BigPictureConfig,
+  type BoundaryStyle,
   type ContextMode,
   type LocalConfig,
   type MapOverlay,
@@ -111,6 +112,70 @@ function Compass() {
       </svg>
       <span className="-mt-0.5 text-[8px] font-bold leading-none">N</span>
     </span>
+  );
+}
+
+// Per-style boundary look. Each boundary is drawn twice (a wider translucent
+// "glow" stroke behind + a crisp stroke in front) so it reads clearly on the
+// satellite without a blur filter.
+function boundaryStyle(style: BoundaryStyle) {
+  switch (style) {
+    case "biblical-territory":
+      return { stroke: "rgba(255,224,138,0.96)", glow: "rgba(255,205,110,0.30)", fill: "rgba(255,221,128,0.13)", dash: "5 3.5", w: 2.6, gw: 6.5 };
+    case "modern-border":
+      return { stroke: "rgba(170,228,255,0.96)", glow: "rgba(150,220,255,0.28)", fill: "rgba(130,210,255,0.10)", dash: undefined, w: 2.6, gw: 6 };
+    case "tribal-allotment":
+      return { stroke: "rgba(255,255,255,0.9)", glow: "rgba(255,255,255,0.2)", fill: "rgba(255,255,255,0.04)", dash: "1.5 3", w: 1.8, gw: 4.5 };
+    case "empire":
+      return { stroke: "rgba(206,176,255,0.85)", glow: "rgba(200,170,255,0.22)", fill: "rgba(180,150,255,0.12)", dash: "8 5", w: 2.4, gw: 7.5 };
+    default:
+      return { stroke: "rgba(255,255,255,0.85)", glow: "rgba(255,255,255,0.18)", fill: "rgba(255,255,255,0.06)", dash: undefined, w: 2, gw: 5 };
+  }
+}
+
+function LegendGlyph({ kind }: { kind: string }) {
+  if (kind === "pin") return <span className="h-2.5 w-2.5 rounded-full bg-white ring-2 ring-[var(--accent-strong)]" />;
+  if (kind === "circle")
+    return <span className="h-3 w-3 rounded-full" style={{ background: "rgba(120,200,255,0.3)", border: "1px solid rgba(180,225,255,0.85)" }} />;
+  return (
+    <svg width="20" height="6" viewBox="0 0 20 6" aria-hidden className="shrink-0">
+      <line
+        x1="1"
+        y1="3"
+        x2="19"
+        y2="3"
+        stroke={kind === "dashed" ? "#ffe08a" : kind === "solid" ? "#9fdcff" : "currentColor"}
+        strokeWidth="2"
+        strokeDasharray={kind === "dashed" ? "4 3" : kind === "path" ? "2 2.5" : undefined}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MapLegend({ mode }: { mode: ContextMode }) {
+  const items =
+    mode === "biblical"
+      ? [
+          { g: "pin", t: "Specific place" },
+          { g: "circle", t: "General area" },
+          { g: "dashed", t: "Approx. biblical territory" },
+          { g: "path", t: "Journey / distance" },
+        ]
+      : [
+          { g: "pin", t: "Specific place" },
+          { g: "solid", t: "Modern region" },
+          { g: "path", t: "Journey / distance" },
+        ];
+  return (
+    <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      {items.map((it) => (
+        <span key={it.t} className="inline-flex items-center gap-1.5 text-[10px] text-secondary">
+          <LegendGlyph kind={it.g} />
+          {it.t}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -243,6 +308,16 @@ function LocalMapPanel({ cfg, reference }: { cfg: LocalConfig; reference: string
             <span className="pointer-events-none absolute inset-0" style={{ boxShadow: "inset 0 0 70px 12px rgba(0,0,0,0.34)" }} />
 
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
+              {(overlay.boundaries ?? []).map((b, i) => {
+                const pts = b.coordinates.map(([x, y]) => `${x},${y}`).join(" ");
+                const s = boundaryStyle(b.style);
+                return (
+                  <g key={`b${i}`}>
+                    <polygon points={pts} fill="none" stroke={s.glow} strokeWidth={s.gw} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                    <polygon points={pts} fill={s.fill} stroke={s.stroke} strokeWidth={s.w} strokeDasharray={s.dash} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                  </g>
+                );
+              })}
               {overlay.regions.map((r, i) =>
                 r.variant === "territory" ? (
                   <ellipse
@@ -275,6 +350,20 @@ function LocalMapPanel({ cfg, reference }: { cfg: LocalConfig; reference: string
                   style={{ background: "rgba(12,14,20,0.6)", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}
                 >
                   {r.label}
+                </span>
+              </Anchored>
+            ))}
+            {(overlay.boundaries ?? []).filter((b) => b.labelAt).map((b, i) => (
+              <Anchored key={`bl${i}`} x={b.labelAt![0]} y={b.labelAt![1]} inv={inv}>
+                <span
+                  className="whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em]"
+                  style={{
+                    color: b.style === "biblical-territory" ? "#ffe08a" : "#bfe4ff",
+                    background: "rgba(12,14,20,0.62)",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+                  }}
+                >
+                  {b.label}
                 </span>
               </Anchored>
             ))}
@@ -317,6 +406,7 @@ function LocalMapPanel({ cfg, reference }: { cfg: LocalConfig; reference: string
           </span>
         </div>
         <p className="mt-3 text-[12px] leading-relaxed text-secondary">{cfg.caption}</p>
+        <MapLegend mode={mode} />
       </div>
     </Frame>
   );
