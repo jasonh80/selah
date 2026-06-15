@@ -10,7 +10,7 @@ const TOPICS: Topic[] = [
   { icon: "🛡", label: "Theology", href: "#deeper-study" },
   { icon: "✝", label: "Jesus Connection", href: "#deeper-study", jesus: true },
   { icon: "🗺", label: "Maps & Places", href: "#maps" },
-  { icon: "🕰", label: "Timeline", href: "#timeline" },
+  { icon: "🕰", label: "Where It Fits", href: "#timeline" },
   { icon: "🔤", label: "Original Language", href: "#deeper-study" },
   { icon: "🔍", label: "What Most People Miss", href: "#deeper-study" },
   { icon: "🙏", label: "Prayer", href: "#deeper-study" },

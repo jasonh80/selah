@@ -50,6 +50,11 @@ export function MapsSection({ data }: { data: ChapterWorkup }) {
         </div>
       </div>
 
+      <p className="mb-2.5 text-[11px] leading-relaxed text-secondary">
+        Start wide, then open <span className="font-medium text-primary">Local Map</span> to compare
+        today’s geography with the biblical-context overlays.
+      </p>
+
       {step === "big" && cfg.bigPicture && <BigPicturePanel cfg={cfg.bigPicture} reference={data.reference} />}
       {step === "local" && cfg.local && <LocalMapPanel cfg={cfg.local} reference={data.reference} />}
       {step === "street" && cfg.streetView && <StreetViewPanel cfg={cfg.streetView} />}
