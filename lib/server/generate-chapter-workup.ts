@@ -15,7 +15,7 @@ import {
 } from "./chapter-workups-repository";
 import { recordCostEvent } from "./cost-events-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
-import { getSelahLearnings } from "./selah-feedback";
+import { getActiveGlobalRuleTexts, getChapterReviewNoteTexts } from "./selah-brain";
 
 // Routine generation control now lives in Supabase (generation_settings), so it
 // changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
@@ -50,7 +50,8 @@ export async function generateChapterWorkup(input: {
   bibleVersion?: string;
   bibleText?: string;
   model?: string;
-  learnings?: string[];
+  globalRules?: string[];
+  chapterNotes?: string[];
 }): Promise<GenOutput> {
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
@@ -61,7 +62,8 @@ export async function generateChapterWorkup(input: {
     chapter: input.chapter,
     bibleVersion: input.bibleVersion,
     bibleText: input.bibleText,
-    learnings: input.learnings,
+    globalRules: input.globalRules,
+    chapterNotes: input.chapterNotes,
   });
 
   // Reasoning models (GPT-5 / o-series) need low reasoning effort here — this is
@@ -124,8 +126,9 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   // Admin-selected model from Supabase settings (falls back to the Netlify default).
   const settings = await getGenerationSettings();
   const model = settings.selected_text_model || CHAPTER_WORKUP_TEXT_MODEL;
-  // Editor's accumulated "Selah Brain" guidance (scope future/both). Fails soft.
-  const learnings = await getSelahLearnings();
+  // Active Selah Brain rules (global) + this chapter's own review notes. Fail soft.
+  const globalRules = await getActiveGlobalRuleTexts();
+  const chapterNotes = await getChapterReviewNoteTexts(slug);
   await logGenerationAudit({ action: "generate_text", slug, model, status: "started" });
 
   try {
@@ -145,7 +148,8 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
       slug,
       bibleVersion,
       model,
-      learnings,
+      globalRules,
+      chapterNotes,
     });
 
     // Log the text cost immediately — tokens are spent regardless of whether the

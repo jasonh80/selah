@@ -13,12 +13,14 @@ import {
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
+import { getAuditLog } from "@/lib/server/selah-feedback";
 import {
-  saveSelahFeedback,
-  getAuditLog,
-  type FeedbackScope,
-  type FeedbackVerdict,
-} from "@/lib/server/selah-feedback";
+  submitReview,
+  listGlobalRules,
+  setRuleActive,
+  deleteRule,
+  type ReviewScope,
+} from "@/lib/server/selah-brain";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -63,15 +65,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, slug, status: await getChapterStatus(slug) });
   }
 
-  // ---- Selah Brain review note (does this feel like Selah?) ----
+  // ---- Selah Brain review (does this feel like Selah?) ----
+  // Saves a chapter note; future/both also creates an active global rule.
   if (action === "feedback") {
-    const ok = await saveSelahFeedback({
+    const ok = await submitReview({
       slug: String(body.slug ?? ""),
-      verdict: String(body.verdict ?? "yes") as FeedbackVerdict,
+      verdict: String(body.verdict ?? "yes") as "yes" | "needs_work",
       note: typeof body.note === "string" ? body.note : "",
-      scope: String(body.scope ?? "chapter") as FeedbackScope,
+      scope: String(body.scope ?? "chapter") as ReviewScope,
       tags: Array.isArray(body.tags) ? (body.tags as string[]) : [],
     });
+    return NextResponse.json({ ok });
+  }
+
+  // ---- Selah Brain rules (Advanced Settings → What Selah Has Learned) ----
+  if (action === "rules_list") {
+    return NextResponse.json({ ok: true, rules: await listGlobalRules() });
+  }
+  if (action === "rule_toggle") {
+    const ok = await setRuleActive(String(body.id ?? ""), body.active === true);
+    return NextResponse.json({ ok });
+  }
+  if (action === "rule_delete") {
+    const ok = await deleteRule(String(body.id ?? ""));
     return NextResponse.json({ ok });
   }
 

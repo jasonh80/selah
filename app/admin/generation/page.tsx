@@ -26,6 +26,14 @@ type AuditEntry = {
   model: string | null;
 };
 
+type Rule = {
+  id: string;
+  title: string;
+  rule_text: string;
+  category: string;
+  active: boolean;
+};
+
 type Phase = "idle" | "generating" | "ready" | "error";
 type Verdict = "" | "yes" | "needs_work";
 type Scope = "chapter" | "future" | "both";
@@ -63,6 +71,7 @@ export default function SelahStudioPage() {
   const [published, setPublished] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
+  const [rules, setRules] = useState<Rule[] | null>(null);
 
   const activeSlug = useRef("");
   const slug = slugFor(book, chapter) ?? "";
@@ -165,6 +174,23 @@ export default function SelahStudioPage() {
     const j = await api("POST", { action: "feedback", slug, verdict, note, scope, tags });
     setBusy(false);
     setNoteSaved(Boolean(j.ok));
+    // A future/both note may have created a global rule — refresh the panel if open.
+    if (j.ok && scope !== "chapter" && rules !== null) void loadRules();
+  }
+
+  async function loadRules() {
+    const j = await api("POST", { action: "rules_list" });
+    if (j.ok) setRules(j.rules as Rule[]);
+  }
+
+  async function toggleRule(id: string, active: boolean) {
+    setRules((rs) => rs?.map((r) => (r.id === id ? { ...r, active } : r)) ?? rs);
+    await api("POST", { action: "rule_toggle", id, active });
+  }
+
+  async function removeRule(id: string) {
+    setRules((rs) => rs?.filter((r) => r.id !== id) ?? rs);
+    await api("POST", { action: "rule_delete", id });
   }
 
   async function publishFinal() {
@@ -411,6 +437,7 @@ export default function SelahStudioPage() {
           onClick={() => {
             setShowAdvanced((v) => !v);
             if (!audit) void loadAudit();
+            if (!rules) void loadRules();
           }}
           className="flex w-full items-center justify-between px-4 py-3 text-[14px] font-medium text-primary"
         >
@@ -459,6 +486,47 @@ export default function SelahStudioPage() {
             <button onClick={saveSettings} disabled={busy} className={primary}>
               {busy ? "…" : "Save settings"}
             </button>
+
+            {/* What Selah Has Learned — active global rules */}
+            <div className="pt-2">
+              <p className="text-eyebrow">What Selah Has Learned</p>
+              <div className="mt-1.5 space-y-1.5">
+                {rules === null ? (
+                  <p className="text-[12px] text-secondary">Loading…</p>
+                ) : rules.length === 0 ? (
+                  <p className="text-[12px] text-secondary">
+                    No rules yet. Add one from a review, or run the Selah Brain SQL to seed the starters.
+                  </p>
+                ) : (
+                  rules.map((r) => (
+                    <div
+                      key={r.id}
+                      className={`flex items-center gap-2 rounded-lg border bg-card-soft px-2.5 py-2 ${r.active ? "" : "opacity-50"}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] text-primary" title={r.rule_text}>{r.title}</p>
+                        <p className="text-[11px] text-secondary">{r.category}</p>
+                      </div>
+                      <button
+                        onClick={() => toggleRule(r.id, !r.active)}
+                        className={`rounded-full border px-2.5 py-1 text-[11px] ${
+                          r.active ? "border-accent-strong bg-accent-strong/15 text-primary" : "bg-card text-secondary"
+                        }`}
+                      >
+                        {r.active ? "Active" : "Off"}
+                      </button>
+                      <button
+                        onClick={() => removeRule(r.id)}
+                        title="Remove rule"
+                        className="rounded-full px-1.5 text-[14px] text-secondary hover:text-jesus-red"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
 
             <div className="pt-2">
               <p className="text-eyebrow">Recent activity</p>
