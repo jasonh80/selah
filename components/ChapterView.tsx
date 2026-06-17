@@ -13,6 +13,7 @@ import { MapsSection } from "@/components/chapter/MapsSection";
 import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { TransparencySection } from "@/components/chapter/TransparencySection";
 import { ChapterControls } from "@/components/chapter/ChapterControls";
+import { SceneCheckSection } from "@/components/chapter/SceneCheckSection";
 import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
 
 /**
@@ -42,6 +43,7 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
         </div>
 
         <GeneratedImagesSection data={data} />
+        <SceneCheckSection data={data} />
         <AuthorAudienceEvidence data={data} />
         <InsightCardGrid data={data} />
         <ScriptureReader data={data} />
