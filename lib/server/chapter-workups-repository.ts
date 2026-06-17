@@ -26,7 +26,7 @@ export interface CreateGeneratingInput {
 export interface SaveReadyInput {
   slug: string;
   workup: ChapterWorkup;
-  status?: "ready" | "reviewed";
+  status?: "ready" | "reviewed" | "draft";
   version?: string;
   bibleVersion?: string;
 }
@@ -54,6 +54,39 @@ export async function getChapterWorkupBySlug(slug: string): Promise<ChapterWorku
     return null;
   }
   return (data?.workup_json as ChapterWorkup | undefined) ?? null;
+}
+
+/** Fetch a workup at ANY status (incl. draft) — for admin preview only. */
+export async function getDraftWorkup(
+  slug: string,
+): Promise<{ workup: ChapterWorkup; status: string } | null> {
+  const db = getSupabaseAdmin();
+  if (!db) {
+    warnSupabaseMissing("getDraftWorkup");
+    return null;
+  }
+  const { data, error } = await db
+    .from(TABLE)
+    .select("workup_json,status")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error || !data?.workup_json) return null;
+  return { workup: data.workup_json as ChapterWorkup, status: (data.status as string) ?? "unknown" };
+}
+
+/** Promote a draft to published (status → reviewed). Returns the new status. */
+export async function publishChapter(slug: string): Promise<string | null> {
+  const db = getSupabaseAdmin();
+  if (!db) {
+    warnSupabaseMissing("publishChapter");
+    return null;
+  }
+  const { error } = await db.from(TABLE).update({ status: "reviewed" }).eq("slug", slug);
+  if (error) {
+    console.error(`[selah] publishChapter(${slug}) failed:`, error.message);
+    return null;
+  }
+  return "reviewed";
 }
 
 /**

@@ -254,6 +254,23 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
     })),
 
     biblicalTimeline: g.biblicalTimeline,
+
+    sceneChecks: g.sceneChecks?.map((s) => ({
+      label: "Scene Check",
+      title: s.title,
+      body: s.body,
+      relatedVerses: s.relatedVerses,
+      visualAccuracyNotes: s.visualAccuracyNotes,
+    })),
+    behindTheChapter: g.behindTheChapter
+      ? [
+          { category: "Author", title: g.behindTheChapter.author.title, body: g.behindTheChapter.author.body },
+          { category: "First Audience", title: g.behindTheChapter.firstAudience.title, body: g.behindTheChapter.firstAudience.body },
+          { category: "Historical World", title: g.behindTheChapter.historicalWorld.title, body: g.behindTheChapter.historicalWorld.body },
+          { category: "Evidence & Artifacts", title: g.behindTheChapter.evidence.title, body: g.behindTheChapter.evidence.body },
+        ]
+      : undefined,
+
     cost: g.cost,
   };
 }

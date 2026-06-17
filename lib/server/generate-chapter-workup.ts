@@ -18,7 +18,7 @@ import { recordCostEvent } from "./cost-events-repository";
 // Only generate when explicitly enabled AND the slug is on the test allowlist —
 // prevents random URLs from spending money / mass-generating the Bible.
 export const GENERATION_ENABLED = process.env.ENABLE_CHAPTER_GENERATION === "true";
-const TEST_GENERATION_ALLOWED_SLUGS = ["psalm-23", "mark-2"];
+const TEST_GENERATION_ALLOWED_SLUGS = ["psalm-23", "mark-2", "mark-6", "exodus-29"];
 
 export function generationAllowed(slug: string): boolean {
   return (
@@ -155,11 +155,12 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
 
     const generated = parseChapterWorkupJson(content);
     const render = generatedToRenderWorkup(generated);
-    // Saved as "ready" (not "reviewed") — an admin can promote it later.
+    // Saved as a DRAFT — not served to the public until reviewed + published via
+    // /dev/publish. Preview a draft at /dev/preview/<slug>.
     await saveReadyChapterWorkup({
       slug,
       workup: render,
-      status: "ready",
+      status: "draft",
       version: generated.version,
       bibleVersion,
     });

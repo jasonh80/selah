@@ -154,6 +154,16 @@ export interface ChapterWorkup {
 
   biblicalTimeline?: BiblicalTimeline;
 
+  // Generated supplemental content (falls back to static config when absent).
+  sceneChecks?: {
+    label?: string;
+    title: string;
+    body: string;
+    relatedVerses?: string[];
+    visualAccuracyNotes?: string[];
+  }[];
+  behindTheChapter?: { category: string; title: string; body: string }[];
+
   // Optional generation cost metadata (placeholder; not shown in the UI).
   cost?: {
     textEstimateUsd?: number;

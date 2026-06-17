@@ -118,8 +118,33 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     "uncertaintyNote": "<what is uncertain and why>",
     "placementReason": "<why you placed it here>"
   },
+  "sceneChecks": [
+    { "title": "<short, vivid>", "body": "<warm, conversational correction of a common WRONG mental image — confident, lightly witty when it fits, never academic>", "relatedVerses": ["<c:v>"], "visualAccuracyNotes": ["<a concrete visual correction that will steer future image generation, e.g. 'tabernacle tent, not a stone temple' or 'wrapped linen turban, not a crown'>"] }
+  ],
+  "behindTheChapter": {
+    "author": { "title": "<who likely wrote it>", "body": "<short, confident, honest about debate where real>" },
+    "firstAudience": { "title": "<who first heard / read / sang it>", "body": "<short>" },
+    "historicalWorld": { "title": "<the world they lived in>", "body": "<short, vivid>" },
+    "evidence": { "title": "<manuscripts / inscriptions / archaeology that ground it>", "body": "<short, honest — name real artifacts/sources where they exist>" }
+  },
   "bibleText": { "version": "${bibleVersion ?? "ESV"}" }
 }
+
+SCENE CHECKS (picture it accurately)
+- Include 1-3 "sceneChecks" ONLY where this chapter has a visual-historical detail
+  people commonly imagine wrongly (wrong building, wrong clothing, wrong scale,
+  English text on objects, a tidy scene that was really chaotic/dangerous, etc.).
+  Do not force them. Tone: warm, visual, confident, historically grounded, lightly
+  witty when it fits — like a wise friend, not a textbook.
+- "visualAccuracyNotes" are crisp, concrete corrections that will later be fed to
+  image generation as guardrails. Be specific (materials, scale in feet, no English
+  lettering, era-appropriate script, etc.).
+
+BEHIND THE CHAPTER
+- Fill "behindTheChapter" with four short, confident cards: who likely wrote it,
+  who first heard/read/sang it, the world they lived in, and the manuscripts /
+  inscriptions / archaeology that ground it. Name real evidence where it exists;
+  stay honest about uncertainty without sounding like a disclaimer.
 
 DATES — BE HONEST
 - estimatedYear is internal (negative = BC). The visible label (estimatedYearLabel)

@@ -9,8 +9,10 @@ import { getSceneChecks, type SceneCheck } from "@/lib/content/chapter-content";
 // adds the visual-accuracy notes and related verses.
 export function SceneCheckSection({ data }: { data: ChapterWorkup }) {
   const { mode } = useReadingMode();
-  const checks = getSceneChecks(data.slug);
-  if (!checks || checks.length === 0) return null;
+  // Prefer generated scene checks; fall back to static config (e.g. Psalm 23).
+  const checks: SceneCheck[] =
+    data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
+  if (checks.length === 0) return null;
   const deep = mode === "deep";
 
   return (

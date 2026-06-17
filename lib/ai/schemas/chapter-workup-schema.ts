@@ -126,6 +126,24 @@ const ChapterTopicSchema = z.object({
   priority: z.number(),
 });
 
+// Scene Check — corrects a common wrong mental image; visualAccuracyNotes also
+// guard future image generation.
+const SceneCheckGenSchema = z.object({
+  title: z.string(),
+  body: z.string(),
+  relatedVerses: z.array(z.string()).optional(),
+  visualAccuracyNotes: z.array(z.string()).optional(),
+});
+
+// Behind the Chapter — author / first audience / historical world / evidence.
+const BehindCardSchema = z.object({ title: z.string(), body: z.string() });
+const BehindTheChapterSchema = z.object({
+  author: BehindCardSchema,
+  firstAudience: BehindCardSchema,
+  historicalWorld: BehindCardSchema,
+  evidence: BehindCardSchema,
+});
+
 // Honest placement in the big biblical story. Uncertain dates stay uncertain.
 const BiblicalTimelineSchema = z.object({
   era: z.string(),
@@ -212,6 +230,8 @@ export const GeneratedChapterWorkupSchema = z.object({
   chapterSpecificTopics: z.array(ChapterTopicSchema).optional(),
   sections: z.array(SectionSchema).optional(),
   biblicalTimeline: BiblicalTimelineSchema.optional(),
+  sceneChecks: z.array(SceneCheckGenSchema).optional(),
+  behindTheChapter: BehindTheChapterSchema.optional(),
 
   // metadata placeholders
   bibleText: BibleTextSchema,
