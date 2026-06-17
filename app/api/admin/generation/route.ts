@@ -13,6 +13,12 @@ import {
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
+import {
+  saveSelahFeedback,
+  getAuditLog,
+  type FeedbackScope,
+  type FeedbackVerdict,
+} from "@/lib/server/selah-feedback";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -55,6 +61,23 @@ export async function POST(req: Request) {
   if (action === "status") {
     const slug = String(body.slug ?? "");
     return NextResponse.json({ ok: true, slug, status: await getChapterStatus(slug) });
+  }
+
+  // ---- Selah Brain review note (does this feel like Selah?) ----
+  if (action === "feedback") {
+    const ok = await saveSelahFeedback({
+      slug: String(body.slug ?? ""),
+      verdict: String(body.verdict ?? "yes") as FeedbackVerdict,
+      note: typeof body.note === "string" ? body.note : "",
+      scope: String(body.scope ?? "chapter") as FeedbackScope,
+      tags: Array.isArray(body.tags) ? (body.tags as string[]) : [],
+    });
+    return NextResponse.json({ ok });
+  }
+
+  // ---- recent activity (Advanced Settings audit panel) ----
+  if (action === "audit") {
+    return NextResponse.json({ ok: true, entries: await getAuditLog() });
   }
 
   // ---- generate a draft (text only) ----

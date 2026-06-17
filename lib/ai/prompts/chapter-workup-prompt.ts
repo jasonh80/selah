@@ -6,11 +6,20 @@ export interface ChapterWorkupPromptInput {
   chapter: number;
   bibleVersion?: string;
   bibleText?: string;
+  // Plain imperative guidance gathered from the editor's "Selah Brain" reviews of
+  // earlier chapters (scope = future/both). Steers tone, depth, and accuracy.
+  learnings?: string[];
 }
 
 export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): string {
-  const { book, chapter, bibleVersion, bibleText } = input;
+  const { book, chapter, bibleVersion, bibleText, learnings } = input;
   const slug = `${book.toLowerCase().replace(/\s+/g, "-")}-${chapter}`;
+  const learningsBlock =
+    learnings && learnings.length
+      ? `\n\nWHAT SELAH HAS LEARNED (apply to EVERY section)\nThe editor reviewed earlier chapters and asked you to keep these in mind:\n${learnings
+          .map((l) => `- ${l}`)
+          .join("\n")}\nHonor these in tone, depth, specificity, and accuracy.`
+      : "";
 
   return `You are the content engine for Selah, a daily Bible chapter app whose only
 goal is to help people grow closer to Jesus through Scripture.
@@ -178,7 +187,7 @@ RULES
 - "primaryCharacters" is an array of strings; "keyObjects", "keyPeople", "sections", "chapterSpecificTopics" are arrays of OBJECTS.
 - Provide 2-4 items for timeline.items, keyObjects, keyPeople, verseByVerse, and each goDeeper group; 3-7 chapterSpecificTopics.
 - Mark the timeline item for THIS chapter with "active": true.
-- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${
+- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${learningsBlock}${
     bibleText ? `\n\nUse this chapter text as your source (do not quote it verbatim in output):\n"""\n${bibleText}\n"""` : ""
   }`;
 }
