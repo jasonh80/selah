@@ -24,7 +24,7 @@ export default async function ChapterPage({ params }: { params: { slug: string }
   // 2) Page loads NEVER start generation (cost safety). We only show the
   //    "Preparing…" screen if a manual job (via /dev/regenerate) is already
   //    in progress, and it auto-refreshes until that job saves a ready workup.
-  if (generationAllowed(slug) && (await getChapterStatus(slug)) === "generating") {
+  if ((await generationAllowed(slug)) && (await getChapterStatus(slug)) === "generating") {
     const parsed = parseSlug(slug);
     return (
       <AppShell>

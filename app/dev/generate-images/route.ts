@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
-import {
-  imageGenAllowed,
-  isImageGenEnabled,
-  CHAPTER_IMAGE_MODEL,
-  IMAGE_ALLOWED_SLUGS,
-} from "@/lib/server/images";
+import { imageGenAllowed, CHAPTER_IMAGE_MODEL, IMAGE_ALLOWED_SLUGS } from "@/lib/server/images";
 import { triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
 
 // DEV/ADMIN ONLY image generation trigger. ALL of these are required:
@@ -34,17 +29,16 @@ export async function GET(request: Request) {
     );
   }
 
-  if (!imageGenAllowed(slug)) {
+  if (!(await imageGenAllowed(slug))) {
     return NextResponse.json(
       {
         ok: false,
         error: "image generation not allowed",
         need: {
-          enableImageGen: isImageGenEnabled(),
           allowedSlugs: IMAGE_ALLOWED_SLUGS,
           slug,
         },
-        hint: "Set ENABLE_CHAPTER_IMAGE_GENERATION=true, ensure OpenAI+Supabase configured, and use an allowlisted slug.",
+        hint: "Enable image generation + allowlist this slug in /admin/generation (and the slug needs an image plan).",
       },
       { status: 403 },
     );

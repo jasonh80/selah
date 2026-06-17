@@ -9,8 +9,17 @@ import { devRoutesEnabled } from "@/lib/server/dev-guard";
 // never generates.
 export const dynamic = "force-dynamic";
 
-export default async function DraftPreviewPage({ params }: { params: { slug: string } }) {
-  if (!devRoutesEnabled()) notFound();
+export default async function DraftPreviewPage({
+  params,
+  searchParams,
+}: {
+  params: { slug: string };
+  searchParams: { token?: string };
+}) {
+  // Accessible via the dev-routes flag OR the admin token (so the admin console
+  // can preview drafts without touching Netlify env vars).
+  const tokenOk = Boolean(process.env.DEV_ADMIN_TOKEN) && searchParams?.token === process.env.DEV_ADMIN_TOKEN;
+  if (!devRoutesEnabled() && !tokenOk) notFound();
   const draft = await getDraftWorkup(params.slug);
   if (!draft) notFound();
 

@@ -6,25 +6,20 @@ import { getOpenAI, isOpenAIConfigured } from "./openai";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { getChapterWorkupBySlug, updateChapterWorkupJson } from "./chapter-workups-repository";
 import { recordCostEvent } from "./cost-events-repository";
+import { getGenerationSettings } from "./generation-settings";
 
 export const CHAPTER_IMAGE_MODEL = process.env.CHAPTER_IMAGE_MODEL || "gpt-image-1";
 
-// Separate flag from text generation. Both stay OFF for normal operation.
-export function isImageGenEnabled(): boolean {
-  return process.env.ENABLE_CHAPTER_IMAGE_GENERATION === "true";
-}
-
-// Image generation is allowed for these slugs ONLY. Psalm 23 only for now.
+// Slugs that have a hand-authored IMAGE_PLAN. (Generated chapters' image prompts
+// will come from their workup later; for now image gen needs a plan here.)
 export const IMAGE_ALLOWED_SLUGS = ["psalm-23"];
 
-export function imageGenAllowed(slug: string): boolean {
-  return (
-    isImageGenEnabled() &&
-    isOpenAIConfigured() &&
-    isSupabaseConfigured() &&
-    IMAGE_ALLOWED_SLUGS.includes(slug) &&
-    Boolean(IMAGE_PLANS[slug])
-  );
+// Routine image control lives in Supabase (generation_settings.image_generation_enabled,
+// defaults OFF). Fail-CLOSED. Still requires an IMAGE_PLAN for the slug.
+export async function imageGenAllowed(slug: string): Promise<boolean> {
+  if (!isOpenAIConfigured() || !isSupabaseConfigured() || !IMAGE_PLANS[slug]) return false;
+  const s = await getGenerationSettings();
+  return s.image_generation_enabled && s.allowed_slugs.includes(slug);
 }
 
 const BUCKET = "chapter-images";
@@ -136,7 +131,7 @@ export interface ImageGenResult {
  * Does NOT generate or modify chapter text.
  */
 export async function generateAndStoreChapterImages(slug: string): Promise<ImageGenResult> {
-  if (!imageGenAllowed(slug)) {
+  if (!(await imageGenAllowed(slug))) {
     return { ok: false, slug, model: CHAPTER_IMAGE_MODEL, error: "image generation not allowed for this slug" };
   }
   const db = getSupabaseAdmin();

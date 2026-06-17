@@ -5,7 +5,7 @@ import { generateAndStoreChapter, generationAllowed } from "../../lib/server/gen
 
 export default async (req: Request) => {
   const slug = new URL(req.url).searchParams.get("slug") || "";
-  if (!generationAllowed(slug)) {
+  if (!(await generationAllowed(slug))) {
     return new Response(JSON.stringify({ ok: false, error: "not allowed" }), { status: 403 });
   }
   try {

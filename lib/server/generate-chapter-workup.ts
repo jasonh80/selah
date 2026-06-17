@@ -14,19 +14,15 @@ import {
   markChapterWorkupFailed,
 } from "./chapter-workups-repository";
 import { recordCostEvent } from "./cost-events-repository";
+import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 
-// Only generate when explicitly enabled AND the slug is on the test allowlist —
-// prevents random URLs from spending money / mass-generating the Bible.
-export const GENERATION_ENABLED = process.env.ENABLE_CHAPTER_GENERATION === "true";
-const TEST_GENERATION_ALLOWED_SLUGS = ["psalm-23", "mark-2", "mark-6", "exodus-29"];
-
-export function generationAllowed(slug: string): boolean {
-  return (
-    GENERATION_ENABLED &&
-    isOpenAIConfigured() &&
-    isSupabaseConfigured() &&
-    TEST_GENERATION_ALLOWED_SLUGS.includes(slug)
-  );
+// Routine generation control now lives in Supabase (generation_settings), so it
+// changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
+// Supabase configured AND text_generation_enabled AND the slug allowlisted there.
+export async function generationAllowed(slug: string): Promise<boolean> {
+  if (!isOpenAIConfigured() || !isSupabaseConfigured()) return false;
+  const s = await getGenerationSettings();
+  return s.text_generation_enabled && s.allowed_slugs.includes(slug);
 }
 
 // "psalm-23" -> { book: "Psalm", chapter: 23 }
@@ -52,9 +48,11 @@ export async function generateChapterWorkup(input: {
   slug: string;
   bibleVersion?: string;
   bibleText?: string;
+  model?: string;
 }): Promise<GenOutput> {
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
+  const model = input.model || CHAPTER_WORKUP_TEXT_MODEL;
 
   const prompt = buildChapterWorkupPrompt({
     book: input.book,
@@ -67,9 +65,9 @@ export async function generateChapterWorkup(input: {
   // content writing, not hard reasoning — or they burn minutes of reasoning on
   // the large prompt. Cap output tokens to avoid runaway. Built as a loose object
   // + cast so it compiles across SDK versions that may not type these fields yet.
-  const isReasoningModel = /^(gpt-5|o\d)/i.test(CHAPTER_WORKUP_TEXT_MODEL);
+  const isReasoningModel = /^(gpt-5|o\d)/i.test(model);
   const body = {
-    model: CHAPTER_WORKUP_TEXT_MODEL,
+    model,
     messages: [
       {
         role: "system",
@@ -120,6 +118,11 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   const bibleVersion = "ESV";
   let costLogged = false;
 
+  // Admin-selected model from Supabase settings (falls back to the Netlify default).
+  const settings = await getGenerationSettings();
+  const model = settings.selected_text_model || CHAPTER_WORKUP_TEXT_MODEL;
+  await logGenerationAudit({ action: "generate_text", slug, model, status: "started" });
+
   try {
     await createGeneratingChapterWorkup({
       book,
@@ -136,6 +139,7 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
       chapter,
       slug,
       bibleVersion,
+      model,
     });
 
     // Log the text cost immediately — tokens are spent regardless of whether the
@@ -145,7 +149,7 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
     await recordCostEvent({
       requestType: "chapter_workup_text",
       provider: "openai",
-      model: CHAPTER_WORKUP_TEXT_MODEL,
+      model,
       inputTokens,
       outputTokens,
       estimatedCostUsd: est.totalEstimateUsd,
@@ -165,18 +169,27 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
       bibleVersion,
     });
 
+    await logGenerationAudit({
+      action: "generate_text",
+      slug,
+      model,
+      estimatedCost: est.totalEstimateUsd,
+      status: "succeeded",
+      message: "saved as draft",
+    });
     return render;
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 300);
     console.error(`[selah] generation failed for ${slug}:`, msg);
     await markChapterWorkupFailed(slug, msg);
+    await logGenerationAudit({ action: "generate_text", slug, model, status: "failed", message: msg });
     // If we never logged usage (OpenAI threw before returning, e.g. quota/timeout),
     // record an error event so failed spend/issues are still visible.
     if (!costLogged) {
       await recordCostEvent({
         requestType: "chapter_workup_text",
         provider: "openai",
-        model: CHAPTER_WORKUP_TEXT_MODEL,
+        model,
         inputTokens: 0,
         outputTokens: 0,
         estimatedCostUsd: 0,

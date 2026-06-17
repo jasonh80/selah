@@ -33,12 +33,12 @@ export async function GET(request: Request) {
   if (process.env.REGEN_TOKEN && token !== process.env.REGEN_TOKEN) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
-  if (!generationAllowed(slug)) {
+  if (!(await generationAllowed(slug))) {
     return NextResponse.json(
       {
         ok: false,
         error:
-          "not allowed — needs ENABLE_CHAPTER_GENERATION=true, OpenAI+Supabase configured, and an allowlisted slug (psalm-23, mark-2)",
+          "not allowed — enable text generation + allowlist this slug in /admin/generation (OpenAI + Supabase must be configured)",
       },
       { status: 403 },
     );

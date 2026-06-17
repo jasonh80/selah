@@ -5,7 +5,7 @@ import { generateAndStoreChapterImages, imageGenAllowed } from "../../lib/server
 
 export default async (req: Request) => {
   const slug = new URL(req.url).searchParams.get("slug") || "";
-  if (!imageGenAllowed(slug)) {
+  if (!(await imageGenAllowed(slug))) {
     return new Response(JSON.stringify({ ok: false, error: "not allowed" }), { status: 403 });
   }
   try {
