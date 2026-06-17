@@ -51,6 +51,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: Boolean(status), slug, status });
   }
 
+  // ---- poll a chapter's status (for the Generate Draft progress UI) ----
+  if (action === "status") {
+    const slug = String(body.slug ?? "");
+    return NextResponse.json({ ok: true, slug, status: await getChapterStatus(slug) });
+  }
+
   // ---- generate a draft (text only) ----
   if (action === "generate") {
     const slug = String(body.slug ?? "");
@@ -60,12 +66,20 @@ export async function POST(req: Request) {
     if (settings.require_confirm && !confirm) {
       return NextResponse.json({ ok: false, error: "confirmation required", requireConfirm: true });
     }
-    // Hard kill switch + allowlist (Supabase). Fails closed.
-    if (!(await generationAllowed(slug))) {
+    // Kill switch: text generation must be enabled.
+    if (!settings.text_generation_enabled) {
       return NextResponse.json(
-        { ok: false, error: "blocked — enable Text Generation and add this slug to Allowed slugs" },
+        { ok: false, error: "Text Generation is OFF — turn it on in Advanced Settings." },
         { status: 403 },
       );
+    }
+    // Temporarily allow the picked slug server-side (so the picker drives the
+    // allowlist — no manual typing). Persists in allowed_slugs.
+    if (!settings.allowed_slugs.includes(slug)) {
+      await updateGenerationSettings({ allowed_slugs: [...settings.allowed_slugs, slug] });
+    }
+    if (!(await generationAllowed(slug))) {
+      return NextResponse.json({ ok: false, error: "blocked — generation not allowed for this slug" }, { status: 403 });
     }
     const status = await getChapterStatus(slug);
     if (status === "generating") {
