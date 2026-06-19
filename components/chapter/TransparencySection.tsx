@@ -6,6 +6,9 @@ import { BUILD_ID } from "@/lib/build";
 export function TransparencySection({ data, source }: { data: ChapterWorkup; source?: string }) {
   const imagesStored =
     data.images.length > 0 && data.images.every((i) => /^https?:\/\//.test(i.src));
+  // Dating nuance lives here (and in expanded historical detail) — never in the
+  // confident "Where It Fits" headline.
+  const datingNote = data.biblicalTimeline?.uncertaintyNote || data.biblicalTimeline?.estimatedYearLabel;
 
   return (
     <details className="group mx-auto w-full max-w-md rounded-md border bg-card shadow-hair">
@@ -19,6 +22,12 @@ export function TransparencySection({ data, source }: { data: ChapterWorkup; sou
         <Row label="Generation" value="Complete · cached" />
         <Row label="Images" value={imagesStored ? "Stored (Supabase Storage)" : "Placeholder art"} />
         <Row label="Build" value={BUILD_ID} />
+        {datingNote && (
+          <p className="mt-3 text-[11px] leading-relaxed text-secondary">
+            <span className="font-medium text-primary">Dating note: </span>
+            {datingNote}
+          </p>
+        )}
         <p className="mt-3 text-[11px] leading-relaxed text-secondary">
           Generated once and cached — most page loads cost nothing. AI cost is tracked privately;
           no live estimate is shown here.

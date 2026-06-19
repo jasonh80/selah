@@ -59,10 +59,13 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
     (range ? Math.round((range.startYear + range.endYear) / 2) : null) ??
     parseYear(data.estimatedDate);
   const pinPos = year != null ? pinPosForYear(year) : null;
-  const note = getTimelineNote(data.slug) ?? bt?.uncertaintyNote;
   const rangeText = range
     ? `${fmtYear(range.startYear)} – ${fmtYear(range.endYear)}`
-    : bt?.estimatedYearLabel ?? data.estimatedDate ?? "";
+    : data.estimatedDate ?? bt?.estimatedYearLabel ?? "";
+  // Primary copy is concise + CONFIDENT: a curated line when we have one, else the
+  // date range. The generated uncertaintyNote is NEVER shown here — dating nuance
+  // lives only in the Transparency drawer.
+  const headline = getTimelineNote(data.slug) ?? rangeText;
 
   return (
     <section id="timeline" className="scroll-mt-20 rounded-md border bg-card p-4 shadow-hair">
@@ -104,10 +107,11 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
         </div>
       </div>
 
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
-        {rangeText && <span className="text-[12px] font-semibold text-primary">{rangeText}</span>}
-        {note && <span className="text-[11px] leading-relaxed text-secondary">{note}</span>}
-      </div>
+      {headline && (
+        <div className="mt-1.5">
+          <span className="text-[12px] font-semibold text-primary">{headline}</span>
+        </div>
+      )}
     </section>
   );
 }

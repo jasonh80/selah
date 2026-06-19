@@ -127,11 +127,11 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "biblicalTimeline": {
     "era": "<one of: Creation/Adam & Eve, Patriarchs, Exodus & Wilderness, David/Kingdom, Exile, Life of Jesus, Early Church, Today>",
     "estimatedYear": -1000,
-    "estimatedYearLabel": "<honest label, e.g. 'traditionally c. 1000 BC' — never a false-precise date>",
+    "estimatedYearLabel": "<CONFIDENT, concise VISIBLE timeline copy — no hedge words ('traditionally', 'approximate', 'debated', 'not pinpointed'). Place the scene like a wise friend, e.g. 'Around AD 30, in Galilee under Herod Antipas' or 'Around 1000 BC, in David's world'>",
     "dateRange": { "startYear": -1100, "endYear": -900 },
     "confidence": "<high | medium | low | debated>",
     "chronologyBasis": "<e.g. 'traditional/event date' or 'likely composition date'>",
-    "uncertaintyNote": "<what is uncertain and why>",
+    "uncertaintyNote": "<dating nuance for the Transparency drawer ONLY — never shown as headline copy. Here (and only here) you may say what is approximate/debated and why>",
     "placementReason": "<why you placed it here>"
   },
   "sceneChecks": [
@@ -162,13 +162,17 @@ BEHIND THE CHAPTER
   inscriptions / archaeology that ground it. Name real evidence where it exists;
   stay honest about uncertainty without sounding like a disclaimer.
 
-DATES — BE HONEST
-- estimatedYear is internal (negative = BC). The visible label (estimatedYearLabel)
-  must NOT pretend uncertain dates are certain — use "traditionally c. ...",
-  "approximate", or "debated".
+DATES — CONFIDENT IN FRONT, HONEST IN DETAIL
+- estimatedYear is internal (negative = BC).
+- estimatedYearLabel is the VISIBLE main-timeline copy: keep it CONCISE and CONFIDENT.
+  Do NOT put hedge words there ("traditionally", "approximate", "exact dating is
+  debated", "not pinpointed"). Write it like a wise friend placing the scene:
+  "Around AD 30, in Galilee under Herod Antipas."
+- Put real dating uncertainty in uncertaintyNote ONLY. That text appears solely in the
+  Transparency drawer / expanded historical detail — never as headline copy.
 - Narrative chapters: place the marker at the EVENT date. Psalms/Proverbs/epistles/
-  poetry: place at the likely COMPOSITION/context date and say it's uncertain.
-  Prophecy: use the date spoken/written, and note fulfillment separately in prose.
+  poetry: place at the likely COMPOSITION/context date (note the nuance in
+  uncertaintyNote). Prophecy: use the date spoken/written, note fulfillment in prose.
 - Never claim a precise Creation year.
 
 CHOOSING TOPICS FIRST

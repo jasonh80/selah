@@ -76,6 +76,7 @@ export function getChipOverride(slug: string, index: number): string | null {
 // in the Author, Audience & Evidence section and Transparency, not here.
 export const CHAPTER_TIMELINE_NOTE: Record<string, string> = {
   "psalm-23": "Psalm 23 belongs naturally in David’s world, around 1000 BC.",
+  "mark-6": "Around AD 30, in Galilee under Herod Antipas.",
 };
 
 export function getTimelineNote(slug: string): string | null {
