@@ -15,7 +15,7 @@ import {
 } from "./chapter-workups-repository";
 import { recordCostEvent } from "./cost-events-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
-import { getActiveGlobalRuleTexts, getChapterReviewNoteTexts } from "./selah-brain";
+import { selectRulesForGeneration, getChapterReviewNoteTexts } from "./selah-brain";
 
 // Routine generation control now lives in Supabase (generation_settings), so it
 // changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
@@ -126,8 +126,10 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   // Admin-selected model from Supabase settings (falls back to the Netlify default).
   const settings = await getGenerationSettings();
   const model = settings.selected_text_model || CHAPTER_WORKUP_TEXT_MODEL;
-  // Active Selah Brain rules (global) + this chapter's own review notes. Fail soft.
-  const globalRules = await getActiveGlobalRuleTexts();
+  // Selectively retrieved Selah Brain rules (core + capped contextual by genre/
+  // stage; QA + governance excluded) + this chapter's own review notes. Fail soft.
+  const selection = await selectRulesForGeneration(slug, "copy_generation");
+  const globalRules = selection.texts;
   const chapterNotes = await getChapterReviewNoteTexts(slug);
   await logGenerationAudit({ action: "generate_text", slug, model, status: "started" });
 

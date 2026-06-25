@@ -28,9 +28,11 @@ type AuditEntry = {
 
 type Rule = {
   id: string;
+  rule_id?: string | null;
   title: string;
   rule_text: string;
   category: string;
+  priority?: string;
   active: boolean;
 };
 
@@ -505,7 +507,9 @@ export default function SelahStudioPage() {
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] text-primary" title={r.rule_text}>{r.title}</p>
-                        <p className="text-[11px] text-secondary">{r.category}</p>
+                        <p className="text-[11px] text-secondary">
+                          {r.rule_id ? `${r.rule_id} · ` : ""}{r.category}{r.priority ? ` · ${r.priority}` : ""}
+                        </p>
                       </div>
                       <button
                         onClick={() => toggleRule(r.id, !r.active)}

@@ -19,6 +19,9 @@ import {
   listGlobalRules,
   setRuleActive,
   deleteRule,
+  seedFromLibrary,
+  selectRulesForGeneration,
+  getRuleCounts,
   type ReviewScope,
 } from "@/lib/server/selah-brain";
 
@@ -89,6 +92,18 @@ export async function POST(req: Request) {
   if (action === "rule_delete") {
     const ok = await deleteRule(String(body.id ?? ""));
     return NextResponse.json({ ok });
+  }
+  // Seed the v1.1 library (idempotent). Rules only — never generates a chapter.
+  if (action === "rules_seed") {
+    const result = await seedFromLibrary();
+    return NextResponse.json({ ok: !result.error, ...result, counts: await getRuleCounts() });
+  }
+  // Preview which rules would be retrieved for a chapter (no generation).
+  if (action === "rules_select") {
+    return NextResponse.json({ ok: true, selection: await selectRulesForGeneration(String(body.slug ?? ""), "copy_generation") });
+  }
+  if (action === "rules_counts") {
+    return NextResponse.json({ ok: true, counts: await getRuleCounts() });
   }
 
   // ---- recent activity (Advanced Settings audit panel) ----
