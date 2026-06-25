@@ -13,6 +13,13 @@ import {
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
+import {
+  snapshotVersion,
+  listVersions,
+  getVersionWorkup,
+  applyMergedDraft,
+} from "@/lib/server/chapter-versions-repository";
+import type { ChapterWorkup } from "@/lib/types";
 import { getAuditLog } from "@/lib/server/selah-feedback";
 import {
   submitReview,
@@ -104,6 +111,27 @@ export async function POST(req: Request) {
   }
   if (action === "rules_counts") {
     return NextResponse.json({ ok: true, counts: await getRuleCounts() });
+  }
+
+  // ---- draft version history (Compare Versions) ----
+  if (action === "versions_list") {
+    return NextResponse.json({ ok: true, versions: await listVersions(String(body.slug ?? "")) });
+  }
+  if (action === "version_get") {
+    const workup = await getVersionWorkup(String(body.slug ?? ""), Number(body.version));
+    return NextResponse.json({ ok: Boolean(workup), workup });
+  }
+  if (action === "versions_snapshot") {
+    const version = await snapshotVersion(String(body.slug ?? ""), typeof body.label === "string" ? body.label : undefined);
+    return NextResponse.json({ ok: version !== null, version });
+  }
+  if (action === "version_apply") {
+    const result = await applyMergedDraft(
+      String(body.slug ?? ""),
+      body.workup as ChapterWorkup,
+      typeof body.label === "string" ? body.label : undefined,
+    );
+    return NextResponse.json({ ok: result.ok, version: result.version });
   }
 
   // ---- recent activity (Advanced Settings audit panel) ----

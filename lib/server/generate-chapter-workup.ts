@@ -14,6 +14,7 @@ import {
   markChapterWorkupFailed,
 } from "./chapter-workups-repository";
 import { recordCostEvent } from "./cost-events-repository";
+import { snapshotVersion } from "./chapter-versions-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import { selectRulesForGeneration, getChapterReviewNoteTexts } from "./selah-brain";
 
@@ -180,6 +181,9 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
       version: generated.version,
       bibleVersion,
     });
+
+    // Archive this draft as a new version (V1 is preserved; this becomes V2, …).
+    await snapshotVersion(slug, "generated draft");
 
     await logGenerationAudit({
       action: "generate_text",

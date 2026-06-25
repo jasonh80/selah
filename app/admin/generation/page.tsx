@@ -336,9 +336,19 @@ export default function SelahStudioPage() {
 
       {/* Step 3 — Preview Draft + Selah Brain review */}
       <Step n={3} title="Preview Draft" state={step3}>
-        <button onClick={previewDraft} disabled={!draftReady} className={ghost}>
-          Preview Draft ↗
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={previewDraft} disabled={!draftReady} className={ghost}>
+            Preview Draft ↗
+          </button>
+          <a
+            href={`/dev/compare/${slug}?token=${encodeURIComponent(token)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[13px] text-secondary underline"
+          >
+            Compare versions ↗
+          </a>
+        </div>
         {draftReady && !previewed && (
           <p className="mt-2.5 text-[13px] text-secondary">Open the preview, then tell Selah how it feels.</p>
         )}
