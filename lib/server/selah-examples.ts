@@ -68,22 +68,24 @@ export async function deleteExample(id: string): Promise<boolean> {
   return !error;
 }
 
+// Example types that belong in the TEXT (copy) prompt — image_direction is for
+// the image stage and is deliberately excluded here.
+export const TEXT_EXAMPLE_TYPES = ["voice", "structure", "application", "scene_check"];
+
 // 1–2 relevant approved examples for a chapter, matched by genre (voice first).
+// Pass `types` to restrict by example_type (e.g. text-only, excluding image).
 export async function getRelevantExamples(
   slug: string,
-  limit = 2,
+  opts: { types?: string[]; limit?: number } = {},
 ): Promise<{ title: string; exampleType: string; content: string }[]> {
+  const limit = opts.limit ?? 2;
   const db = getSupabaseAdmin();
   if (!db) return [];
   const genre = genreForSlug(slug);
   if (!genre) return [];
-  const { data, error } = await db
-    .from(TABLE)
-    .select("title,example_type,content")
-    .eq("active", true)
-    .eq("genre", genre)
-    .order("created_at", { ascending: false })
-    .limit(10);
+  let q = db.from(TABLE).select("title,example_type,content").eq("active", true).eq("genre", genre);
+  if (opts.types && opts.types.length) q = q.in("example_type", opts.types);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(10);
   if (error || !data) return [];
   const rows = data as { title: string; example_type: string; content: string }[];
   // Voice exemplars first, then the rest.

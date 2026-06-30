@@ -26,6 +26,7 @@ import {
   setExampleActive,
   deleteExample,
   getRelevantExamples,
+  TEXT_EXAMPLE_TYPES,
 } from "@/lib/server/selah-examples";
 import { getAuditLog } from "@/lib/server/selah-feedback";
 import {
@@ -163,9 +164,9 @@ export async function POST(req: Request) {
     const ok = await deleteExample(String(body.id ?? ""));
     return NextResponse.json({ ok });
   }
-  // Preview which examples would be retrieved for a chapter (no generation).
+  // Preview which TEXT examples would be retrieved for a chapter (no generation).
   if (action === "examples_select") {
-    const ex = await getRelevantExamples(String(body.slug ?? ""));
+    const ex = await getRelevantExamples(String(body.slug ?? ""), { types: TEXT_EXAMPLE_TYPES });
     return NextResponse.json({ ok: true, examples: ex.map((e) => ({ title: e.title, exampleType: e.exampleType, chars: e.content.length })) });
   }
 

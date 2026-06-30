@@ -17,7 +17,7 @@ import { recordCostEvent } from "./cost-events-repository";
 import { snapshotVersion } from "./chapter-versions-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import { selectRulesForGeneration, getChapterReviewNoteTexts } from "./selah-brain";
-import { getRelevantExamples } from "./selah-examples";
+import { getRelevantExamples, TEXT_EXAMPLE_TYPES } from "./selah-examples";
 
 // Routine generation control now lives in Supabase (generation_settings), so it
 // changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
@@ -135,8 +135,9 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   const selection = await selectRulesForGeneration(slug, "copy_generation");
   const globalRules = selection.texts;
   const chapterNotes = await getChapterReviewNoteTexts(slug);
-  // 1–2 approved voice exemplars for this genre. Fail soft.
-  const examples = await getRelevantExamples(slug);
+  // 1–2 approved TEXT exemplars (voice/structure/application) for this genre —
+  // image_direction examples are excluded from the copy prompt. Fail soft.
+  const examples = await getRelevantExamples(slug, { types: TEXT_EXAMPLE_TYPES });
   await logGenerationAudit({ action: "generate_text", slug, model, status: "started" });
 
   try {
