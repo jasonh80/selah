@@ -1,10 +1,10 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "name": "Selah Brain Initial Rule Library",
   "status": "initial_seed",
-  "audit_basis": "28-workup canonical audit plus approved Exodus 31 amendment",
+  "audit_basis": "28-workup canonical audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence amendment",
   "source_count": 29,
-  "rule_count": 89,
+  "rule_count": 92,
   "rules": [
     {
       "id": "SB-001",
@@ -1251,6 +1251,54 @@
       ],
       "active": true,
       "priority": "contextual"
+    },
+    {
+      "id": "SB-200",
+      "category": "voice",
+      "title": "Daily Rundown cadence",
+      "text": "Do not merely explain the chapter in polished paragraphs. Include short, memorable interpretive lines that name the spiritual reality underneath the scene — e.g. 'Fear wearing religious clothing.' / 'Familiarity pretending to be discernment.' / 'Do not receive the bread and miss who gave it.' / 'They are holding leftovers and still missing the point.' / 'A ruler with power but no backbone.' / 'Control dressed up as worship.' Use conversational rhythm and wise-friend directness, with occasional restrained wit when appropriate. These lines should feel natural, never forced. Lean on this especially in Quick Summary, What Most People Miss, Jesus at the Center, Live It, and Scene Checks.",
+      "scope": "global",
+      "sources": [
+        "Mark 6 Daily Rundown"
+      ],
+      "stages": [
+        "copy_generation",
+        "copy_review"
+      ],
+      "active": true,
+      "priority": "core"
+    },
+    {
+      "id": "SB-201",
+      "category": "reverence",
+      "title": "Wit guardrail",
+      "text": "Restrained wit is allowed when exposing human foolishness, fear, excuses, religious self-deception, or irony in the text. Never use sarcasm or wit around God's holiness, suffering, death, sacrifice, sacred rituals, grief, or Jesus' compassion.",
+      "scope": "global",
+      "sources": [
+        "Mark 6 Daily Rundown"
+      ],
+      "stages": [
+        "copy_generation",
+        "copy_review"
+      ],
+      "active": true,
+      "priority": "core"
+    },
+    {
+      "id": "SB-202",
+      "category": "voice",
+      "title": "First-person prayer voice",
+      "text": "Default prayers use first-person singular for the personal devotional experience ('help me', 'teach me', 'open my eyes', 'give me courage'). Use 'we/us' only when the chapter, context, or selected mode is intentionally corporate.",
+      "scope": "global",
+      "sources": [
+        "Mark 6 Daily Rundown"
+      ],
+      "stages": [
+        "copy_generation",
+        "copy_review"
+      ],
+      "active": true,
+      "priority": "core"
     }
   ],
   "injection_policy": {
@@ -1272,7 +1320,10 @@
       "SB-035",
       "SB-042",
       "SB-056",
-      "SB-059"
+      "SB-059",
+      "SB-200",
+      "SB-201",
+      "SB-202"
     ],
     "max_contextual_rules_per_generation": 12,
     "retrieve_contextual_rules_by": [
