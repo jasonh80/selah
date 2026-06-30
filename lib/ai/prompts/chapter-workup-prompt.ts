@@ -10,10 +10,12 @@ export interface ChapterWorkupPromptInput {
   // to THIS chapter. Both come from the dedicated Selah Brain tables.
   globalRules?: string[];
   chapterNotes?: string[];
+  // 1–2 approved exemplars demonstrating the desired voice for this genre.
+  examples?: { title: string; exampleType: string; content: string }[];
 }
 
 export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): string {
-  const { book, chapter, bibleVersion, bibleText, globalRules, chapterNotes } = input;
+  const { book, chapter, bibleVersion, bibleText, globalRules, chapterNotes, examples } = input;
   const slug = `${book.toLowerCase().replace(/\s+/g, "-")}-${chapter}`;
   const rulesBlock =
     globalRules && globalRules.length
@@ -26,6 +28,12 @@ export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): strin
       ? `\n\nCHAPTER-SPECIFIC REVIEW NOTES FOR ${book} ${chapter} (apply directly to this chapter)\n${chapterNotes
           .map((n) => `- ${n}`)
           .join("\n")}`
+      : "";
+  const examplesBlock =
+    examples && examples.length
+      ? `\n\nAPPROVED VOICE EXAMPLE — THE GOLD STANDARD FOR HOW THIS SHOULD SOUND\nMatch the warmth, rhythm, directness, short punchy interpretive lines, restrained wit, wise-friend tone, and practical Jesus-centered clarity of the example(s) below. Write Selah's structured fields in THIS register — not generic, academic, or "Bible-app" phrasing. Capture the voice and the kind of insight; do not copy the wording verbatim.\n${examples
+          .map((e) => `--- EXAMPLE: ${e.title} (${e.exampleType}) ---\n${e.content}\n--- END EXAMPLE ---`)
+          .join("\n\n")}`
       : "";
 
   return `You are the content engine for Selah, a daily Bible chapter app whose only
@@ -198,7 +206,7 @@ RULES
 - "primaryCharacters" is an array of strings; "keyObjects", "keyPeople", "sections", "chapterSpecificTopics" are arrays of OBJECTS.
 - Provide 2-4 items for timeline.items, keyObjects, keyPeople, verseByVerse, and each goDeeper group; 3-7 chapterSpecificTopics.
 - Mark the timeline item for THIS chapter with "active": true.
-- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${rulesBlock}${chapterBlock}${
+- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${rulesBlock}${chapterBlock}${examplesBlock}${
     bibleText ? `\n\nUse this chapter text as your source (do not quote it verbatim in output):\n"""\n${bibleText}\n"""` : ""
   }`;
 }

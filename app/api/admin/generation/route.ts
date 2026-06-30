@@ -20,6 +20,13 @@ import {
   applyMergedDraft,
 } from "@/lib/server/chapter-versions-repository";
 import type { ChapterWorkup } from "@/lib/types";
+import {
+  addExample,
+  listExamples,
+  setExampleActive,
+  deleteExample,
+  getRelevantExamples,
+} from "@/lib/server/selah-examples";
 import { getAuditLog } from "@/lib/server/selah-feedback";
 import {
   submitReview,
@@ -132,6 +139,34 @@ export async function POST(req: Request) {
       typeof body.label === "string" ? body.label : undefined,
     );
     return NextResponse.json({ ok: result.ok, version: result.version });
+  }
+
+  // ---- Selah Brain approved examples ----
+  if (action === "examples_list") {
+    return NextResponse.json({ ok: true, examples: await listExamples() });
+  }
+  if (action === "example_add") {
+    const ok = await addExample({
+      title: String(body.title ?? ""),
+      genre: String(body.genre ?? ""),
+      example_type: String(body.example_type ?? "voice"),
+      content: String(body.content ?? ""),
+      source_title: typeof body.source_title === "string" ? body.source_title : undefined,
+    });
+    return NextResponse.json({ ok });
+  }
+  if (action === "example_toggle") {
+    const ok = await setExampleActive(String(body.id ?? ""), body.active === true);
+    return NextResponse.json({ ok });
+  }
+  if (action === "example_delete") {
+    const ok = await deleteExample(String(body.id ?? ""));
+    return NextResponse.json({ ok });
+  }
+  // Preview which examples would be retrieved for a chapter (no generation).
+  if (action === "examples_select") {
+    const ex = await getRelevantExamples(String(body.slug ?? ""));
+    return NextResponse.json({ ok: true, examples: ex.map((e) => ({ title: e.title, exampleType: e.exampleType, chars: e.content.length })) });
   }
 
   // ---- recent activity (Advanced Settings audit panel) ----

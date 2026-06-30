@@ -17,6 +17,7 @@ import { recordCostEvent } from "./cost-events-repository";
 import { snapshotVersion } from "./chapter-versions-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import { selectRulesForGeneration, getChapterReviewNoteTexts } from "./selah-brain";
+import { getRelevantExamples } from "./selah-examples";
 
 // Routine generation control now lives in Supabase (generation_settings), so it
 // changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
@@ -53,6 +54,7 @@ export async function generateChapterWorkup(input: {
   model?: string;
   globalRules?: string[];
   chapterNotes?: string[];
+  examples?: { title: string; exampleType: string; content: string }[];
 }): Promise<GenOutput> {
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
@@ -65,6 +67,7 @@ export async function generateChapterWorkup(input: {
     bibleText: input.bibleText,
     globalRules: input.globalRules,
     chapterNotes: input.chapterNotes,
+    examples: input.examples,
   });
 
   // Reasoning models (GPT-5 / o-series) need low reasoning effort here — this is
@@ -132,6 +135,8 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   const selection = await selectRulesForGeneration(slug, "copy_generation");
   const globalRules = selection.texts;
   const chapterNotes = await getChapterReviewNoteTexts(slug);
+  // 1–2 approved voice exemplars for this genre. Fail soft.
+  const examples = await getRelevantExamples(slug);
   await logGenerationAudit({ action: "generate_text", slug, model, status: "started" });
 
   try {
@@ -153,6 +158,7 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
       model,
       globalRules,
       chapterNotes,
+      examples,
     });
 
     // Log the text cost immediately — tokens are spent regardless of whether the
