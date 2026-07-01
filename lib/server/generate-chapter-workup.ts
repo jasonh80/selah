@@ -94,8 +94,10 @@ export async function generateChapterWorkup(input: {
 
   // HARD wall-clock abort — the SDK timeout alone didn't reliably stop a slow
   // reasoning call, which once left a job zombied past the function limit.
+  // Raised from 150s to 10min for the gpt-5.5 authorship test (reasoning models
+  // blew past 150s). Runs inside a Netlify background function (15min budget).
   const controller = new AbortController();
-  const abortTimer = setTimeout(() => controller.abort(), 150_000);
+  const abortTimer = setTimeout(() => controller.abort(), 600_000);
   let resp: {
     choices: { message?: { content?: string | null } }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };

@@ -11,6 +11,7 @@ export interface AuditEntry {
   status: string;
   model: string | null;
   message: string | null;
+  estimated_cost?: number | null;
 }
 
 export async function getAuditLog(limit = 15): Promise<AuditEntry[]> {
@@ -18,7 +19,7 @@ export async function getAuditLog(limit = 15): Promise<AuditEntry[]> {
   if (!db) return [];
   const { data, error } = await db
     .from("generation_audit_log")
-    .select("created_at, action, slug, status, model, message")
+    .select("created_at, action, slug, status, model, message, estimated_cost")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error || !data) return [];
