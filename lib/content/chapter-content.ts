@@ -91,6 +91,11 @@ export const CHAPTER_IMAGE_TITLES: Record<string, Record<string, string>> = {
     detail: "Still Waters",
     human: "Through the Valley",
   },
+  "mark-6": {
+    establishing: "The World of Mark 6: Galilee",
+    detail: "Five Barley Loaves and Two Fish",
+    human: "A Wilderness Full of People, Fed",
+  },
 };
 
 export function getImageTitle(slug: string, kind: string, fallback: string): string {
@@ -108,10 +113,113 @@ export const CHAPTER_VERSE_NOTES: Record<string, Record<number, string>> = {
     5: "A table set in the open, in full view of enemies: God honors, provides, and overflows His grace even amid threat.",
     6: "Confident hope — God’s goodness and covenant love pursue David all his days, leading him home to dwell with the Lord forever.",
   },
+  // Section-anchored notes (each sits at the first verse of its scene).
+  "mark-6": {
+    1: "Rejected at home: familiarity closes its eyes. The people who watched Jesus grow up can’t get past “the carpenter.” Knowing about Jesus is not the same as receiving Him.",
+    7: "Sending the Twelve: two by two, with almost nothing — training dependence, not glorifying poverty. Ordinary, unpolished people start carrying His mission.",
+    14: "Herod’s court: Mark cuts away to show what worldly power looks like — a king who fears his guests more than doing wrong. John dies because Herod protected his image over the truth.",
+    30: "The wilderness banquet: Jesus sees a crowd like sheep without a shepherd, and feeds them. Herod’s feast ended in death; Jesus’ ends in leftovers — twelve baskets full.",
+    45: "Walking on the water: Jesus “means to pass by” — Old Testament language for God revealing His glory. He does what only God does. Yet the disciples are terrified; they had not understood the loaves.",
+    53: "Gennesaret: the chapter that began with a hometown refusing Jesus ends with strangers desperate just to touch the edge of His cloak.",
+  },
 };
 
 export function getVerseNotes(slug: string): Record<number, string> | null {
   return CHAPTER_VERSE_NOTES[slug] ?? null;
+}
+
+// ---- What People Ask (static, approved FAQ — not a live Ask tool yet) -------
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+export const CHAPTER_FAQ: Record<string, FaqItem[]> = {
+  "mark-6": [
+    {
+      question: "Why could Jesus do no mighty work in Nazareth?",
+      answer:
+        "It wasn’t that Jesus lost His power at the town line. Mark says He “could do no mighty work there” because of their unbelief — not because their doubt overpowered Him, but because miracles were never meant for people who had already decided not to trust Him. He still healed a few sick people. But Nazareth wanted a hometown boy they could explain, not a Messiah they had to follow. Unbelief doesn’t handcuff Jesus; it just refuses what He offers.",
+    },
+    {
+      question: "Why did Jesus send the Twelve with almost nothing?",
+      answer:
+        "No bread, no bag, no money — just a staff and sandals. That sounds harsh until you see what He was doing. He wasn’t glorifying poverty; He was training dependence. If He sent them, He would sustain them, through the hospitality of others and the provision of God. Traveling light also kept the mission about the message, not their supplies. They had to trust before they could see how it would work out.",
+    },
+    {
+      question: "Why was John the Baptist killed?",
+      answer:
+        "On the surface: a girl danced, a king made a drunken promise, and a grudge got its moment. Underneath: Herod feared looking weak in front of powerful guests more than he feared killing an innocent man. He knew John was righteous. He even liked listening to him. But when the moment came, he protected his image instead of the truth. John died because a ruler had power and no backbone.",
+    },
+    {
+      question: "Why does Mark count 5,000 men?",
+      answer:
+        "Mark gives the counted category — 5,000 men — the way ancient crowds were often numbered. Matthew adds that women and children were there too. So the real crowd was larger, probably much larger. The safest way to say it: more than 5,000 people, with 5,000 men counted, plus women and children present. The point isn’t the exact headcount; it’s that Jesus fed a wilderness full of hungry people from a boy’s lunch — and had leftovers.",
+    },
+    {
+      question: "What does it mean that Jesus intended to pass by the disciples?",
+      answer:
+        "It’s a strange line — “He meant to pass by them.” It doesn’t mean He was going to ignore them. In the Old Testament, “passing by” is how God reveals His glory; He “passed by” Moses and Elijah. Mark is borrowing that same language. Jesus walking on the sea and “passing by” is a quiet claim that the One out on the water is doing what only God does. He wasn’t abandoning them; He was showing them who He is.",
+    },
+    {
+      question: "Why did the disciples not understand the loaves?",
+      answer:
+        "Mark says their hearts were hardened — not evil, just slow and scared. They had just watched Jesus feed thousands from almost nothing, but when the storm hit, they panicked as if they’d never seen Him provide. The feeding was meant to teach them who He was, and they missed the lesson. It’s a warning we can feel: you can benefit from Jesus’ power and still not grasp His person. You can hold the leftovers and miss the point.",
+    },
+    {
+      question: "Where is Gennesaret?",
+      answer:
+        "Gennesaret is a small, fertile plain on the northwest shore of the Sea of Galilee, just south of Capernaum — less a single town than a rich stretch of farmland and villages. When the boat lands there, the whole region recognizes Jesus and rushes the sick to Him. The chapter that opened with a hometown refusing Him ends with strangers desperate just to touch the edge of His cloak.",
+    },
+  ],
+};
+
+export function getChapterFaq(slug: string): FaqItem[] | null {
+  return CHAPTER_FAQ[slug] ?? null;
+}
+
+// ---- Image plan (concepts only — NOT generated) ----------------------------
+// The 3 Selah visual roles per chapter. Prompts are approved concepts staged for
+// the image stage; image generation stays OFF until explicitly enabled.
+export interface ImagePlanConcept {
+  kind: "establishing" | "detail" | "human";
+  role: "Orient Me" | "Reveal Something" | "Let Me Feel It";
+  title: string;
+  description: string;
+  prompt: string;
+}
+
+export const CHAPTER_IMAGE_PLAN: Record<string, ImagePlanConcept[]> = {
+  "mark-6": [
+    {
+      kind: "establishing",
+      role: "Orient Me",
+      title: "The World of Mark 6: Galilee",
+      description: "The wider stage of the chapter — the Sea of Galilee, low hills, and small villages where two kingdoms collide.",
+      prompt:
+        "Wide photorealistic historical landscape of Galilee around AD 29 in late-afternoon light: the freshwater Sea of Galilee, low brown hills, a small stone village on a hillside, a single wooden fishing boat on the water, dry grass, dust in the air. Documentary realism, natural light, no modern objects, no text, no fantasy glow.",
+    },
+    {
+      kind: "detail",
+      role: "Reveal Something",
+      title: "Five Barley Loaves and Two Fish",
+      description: "What abundance from almost nothing actually looked like — the real food, not bakery bread.",
+      prompt:
+        "Honest close-up historical detail: small rough barley flatbreads and small dried fish in worn woven baskets, weathered first-century hands breaking a coarse loaf. Earthy, imperfect, real. Photorealistic documentary style, natural light, no modern bakery bread, no text, no fantasy glow.",
+    },
+    {
+      kind: "human",
+      role: "Let Me Feel It",
+      title: "A Wilderness Full of People, Fed",
+      description: "The feeding of the 5,000 — compassion for a crowd like sheep without a shepherd. Uses the approved Mark 6 feeding-of-the-5,000 image-direction example.",
+      prompt:
+        "Photorealistic historical scene from Mark 6, the feeding of the 5,000, set in Galilee around AD 29 on a remote grassy hillside above the Sea of Galilee. A massive crowd of ordinary first-century Jewish villagers — 5,000 adult men counted, with women and children also present — seated and reclining in loose, uneven family groups. Jesus appears as an ordinary first-century Galilean Jewish man in worn earth-toned clothing, not glowing, not idealized, near the center but naturally placed, quietly breaking rough barley flatbreads and handing pieces to the disciples, who move through the crowd with simple baskets of barley loaves and dried fish. Woven wool and linen garments, leather sandals, dusty feet, sun-worn faces, wind, dry grass, cloaks on the ground, children with families, the Sea of Galilee visible beyond. True photorealism, anamorphic 35mm film still, strong late-afternoon directional light, dust haze, warm rim light. No halos, no text, no modern objects, no Europeanized faces, no oversized bakery bread, no movie-poster posing.",
+    },
+  ],
+};
+
+export function getChapterImagePlan(slug: string): ImagePlanConcept[] | null {
+  return CHAPTER_IMAGE_PLAN[slug] ?? null;
 }
 
 // ---- Scene Checks ("how to picture this accurately") -----------------------

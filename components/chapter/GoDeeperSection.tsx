@@ -1,4 +1,6 @@
+import type { ChapterWorkup } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
+import { getChapterMap } from "@/lib/maps/chapter-maps";
 
 // One "Go Deeper" — a single grid of ways into the chapter's depth. Every card
 // links to a real section already on the page (no unbuilt/"coming soon" cards).
@@ -17,12 +19,21 @@ const TOPICS: Topic[] = [
   { icon: "❒", label: "Related Chapters", href: "#chapters" },
 ];
 
-export function GoDeeperSection() {
+export function GoDeeperSection({ data }: { data: ChapterWorkup }) {
+  // Only advertise sections that actually have content for this chapter.
+  const hasMap = Boolean(getChapterMap(data.slug));
+  const insightTitles = new Set(data.insights.map((i) => i.title.trim().toLowerCase()));
+  const topics = TOPICS.filter((t) => {
+    if (t.label === "Maps & Places") return hasMap;
+    if (t.label === "Original Language") return insightTitles.has("original language");
+    return true;
+  });
+
   return (
     <section>
       <SectionHead title="Go Deeper" />
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        {TOPICS.map((t) => (
+        {topics.map((t) => (
           <a
             key={t.label}
             href={t.href}
