@@ -18,6 +18,7 @@ import {
   listVersions,
   getVersionWorkup,
   applyMergedDraft,
+  restoreVersion,
 } from "@/lib/server/chapter-versions-repository";
 import type { ChapterWorkup } from "@/lib/types";
 import {
@@ -128,6 +129,10 @@ export async function POST(req: Request) {
   if (action === "version_get") {
     const workup = await getVersionWorkup(String(body.slug ?? ""), Number(body.version));
     return NextResponse.json({ ok: Boolean(workup), workup });
+  }
+  if (action === "version_restore") {
+    const ok = await restoreVersion(String(body.slug ?? ""), Number(body.version));
+    return NextResponse.json({ ok });
   }
   if (action === "versions_snapshot") {
     const version = await snapshotVersion(String(body.slug ?? ""), typeof body.label === "string" ? body.label : undefined);

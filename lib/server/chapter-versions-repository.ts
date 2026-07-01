@@ -72,6 +72,24 @@ export async function getVersionWorkup(slug: string, version: number): Promise<C
   return data.workup_json as ChapterWorkup;
 }
 
+// Restore an existing archived version as the working draft (kept 'draft').
+// Does NOT create a new version — the archive is unchanged. Never publishes.
+export async function restoreVersion(slug: string, version: number): Promise<boolean> {
+  const db = getSupabaseAdmin();
+  if (!db) return false;
+  const workup = await getVersionWorkup(slug, version);
+  if (!workup) return false;
+  const { error } = await db
+    .from("chapter_workups")
+    .update({ workup_json: workup, status: "draft", updated_at: new Date().toISOString() })
+    .eq("slug", slug);
+  if (error) {
+    console.error(`[selah] restoreVersion(${slug},${version}) failed:`, error.message);
+    return false;
+  }
+  return true;
+}
+
 // Write a chosen/merged workup to the working draft (kept as 'draft' — never
 // published) and snapshot it as a new version for traceability.
 export async function applyMergedDraft(
