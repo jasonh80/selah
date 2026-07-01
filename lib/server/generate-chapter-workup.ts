@@ -88,8 +88,9 @@ export async function generateChapterWorkup(input: {
     response_format: { type: "json_object" },
     max_completion_tokens: 12000,
     // GPT-5 series only support the default temperature, so we don't set it.
-    // "minimal" reasoning so the call finishes inside the function window.
-    ...(isReasoningModel ? { reasoning_effort: "minimal" } : {}),
+    // "low" reasoning keeps the call inside the window (gpt-5.5 rejects "minimal";
+    // it accepts none/low/medium/high/xhigh). Low suits content writing.
+    ...(isReasoningModel ? { reasoning_effort: "low" } : {}),
   };
 
   // HARD wall-clock abort — the SDK timeout alone didn't reliably stop a slow
