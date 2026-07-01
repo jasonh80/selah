@@ -204,6 +204,108 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
       attribution: "Google Street View (official API, planned)",
     },
   },
+
+  "mark-6": {
+    bigPicture: {
+      baseMapImage: "/img/maps/levant-region.jpg",
+      attribution: ESRI,
+      caption:
+        "Mark 6 unfolds in Galilee — the northern region around the inland Sea of Galilee, Jesus’ home turf for much of His ministry.",
+      pins: [
+        { x: 42, y: 44, label: "Galilee" },
+        { x: 40, y: 54, label: "Jerusalem" },
+      ],
+      labels: [
+        { x: 18, y: 25, text: "Mediterranean Sea", tone: "water" },
+        { x: 34, y: 48, text: "Israel · Judah", tone: "region" },
+        { x: 44, y: 58, text: "Dead Sea", tone: "water" },
+        { x: 79, y: 36, text: "→ Mesopotamia", tone: "region" },
+      ],
+      regions: [],
+    },
+
+    local: {
+      baseMapImage: "/img/maps/galilee-satellite.jpg",
+      attribution: ESRI,
+      caption:
+        "The chapter moves around the Sea of Galilee: Nazareth in the hills, the wilderness feeding on the shore, a night crossing toward Bethsaida, and a landing at Gennesaret. The feeding site is shown as an approximate area, not an exact pin.",
+      milesAcross: 35,
+      modes: {
+        today: {
+          pins: [
+            { x: 24.7, y: 77.3, label: "Nazareth" },
+            { x: 70.8, y: 37.6, label: "Capernaum" },
+            { x: 61.7, y: 45.6, label: "Gennesaret" },
+            { x: 80.2, y: 31.1, label: "Bethsaida" },
+          ],
+          labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
+          regions: [],
+          paths: [],
+          boundaries: [
+            {
+              id: "galilee-region",
+              label: "Galilee",
+              certainty: "representative",
+              geometryType: "region",
+              style: "modern-border",
+              labelAt: [30, 18],
+              coordinates: [
+                [12, 22], [86, 20], [93, 50], [74, 82], [30, 86], [9, 52],
+              ],
+            },
+          ],
+        },
+        biblical: {
+          pins: [
+            { x: 24.7, y: 77.3, label: "Nazareth" },
+            { x: 70.8, y: 37.6, label: "Capernaum" },
+            { x: 61.7, y: 45.6, label: "Gennesaret" },
+            { x: 80.2, y: 31.1, label: "Bethsaida" },
+          ],
+          labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
+          regions: [
+            {
+              cx: 66,
+              cy: 40,
+              rx: 9,
+              ry: 7,
+              variant: "glow",
+              label: "Feeding of the 5,000 · approx.",
+              lx: 52,
+              ly: 31,
+              approx: true,
+            },
+          ],
+          paths: [
+            { points: [[66, 41], [80, 32]], label: "set out for Bethsaida", lx: 88, ly: 28 },
+            { points: [[80, 32], [62, 46]], label: "blown to Gennesaret", lx: 48, ly: 52 },
+          ],
+          boundaries: [
+            {
+              id: "galilee-ministry",
+              label: "Galilee · Jesus’ ministry world",
+              certainty: "representative",
+              geometryType: "region",
+              style: "biblical-territory",
+              labelAt: [30, 18],
+              coordinates: [
+                [12, 22], [86, 20], [93, 50], [74, 82], [30, 86], [9, 52],
+              ],
+            },
+          ],
+        },
+      },
+    },
+
+    streetView: {
+      status: "roadmap",
+      provider: "google-street-view",
+      location: { lat: 32.8807, lng: 35.5758 }, // representative — NW shore near Capernaum
+      caption:
+        "Representative modern view on the northwest shore of the Sea of Galilee — not an exact Mark 6 event site.",
+      attribution: "Google Street View (official API, planned)",
+    },
+  },
 };
 
 export function getChapterMap(slug: string): ChapterMapConfig | null {
