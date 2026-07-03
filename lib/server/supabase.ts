@@ -28,6 +28,12 @@ export function getSupabaseAdmin(): SupabaseClient | null {
 
   cachedAdmin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    // Next.js caches fetch() inside server components (even on force-dynamic
+    // pages), which served STALE chapter rows after admin writes. Opt Supabase
+    // reads out of the framework data cache — DB data must always be live.
+    global: {
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
   return cachedAdmin;
 }
