@@ -8,7 +8,29 @@ import { getDraftWorkup, updateChapterWorkupJson } from "./chapter-workups-repos
 import { recordCostEvent } from "./cost-events-repository";
 import { getGenerationSettings } from "./generation-settings";
 
+// Fallback default only — the ACTIVE model comes from Supabase settings
+// (selected_image_model, Studio-controlled). Never silently falls back: the
+// selected model is used exactly; if the API rejects it, the run fails loudly.
 export const CHAPTER_IMAGE_MODEL = process.env.CHAPTER_IMAGE_MODEL || "gpt-image-1";
+
+async function activeImageModel(): Promise<string> {
+  const s = await getGenerationSettings();
+  return s.selected_image_model || CHAPTER_IMAGE_MODEL;
+}
+
+// No-cost availability probe (models.retrieve — no image generated). Used by the
+// admin console to confirm access BEFORE any generation with a new model.
+export async function checkImageModel(model?: string): Promise<{ ok: boolean; model: string; error?: string }> {
+  const m = model || (await activeImageModel());
+  const client = getOpenAI();
+  if (!client) return { ok: false, model: m, error: "OpenAI not configured" };
+  try {
+    await client.models.retrieve(m);
+    return { ok: true, model: m };
+  } catch (e) {
+    return { ok: false, model: m, error: String((e as Error).message).slice(0, 300) };
+  }
+}
 
 // Slugs that have a hand-authored IMAGE_PLAN. (Generated chapters' image prompts
 // will come from their workup later; for now image gen needs a plan here.)
@@ -32,6 +54,7 @@ interface ImagePlan {
   prompt: string;
   alt: string;
   caption: string;
+  wide?: boolean; // landscape output (hero-suited); default portrait
 }
 
 // Final prompts (user-provided) + style suffix, keyed by slug.
@@ -63,38 +86,57 @@ const IMAGE_PLANS: Record<string, ImagePlan[]> = {
     },
   ],
 
-  // Approved Mark 6 plan (CHAPTER_IMAGE_PLAN concepts — Orient Me / Reveal
-  // Something / Let Me Feel It). Prompts carry their own style + negative
-  // guardrails (from the approved feeding-of-the-5,000 image direction), so the
-  // Judean STYLE suffix is intentionally NOT appended.
+  // Approved Mark 6 FIVE-image plan (chapter-driven roles — see CHAPTER_IMAGE_PLAN
+  // for the concept descriptions). Prompts carry their own documentary style +
+  // negative guardrails; the Judean STYLE suffix is intentionally NOT appended.
+  // Distinct kinds/filenames — does NOT overwrite the earlier establishing/
+  // detail/human files.
   "mark-6": [
     {
-      kind: "establishing",
-      caption: "The World of Mark 6: Galilee",
-      alt: "The Sea of Galilee with low hills, a small stone hillside village, and a wooden fishing boat in late-afternoon light.",
+      kind: "nazareth",
+      wide: true,
+      caption: "Nazareth: Familiar Faces, Closed Hearts",
+      alt: "Jesus teaching in a modest stone synagogue in Nazareth while familiar townspeople react with skepticism and offense.",
       prompt:
-        "Wide photorealistic historical landscape of Galilee around AD 29 in late-afternoon light: the freshwater Sea of Galilee, low brown hills, a small stone village on a hillside, a single wooden fishing boat on the water, dry grass, dust in the air. Documentary realism, natural light, no modern objects, no text, no fantasy glow.",
+        "Photorealistic historical scene inside a modest first-century village synagogue in Nazareth, around AD 29. Jesus, an ordinary Galilean Jewish man in simple worn wool, stands teaching before a room of townspeople who have known Him since childhood. Their faces show skepticism, discomfort, and quiet offense — crossed arms, sideways glances, murmuring neighbors. Small stone room, plastered walls, simple benches, oil-lamp and window light, dust in the air. True photorealism, documentary realism, natural light, believable Middle Eastern faces, worn fabrics. No halos, no glow, no text or lettering, no modern objects, no stained glass, no pews, no church architecture, no theatrical posing.",
     },
     {
-      kind: "detail",
-      caption: "Five Barley Loaves and Two Fish",
-      alt: "Small rough barley flatbreads and dried fish in worn woven baskets, with weathered hands breaking a coarse loaf.",
+      kind: "sending",
+      caption: "Sent Out Two by Two",
+      alt: "Two disciples with staffs and sandals on a dusty Galilean road, dressed simply, setting out with serious faces.",
       prompt:
-        "Honest close-up historical detail: small rough barley flatbreads and small dried fish in worn woven baskets, weathered first-century hands breaking a coarse loaf. Earthy, imperfect, real. Photorealistic documentary style, natural light, no modern bakery bread, no text, no fantasy glow.",
+        "Photorealistic historical scene of two first-century Jewish disciples being sent out on mission in Galilee, around AD 29: standing on a dusty village road with simple wooden staffs, leather sandals, single travel-worn tunics and cloaks, no bags, no provisions. Serious, resolved faces — ordinary working men, not heroes. Behind them, other pairs set out toward different villages, and Jesus sees them off at a distance. Dry hills and village houses beyond. True photorealism, documentary realism, natural morning light, dusty feet, worn textures. No halos, no glow, no text, no modern objects, no staged posing.",
     },
     {
-      kind: "human",
-      caption: "A Wilderness Full of People, Fed",
-      alt: "A vast crowd of first-century villagers seated in family groups on a grassy hillside above the Sea of Galilee as disciples distribute bread and fish.",
+      kind: "herods-feast",
+      wide: true,
+      caption: "Herod's Feast: Power Without Courage",
+      alt: "Herod's tense banquet hall — wealthy guests reclining at a lavish table, opulence with unease beneath it.",
       prompt:
-        "Photorealistic historical scene from Mark 6, the feeding of the 5,000, set in Galilee around AD 29 on a remote grassy hillside above the Sea of Galilee. A massive crowd of ordinary first-century Jewish villagers — 5,000 adult men counted, with women and children also present — seated and reclining in loose, uneven family groups. Jesus appears as an ordinary first-century Galilean Jewish man in worn earth-toned clothing, not glowing, not idealized, near the center but naturally placed, quietly breaking rough barley flatbreads and handing pieces to the disciples, who move through the crowd with simple baskets of barley loaves and dried fish. Woven wool and linen garments, leather sandals, dusty feet, sun-worn faces, wind, dry grass, cloaks on the ground, children with families, the Sea of Galilee visible beyond. True photorealism, anamorphic 35mm film still, strong late-afternoon directional light, dust haze, warm rim light. No halos, no text, no modern objects, no Europeanized faces, no oversized bakery bread, no movie-poster posing.",
+        "Photorealistic historical scene of Herod Antipas's birthday banquet in a first-century Galilean palace hall: nobles, military commanders, and leading men reclining at low tables heavy with food and wine, oil lamps and torchlight, rich fabrics, gold vessels. The atmosphere is tense and morally uneasy rather than festive — Herod on his couch looks troubled and cornered, guests watch him, whispers at the edges. Serious and unsettling, not sensational; no gore, no severed head shown, nothing lurid. True photorealism, documentary realism, warm low torchlight and deep shadows, believable Middle Eastern and Roman-era faces. No halos, no text, no modern objects, no cartoon villainy, no theatrical posing.",
+    },
+    {
+      kind: "feeding",
+      wide: true,
+      caption: "The Feeding of the 5,000",
+      alt: "Jesus and the disciples among a vast crowd of men, women, and children seated on green spring grass by the Sea of Galilee as baskets move through the crowd.",
+      prompt:
+        "Photorealistic historical scene from Mark 6, the feeding of the 5,000, on a remote hillside of GREEN SPRING GRASS above the Sea of Galilee, around AD 29 near Passover season. A massive crowd of ordinary first-century Jewish villagers — 5,000 men counted, with women and children clearly present — seated and reclining in loose, uneven family groups on the green grass. Jesus, an ordinary Galilean Jewish man in worn earth-toned clothing, not glowing, not idealized, naturally placed among the people, breaks rough barley flatbreads; disciples move through the crowd with simple woven baskets of small barley loaves and small dried fish. Woven wool and linen garments, leather sandals, dusty feet, sun-worn faces, wind, cloaks spread on the grass, the lake visible beyond. True photorealism, anamorphic 35mm film still, late-afternoon directional light, warm rim light. No halos, no text, no modern objects, no Europeanized faces, no oversized bakery bread, no movie-poster posing.",
+    },
+    {
+      kind: "walking-water",
+      wide: true,
+      caption: "Walking on the Water: Do Not Miss Who He Is",
+      alt: "Disciples strain at the oars of a low wooden boat in wind and waves at night as Jesus approaches across the dark water.",
+      prompt:
+        "Photorealistic historical night scene on the Sea of Galilee, fourth watch of the night: a low first-century wooden fishing boat with exhausted disciples straining at the oars against wind and rough waves, cloaks soaked, faces fearful. Approaching across the dark water is Jesus, an ordinary Galilean Jewish man in worn robes, walking on the sea — mysterious and quietly powerful, seen through wind and spray, NOT glowing, no halo, no supernatural light effects; the awe comes from the impossibility itself. Moonlit clouds, deep blues and shadows, realistic water, wind-blown fabric. Fearful, mysterious, revealing — not fantasy. True photorealism, documentary realism. No halos, no glow, no lightning, no text, no modern objects, no fantasy effects, no theatrical posing.",
     },
   ],
 };
 
-function imageSize(kind: ImageKind): string {
-  const m = CHAPTER_IMAGE_MODEL.toLowerCase();
-  const landscape = kind === "establishing";
+function imageSize(model: string, plan: ImagePlan): string {
+  const m = model.toLowerCase();
+  const landscape = plan.wide ?? plan.kind === "establishing";
   if (m.includes("dall-e")) return landscape ? "1792x1024" : "1024x1792";
   if (m.includes("gpt-image")) return landscape ? "1536x1024" : "1024x1536";
   return "1024x1024";
@@ -108,15 +150,16 @@ async function ensureBucket(db: NonNullable<ReturnType<typeof getSupabaseAdmin>>
   }
 }
 
-// One image → PNG bytes. Handles gpt-image-1 (b64) and dall-e (url/b64).
-async function generateImageBytes(prompt: string, kind: ImageKind): Promise<Buffer> {
+// One image → PNG bytes. Handles gpt-image models (b64) and dall-e (url/b64).
+// Uses EXACTLY the given model — no fallback; unknown models fail loudly.
+async function generateImageBytes(model: string, plan: ImagePlan): Promise<Buffer> {
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
-  const isDalle = /dall-e/i.test(CHAPTER_IMAGE_MODEL);
+  const isDalle = /dall-e/i.test(model);
   const params: Record<string, unknown> = {
-    model: CHAPTER_IMAGE_MODEL,
-    prompt,
-    size: imageSize(kind),
+    model,
+    prompt: plan.prompt,
+    size: imageSize(model, plan),
     n: 1,
   };
   if (isDalle) params.response_format = "b64_json";
@@ -159,11 +202,17 @@ export interface ImageGenResult {
  * Does NOT generate or modify chapter text.
  */
 export async function generateAndStoreChapterImages(slug: string): Promise<ImageGenResult> {
+  const model = await activeImageModel();
   if (!(await imageGenAllowed(slug))) {
-    return { ok: false, slug, model: CHAPTER_IMAGE_MODEL, error: "image generation not allowed for this slug" };
+    return { ok: false, slug, model, error: "image generation not allowed for this slug" };
+  }
+  // Confirm the selected model exists BEFORE spending anything. NO fallback.
+  const check = await checkImageModel(model);
+  if (!check.ok) {
+    return { ok: false, slug, model, error: `image model "${model}" unavailable: ${check.error}` };
   }
   const db = getSupabaseAdmin();
-  if (!db) return { ok: false, slug, model: CHAPTER_IMAGE_MODEL, error: "Supabase not configured" };
+  if (!db) return { ok: false, slug, model, error: "Supabase not configured" };
 
   const plans = IMAGE_PLANS[slug];
   // Works on ANY stored row including hidden drafts — images attach before
@@ -171,7 +220,7 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
   const row = await getDraftWorkup(slug);
   const workup = row?.workup ?? null;
   if (!workup) {
-    return { ok: false, slug, model: CHAPTER_IMAGE_MODEL, error: "no stored chapter row for slug" };
+    return { ok: false, slug, model, error: "no stored chapter row for slug" };
   }
 
   await ensureBucket(db);
@@ -179,12 +228,14 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
   // Generate + upload each image (sequential — kinder to rate limits).
   const stored: { kind: ImageKind; url: string; plan: ImagePlan }[] = [];
   for (const plan of plans) {
-    const bytes = await generateImageBytes(plan.prompt, plan.kind);
+    const bytes = await generateImageBytes(model, plan);
     const url = await uploadImage(db, `${slug}/${fileFor(plan.kind)}`, bytes);
     stored.push({ kind: plan.kind, url, plan });
   }
 
-  // Wire the stored images into workup_json.images (status complete).
+  // Wire stored images into workup_json.images: replace matching kinds, APPEND
+  // new kinds (supports 3- or 5-image chapter-driven plans; earlier images with
+  // other kinds are left in place, never overwritten here).
   const updatedImages = workup.images.map((img) => {
     const hit = stored.find((s) => s.kind === img.kind);
     if (!hit) return img;
@@ -197,23 +248,39 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
       caption: hit.plan.caption,
     };
   });
+  const existingKinds = new Set(workup.images.map((i) => i.kind));
+  let nextIndex = workup.images.length;
+  for (const s of stored) {
+    if (existingKinds.has(s.kind)) continue;
+    nextIndex += 1;
+    updatedImages.push({
+      kind: s.kind,
+      index: nextIndex,
+      label: s.plan.caption,
+      prompt: s.plan.prompt,
+      caption: s.plan.caption,
+      src: s.url,
+      alt: s.plan.alt,
+      status: "complete" as const,
+    });
+  }
   await updateChapterWorkupJson(slug, { ...workup, images: updatedImages });
 
-  // Cost event (estimate; image APIs don't return per-call USD).
+  // Cost event (estimate scales with image count; APIs don't return per-call USD).
   await recordCostEvent({
     requestType: "chapter_image_generation",
     provider: "openai",
-    model: CHAPTER_IMAGE_MODEL,
+    model,
     imageCount: plans.length,
     estimatedCostUsd: plans.length * 0.04,
     metadata: { slug, imageTypes: plans.map((p) => p.kind) },
   });
 
-  return { ok: true, slug, model: CHAPTER_IMAGE_MODEL, images: stored.map((s) => ({ kind: s.kind, url: s.url })) };
+  return { ok: true, slug, model, images: stored.map((s) => ({ kind: s.kind, url: s.url })) };
 }
 
+// Storage filename per image kind. Classic kinds keep their legacy names
+// (psalm-23 paths unchanged); chapter-driven kinds map to "<kind>.png".
 function fileFor(kind: ImageKind): string {
-  if (kind === "establishing") return "establishing.png";
-  if (kind === "detail") return "detail.png";
-  return "human.png";
+  return `${String(kind).toLowerCase().replace(/[^a-z0-9-]/g, "-")}.png`;
 }

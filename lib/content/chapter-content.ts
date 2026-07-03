@@ -95,6 +95,11 @@ export const CHAPTER_IMAGE_TITLES: Record<string, Record<string, string>> = {
     establishing: "The World of Mark 6: Galilee",
     detail: "Five Barley Loaves and Two Fish",
     human: "A Wilderness Full of People, Fed",
+    nazareth: "Nazareth: Familiar Faces, Closed Hearts",
+    sending: "Sent Out Two by Two",
+    "herods-feast": "Herod’s Feast: Power Without Courage",
+    feeding: "The Feeding of the 5,000",
+    "walking-water": "Walking on the Water: Do Not Miss Who He Is",
   },
 };
 
@@ -179,41 +184,64 @@ export function getChapterFaq(slug: string): FaqItem[] | null {
 }
 
 // ---- Image plan (concepts only — NOT generated) ----------------------------
-// The 3 Selah visual roles per chapter. Prompts are approved concepts staged for
-// the image stage; image generation stays OFF until explicitly enabled.
+// Chapter-driven visual concepts (3 default, 5 for chapters with narrative
+// breadth). Roles are flexible per chapter. Prompts are approved concepts staged
+// for the image stage; image generation stays OFF until explicitly enabled.
 export interface ImagePlanConcept {
-  kind: "establishing" | "detail" | "human";
-  role: "Orient Me" | "Reveal Something" | "Let Me Feel It";
+  kind: string;
+  role: string;
   title: string;
   description: string;
   prompt: string;
 }
 
 export const CHAPTER_IMAGE_PLAN: Record<string, ImagePlanConcept[]> = {
+  // Approved Mark 6 FIVE-image plan (two kingdoms side by side).
   "mark-6": [
     {
-      kind: "establishing",
-      role: "Orient Me",
-      title: "The World of Mark 6: Galilee",
-      description: "The wider stage of the chapter — the Sea of Galilee, low hills, and small villages where two kingdoms collide.",
+      kind: "nazareth",
+      role: "Orient Me / Show Me the Pressure",
+      title: "Nazareth: Familiar Faces, Closed Hearts",
+      description:
+        "Jesus teaching in the synagogue at Nazareth, surrounded by familiar townspeople whose faces show skepticism, discomfort, and offense. The chapter opens with rejection, not triumph — familiarity becomes a blindfold.",
       prompt:
-        "Wide photorealistic historical landscape of Galilee around AD 29 in late-afternoon light: the freshwater Sea of Galilee, low brown hills, a small stone village on a hillside, a single wooden fishing boat on the water, dry grass, dust in the air. Documentary realism, natural light, no modern objects, no text, no fantasy glow.",
+        "Photorealistic historical scene inside a modest first-century village synagogue in Nazareth, around AD 29. Jesus, an ordinary Galilean Jewish man in simple worn wool, stands teaching before a room of townspeople who have known Him since childhood. Their faces show skepticism, discomfort, and quiet offense — crossed arms, sideways glances, murmuring neighbors. Small stone room, plastered walls, simple benches, oil-lamp and window light, dust in the air. True photorealism, documentary realism, natural light, believable Middle Eastern faces, worn fabrics. No halos, no glow, no text or lettering, no modern objects, no stained glass, no pews, no church architecture, no theatrical posing.",
     },
     {
-      kind: "detail",
-      role: "Reveal Something",
-      title: "Five Barley Loaves and Two Fish",
-      description: "What abundance from almost nothing actually looked like — the real food, not bakery bread.",
+      kind: "sending",
+      role: "Mission / Dependence",
+      title: "Sent Out Two by Two",
+      description:
+        "Jesus sending the Twelve out in pairs — simple staffs, sandals, travel-worn clothes, serious faces. Discipleship, dependence, obedience: Jesus multiplying His mission through ordinary people.",
       prompt:
-        "Honest close-up historical detail: small rough barley flatbreads and small dried fish in worn woven baskets, weathered first-century hands breaking a coarse loaf. Earthy, imperfect, real. Photorealistic documentary style, natural light, no modern bakery bread, no text, no fantasy glow.",
+        "Photorealistic historical scene of two first-century Jewish disciples being sent out on mission in Galilee, around AD 29: standing on a dusty village road with simple wooden staffs, leather sandals, single travel-worn tunics and cloaks, no bags, no provisions. Serious, resolved faces — ordinary working men, not heroes. Behind them, other pairs set out toward different villages, and Jesus sees them off at a distance. Dry hills and village houses beyond. True photorealism, documentary realism, natural morning light, dusty feet, worn textures. No halos, no glow, no text, no modern objects, no staged posing.",
     },
     {
-      kind: "human",
-      role: "Let Me Feel It",
-      title: "A Wilderness Full of People, Fed",
-      description: "The feeding of the 5,000 — compassion for a crowd like sheep without a shepherd. Uses the approved Mark 6 feeding-of-the-5,000 image-direction example.",
+      kind: "herods-feast",
+      role: "Show Me the False Kingdom",
+      title: "Herod’s Feast: Power Without Courage",
+      description:
+        "Herod's banquet — wealthy table, tense atmosphere, powerful people, moral rot beneath polished surfaces. Serious and unsettling, not sensational: fear, image-management, appetite, pride, and a ruler with power but no backbone.",
       prompt:
-        "Photorealistic historical scene from Mark 6, the feeding of the 5,000, set in Galilee around AD 29 on a remote grassy hillside above the Sea of Galilee. A massive crowd of ordinary first-century Jewish villagers — 5,000 adult men counted, with women and children also present — seated and reclining in loose, uneven family groups. Jesus appears as an ordinary first-century Galilean Jewish man in worn earth-toned clothing, not glowing, not idealized, near the center but naturally placed, quietly breaking rough barley flatbreads and handing pieces to the disciples, who move through the crowd with simple baskets of barley loaves and dried fish. Woven wool and linen garments, leather sandals, dusty feet, sun-worn faces, wind, dry grass, cloaks on the ground, children with families, the Sea of Galilee visible beyond. True photorealism, anamorphic 35mm film still, strong late-afternoon directional light, dust haze, warm rim light. No halos, no text, no modern objects, no Europeanized faces, no oversized bakery bread, no movie-poster posing.",
+        "Photorealistic historical scene of Herod Antipas's birthday banquet in a first-century Galilean palace hall: nobles, military commanders, and leading men reclining at low tables heavy with food and wine, oil lamps and torchlight, rich fabrics, gold vessels. The atmosphere is tense and morally uneasy rather than festive — Herod on his couch looks troubled and cornered, guests watch him, whispers at the edges. Serious and unsettling, not sensational; no gore, no severed head shown, nothing lurid. True photorealism, documentary realism, warm low torchlight and deep shadows, believable Middle Eastern and Roman-era faces. No halos, no text, no modern objects, no cartoon villainy, no theatrical posing.",
+    },
+    {
+      kind: "feeding",
+      role: "Show Me the True Kingdom",
+      title: "The Feeding of the 5,000",
+      description:
+        "Jesus and the disciples among a massive crowd on green spring grass near the Sea of Galilee — men, women, and children, baskets moving through the crowd. Herod's table serves death; Jesus' table gives life.",
+      prompt:
+        "Photorealistic historical scene from Mark 6, the feeding of the 5,000, on a remote hillside of GREEN SPRING GRASS above the Sea of Galilee, around AD 29 near Passover season. A massive crowd of ordinary first-century Jewish villagers — 5,000 men counted, with women and children clearly present — seated and reclining in loose, uneven family groups on the green grass. Jesus, an ordinary Galilean Jewish man in worn earth-toned clothing, not glowing, not idealized, naturally placed among the people, breaks rough barley flatbreads; disciples move through the crowd with simple woven baskets of small barley loaves and small dried fish. Woven wool and linen garments, leather sandals, dusty feet, sun-worn faces, wind, cloaks spread on the grass, the lake visible beyond. True photorealism, anamorphic 35mm film still, late-afternoon directional light, warm rim light. No halos, no text, no modern objects, no Europeanized faces, no oversized bakery bread, no movie-poster posing.",
+    },
+    {
+      kind: "walking-water",
+      role: "Show Me What I Should Not Miss",
+      title: "Walking on the Water: Do Not Miss Who He Is",
+      description:
+        "The disciples in a low wooden boat at night, straining against wind and waves, as Jesus approaches across the water. Fearful, mysterious, revealing — not fantasy. They received the bread but missed what the bread was showing them. Jesus is not merely useful. He is Lord.",
+      prompt:
+        "Photorealistic historical night scene on the Sea of Galilee, fourth watch of the night: a low first-century wooden fishing boat with exhausted disciples straining at the oars against wind and rough waves, cloaks soaked, faces fearful. Approaching across the dark water is Jesus, an ordinary Galilean Jewish man in worn robes, walking on the sea — mysterious and quietly powerful, seen through wind and spray, NOT glowing, no halo, no supernatural light effects; the awe comes from the impossibility itself. Moonlit clouds, deep blues and shadows, realistic water, wind-blown fabric. Fearful, mysterious, revealing — not fantasy. True photorealism, documentary realism. No halos, no glow, no lightning, no text, no modern objects, no fantasy effects, no theatrical posing.",
     },
   ],
 };

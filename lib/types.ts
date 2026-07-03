@@ -1,7 +1,10 @@
 // Selah data model. Phase 0: filled from a local placeholder file.
 // Phase 1+: produced once by the generation service and cached in Supabase.
 
-export type ImageKind = "establishing" | "detail" | "human";
+// Image kinds are chapter-driven (SB rule: no rigid buckets). The three classic
+// kinds keep autocomplete; any chapter-specific kind string is valid too
+// (e.g. "herods-feast", "walking-water").
+export type ImageKind = "establishing" | "detail" | "human" | (string & {});
 
 export interface ChapterImage {
   kind: ImageKind;

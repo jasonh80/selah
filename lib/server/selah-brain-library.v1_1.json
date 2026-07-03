@@ -1,10 +1,10 @@
 {
-  "version": "1.3",
+  "version": "1.4",
   "name": "Selah Brain Initial Rule Library",
   "status": "initial_seed",
-  "audit_basis": "28-workup canonical audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments",
+  "audit_basis": "28-workup canonical audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment",
   "source_count": 29,
-  "rule_count": 94,
+  "rule_count": 96,
   "rules": [
     {
       "id": "SB-001",
@@ -633,8 +633,8 @@
     {
       "id": "SB-070",
       "category": "visuals",
-      "title": "Orient, reveal, feel",
-      "text": "Choose three primary visual roles flexibly: Orient Me (world/scale/place), Reveal Something (object/process/hidden detail/correction), and Let Me Feel It (human emotion/action/turning point).",
+      "title": "Chapter-driven image selection",
+      "text": "Do not use rigid image buckets. For each chapter, choose the 3 or 5 most compelling visual moments based on narrative importance, theological significance, emotional power, teaching value, visual distinctiveness, and usefulness for helping the reader understand the chapter. The image set should help the user enter the world of the chapter, see the important people, feel the pressure or conflict, understand the major contrast, and notice what the chapter does not want the reader to miss. Use flexible, chapter-specific role labels (e.g. Orient Me, Show Me the Pressure, Show Me the False Kingdom, Show Me the True Kingdom, Show Me What I Should Not Miss) — do not force the same role names on every chapter.",
       "scope": "global",
       "stages": [
         "copy_generation",
@@ -642,7 +642,10 @@
         "image_review"
       ],
       "active": true,
-      "priority": "contextual"
+      "priority": "contextual",
+      "sources": [
+        "Mark 6 image workflow review"
+      ]
     },
     {
       "id": "SB-071",
@@ -1331,6 +1334,40 @@
       ],
       "active": true,
       "priority": "core"
+    },
+    {
+      "id": "SB-206",
+      "category": "visuals",
+      "title": "Image count: 3 default, 5 expanded",
+      "text": "Default to 3 images per chapter. Use 5 when the chapter has multiple major scenes, strong thematic contrast, several important people, more than one major turning point, or narrative breadth that would be flattened by only 3 images. Simpler chapters stay at 3.",
+      "scope": "global",
+      "sources": [
+        "Mark 6 image workflow review"
+      ],
+      "stages": [
+        "copy_generation",
+        "image_prompt",
+        "image_review"
+      ],
+      "active": true,
+      "priority": "contextual"
+    },
+    {
+      "id": "SB-207",
+      "category": "visuals",
+      "title": "People-first visuals",
+      "text": "Prefer people-centered scenes over empty scenic images unless the location itself is the main point. 'Orient Me' does not mean an empty landscape — show the world AND the people who matter in that world.",
+      "scope": "global",
+      "sources": [
+        "Mark 6 image workflow review"
+      ],
+      "stages": [
+        "copy_generation",
+        "image_prompt",
+        "image_review"
+      ],
+      "active": true,
+      "priority": "contextual"
     }
   ],
   "injection_policy": {

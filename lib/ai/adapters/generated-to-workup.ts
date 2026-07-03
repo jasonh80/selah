@@ -34,7 +34,7 @@ const SECTION_ICON: Record<WorkupSection["type"], string> = {
 
 const TAGLINE = "Pause. Reflect. Elevate.";
 const IMAGE_ORDER: ImageKind[] = ["establishing", "detail", "human"];
-const IMAGE_LABEL: Record<ImageKind, string> = {
+const IMAGE_LABEL: Record<string, string> = {
   establishing: "Establishing Shot",
   detail: "Detail Shot",
   human: "Human Moment",

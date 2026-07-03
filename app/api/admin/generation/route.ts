@@ -13,7 +13,7 @@ import {
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
 import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
-import { imageGenAllowed } from "@/lib/server/images";
+import { imageGenAllowed, checkImageModel } from "@/lib/server/images";
 import {
   snapshotVersion,
   listVersions,
@@ -146,6 +146,12 @@ export async function POST(req: Request) {
       typeof body.label === "string" ? body.label : undefined,
     );
     return NextResponse.json({ ok: result.ok, version: result.version });
+  }
+
+  // ---- image model availability probe (no image generated, no cost) ----
+  if (action === "image_model_check") {
+    const result = await checkImageModel(typeof body.model === "string" ? body.model : undefined);
+    return NextResponse.json({ ok: result.ok, ...result });
   }
 
   // ---- image generation (Image Preview stage; separate kill switch) ----
