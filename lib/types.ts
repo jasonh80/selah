@@ -164,6 +164,10 @@ export interface ChapterWorkup {
   }[];
   behindTheChapter?: { category: string; title: string; body: string }[];
 
+  // Static, approved "What People Ask" FAQ (not a live Ask tool). Falls back to
+  // CHAPTER_FAQ config when absent.
+  whatPeopleAsk?: { question: string; answer: string }[];
+
   // Optional generation cost metadata (placeholder; not shown in the UI).
   cost?: {
     textEstimateUsd?: number;
