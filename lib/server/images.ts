@@ -4,7 +4,7 @@
 import type { ChapterWorkup, ImageKind } from "@/lib/types";
 import { getOpenAI, isOpenAIConfigured } from "./openai";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
-import { getChapterWorkupBySlug, updateChapterWorkupJson } from "./chapter-workups-repository";
+import { getDraftWorkup, updateChapterWorkupJson } from "./chapter-workups-repository";
 import { recordCostEvent } from "./cost-events-repository";
 import { getGenerationSettings } from "./generation-settings";
 
@@ -12,7 +12,7 @@ export const CHAPTER_IMAGE_MODEL = process.env.CHAPTER_IMAGE_MODEL || "gpt-image
 
 // Slugs that have a hand-authored IMAGE_PLAN. (Generated chapters' image prompts
 // will come from their workup later; for now image gen needs a plan here.)
-export const IMAGE_ALLOWED_SLUGS = ["psalm-23"];
+export const IMAGE_ALLOWED_SLUGS = ["psalm-23", "mark-6"];
 
 // Routine image control lives in Supabase (generation_settings.image_generation_enabled,
 // defaults OFF). Fail-CLOSED. Still requires an IMAGE_PLAN for the slug.
@@ -60,6 +60,34 @@ const IMAGE_PLANS: Record<string, ImagePlan[]> = {
       prompt:
         "A shepherd guiding sheep through a narrow shadowed ravine at dusk, protective posture, quiet danger, deep shadows, ancient Judean wilderness, emotionally reverent but realistic." +
         STYLE,
+    },
+  ],
+
+  // Approved Mark 6 plan (CHAPTER_IMAGE_PLAN concepts — Orient Me / Reveal
+  // Something / Let Me Feel It). Prompts carry their own style + negative
+  // guardrails (from the approved feeding-of-the-5,000 image direction), so the
+  // Judean STYLE suffix is intentionally NOT appended.
+  "mark-6": [
+    {
+      kind: "establishing",
+      caption: "The World of Mark 6: Galilee",
+      alt: "The Sea of Galilee with low hills, a small stone hillside village, and a wooden fishing boat in late-afternoon light.",
+      prompt:
+        "Wide photorealistic historical landscape of Galilee around AD 29 in late-afternoon light: the freshwater Sea of Galilee, low brown hills, a small stone village on a hillside, a single wooden fishing boat on the water, dry grass, dust in the air. Documentary realism, natural light, no modern objects, no text, no fantasy glow.",
+    },
+    {
+      kind: "detail",
+      caption: "Five Barley Loaves and Two Fish",
+      alt: "Small rough barley flatbreads and dried fish in worn woven baskets, with weathered hands breaking a coarse loaf.",
+      prompt:
+        "Honest close-up historical detail: small rough barley flatbreads and small dried fish in worn woven baskets, weathered first-century hands breaking a coarse loaf. Earthy, imperfect, real. Photorealistic documentary style, natural light, no modern bakery bread, no text, no fantasy glow.",
+    },
+    {
+      kind: "human",
+      caption: "A Wilderness Full of People, Fed",
+      alt: "A vast crowd of first-century villagers seated in family groups on a grassy hillside above the Sea of Galilee as disciples distribute bread and fish.",
+      prompt:
+        "Photorealistic historical scene from Mark 6, the feeding of the 5,000, set in Galilee around AD 29 on a remote grassy hillside above the Sea of Galilee. A massive crowd of ordinary first-century Jewish villagers — 5,000 adult men counted, with women and children also present — seated and reclining in loose, uneven family groups. Jesus appears as an ordinary first-century Galilean Jewish man in worn earth-toned clothing, not glowing, not idealized, near the center but naturally placed, quietly breaking rough barley flatbreads and handing pieces to the disciples, who move through the crowd with simple baskets of barley loaves and dried fish. Woven wool and linen garments, leather sandals, dusty feet, sun-worn faces, wind, dry grass, cloaks on the ground, children with families, the Sea of Galilee visible beyond. True photorealism, anamorphic 35mm film still, strong late-afternoon directional light, dust haze, warm rim light. No halos, no text, no modern objects, no Europeanized faces, no oversized bakery bread, no movie-poster posing.",
     },
   ],
 };
@@ -138,9 +166,12 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
   if (!db) return { ok: false, slug, model: CHAPTER_IMAGE_MODEL, error: "Supabase not configured" };
 
   const plans = IMAGE_PLANS[slug];
-  const workup = await getChapterWorkupBySlug(slug);
+  // Works on ANY stored row including hidden drafts — images attach before
+  // Publish Final in the Selah Studio flow. Never creates a row.
+  const row = await getDraftWorkup(slug);
+  const workup = row?.workup ?? null;
   if (!workup) {
-    return { ok: false, slug, model: CHAPTER_IMAGE_MODEL, error: "chapter row not found (must be ready/reviewed)" };
+    return { ok: false, slug, model: CHAPTER_IMAGE_MODEL, error: "no stored chapter row for slug" };
   }
 
   await ensureBucket(db);

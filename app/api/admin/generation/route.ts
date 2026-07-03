@@ -12,7 +12,8 @@ import {
   getDraftWorkup,
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
-import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
+import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
+import { imageGenAllowed } from "@/lib/server/images";
 import {
   snapshotVersion,
   listVersions,
@@ -145,6 +146,34 @@ export async function POST(req: Request) {
       typeof body.label === "string" ? body.label : undefined,
     );
     return NextResponse.json({ ok: result.ok, version: result.version });
+  }
+
+  // ---- image generation (Image Preview stage; separate kill switch) ----
+  if (action === "generate_images") {
+    const slug = String(body.slug ?? "");
+    if (!(await imageGenAllowed(slug))) {
+      return NextResponse.json(
+        { ok: false, error: "Image generation not allowed — needs Image Generation ON, the slug allowlisted, and an approved image plan." },
+        { status: 403 },
+      );
+    }
+    await logGenerationAudit({ action: "generate_images", slug, status: "started" });
+    await triggerBackgroundImageGeneration(slug, new URL(req.url).host);
+    return NextResponse.json({ ok: true, triggered: true, slug });
+  }
+  if (action === "images_status") {
+    const slug = String(body.slug ?? "");
+    const row = await getDraftWorkup(slug);
+    const imgs = row?.workup.images ?? [];
+    const stored = imgs.filter((i) => /^https?:\/\//.test(i.src));
+    return NextResponse.json({
+      ok: true,
+      slug,
+      total: imgs.length,
+      stored: stored.length,
+      done: imgs.length > 0 && stored.length === imgs.length,
+      urls: stored.map((i) => ({ kind: i.kind, src: i.src })),
+    });
   }
 
   // ---- Selah Brain approved examples ----
