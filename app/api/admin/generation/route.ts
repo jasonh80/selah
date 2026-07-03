@@ -151,7 +151,7 @@ export async function POST(req: Request) {
   // ---- image model availability probe (no image generated, no cost) ----
   if (action === "image_model_check") {
     const result = await checkImageModel(typeof body.model === "string" ? body.model : undefined);
-    return NextResponse.json({ ok: result.ok, ...result });
+    return NextResponse.json(result);
   }
 
   // ---- image generation (Image Preview stage; separate kill switch) ----
