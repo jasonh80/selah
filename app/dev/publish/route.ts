@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
 import { getDraftWorkup, publishChapter } from "@/lib/server/chapter-workups-repository";
+import { isChapterMutationError } from "@/lib/server/protected-chapters";
 
 // DEV/admin: promote a reviewed draft to published (status → reviewed, which the
 // public read-through serves). Two steps:
@@ -33,6 +34,14 @@ export async function GET(request: Request) {
     });
   }
 
-  const newStatus = await publishChapter(slug);
-  return NextResponse.json({ ok: Boolean(newStatus), slug, status: newStatus, published: Boolean(newStatus) });
+  try {
+    const newStatus = await publishChapter(slug);
+    return NextResponse.json({ ok: true, slug, status: newStatus, published: true });
+  } catch (e) {
+    if (isChapterMutationError(e)) {
+      const code = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
+      return NextResponse.json({ ok: false, slug, error: `${e.code}: ${e.message}` }, { status: code });
+    }
+    return NextResponse.json({ ok: false, slug, error: String((e as Error).message) }, { status: 500 });
+  }
 }

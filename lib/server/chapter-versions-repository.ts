@@ -4,6 +4,7 @@
 import type { ChapterWorkup } from "../types";
 import { getSupabaseAdmin } from "./supabase";
 import { chapterMutationDecision } from "./protected-chapters";
+import type { ChapterRowSnapshot } from "./protected-chapters";
 
 const TABLE = "chapter_workup_versions";
 
@@ -85,10 +86,7 @@ export async function restoreVersion(slug: string, version: number): Promise<boo
   if (!db) return false;
   const workup = await getVersionWorkup(slug, version);
   if (!workup) return false;
-  const { error } = await db
-    .from("chapter_workups")
-    .update({ workup_json: workup, status: "draft", updated_at: new Date().toISOString() })
-    .eq("slug", slug);
+  const { error } = await conditionalDraftWrite(db, slug, workup, decision.expected);
   if (error) {
     console.error(`[selah] restoreVersion(${slug},${version}) failed:`, error.message);
     return false;
@@ -110,14 +108,33 @@ export async function applyMergedDraft(
   }
   const db = getSupabaseAdmin();
   if (!db) return { ok: false, version: null };
-  const up = await db
-    .from("chapter_workups")
-    .update({ workup_json: workup, status: "draft", updated_at: new Date().toISOString() })
-    .eq("slug", slug);
+  const up = await conditionalDraftWrite(db, slug, workup, decision.expected);
   if (up.error) {
     console.error(`[selah] applyMergedDraft(${slug}) failed:`, up.error.message);
     return { ok: false, version: null };
   }
   const version = await snapshotVersion(slug, label ?? "selected merge");
   return { ok: true, version };
+}
+
+// Conditional draft write shared by restore/merge: the write re-asserts the
+// decision's revision token; zero rows changed = conflict (surfaces as error).
+async function conditionalDraftWrite(
+  db: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  slug: string,
+  workup: ChapterWorkup,
+  expected: ChapterRowSnapshot | null,
+): Promise<{ error: { message: string } | null }> {
+  let query = db
+    .from("chapter_workups")
+    .update({ workup_json: workup, status: "draft", updated_at: new Date().toISOString() })
+    .eq("slug", slug)
+    .eq("status", expected?.status ?? "draft");
+  if (expected?.updatedAt) query = query.eq("updated_at", expected.updatedAt);
+  const { data, error } = await query.select("slug");
+  if (error) return { error };
+  if (!data || data.length === 0) {
+    return { error: { message: `conflict: "${slug}" changed since the mutability check (zero rows written)` } };
+  }
+  return { error: null };
 }

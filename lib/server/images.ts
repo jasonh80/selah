@@ -5,6 +5,7 @@ import type { ChapterWorkup, ImageKind } from "@/lib/types";
 import { getOpenAI, isOpenAIConfigured } from "./openai";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { getDraftWorkup, updateChapterWorkupJson } from "./chapter-workups-repository";
+import { isChapterMutationError } from "./protected-chapters";
 import { recordCostEvent } from "./cost-events-repository";
 import { getGenerationSettings } from "./generation-settings";
 import { chapterMutationDecision } from "./protected-chapters";
@@ -185,7 +186,7 @@ async function uploadImage(
 ): Promise<string> {
   const { error } = await db.storage
     .from(BUCKET)
-    .upload(path, bytes, { contentType: "image/png", upsert: true });
+    .upload(path, bytes, { contentType: "image/png", upsert: false });
   if (error) throw new Error(`upload failed (${path}): ${error.message}`);
   return db.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
@@ -205,12 +206,15 @@ export interface ImageGenResult {
 export async function generateAndStoreChapterImages(slug: string): Promise<ImageGenResult> {
   const model = await activeImageModel();
   // Issue #8 mutation guard — BEFORE any model spend: published/protected
-  // chapters cannot have their images regenerated or overwritten.
-  const decision = await chapterMutationDecision(slug, "generateAndStoreChapterImages");
+  // chapters cannot have their images regenerated or overwritten. The decision
+  // token pins THE WHOLE RUN: the final JSON write re-asserts this exact
+  // revision, so a row that changes mid-run becomes a CONFLICT (no overwrite).
+  const decision = await chapterMutationDecision(slug, "updateChapterWorkupJson");
   if (!decision.allowed) {
     console.error(`[selah] mutation guard: ${decision.reason}`);
     return { ok: false, slug, model, error: decision.reason };
   }
+  const runToken = decision.expected;
   if (!(await imageGenAllowed(slug))) {
     return { ok: false, slug, model, error: "image generation not allowed for this slug" };
   }
@@ -234,10 +238,14 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
   await ensureBucket(db);
 
   // Generate + upload each image (sequential — kinder to rate limits).
+  // Every run writes to its OWN immutable directory (never upsert, never a
+  // stable path), so a stale/concurrent run cannot overwrite published bytes
+  // even before the final conditional JSON write (Codex finding #3).
+  const runId = new Date().toISOString().replace(/[:.]/g, "-").toLowerCase();
   const stored: { kind: ImageKind; url: string; plan: ImagePlan }[] = [];
   for (const plan of plans) {
     const bytes = await generateImageBytes(model, plan);
-    const url = await uploadImage(db, `${slug}/${fileFor(plan.kind)}`, bytes);
+    const url = await uploadImage(db, `${slug}/${runId}/${fileFor(plan.kind)}`, bytes);
     stored.push({ kind: plan.kind, url, plan });
   }
 
@@ -272,7 +280,15 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
       status: "complete" as const,
     });
   }
-  await updateChapterWorkupJson(slug, { ...workup, images: updatedImages });
+  try {
+    // Revision-pinned write: refused (typed CONFLICT) if the row changed at any
+    // point during this run — the uploaded bytes stay isolated in the run dir.
+    await updateChapterWorkupJson(slug, { ...workup, images: updatedImages }, runToken);
+  } catch (e) {
+    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
+    console.error(`[selah] image run for ${slug} not applied — ${msg}`);
+    return { ok: false, slug, model, error: `image run not applied — ${msg}` };
+  }
 
   // Cost event (estimate scales with image count; APIs don't return per-call USD).
   await recordCostEvent({

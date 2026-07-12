@@ -2,7 +2,7 @@
   "name": "selah",
   "version": "0.1.0",
   "private": true,
-  "description": "Selah — your daily Bible chapter, made visual, simple, and personal.",
+  "description": "Selah \u2014 your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,7 +11,9 @@
     "validate:workup": "tsx scripts/validate-workup.ts",
     "check:workup": "npm run validate:workup",
     "seed:exodus-27": "tsx scripts/seed-exodus-27.ts",
-    "verify:supabase": "tsx scripts/verify-supabase-workups.ts"
+    "verify:supabase": "tsx scripts/verify-supabase-workups.ts",
+    "verify:studio-safety": "tsx scripts/verify-studio-safety.ts",
+    "prebuild": "npm run verify:studio-safety"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",

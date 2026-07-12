@@ -14,7 +14,11 @@ import {
 } from "@/lib/server/chapter-workups-repository";
 import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
 import { imageGenAllowed, checkImageModel } from "@/lib/server/images";
-import { chapterMutationDecision } from "@/lib/server/protected-chapters";
+import {
+  chapterMutationDecision,
+  isChapterMutationError,
+  type MutationAction,
+} from "@/lib/server/protected-chapters";
 import {
   snapshotVersion,
   listVersions,
@@ -63,6 +67,25 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const action = String(body.action ?? "");
 
+  // Durable audit for every blocked attempt (Codex finding #5), then the
+  // matching HTTP status: REFUSED→403, CONFLICT→409, WRITE_FAILED→500.
+  async function refuse(slug: string, what: string, reason: string, status: number) {
+    await logGenerationAudit({ action: `refused:${what}`, slug, status: "failed", message: reason.slice(0, 300) });
+    return NextResponse.json({ ok: false, error: reason }, { status });
+  }
+  async function guardOrRefuse(slug: string, what: string, guardAction: MutationAction) {
+    const guard = await chapterMutationDecision(slug, guardAction);
+    if (!guard.allowed) return refuse(slug, what, guard.reason, 403);
+    return null;
+  }
+  async function mapMutationError(slug: string, what: string, e: unknown) {
+    if (isChapterMutationError(e)) {
+      const status = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
+      return refuse(slug, what, `${e.code}: ${e.message}`, status);
+    }
+    return refuse(slug, what, String((e as Error).message ?? "unknown error").slice(0, 300), 500);
+  }
+
   // ---- save settings ----
   if (action === "save") {
     const updated = await updateGenerationSettings((body.settings ?? {}) as Partial<GenerationSettings>);
@@ -75,15 +98,13 @@ export async function POST(req: Request) {
     const slug = String(body.slug ?? "");
     const draft = await getDraftWorkup(slug);
     if (!draft) return NextResponse.json({ ok: false, error: "no stored row for slug" }, { status: 404 });
-    const status = await publishChapter(slug);
-    await logGenerationAudit({ action: "publish", slug, status: status ? "succeeded" : "failed" });
-    if (!status) {
-      return NextResponse.json(
-        { ok: false, slug, error: "publish refused — the chapter may already be published (published chapters are immutable)" },
-        { status: 409 },
-      );
+    try {
+      const status = await publishChapter(slug);
+      await logGenerationAudit({ action: "publish", slug, status: "succeeded" });
+      return NextResponse.json({ ok: true, slug, status });
+    } catch (e) {
+      return mapMutationError(slug, "publish", e);
     }
-    return NextResponse.json({ ok: true, slug, status });
   }
 
   // ---- poll a chapter's status (for the Generate Draft progress UI) ----
@@ -140,12 +161,11 @@ export async function POST(req: Request) {
   }
   if (action === "version_restore") {
     const slug = String(body.slug ?? "");
-    const guard = await chapterMutationDecision(slug, "version_restore");
-    if (!guard.allowed) {
-      return NextResponse.json({ ok: false, error: guard.reason }, { status: 403 });
-    }
+    const blocked = await guardOrRefuse(slug, "version_restore", "restoreVersion");
+    if (blocked) return blocked;
     const ok = await restoreVersion(slug, Number(body.version));
-    return NextResponse.json({ ok });
+    if (!ok) return refuse(slug, "version_restore", "restore failed or conflicted — nothing was written", 409);
+    return NextResponse.json({ ok: true });
   }
   if (action === "versions_snapshot") {
     const version = await snapshotVersion(String(body.slug ?? ""), typeof body.label === "string" ? body.label : undefined);
@@ -153,16 +173,15 @@ export async function POST(req: Request) {
   }
   if (action === "version_apply") {
     const slug = String(body.slug ?? "");
-    const guard = await chapterMutationDecision(slug, "version_apply");
-    if (!guard.allowed) {
-      return NextResponse.json({ ok: false, error: guard.reason }, { status: 403 });
-    }
+    const blocked = await guardOrRefuse(slug, "version_apply", "applyMergedDraft");
+    if (blocked) return blocked;
     const result = await applyMergedDraft(
       slug,
       body.workup as ChapterWorkup,
       typeof body.label === "string" ? body.label : undefined,
     );
-    return NextResponse.json({ ok: result.ok, version: result.version });
+    if (!result.ok) return refuse(slug, "version_apply", "merge failed or conflicted — nothing was written", 409);
+    return NextResponse.json({ ok: true, version: result.version });
   }
 
   // ---- image model availability probe (no image generated, no cost) ----
@@ -174,10 +193,8 @@ export async function POST(req: Request) {
   // ---- image generation (Image Preview stage; separate kill switch) ----
   if (action === "generate_images") {
     const slug = String(body.slug ?? "");
-    const guard = await chapterMutationDecision(slug, "generate_images");
-    if (!guard.allowed) {
-      return NextResponse.json({ ok: false, error: guard.reason }, { status: 403 });
-    }
+    const blocked = await guardOrRefuse(slug, "generate_images", "updateChapterWorkupJson");
+    if (blocked) return blocked;
     if (!(await imageGenAllowed(slug))) {
       return NextResponse.json(
         { ok: false, error: "Image generation not allowed — needs Image Generation ON, the slug allowlisted, and an approved image plan." },
@@ -240,10 +257,8 @@ export async function POST(req: Request) {
   if (action === "generate") {
     const slug = String(body.slug ?? "");
     // Issue #8 mutation guard: published/protected chapters cannot be regenerated.
-    const guard = await chapterMutationDecision(slug, "generate");
-    if (!guard.allowed) {
-      return NextResponse.json({ ok: false, error: guard.reason }, { status: 403 });
-    }
+    const blocked = await guardOrRefuse(slug, "generate", "createGeneratingChapterWorkup");
+    if (blocked) return blocked;
     const confirm = body.confirm === true || body.confirm === "yes";
     const settings = await getGenerationSettings();
 
@@ -271,7 +286,10 @@ export async function POST(req: Request) {
     }
 
     const parsed = parseSlug(slug);
-    if (parsed) {
+    if (!parsed) return refuse(slug, "generate", "unparseable slug", 400);
+    try {
+      // Typed, race-safe placeholder claim. If this fails, NO trigger and NO
+      // success-shaped response follow (Codex finding #4).
       await createGeneratingChapterWorkup({
         book: parsed.book,
         chapter: parsed.chapter,
@@ -279,6 +297,8 @@ export async function POST(req: Request) {
         title: `${parsed.book} ${parsed.chapter}`,
         source: "generated",
       });
+    } catch (e) {
+      return mapMutationError(slug, "generate", e);
     }
     await triggerBackgroundGeneration(slug, new URL(req.url).host);
     return NextResponse.json({

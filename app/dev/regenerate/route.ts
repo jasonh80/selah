@@ -4,15 +4,16 @@ import {
   createGeneratingChapterWorkup,
   getChapterStatus,
 } from "@/lib/server/chapter-workups-repository";
+import { isChapterMutationError } from "@/lib/server/protected-chapters";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
 import { CHAPTER_WORKUP_TEXT_MODEL } from "@/lib/server/openai";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
 
-// DEV/admin: the ONLY way to start a chapter generation. Two steps for safety:
-//   1. GET /dev/regenerate?slug=psalm-23           → PREVIEW (no generation)
-//   2. GET /dev/regenerate?slug=psalm-23&confirm=yes → starts a background job
-// Add &force=yes to overwrite an existing ready/reviewed row. Gated by
-// generationAllowed (flag + OpenAI + Supabase + allowlist) and optional REGEN_TOKEN.
+// DEV/admin legacy generation trigger. Two steps for safety:
+//   1. GET /dev/regenerate?slug=<slug>             → PREVIEW (no generation)
+//   2. GET /dev/regenerate?slug=<slug>&confirm=yes → starts a background job
+// There is NO force/overwrite path (issue #8): the mutation guard refuses
+// protected, published, quarantined-ready, and mid-run rows — always.
 export const dynamic = "force-dynamic";
 
 function estimatedCostRange(model: string): string {
@@ -28,7 +29,6 @@ export async function GET(request: Request) {
   const slug = url.searchParams.get("slug") || "";
   const token = url.searchParams.get("token") || "";
   const confirm = url.searchParams.get("confirm") === "yes";
-  const force = url.searchParams.get("force") === "yes";
 
   if (process.env.REGEN_TOKEN && token !== process.env.REGEN_TOKEN) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -58,27 +58,18 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ...base,
       preview: true,
-      willRegenerate: !isReady || force,
-      note: isReady && !force
-        ? "Already ready. Add &force=yes&confirm=yes to overwrite, or leave it."
+      willRegenerate: !isReady,
+      note: isReady
+        ? "This chapter is published/ready — the mutation guard will refuse regeneration. There is no force override."
         : "Add &confirm=yes to start the background generation.",
     });
   }
 
-  // Step 2: confirmed — guard rails.
-  if (status === "generating") {
-    return NextResponse.json({ ...base, ok: false, error: "already generating — wait for it to finish" });
-  }
-  if (isReady && !force) {
-    return NextResponse.json({
-      ...base,
-      ok: false,
-      error: "already ready — add &force=yes to overwrite",
-    });
-  }
-
+  // Step 2: confirmed — the typed, race-safe claim IS the guard rail. Any
+  // refusal/conflict is surfaced; no trigger follows a failed claim.
   const parsed = parseSlug(slug);
-  if (parsed) {
+  if (!parsed) return NextResponse.json({ ...base, ok: false, error: "unparseable slug" }, { status: 400 });
+  try {
     await createGeneratingChapterWorkup({
       book: parsed.book,
       chapter: parsed.chapter,
@@ -86,6 +77,12 @@ export async function GET(request: Request) {
       title: `${parsed.book} ${parsed.chapter}`,
       source: "generated",
     });
+  } catch (e) {
+    if (isChapterMutationError(e)) {
+      const code = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
+      return NextResponse.json({ ...base, ok: false, error: `${e.code}: ${e.message}` }, { status: code });
+    }
+    return NextResponse.json({ ...base, ok: false, error: String((e as Error).message) }, { status: 500 });
   }
   await triggerBackgroundGeneration(slug, url.host);
 
