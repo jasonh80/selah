@@ -24,7 +24,8 @@ export function ChapterControls({
       onToggleScripture();
       return;
     }
-    document.getElementById("chapter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById("chapter")?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   }
 
   const base =
@@ -39,6 +40,7 @@ export function ChapterControls({
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
       <button
+        type="button"
         onClick={readChapter}
         aria-expanded={isToggle ? Boolean(scriptureOpen) : undefined}
         aria-controls={isToggle ? "chapter" : undefined}
@@ -49,10 +51,10 @@ export function ChapterControls({
           {isToggle ? (scriptureOpen ? "⌃" : "⌄") : "↓"}
         </span>
       </button>
-      <button onClick={() => setMode("quick")} aria-pressed={mode === "quick"} className={modeBtn("quick")}>
+      <button type="button" onClick={() => setMode("quick")} aria-pressed={mode === "quick"} className={modeBtn("quick")}>
         Quick Dive
       </button>
-      <button onClick={() => setMode("deep")} aria-pressed={mode === "deep"} className={modeBtn("deep")}>
+      <button type="button" onClick={() => setMode("deep")} aria-pressed={mode === "deep"} className={modeBtn("deep")}>
         Deep Dive
       </button>
     </div>
