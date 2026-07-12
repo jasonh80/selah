@@ -14,13 +14,24 @@ import {
 } from "../lib/server/mark-sprint-manifest-policy";
 
 const raw = {
-  prompt: "PRIVATE ASSEMBLED PROMPT\nDo not return me.",
-  source: "PRIVATE RIGHTS-CLEARED SOURCE\nDo not return me.",
+  requestSystem: "PRIVATE SYSTEM MESSAGE\nDo not return me.",
+  requestUser: "PRIVATE ASSEMBLED USER PROMPT\nDo not return me.",
+  source: "PRIVATE ORDERED RIGHTS-CLEARED PRIMARY + CONTEXT SOURCE BUNDLE\nDo not return me.",
   example: "PRIVATE APPROVED EXAMPLE\nDo not return me.",
   ruleOne: "Private rule one text.",
   ruleTwo: "Private rule two text.",
   noteOne: "Private note one text.",
   noteTwo: "Private note two text.",
+};
+const modelRequest = {
+  model: "gpt-5.5",
+  reasoning_effort: "low",
+  max_completion_tokens: 12_000,
+  messages: [
+    { role: "system", content: raw.requestSystem },
+    { role: "user", content: raw.requestUser },
+  ],
+  response_format: { type: "json_object" },
 };
 
 const requirements: GenerationManifestRequirementsV1 = {
@@ -35,19 +46,19 @@ const requirements: GenerationManifestRequirementsV1 = {
   model: { id: "gpt-5.5", reasoningEffort: "low" },
   prompt: {
     revision: "chapter-workup-json-v2",
-    digest: sha256Text(raw.prompt),
+    digest: sha256Canonical(modelRequest),
   },
   brain: {
-    libraryVersion: "1.6",
-    libraryDigest: sha256Canonical({ version: "1.6", rules: 2 }),
+    libraryVersion: "1.7",
+    libraryDigest: sha256Canonical({ version: "1.7", rules: 2 }),
     rules: [
       { id: "SB-001", digest: sha256Text(raw.ruleOne) },
       { id: "SB-032", digest: sha256Text(raw.ruleTwo) },
     ],
   },
   guidance: {
-    packetId: "mark-8-11-2026-07-v3",
-    version: "1.2",
+    packetId: "mark-8-11-2026-07-v4",
+    version: "1.3",
     digest: sha256Canonical({ packet: "v3", notes: 2 }),
     notes: [
       { id: "M8-01", storedRowId: "row-note-1", digest: sha256Text(raw.noteOne) },
@@ -67,6 +78,7 @@ const requirements: GenerationManifestRequirementsV1 = {
     rights: "CC0",
     url: "https://openenglishbible.org/oeb/2025.6/read/b041.html",
     reference: "Mark 8",
+    contextReference: "Mark 7–9 context; Mark 8 primary (grounded_book_flow_only)",
     contentDigest: sha256Text(raw.source),
   },
   approvedManifestDigest: null,
@@ -147,7 +159,9 @@ expectBlocked("wrong slug", (_r, m) => { m.subject.slug = "mark-9"; }, "IDENTITY
 expectBlocked("wrong model", (_r, m) => { m.model.id = "other-model"; }, "IDENTITY_MISMATCH");
 expectBlocked("wrong reasoning", (_r, m) => { m.model.reasoningEffort = "high"; }, "IDENTITY_MISMATCH");
 expectBlocked("wrong prompt revision", (_r, m) => { m.prompt.revision = "changed"; }, "IDENTITY_MISMATCH");
-expectBlocked("changed prompt", (_r, m) => { m.prompt.digest = sha256Text(`${raw.prompt}!`); }, "DIGEST_MISMATCH");
+expectBlocked("changed model request", (_r, m) => {
+  m.prompt.digest = sha256Canonical({ ...modelRequest, max_completion_tokens: 11_999 });
+}, "DIGEST_MISMATCH");
 expectBlocked("array-valued digest", (r, m) => {
   const coercesLikeDigest = ["a".repeat(64)];
   (r.prompt as unknown as Record<string, unknown>).digest = coercesLikeDigest;
@@ -183,6 +197,7 @@ expectBlocked("source string approved", (_r, m) => { (m.source as unknown as Rec
 expectBlocked("source numeric connected", (_r, m) => { (m.source as unknown as Record<string, unknown>).connected = 1; }, "SOURCE_NOT_CONNECTED");
 expectBlocked("source null content", (_r, m) => { (m.source as unknown as Record<string, unknown>).contentPresent = null; }, "SOURCE_CONTENT_MISSING");
 expectBlocked("changed source", (_r, m) => { m.source.contentDigest = sha256Text(`${raw.source}!`); }, "DIGEST_MISMATCH");
+expectBlocked("wrong source context", (_r, m) => { m.source.contextReference = "Mark 8 only"; }, "IDENTITY_MISMATCH");
 expectBlocked("blank source digest", (_r, m) => { m.source.contentDigest = ""; }, "INVALID_DIGEST");
 expectBlocked("blank matching identity", (r, m) => { r.model.id = ""; m.model.id = ""; }, "INVALID_IDENTITY");
 expectBlocked("stale owner approval", (r) => { r.approvedManifestDigest = "f".repeat(64); }, "MANIFEST_APPROVAL_MISMATCH");
@@ -198,7 +213,7 @@ assert.throws(
 const taintedMaterials = structuredClone(materials) as GenerationManifestMaterialsV1 &
   Record<string, unknown>;
 taintedMaterials.rawTopLevel = "PRIVATE TOP-LEVEL WORDING";
-Object.assign(taintedMaterials.prompt, { rawPrompt: raw.prompt });
+Object.assign(taintedMaterials.prompt, { rawRequest: modelRequest });
 Object.assign(taintedMaterials.brain.rules[0], { ruleText: raw.ruleOne });
 Object.assign(taintedMaterials.guidance.notes[0], { noteText: raw.noteOne });
 Object.assign(taintedMaterials.examples[0], { rawExample: raw.example });
@@ -209,7 +224,8 @@ assert.ok(tainted.findings.some((finding) => finding.code === "UNKNOWN_FIELD"));
 const serializedTainted = JSON.stringify(tainted);
 for (const protectedText of [
   "PRIVATE TOP-LEVEL WORDING",
-  raw.prompt,
+  raw.requestSystem,
+  raw.requestUser,
   raw.ruleOne,
   raw.noteOne,
   raw.example,
@@ -253,7 +269,7 @@ for (const slug of MARK_SPRINT_SLUGS) {
     "brain_live_match_missing",
     "source_not_connected",
     "source_digest_missing",
-    "prompt_digest_missing",
+    "model_request_digest_missing",
     "chapter_note_row_ids_missing",
     "voice_example_id_missing",
     "voice_example_digest_missing",
@@ -264,9 +280,9 @@ for (const slug of MARK_SPRINT_SLUGS) {
   const serializedPolicy = JSON.stringify(policy);
   assert.ok(!serializedPolicy.includes("Preserve every movement"));
   assert.ok(!serializedPolicy.includes("Partial-to-clear sight"));
-  assert.equal(policy.requirements.brain.requiredCoreRuleIds.length, 24);
+  assert.equal(policy.requirements.brain.requiredCoreRuleIds.length, 25);
   assert.equal(policy.requirements.brain.requiredContextualRuleIds.length, 12);
-  assert.equal(policy.requirements.brain.requiredRules.length, 36);
+  assert.equal(policy.requirements.brain.requiredRules.length, 37);
   policyBlockers[slug] = codes;
 }
 

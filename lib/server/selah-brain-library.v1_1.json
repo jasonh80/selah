@@ -1,11 +1,11 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "name": "Selah Brain Initial Rule Library",
   "status": "review_only",
   "seed_approval": null,
   "audit_basis": "28-workup canonical audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment plus the review-only high-weight Mark 8–11 accuracy audit plus a signed-in recent Mark/Exodus benchmark correction audit",
-  "source_count": 34,
-  "rule_count": 98,
+  "source_count": 35,
+  "rule_count": 99,
   "rules": [
     {
       "id": "SB-001",
@@ -1294,7 +1294,7 @@
       "id": "SB-200",
       "category": "voice",
       "title": "Daily Rundown cadence",
-      "text": "Do not merely explain the chapter in polished paragraphs. Include short, memorable interpretive lines that name the spiritual reality underneath the scene — e.g. 'Fear wearing religious clothing.' / 'Familiarity pretending to be discernment.' / 'Do not receive the bread and miss who gave it.' / 'They are holding leftovers and still missing the point.' / 'A ruler with power but no backbone.' / 'Control dressed up as worship.' Use conversational rhythm and wise-friend directness, with occasional restrained wit when appropriate. These lines should feel natural, never forced. Lean on this especially in Quick Summary, What Most People Miss, Jesus at the Center, Live It, and Scene Checks.",
+      "text": "Do not merely explain the chapter in polished paragraphs. Earn a small number of memorable interpretive lines grounded in an explained textual insight, naming the human or spiritual reality underneath it in fresh, concrete language. Use conversational rhythm, wise-friend directness, and occasional restrained wit when appropriate. Do not stack aphorisms, force a quotable line into every section, or imitate the syntax, metaphor, title, or wording of an approved example. Lean on this especially in Quick Summary, What Most People Miss, Jesus at the Center, Live It, and Scene Checks.",
       "scope": "global",
       "sources": [
         "Mark 6 Daily Rundown"
@@ -1342,7 +1342,7 @@
       "id": "SB-203",
       "category": "voice",
       "title": "Plainspoken Selah voice",
-      "text": "Sound like a wise, honest friend helping someone understand Scripture clearly. Avoid overly churchy, academic, or generic devotional phrasing. Prefer concrete, everyday language approachable for newer Bible readers while still rich enough for mature believers. Be deep without sounding like you are trying to prove you are deep. Instead of 'The disciples fail to apprehend the theological significance of the miracle,' say 'They received the bread, but they missed what the bread was showing them.' Instead of 'Cultivate faith amid uncertainty,' say 'Trust Him before you can see how the whole thing works out.'",
+      "text": "Sound like a wise, honest friend helping someone understand Scripture clearly. Avoid overly churchy, academic, or generic devotional phrasing. Prefer concrete verbs, everyday language, and images that arise from the passage, approachable for newer Bible readers while still rich enough for mature believers. Translate specialized claims into plain language without losing their precision. Be deep without sounding like you are trying to prove you are deep, and do not substitute generic inspirational slogans for explanation.",
       "scope": "global",
       "sources": [
         "Mark 6 review"
@@ -1358,7 +1358,7 @@
       "id": "SB-204",
       "category": "theology",
       "title": "Teach theology, don't hide it",
-      "text": "The Theology Principle section should introduce a real theological word, doctrine, concept, or principle when useful. Do not avoid theological language, but do not assume the reader already knows it. Generally follow this pattern: (1) Name the theological principle, doctrine, concept, or word. (2) Define it simply. (3) Show how THIS chapter reveals or illustrates it. (4) Explain why it matters for life with Jesus. Example — Theology Principle: Christology. What it means: Christology is the study of who Jesus is. How Mark 6 shows it: Mark shows Jesus as fully human (rejected by His hometown, tired from ministry, surrounded by needy people) but also doing what only God can do (feeding a wilderness crowd, walking on the sea, commanding creation, healing the sick). Why it matters: faith is not just being impressed by Jesus' miracles; it is recognizing who the miracles reveal. The disciples received the bread but missed what it was saying: Jesus is not merely useful. He is Lord.",
+      "text": "The Theology Principle section should introduce a real theological word, doctrine, concept, or principle when useful. Do not avoid theological language, but do not assume the reader already knows it. Generally follow this pattern: (1) name the principle, doctrine, concept, or word; (2) define it simply and accurately; (3) show how this chapter reveals, tests, or illustrates it; and (4) explain why it matters for life with Jesus. Let the chapter supply the evidence and emphasis. Do not reuse an approved exemplar's worked example, concluding line, or distinctive phrasing.",
       "scope": "global",
       "sources": [
         "Mark 6 review"
@@ -1438,6 +1438,22 @@
       ],
       "active": true,
       "priority": "core"
+    },
+    {
+      "id": "SB-210",
+      "category": "structure",
+      "title": "Place the chapter in its book flow",
+      "text": "When it materially helps understanding, briefly explain what this chapter receives from the surrounding chapters and what it advances in the book's developing argument, story, or tension. Keep immediate book flow distinct from a whole-Bible or Jesus connection. Do not force a recap, flatten the chapter into one theme, or claim a literary link the text does not support.",
+      "scope": "global",
+      "sources": [
+        "Owner product direction: book flow"
+      ],
+      "stages": [
+        "copy_generation",
+        "copy_review"
+      ],
+      "active": true,
+      "priority": "core"
     }
   ],
   "injection_policy": {
@@ -1465,7 +1481,8 @@
       "SB-202",
       "SB-203",
       "SB-204",
-      "SB-209"
+      "SB-209",
+      "SB-210"
     ],
     "max_contextual_rules_per_generation": 12,
     "max_contextual_rules_by_stage": {
@@ -1670,6 +1687,11 @@
       "title": "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit",
       "genre_or_use": "Voice posture / visual evidence / explicit supernatural effects",
       "principal_intelligence": "Stand under Scripture with the reader; learn benchmark posture without copying wording; prevent visuals from encoding unsupported age, status, motive, emotion, or disability claims; and preserve text-explicit supernatural effects with restraint. Raw private transcripts and benchmark prose remain outside the public library."
+    },
+    {
+      "title": "Owner product direction: book flow",
+      "genre_or_use": "Book-level context / surrounding-chapter flow",
+      "principal_intelligence": "Show how a chapter receives and advances its book when that context materially helps, while keeping book flow distinct from whole-Bible synthesis and avoiding forced links."
     }
   ],
   "change_log": [
@@ -1700,7 +1722,9 @@
     "Added Gospel-account locality so parallel-account details and traditional composite titles remain labeled rather than silently imported.",
     "Added a core safeguard against turning narrative provision, healing, or deliverance into guaranteed outcomes or blame for continued suffering.",
     "Audited the signed-in recent Mark 8–10 and Exodus 33–34 benchmarks without importing their prose; strengthened humble fellow-learner voice, applied text/inference/safety rules to image stages, blocked visual storytelling from smuggling unsupported claims, and preserved text-explicit supernatural effects without fantasy inflation.",
-    "Completed the Mark 6 source ledger and scoped craftsmanship-only visual rules to their genre so provenance resolves and unrelated image prompts do not absorb Exodus-specific guidance."
+    "Completed the Mark 6 source ledger and scoped craftsmanship-only visual rules to their genre so provenance resolves and unrelated image prompts do not absorb Exodus-specific guidance.",
+    "Abstracted the Mark 6 voice and theology lessons into reusable principles so the digest-bound exemplar remains the only authoring channel for its worked prose and future chapters are not coached to echo its distinctive lines.",
+    "Added the owner's book-flow direction as a core authoring rule so surrounding-chapter context is taught when useful rather than only discovered as a review failure."
   ],
   "conflict_ledger": [
     {

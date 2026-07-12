@@ -14,7 +14,7 @@ packet and comparison rubric; neither file is active in the live Brain.
 The recent workups are benchmarks, not final chapter copy. Selah Brain should
 author a fresh workup for each chapter after:
 
-1. the v1.6 rule diff is independently reviewed and approved;
+1. the v1.7 rule diff is independently reviewed and approved;
 2. these chapter-only notes are owner-approved and added with `scope=chapter`;
 3. the retrieval manifest proves that the intended rules, notes, example, and
    rights-cleared source are present;
@@ -42,7 +42,10 @@ Primary rights-cleared source candidate for this New Testament sprint:
 [Open English Bible 2025.6](https://openenglishbible.org/oeb/2025.6/read/b041.html)
 (CC0). It is not the ESV and must never be labeled as ESV. Edition-specific
 wording and textual variants still require human review against the licensed
-reader display.
+reader display. To ground the new book-flow rule without relying on model
+memory, the approved authoring bundle must include the primary Mark chapter
+plus one OEB chapter on each side; the manifest binds the ordered bundle and
+its context reference as one immutable source identity.
 
 ## Mark 8 (`mark-8`)
 
@@ -278,7 +281,7 @@ Before a paid authoring run, Studio must show and retain a non-secret manifest
 for the exact slug and revision:
 
 - the approved source and version;
-- all active core rule IDs, including `SB-209`;
+- all active core rule IDs, including `SB-209` and book-flow rule `SB-210`;
 - Gospel contextual IDs including `SB-107`, `SB-208`, `SB-032`, `SB-036`, and
   `SB-039`;
 - every approved note above for that slug;
@@ -303,6 +306,15 @@ word-for-word similarity but for:
 8. image/map/completion readiness;
 9. no licensed Bible text in generated output;
 10. no copying of private-source wording merely because it was a benchmark.
+
+Operational comparison uses the versioned 100-point rubric in
+`lib/ai/quality/selah-benchmark-rubric.v1.json`. It expands these ten concerns
+into thirteen independently evidenced dimensions. The provisional gate
+requires at least 85/100 with no dimension below the publishable floor and
+requires benchmark-level Selah voice, source integrity, and fresh authorship.
+A machine may validate the review artifact and calculate the score; it may not
+declare the chapter owner-approved. Weak dimensions receive typed, targeted
+remediation rather than a blind full-chapter regeneration.
 
 Systemic misses become reviewed rule amendments. Chapter-only misses become
 chapter notes. Mechanical misses become code QA. A weak section receives a

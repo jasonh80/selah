@@ -78,6 +78,8 @@ type GuidancePacket = {
     source_text_included: boolean;
     reader_display_version: string;
     reader_and_generation_sources_are_distinct: boolean;
+    context_chapters_each_side: number;
+    context_purpose: string;
   };
   expected_model: string;
   required_rule_ids: {
@@ -197,7 +199,7 @@ for (const rule of library.rules) {
 }
 
 const byId = new Map(library.rules.map((rule) => [rule.id, rule]));
-assert.equal(library.version, "1.6", "unexpected candidate Brain version");
+assert.equal(library.version, "1.7", "unexpected candidate Brain version");
 assert.match(LIBRARY_CONTENT_DIGEST, /^[a-f0-9]{64}$/);
 assert.ok(
   ["review_only", "approved_for_seed"].includes(library.status),
@@ -233,8 +235,8 @@ assert.equal(
   false,
   "stale approval must not authorize changed Brain content",
 );
-assert.equal(library.rule_count, 98, "unexpected candidate rule count");
-assert.equal(library.source_count, 34, "unexpected candidate source count");
+assert.equal(library.rule_count, 99, "unexpected candidate rule count");
+assert.equal(library.source_count, 35, "unexpected candidate source count");
 assert.equal(library.injection_policy.max_contextual_rules_per_generation, 12);
 assert.deepEqual(library.injection_policy.max_contextual_rules_by_stage, {
   image_prompt: 18,
@@ -370,6 +372,7 @@ for (const slug of ["mark-8", "mark-9", "mark-10", "mark-11"]) {
     `${slug} contextual selection drifted`,
   );
   assert.ok(selection.coreIds.includes("SB-209"), `${slug} needs SB-209`);
+  assert.ok(selection.coreIds.includes("SB-210"), `${slug} needs SB-210 book flow`);
   for (const id of requiredGospelRules) {
     assert.ok(
       selection.contextualIds.includes(id),
@@ -509,8 +512,18 @@ assert.equal(unchangedSeedPlan.updates.length, 0);
 assert.equal(unchangedSeedPlan.unchanged, library.rule_count);
 assert.deepEqual(unchangedSeedPlan.unexpectedRuleIds, []);
 
+const priorLibraryPlan = planLibrarySeed(
+  canonicalExisting.filter((row) => row.rule_id !== "SB-210"),
+  "2026-07-12T00:00:00.000Z",
+);
+assert.deepEqual(
+  priorLibraryPlan.inserts.map((insert) => insert.rule_id),
+  ["SB-210"],
+  "the new owner-directed book-flow rule must be an explicit seed insertion",
+);
+
 const versionOnlyPlan = planLibrarySeed(
-  canonicalExisting.map((row) => ({ ...row, version: "1.5" })),
+  canonicalExisting.map((row) => ({ ...row, version: "1.6" })),
   "2026-07-12T00:00:00.000Z",
 );
 assert.equal(
@@ -541,7 +554,7 @@ const staleSeedRows = canonicalExisting.map((row) => {
     return {
       ...row,
       rule_text: priorWiseCounsel,
-      version: "1.5",
+      version: "1.6",
       active: false,
       archived: true,
     };
@@ -551,7 +564,7 @@ const staleSeedRows = canonicalExisting.map((row) => {
       ...row,
       stages: ["copy_generation", "copy_review"],
       source_titles: [],
-      version: "1.5",
+      version: "1.6",
     };
   }
   return row;
@@ -568,7 +581,7 @@ assert.deepEqual(
 );
 const textUpdate = reconciliationPlan.updates[0];
 assert.equal(textUpdate.previousText, priorWiseCounsel);
-assert.equal(textUpdate.previousVersion, "1.5");
+assert.equal(textUpdate.previousVersion, "1.6");
 assert.ok(!("active" in textUpdate.values));
 assert.ok(!("archived" in textUpdate.values));
 const metadataUpdate = reconciliationPlan.updates[1];
@@ -580,11 +593,11 @@ assert.deepEqual(metadataUpdate.values.stages, [
   "image_review",
 ]);
 assert.deepEqual(metadataUpdate.values.source_titles, [recentAuditTitle]);
-assert.equal(metadataUpdate.values.version, "1.6");
+assert.equal(metadataUpdate.values.version, "1.7");
 
 assert.equal(guidance.status, "review_only", "guidance must not be active");
-assert.equal(guidance.packet_id, "mark-8-11-2026-07-v3");
-assert.equal(guidance.version, "1.2");
+assert.equal(guidance.packet_id, "mark-8-11-2026-07-v4");
+assert.equal(guidance.version, "1.3");
 assert.equal(
   guidance.library_version,
   library.version,
@@ -638,6 +651,12 @@ assert.equal(
   true,
   "generation and reader sources must not be mislabeled",
 );
+assert.equal(
+  guidance.source_requirement.context_chapters_each_side,
+  1,
+  "book-flow authorship must receive one rights-cleared adjacent chapter on each side",
+);
+assert.equal(guidance.source_requirement.context_purpose, "grounded_book_flow_only");
 assert.equal(guidance.expected_model, "gpt-5.5");
 assert.deepEqual(guidance.required_voice_example, {
   title: "Mark 6 Daily Rundown",
@@ -645,6 +664,32 @@ assert.deepEqual(guidance.required_voice_example, {
   example_type: "voice",
   selection: "exact_identity_required",
 });
+const generationRuleText = library.rules
+  .filter((rule) => rule.stages.includes("copy_generation"))
+  .map((rule) => rule.text)
+  .join("\n");
+for (const workedExemplarPhrase of [
+  "Fear wearing religious clothing",
+  "Familiarity pretending to be discernment",
+  "They are holding leftovers and still missing the point",
+  "Do not receive the bread and miss who gave it",
+  "A ruler with power but no backbone",
+  "Control dressed up as worship",
+  "They received the bread, but they missed what the bread was showing them",
+  "Trust Him before you can see how the whole thing works out",
+  "The disciples received the bread but missed what it was saying",
+  "Jesus is not merely useful. He is Lord",
+]) {
+  assert.ok(
+    !generationRuleText.includes(workedExemplarPhrase),
+    `worked Mark 6 exemplar prose leaked into global generation rules: ${workedExemplarPhrase}`,
+  );
+}
+assert.match(
+  library.rules.find((rule) => rule.id === "SB-200")?.text ?? "",
+  /do not .*imitate.*approved example/i,
+  "the cadence rule must explicitly require fresh language",
+);
 assert.deepEqual(
   Object.keys(guidance.chapters).sort(),
   ["mark-10", "mark-11", "mark-8", "mark-9"],
@@ -742,6 +787,16 @@ const withoutOutcomeGuard = selectRulesFromRows(
 assert.ok(
   !withoutOutcomeGuard.coreIds.includes("SB-209"),
   "missing SB-209 must remain visible to a future fail-closed manifest",
+);
+
+const withoutBookFlow = selectRulesFromRows(
+  rows.filter((rule) => rule.rule_id !== "SB-210"),
+  "mark-8",
+  "copy_generation",
+);
+assert.ok(
+  !withoutBookFlow.coreIds.includes("SB-210"),
+  "missing SB-210 must remain visible to a future fail-closed manifest",
 );
 
 console.log(

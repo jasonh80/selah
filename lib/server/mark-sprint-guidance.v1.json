@@ -1,8 +1,8 @@
 {
-  "packet_id": "mark-8-11-2026-07-v3",
-  "version": "1.2",
+  "packet_id": "mark-8-11-2026-07-v4",
+  "version": "1.3",
   "status": "review_only",
-  "library_version": "1.6",
+  "library_version": "1.7",
   "authoring_policy": {
     "fresh_authorship_required": true,
     "private_benchmark_wording_available_during_generation": false,
@@ -19,11 +19,13 @@
     "status": "candidate_not_connected",
     "source_text_included": false,
     "reader_display_version": "ESV",
-    "reader_and_generation_sources_are_distinct": true
+    "reader_and_generation_sources_are_distinct": true,
+    "context_chapters_each_side": 1,
+    "context_purpose": "grounded_book_flow_only"
   },
   "expected_model": "gpt-5.5",
   "required_rule_ids": {
-    "core": ["SB-209"],
+    "core": ["SB-209", "SB-210"],
     "gospel_contextual": [
       "SB-107",
       "SB-208",

@@ -49,8 +49,8 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 ## Selah Brain (the quality system)
 
 - **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 is the last
-  verified live library). The version-controlled seed has a review-only v1.6
-  candidate with 98 rules. Its artifact status is fail-closed `review_only`, so
+  verified live library). The version-controlled seed has a review-only v1.7
+  candidate with 99 rules. Its artifact status is fail-closed `review_only`, so
   it cannot be seeded until a separately reviewed artifact is marked
   `approved_for_seed` and records owner, timestamp, review evidence, version, and
   an exact content digest. `npm run build` runs the Brain verifier first. Supabase
@@ -60,10 +60,13 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 - Layers: core (always-on) · contextual (max 12 for copy and 18 for image
   stages, selected by genre/stage) ·
   qa (review only) · governance (never in prose prompts).
-- The v1.6 recent-chat audit adds humble fellow-learner voice, prevents visual
+- The v1.7 candidate includes the recent-chat audit plus fresh-language
+  abstraction: it adds humble fellow-learner voice, prevents visual
   details from smuggling unsupported claims, and makes text/inference/safety
-  rules eligible for image stages. Image-stage Brain retrieval is still not
-  wired into production; metadata alone does not govern a generated image.
+  rules eligible for image stages. It also teaches useful surrounding-chapter
+  book flow without conflating it with whole-Bible synthesis. Image-stage Brain
+  retrieval is still not wired into production; metadata alone does not govern
+  a generated image.
 - **Approved examples** (`selah_approved_examples`): the Mark 6 Daily Rundown is
   the gold-standard *voice* exemplar for gospel narrative; an image-direction
   example exists for the feeding scene. 1–2 examples retrieved per generation.
@@ -99,7 +102,9 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 - The review-only Mark 8–11 guidance packet is versioned in
   `lib/server/mark-sprint-guidance.v1.json`; it is not loaded into Supabase or
   connected to generation. The OEB 2025.6 CC0 source is a candidate, not yet
-  vendored or approved for a run.
+  vendored or approved for a run. The candidate contract includes one adjacent
+  OEB chapter on each side so book-flow claims are source-grounded rather than
+  supplied from model memory.
 - Generation Manifest v1 is offline, review-only groundwork. It binds exact
   model, prompt, Brain rules, chapter notes, exemplar, source, and owner-approved
   manifest digests, and intentionally reports every current Mark sprint chapter
@@ -111,11 +116,19 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   Studio and does not prove provenance, freshness, semantic accuracy, rendered
   map/image completion, or owner approval. Those remain fail-closed manifest,
   source-aware comparison, completion, and human-review gates.
+- A local `selah-benchmark-rubric-v1` candidate now turns the strongest recent
+  Mark/Exodus workup standard into a thirteen-dimension, evidence-backed
+  editorial review. Its provisional gate requires at least 85/100, no criterion
+  below the publishable floor, benchmark-level voice/source/freshness, and a
+  sufficient typed remediation plan. It remains review-only, cannot perform the
+  semantic judgment itself, calls a qualifying result `benchmark_ready`, and
+  always leaves that draft at `needs_owner_review`; see
+  `docs/selah/benchmark-quality-review.md`.
 
 ## Next up
 
 - **Current release sprint: Mark 8–11**, with Tuesday 2026-07-14 as the stretch
-  target. Selah Brain should author fresh drafts after the safety PR, v1.6,
+  target. Selah Brain should author fresh drafts after the safety PR, v1.7,
   chapter guidance, rights-cleared source, exact Mark 6 voice exemplar, and
   fail-closed manifest are reviewed. Each generation and publication still
   requires explicit owner approval.

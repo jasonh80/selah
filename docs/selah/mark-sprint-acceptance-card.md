@@ -19,11 +19,20 @@ session for an already-audited release candidate, not the first quality check.
 - Model:
 - Generation source / version / digest:
 - Reader display version:
-- QA contract / report:
+- Structural QA contract / report / digest:
+- Source-overlap report / digest:
+- Freshness report / digest:
+- Benchmark set / digest:
+- Benchmark rubric / digest:
+- Artifact registry / resolver version / evidence and remediation reports:
+- Benchmark review / digest:
 
-The machine gate must say **PASS**, contain zero blockers, and show a written
-disposition for every warning. Any content, image, rule, note, example, source,
-model, or prompt change invalidates this card and requires a new report.
+The structural machine gate must say **PASS** and contain zero blockers. The
+benchmark review contract must also validate, but validation only proves that
+the required evidence and ratings are complete and bound to the right draft; it
+does not prove the editorial judgments are true. Any content, image, rule,
+note, example, source, model, prompt, or review change invalidates this card
+and requires new digests and reports.
 
 The current local evaluator is only a structural floor. It is not yet bound to a
 generation manifest or workup digest, so it cannot prove that Selah Brain, the
@@ -31,27 +40,51 @@ approved model, rules, notes, source, prompt, or exemplar authored the draft.
 Those identities must fail closed in the future pre-generation manifest before
 this card can be used operationally.
 
-## Owner review
+## Independent benchmark review
 
-Choose **Pass**, **Targeted revision**, or **Block**. A revision must name exact
-fields or sections; do not blindly regenerate an otherwise good chapter.
+Rate each dimension from **0–4** and cite resolved evidence paths. A 4 means
+comparable to the strongest approved Selah workups; 3 means responsible and
+publishable but not consistently benchmark-level; 2 requires targeted
+remediation; 1 or 0 blocks. A remediation must name an exact workup, manifest,
+review-process, or clean-generation target and describe the quality needed
+without quoting private benchmark wording.
 
-| ID | Owner question | Decision / evidence path |
-|---|---|---|
-| OWN-01 | Does every chapter movement receive meaningful treatment without one theme flattening the passage? | |
-| OWN-02 | Are facts Mark-local, with parallel-Gospel details clearly labeled? | |
-| OWN-03 | Are text, inference, interpretation, tradition, and unknown kept distinct? | |
-| OWN-04 | Does it sound like Selah: warm, specific, memorable, and natural rather than generic or academic? | |
-| OWN-05 | Is the Jesus connection grounded and deep without erasing the first meaning or forcing typology? | |
-| OWN-06 | Is the historical, geographic, Jewish-context, medical, disability, and pastoral treatment responsible? | |
-| OWN-07 | Are application and prayer chapter-shaped and free of guarantees, blame, coercion, self-harm, or unsafe counsel? | |
-| OWN-08 | Are FAQ, passage flow, Scene Checks, image directions, maps, and completion inputs accurate enough for the next stage? | |
-| OWN-09 | Is generated copy free of stored licensed Scripture and source mislabeling? | |
-| OWN-10 | Is this fresh authorship rather than copied benchmark wording or disguised paraphrase? | |
+| ID | Weight | Review dimension | Rating / evidence / targeted revision |
+|---|---:|---|---|
+| BMQ-01 | 12 | Complete, proportionate chapter and book-flow coverage | |
+| BMQ-02 | 11 | Textual grounding and Mark-local accuracy | |
+| BMQ-03 | 8 | Text / inference / interpretation / unknown honesty | |
+| BMQ-04 | 11 | Jesus-centered theological depth | |
+| BMQ-05 | 9 | Explanatory and discovery value | |
+| BMQ-06 | 12 | Selah voice and memorability | |
+| BMQ-07 | 7 | Historical, geographic, and Jewish-context integrity | |
+| BMQ-08 | 8 | Pastoral, medical, and human dignity | |
+| BMQ-09 | 9 | Chapter-shaped application and prayer | |
+| BMQ-10 | 4 | FAQ, flow, timeline, map, and Quick/Deep usefulness | |
+| BMQ-11 | 4 | Copy-stage Scene Check and visual-direction truthfulness | |
+| BMQ-12 | 2 | Source and rights integrity | |
+| BMQ-13 | 3 | Fresh authorship without copied or disguised benchmark wording | |
+
+The provisional internal weighted score must be at least **85/100**, every
+criterion must be at least 3, and Selah voice, source integrity, and fresh
+authorship (BMQ-06, BMQ-12, and BMQ-13) must be 4. Averaging can never hide a
+weak or unsafe area. The 85 threshold is not yet calibrated against scored
+strong and weak workups, so the code calls a qualifying result
+`benchmark_ready`, not “proven comparable.” It still remains
+`needs_owner_review`; it is not a publication approval.
+
+The versioned rubric is
+`lib/ai/quality/selah-benchmark-rubric.v1.json`. The pure validator and scorer
+are `lib/server/selah-benchmark-review.ts`, verified offline by
+`npm run verify:benchmark`. Private benchmark wording may be consulted by the
+independent post-generation reviewer, but it must not enter the persisted
+review artifact or targeted revision instructions. Studio must bind passing
+source-overlap, draft-freshness, evidence-resolution, and private-text scan
+reports before showing the review snapshot.
 
 ## Deterministic evidence
 
-The offline contract currently verifies:
+The structural offline contract currently verifies:
 
 - exact book, chapter, slug, reference title, and draft status;
 - all eight required core section types with unique IDs;
@@ -95,6 +128,11 @@ Automation cannot responsibly approve:
 - legal approval of a source license;
 - owner authorization or publication judgment.
 
+The benchmark validator adds no semantic magic: it binds the exact generation
+manifest, structural report, draft, benchmark set, rubric, reviewer identity,
+attestations, ratings, evidence paths, and targeted revisions. A separate
+human or independent reviewer must still do the comparison honestly.
+
 ## Acceptance rule
 
 A chapter advances only when:
@@ -102,12 +140,15 @@ A chapter advances only when:
 1. the pre-generation manifest was green and bound to the run;
 2. deterministic copy QA reports no blockers;
 3. every warning is fixed or explicitly accepted with rationale;
-4. OWN-01 through OWN-10 are all **Pass**;
-5. any targeted revisions are revalidated against new digests;
-6. copy is frozen before image generation;
-7. completion, image, mobile/desktop, and published-chapter regression gates
+4. the benchmark review validates, scores at least 85, meets every floor, and
+   remains bound to the exact draft;
+5. the owner passes the exact draft and review digests;
+6. any targeted revisions are revalidated against new digests;
+7. copy is frozen before image generation;
+8. completion, image, mobile/desktop, and published-chapter regression gates
    pass separately;
-8. the owner explicitly approves that exact chapter to publish.
+9. the owner explicitly approves that exact chapter to publish.
 
-Current status: the authoring contract and offline evaluator are local candidate
-code only. They are not connected to Selah Studio or the live generation path.
+Current status: the authoring, manifest, and benchmark contracts are local
+candidate code only. They are not connected to Selah Studio or the live
+generation path and authorize no generation or publishing.

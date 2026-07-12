@@ -47,6 +47,8 @@ interface GuidancePacket {
     source_text_included: boolean;
     reader_display_version: string;
     reader_and_generation_sources_are_distinct: boolean;
+    context_chapters_each_side: number;
+    context_purpose: string;
     content_digest?: string;
   };
   expected_model: string;
@@ -76,7 +78,7 @@ export type MarkSprintPolicyBlockerCode =
   | "required_brain_rule_missing"
   | "source_not_connected"
   | "source_digest_missing"
-  | "prompt_digest_missing"
+  | "model_request_digest_missing"
   | "chapter_note_row_ids_missing"
   | "voice_example_id_missing"
   | "voice_example_digest_missing"
@@ -91,8 +93,8 @@ export interface MarkSprintPolicyBlocker {
 
 export interface MarkSprintManifestRequirements {
   slug: MarkSprintSlug;
-  promptRevision: string;
-  expectedPromptDigest: null;
+  requestRevision: string;
+  expectedModelRequestDigest: null;
   expectedModel: string;
   expectedReasoningEffort: "low";
   guidance: {
@@ -120,6 +122,7 @@ export interface MarkSprintManifestRequirements {
     rights: string;
     url: string;
     reference: string;
+    contextReference: string;
     status: string;
     expectedContentDigest: string | null;
     sourceTextIncluded: boolean;
@@ -175,8 +178,8 @@ export function buildMarkSprintManifestPolicy(
 
   const requirements: MarkSprintManifestRequirements = {
     slug,
-    promptRevision: CHAPTER_WORKUP_PROMPT_REVISION,
-    expectedPromptDigest: null,
+    requestRevision: CHAPTER_WORKUP_PROMPT_REVISION,
+    expectedModelRequestDigest: null,
     expectedModel: guidance.expected_model,
     expectedReasoningEffort: "low",
     guidance: {
@@ -211,6 +214,11 @@ export function buildMarkSprintManifestPolicy(
       rights: guidance.source_requirement.rights,
       url: guidance.source_requirement.url,
       reference: `Mark ${slug.split("-")[1]}`,
+      contextReference: (() => {
+        const chapter = Number(slug.split("-")[1]);
+        const radius = guidance.source_requirement.context_chapters_each_side;
+        return `Mark ${Math.max(1, chapter - radius)}–${chapter + radius} context; Mark ${chapter} primary (${guidance.source_requirement.context_purpose})`;
+      })(),
       status: guidance.source_requirement.status,
       expectedContentDigest:
         guidance.source_requirement.content_digest?.trim() || null,
@@ -287,10 +295,10 @@ export function buildMarkSprintManifestPolicy(
     });
   }
   blockers.push({
-    code: "prompt_digest_missing",
-    expected: "exact SHA-256 digest of the assembled server-owned prompt",
+    code: "model_request_digest_missing",
+    expected: "exact SHA-256 digest of the complete canonical server-owned model request",
     actual: null,
-    message: "The final prompt can only be bound after live materials are prepared.",
+    message: "The final request can only be bound after live materials are prepared.",
   });
   blockers.push({
     code: "chapter_note_row_ids_missing",

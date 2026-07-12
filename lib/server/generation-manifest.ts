@@ -28,6 +28,9 @@ export interface GenerationManifestRequirementsV1 {
     readerVersion: string;
   };
   model: { id: string; reasoningEffort: string };
+  // `digest` binds the complete canonical model request (system + user
+  // messages, response format/schema, token controls, model, and reasoning),
+  // not merely the visible user prompt. The legacy field name remains v1 API.
   prompt: { revision: string; digest: string };
   brain: {
     libraryVersion: string;
@@ -53,6 +56,7 @@ export interface GenerationManifestRequirementsV1 {
     rights: string;
     url: string;
     reference: string;
+    contextReference: string;
     contentDigest: string;
   };
   approvedManifestDigest: string | null;
@@ -97,6 +101,7 @@ export interface GenerationManifestMaterialsV1 {
     rights: string;
     url: string;
     reference: string;
+    contextReference: string;
     approved: boolean;
     connected: boolean;
     contentPresent: boolean;
@@ -309,7 +314,7 @@ export function evaluateGenerationManifest(
     "id", "title", "genre", "exampleType", "contentDigest",
   ]);
   rejectUnknown("requirements.source", requirements.source as unknown as Record<string, unknown>, [
-    "name", "version", "rights", "url", "reference", "contentDigest",
+    "name", "version", "rights", "url", "reference", "contextReference", "contentDigest",
   ]);
 
   rejectUnknown("materials", materials as unknown as Record<string, unknown>, [
@@ -344,7 +349,7 @@ export function evaluateGenerationManifest(
     ]),
   );
   rejectUnknown("source", materials.source as unknown as Record<string, unknown>, [
-    "name", "version", "rights", "url", "reference", "approved", "connected", "contentPresent", "contentDigest",
+    "name", "version", "rights", "url", "reference", "contextReference", "approved", "connected", "contentPresent", "contentDigest",
   ]);
 
   const identity = (path: string, value: unknown) => {
@@ -373,6 +378,7 @@ export function evaluateGenerationManifest(
     ["source.rights", requirements.source.rights, materials.source.rights],
     ["source.url", requirements.source.url, materials.source.url],
     ["source.reference", requirements.source.reference, materials.source.reference],
+    ["source.contextReference", requirements.source.contextReference, materials.source.contextReference],
   ];
   for (const [path, expected, actual] of identityPairs) {
     identity(`requirements.${path}`, expected);
@@ -436,7 +442,7 @@ export function evaluateGenerationManifest(
     if (example.active !== true) add("EXAMPLE_NOT_ACTIVE", "example.active", "Approved voice example is inactive");
   }
 
-  for (const key of ["name", "version", "rights", "url", "reference"] as const) {
+  for (const key of ["name", "version", "rights", "url", "reference", "contextReference"] as const) {
     same(`source.${key}`, requirements.source[key], materials.source[key]);
   }
   digest("source.contentDigest", requirements.source.contentDigest, materials.source.contentDigest);
@@ -494,6 +500,7 @@ export function evaluateGenerationManifest(
       rights: materials.source.rights,
       url: materials.source.url,
       reference: materials.source.reference,
+      contextReference: materials.source.contextReference,
       approved: materials.source.approved,
       connected: materials.source.connected,
       contentPresent: materials.source.contentPresent,
