@@ -9,10 +9,12 @@ import { estimateChapterWorkupCost } from "../ai/costs";
 import { getOpenAI, isOpenAIConfigured, CHAPTER_WORKUP_TEXT_MODEL } from "./openai";
 import { isSupabaseConfigured } from "./supabase";
 import {
-  createGeneratingChapterWorkup,
-  saveReadyChapterWorkup,
-  markChapterWorkupFailed,
-} from "./chapter-workups-repository";
+  verifyGenerationClaim,
+  completeGenerationJob,
+  failGenerationJob,
+  requireJobStore,
+} from "./generation-jobs";
+import { isChapterMutationError } from "./protected-chapters";
 import { recordCostEvent } from "./cost-events-repository";
 import { snapshotVersion } from "./chapter-versions-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
@@ -123,12 +125,16 @@ export async function generateChapterWorkup(input: {
  * Full missing-chapter flow (Option A, server-side blocking). Returns the
  * render-ready workup (now saved as "ready"), or null on failure (→ 404).
  */
-export async function generateAndStoreChapter(slug: string): Promise<ChapterWorkup | null> {
+export async function generateAndStoreChapter(slug: string, jobId: string): Promise<ChapterWorkup | null> {
   const parsed = parseSlug(slug);
   if (!parsed) return null;
   const { book, chapter } = parsed;
   const bibleVersion = "ESV";
   let costLogged = false;
+  // The ROUTE took the single atomic claim; this worker only verifies it owns
+  // that exact claim. No re-claim, no spend before verification.
+  const store = requireJobStore(slug, "generateAndStoreChapter");
+  await verifyGenerationClaim(store, slug, jobId);
 
   // Admin-selected model from Supabase settings (falls back to the Netlify default).
   const settings = await getGenerationSettings();
@@ -144,15 +150,6 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   await logGenerationAudit({ action: "generate_text", slug, model, status: "started" });
 
   try {
-    await createGeneratingChapterWorkup({
-      book,
-      chapter,
-      slug,
-      title: `${book} ${chapter}`,
-      source: "generated",
-      bibleVersion,
-    });
-
     // OpenAI call (tokens spent here).
     const { content, inputTokens, outputTokens } = await generateChapterWorkup({
       book,
@@ -182,12 +179,10 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
 
     const generated = parseChapterWorkupJson(content);
     const render = generatedToRenderWorkup(generated);
-    // Saved as a DRAFT — not served to the public until reviewed + published via
-    // /dev/publish. Preview a draft at /dev/preview/<slug>.
-    await saveReadyChapterWorkup({
-      slug,
+    // Terminal save is pinned to status="generating" AND this exact job ID —
+    // an older worker can never overwrite a newer run (zero rows = CONFLICT).
+    await completeGenerationJob(store, slug, jobId, {
       workup: render,
-      status: "draft",
       version: generated.version,
       bibleVersion,
     });
@@ -207,8 +202,17 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 300);
     console.error(`[selah] generation failed for ${slug}:`, msg);
-    await markChapterWorkupFailed(slug, msg);
-    await logGenerationAudit({ action: "generate_text", slug, model, status: "failed", message: msg });
+    // Terminal failure is pinned to this job ID; a newer run is never failed by
+    // an old worker. Conflicts get their own audit trail (terminal outcome).
+    const marked = await failGenerationJob(store, slug, jobId, msg);
+    const kind = isChapterMutationError(e) && e.code === "CONFLICT" ? "generate_text_conflict" : "generate_text";
+    await logGenerationAudit({
+      action: kind,
+      slug,
+      model,
+      status: "failed",
+      message: marked ? msg : `${msg} (claim not owned; newer run untouched)`,
+    });
     // If we never logged usage (OpenAI threw before returning, e.g. quota/timeout),
     // record an error event so failed spend/issues are still visible.
     if (!costLogged) {

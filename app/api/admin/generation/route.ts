@@ -7,11 +7,11 @@ import {
 } from "@/lib/server/generation-settings";
 import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
 import {
-  createGeneratingChapterWorkup,
   getChapterStatus,
   getDraftWorkup,
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
+import { claimGenerationJob, failGenerationJob, requireJobStore } from "@/lib/server/generation-jobs";
 import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
 import { imageGenAllowed, checkImageModel } from "@/lib/server/images";
 import {
@@ -202,7 +202,10 @@ export async function POST(req: Request) {
       );
     }
     await logGenerationAudit({ action: "generate_images", slug, status: "started" });
-    await triggerBackgroundImageGeneration(slug, new URL(req.url).host);
+    const triggered = await triggerBackgroundImageGeneration(slug, new URL(req.url).host);
+    if (!triggered.ok) {
+      return refuse(slug, "generate_images", `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`})`, 502);
+    }
     return NextResponse.json({ ok: true, triggered: true, slug });
   }
   if (action === "images_status") {
@@ -287,20 +290,26 @@ export async function POST(req: Request) {
 
     const parsed = parseSlug(slug);
     if (!parsed) return refuse(slug, "generate", "unparseable slug", 400);
+    let jobId: string;
     try {
-      // Typed, race-safe placeholder claim. If this fails, NO trigger and NO
-      // success-shaped response follow (Codex finding #4).
-      await createGeneratingChapterWorkup({
+      // ONE atomic claim with a unique job id — the worker only verifies it.
+      // If this fails, NO trigger and NO success-shaped response follow.
+      jobId = await claimGenerationJob(requireJobStore(slug, "generate"), slug, {
         book: parsed.book,
         chapter: parsed.chapter,
-        slug,
         title: `${parsed.book} ${parsed.chapter}`,
         source: "generated",
       });
     } catch (e) {
       return mapMutationError(slug, "generate", e);
     }
-    await triggerBackgroundGeneration(slug, new URL(req.url).host);
+    const triggered = await triggerBackgroundGeneration(slug, new URL(req.url).host, jobId);
+    if (!triggered.ok) {
+      // The chapter must never be stranded as "generating" by a failed trigger:
+      // fail the claimed job (pinned to this job id) and return a REAL failure.
+      await failGenerationJob(requireJobStore(slug, "generate"), slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+      return refuse(slug, "generate", `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — job marked failed`, 502);
+    }
     return NextResponse.json({
       ok: true,
       triggered: true,

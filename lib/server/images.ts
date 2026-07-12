@@ -4,11 +4,15 @@
 import type { ChapterWorkup, ImageKind } from "@/lib/types";
 import { getOpenAI, isOpenAIConfigured } from "./openai";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
-import { getDraftWorkup, updateChapterWorkupJson } from "./chapter-workups-repository";
 import { isChapterMutationError } from "./protected-chapters";
 import { recordCostEvent } from "./cost-events-repository";
-import { getGenerationSettings } from "./generation-settings";
-import { chapterMutationDecision } from "./protected-chapters";
+import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
+import {
+  claimImageJob,
+  completeImageJob,
+  releaseImageJob,
+  requireJobStore,
+} from "./generation-jobs";
 
 // Fallback default only — the ACTIVE model comes from Supabase settings
 // (selected_image_model, Studio-controlled). Never silently falls back: the
@@ -205,16 +209,6 @@ export interface ImageGenResult {
  */
 export async function generateAndStoreChapterImages(slug: string): Promise<ImageGenResult> {
   const model = await activeImageModel();
-  // Issue #8 mutation guard — BEFORE any model spend: published/protected
-  // chapters cannot have their images regenerated or overwritten. The decision
-  // token pins THE WHOLE RUN: the final JSON write re-asserts this exact
-  // revision, so a row that changes mid-run becomes a CONFLICT (no overwrite).
-  const decision = await chapterMutationDecision(slug, "updateChapterWorkupJson");
-  if (!decision.allowed) {
-    console.error(`[selah] mutation guard: ${decision.reason}`);
-    return { ok: false, slug, model, error: decision.reason };
-  }
-  const runToken = decision.expected;
   if (!(await imageGenAllowed(slug))) {
     return { ok: false, slug, model, error: "image generation not allowed for this slug" };
   }
@@ -226,27 +220,64 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
   const db = getSupabaseAdmin();
   if (!db) return { ok: false, slug, model, error: "Supabase not configured" };
 
-  const plans = IMAGE_PLANS[slug];
-  // Works on ANY stored row including hidden drafts — images attach before
-  // Publish Final in the Selah Studio flow. Never creates a row.
-  const row = await getDraftWorkup(slug);
-  const workup = row?.workup ?? null;
-  if (!workup) {
-    return { ok: false, slug, model, error: "no stored chapter row for slug" };
+  // SINGLE-USE image job claim (collision-resistant UUID) taken BEFORE any
+  // model spend: a duplicate request cannot claim (409) and cannot spend twice.
+  // The claim is refused on protected/published/quarantined rows and pins the
+  // whole run — the terminal write re-asserts this exact job id.
+  const store = requireJobStore(slug, "generateAndStoreChapterImages");
+  let jobId: string;
+  let workup: ChapterWorkup;
+  try {
+    const claim = await claimImageJob(store, slug);
+    jobId = claim.jobId;
+    workup = claim.workup;
+  } catch (e) {
+    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
+    console.error(`[selah] image claim failed for ${slug}: ${msg}`);
+    await logGenerationAudit({ action: "image_run_refused", slug, model, status: "failed", message: msg.slice(0, 300) });
+    return { ok: false, slug, model, error: msg };
+  }
+  if (!workup || !Array.isArray(workup.images)) {
+    await releaseImageJob(store, slug, jobId);
+    await logGenerationAudit({ action: "image_run_refused", slug, model, status: "failed", message: "stored row has no renderable workup" });
+    return { ok: false, slug, model, error: "no stored chapter workup for slug" };
   }
 
+  const plans = IMAGE_PLANS[slug];
   await ensureBucket(db);
 
   // Generate + upload each image (sequential — kinder to rate limits).
-  // Every run writes to its OWN immutable directory (never upsert, never a
-  // stable path), so a stale/concurrent run cannot overwrite published bytes
-  // even before the final conditional JSON write (Codex finding #3).
-  const runId = new Date().toISOString().replace(/[:.]/g, "-").toLowerCase();
+  // Every run writes to its OWN immutable directory named by the job id (never
+  // upsert, never a stable path): a stale/concurrent run cannot overwrite
+  // published bytes at any point.
   const stored: { kind: ImageKind; url: string; plan: ImagePlan }[] = [];
-  for (const plan of plans) {
-    const bytes = await generateImageBytes(model, plan);
-    const url = await uploadImage(db, `${slug}/${runId}/${fileFor(plan.kind)}`, bytes);
-    stored.push({ kind: plan.kind, url, plan });
+  try {
+    for (const plan of plans) {
+      const bytes = await generateImageBytes(model, plan);
+      const url = await uploadImage(db, `${slug}/${jobId}/${fileFor(plan.kind)}`, bytes);
+      stored.push({ kind: plan.kind, url, plan });
+    }
+  } catch (e) {
+    // Terminal audit for failed spend: record how far the run got, release the
+    // claim so a retry can proceed, and point at any orphaned files.
+    const msg = String((e as Error).message).slice(0, 200);
+    await recordCostEvent({
+      requestType: "chapter_image_generation",
+      provider: "openai",
+      model,
+      imageCount: stored.length,
+      estimatedCostUsd: stored.length * 0.04,
+      metadata: { slug, jobId, failed: true, error: msg, completedKinds: stored.map((x) => x.kind) },
+    });
+    await logGenerationAudit({
+      action: "image_run_failed",
+      slug,
+      model,
+      status: "failed",
+      message: `spent ${stored.length}/${plans.length} images before error: ${msg}; orphaned dir: ${slug}/${jobId}/`,
+    });
+    await releaseImageJob(store, slug, jobId);
+    return { ok: false, slug, model, error: `image run failed after ${stored.length}/${plans.length} images: ${msg}` };
   }
 
   // Wire stored images into workup_json.images: replace matching kinds, APPEND
@@ -281,14 +312,28 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
     });
   }
   try {
-    // Revision-pinned write: refused (typed CONFLICT) if the row changed at any
-    // point during this run — the uploaded bytes stay isolated in the run dir.
-    await updateChapterWorkupJson(slug, { ...workup, images: updatedImages }, runToken);
+    // Terminal write pinned to THIS job id: a superseded/stale run is a typed
+    // CONFLICT and the uploaded bytes stay isolated in the job directory.
+    await completeImageJob(store, slug, jobId, { ...workup, images: updatedImages });
   } catch (e) {
     const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
     console.error(`[selah] image run for ${slug} not applied — ${msg}`);
+    await logGenerationAudit({
+      action: "image_run_conflict",
+      slug,
+      model,
+      status: "failed",
+      message: `run not applied (${msg}); ${stored.length} orphaned files under ${slug}/${jobId}/`,
+    });
     return { ok: false, slug, model, error: `image run not applied — ${msg}` };
   }
+  await logGenerationAudit({
+    action: "image_run_succeeded",
+    slug,
+    model,
+    status: "succeeded",
+    message: `stored ${stored.length} images under ${slug}/${jobId}/`,
+  });
 
   // Cost event (estimate scales with image count; APIs don't return per-call USD).
   await recordCostEvent({

@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
-import {
-  createGeneratingChapterWorkup,
-  getChapterStatus,
-} from "@/lib/server/chapter-workups-repository";
+import { getChapterStatus } from "@/lib/server/chapter-workups-repository";
+import { claimGenerationJob, failGenerationJob, requireJobStore } from "@/lib/server/generation-jobs";
 import { isChapterMutationError } from "@/lib/server/protected-chapters";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
 import { CHAPTER_WORKUP_TEXT_MODEL } from "@/lib/server/openai";
@@ -69,11 +67,11 @@ export async function GET(request: Request) {
   // refusal/conflict is surfaced; no trigger follows a failed claim.
   const parsed = parseSlug(slug);
   if (!parsed) return NextResponse.json({ ...base, ok: false, error: "unparseable slug" }, { status: 400 });
+  let jobId: string;
   try {
-    await createGeneratingChapterWorkup({
+    jobId = await claimGenerationJob(requireJobStore(slug, "regenerate"), slug, {
       book: parsed.book,
       chapter: parsed.chapter,
-      slug,
       title: `${parsed.book} ${parsed.chapter}`,
       source: "generated",
     });
@@ -84,7 +82,14 @@ export async function GET(request: Request) {
     }
     return NextResponse.json({ ...base, ok: false, error: String((e as Error).message) }, { status: 500 });
   }
-  await triggerBackgroundGeneration(slug, url.host);
+  const triggered = await triggerBackgroundGeneration(slug, url.host, jobId);
+  if (!triggered.ok) {
+    await failGenerationJob(requireJobStore(slug, "regenerate"), slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+    return NextResponse.json(
+      { ...base, ok: false, error: `background trigger failed — job marked failed (${triggered.error ?? triggered.status})` },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({
     ...base,

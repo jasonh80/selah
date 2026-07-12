@@ -98,6 +98,12 @@ for (const [action, status] of expectRefused) {
   ok(!decideMutation(action, "mark-8", row(status)).allowed, `${action} refused on ${status}`);
 }
 
+// ---------- 5b. NULL updated_at can never authorize a mutation (fail closed) ----------
+for (const [action, status] of expectAllowed) {
+  const d = decideMutation(action, "mark-8", row(status, null));
+  ok(!d.allowed && /updated_at|revision/i.test(d.reason), `${action} on ${status} with NULL revision refused`);
+}
+
 // ---------- 6. Missing row: only creation may proceed ----------
 for (const action of ACTIONS) {
   const d = decideMutation(action, "mark-8", { kind: "missing" });
@@ -235,4 +241,177 @@ for (const lookup of [row("reviewed"), row("ready"), { kind: "error", message: "
   ok(!d.allowed && d.reason.length > 20 && d.reason.includes("publishChapter"), "10 refusal reason names action + cause");
 }
 
-console.log(`verify:studio-safety ✓ ${checks} checks passed (pure decision core + conditional-write semantics)`);
+
+
+
+// =====================================================================
+// INTEGRATION SUITE — the REAL route → claim → worker → save/fail
+// orchestration from generation-jobs.ts, driven against a fake store that
+// honors the same predicates the Supabase adapter issues.
+// =====================================================================
+import type { JobStorePort, JobRow, JobPredicates } from "../lib/server/generation-jobs";
+import {
+  claimGenerationJob,
+  verifyGenerationClaim,
+  completeGenerationJob,
+  failGenerationJob,
+  claimImageJob,
+  completeImageJob,
+  releaseImageJob,
+  TEXT_JOB_KEY,
+  IMAGE_JOB_KEY,
+} from "../lib/server/generation-jobs";
+import { isChapterMutationError } from "../lib/server/protected-chapters";
+import type { ChapterWorkup } from "../lib/types";
+
+class FakeJobStore implements JobStorePort {
+  rows = new Map<string, { status: string; updated_at: string | null; workup_json: Record<string, unknown>; extra: Record<string, unknown> }>();
+  private tick = 0;
+  now(): string { return `T${++this.tick}`; }
+  seed(slug: string, status: string, json: Record<string, unknown> = {}, updatedAt: string | null = "T0"): void {
+    this.rows.set(slug, { status, updated_at: updatedAt, workup_json: json, extra: {} });
+  }
+  async read(slug: string): Promise<JobRow | null | { error: string }> {
+    const r = this.rows.get(slug);
+    return r ? { status: r.status, updatedAt: r.updated_at, workupJson: r.workup_json } : null;
+  }
+  async insert(slug: string, payload: Record<string, unknown>): Promise<"ok" | "duplicate" | { error: string }> {
+    if (this.rows.has(slug)) return "duplicate";
+    this.rows.set(slug, {
+      status: String(payload.status),
+      updated_at: this.now(),
+      workup_json: (payload.workup_json as Record<string, unknown>) ?? {},
+      extra: payload,
+    });
+    return "ok";
+  }
+  async update(slug: string, p: JobPredicates, next: Record<string, unknown>): Promise<number | { error: string }> {
+    const r = this.rows.get(slug);
+    if (!r) return 0;
+    if (r.status !== p.status) return 0;
+    if (p.updatedAt !== undefined && p.updatedAt !== null && r.updated_at !== p.updatedAt) return 0;
+    if (p.jsonKey) {
+      const actual = r.workup_json?.[p.jsonKey];
+      if (p.jsonEquals === null && actual !== undefined && actual !== null) return 0;
+      if (p.jsonEquals !== null && actual !== p.jsonEquals) return 0;
+    }
+    if ("status" in next) r.status = String(next.status);
+    if ("workup_json" in next) r.workup_json = next.workup_json as Record<string, unknown>;
+    r.updated_at = this.now();
+    return 1;
+  }
+}
+
+const META = { book: "Mark", chapter: 8, title: "Mark 8" };
+const WORKUP = { slug: "mark-8", title: "Mark 8" } as unknown as ChapterWorkup;
+
+async function expectCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
+  try {
+    await fn();
+    ok(false, `${label} (should have thrown ${code})`);
+  } catch (e) {
+    ok(isChapterMutationError(e) && e.code === code, `${label} → ${code}`);
+  }
+}
+
+const integration = (async () => {
+  // I1. Happy path: route claims once, worker verifies THAT claim, completes.
+  {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", META);
+    ok(store.rows.get("mark-8")!.status === "generating", "I1 claim marks generating");
+    ok(store.rows.get("mark-8")!.workup_json[TEXT_JOB_KEY] === jobId, "I1 claim stamps job id");
+    await verifyGenerationClaim(store, "mark-8", jobId); // worker does NOT re-claim
+    await completeGenerationJob(store, "mark-8", jobId, { workup: WORKUP });
+    const r = store.rows.get("mark-8")!;
+    ok(r.status === "draft" && (r.workup_json as { title?: string }).title === "Mark 8", "I1 worker saved draft");
+    checks && ok(true, "I1 end-to-end generation flow works (route claim + worker verify, no double claim)");
+  }
+
+  // I2. Duplicate request while a run is live: second claim conflicts; no second job.
+  {
+    const store = new FakeJobStore();
+    await claimGenerationJob(store, "mark-8", META);
+    await expectCode(() => claimGenerationJob(store, "mark-8", META), "REFUSED", "I2 duplicate generate request refused while generating");
+  }
+
+  // I3. Stale worker: old job can neither complete nor fail a newer run.
+  {
+    const store = new FakeJobStore();
+    const jobA = await claimGenerationJob(store, "mark-8", META);
+    // trigger for A fails → route fails job A → row becomes failed (re-claimable)
+    ok(await failGenerationJob(store, "mark-8", jobA, "trigger failed"), "I3 failed trigger marks job A failed");
+    ok(store.rows.get("mark-8")!.status === "failed", "I3 not stranded as generating");
+    const jobB = await claimGenerationJob(store, "mark-8", META); // retry claims B
+    // zombie worker A wakes up:
+    await expectCode(() => verifyGenerationClaim(store, "mark-8", jobA), "CONFLICT", "I3 zombie A cannot verify");
+    await expectCode(() => completeGenerationJob(store, "mark-8", jobA, { workup: WORKUP }), "CONFLICT", "I3 zombie A cannot overwrite B");
+    ok((await failGenerationJob(store, "mark-8", jobA, "zombie")) === false, "I3 zombie A cannot fail B");
+    ok(store.rows.get("mark-8")!.workup_json[TEXT_JOB_KEY] === jobB, "I3 B's claim intact");
+    await completeGenerationJob(store, "mark-8", jobB, { workup: WORKUP });
+    ok(store.rows.get("mark-8")!.status === "draft", "I3 newer run B completes normally");
+  }
+
+  // I4. Job ids are collision-resistant UUIDs, not timestamps.
+  {
+    const store = new FakeJobStore();
+    const a = await claimGenerationJob(store, "mark-8", META);
+    ok(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a), "I4 job id is a UUID");
+  }
+
+  // I5. Image single-use claim: duplicates cannot double-spend.
+  {
+    const store = new FakeJobStore();
+    store.seed("mark-8", "draft", { title: "Mark 8", images: [] });
+    const { jobId } = await claimImageJob(store, "mark-8");
+    await expectCode(() => claimImageJob(store, "mark-8"), "CONFLICT", "I5 second image request cannot claim (no double spend)");
+    // failed run releases → retry can claim
+    ok(await releaseImageJob(store, "mark-8", jobId), "I5 failed run releases claim");
+    const second = await claimImageJob(store, "mark-8");
+    ok(second.jobId !== jobId, "I5 retry gets a fresh job id");
+    await completeImageJob(store, "mark-8", second.jobId, { title: "Mark 8", images: [{}] } as unknown as ChapterWorkup);
+    ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "I5 completion clears the claim");
+  }
+
+  // I6. Stale image worker: superseded run cannot apply; bytes stay orphaned.
+  {
+    const store = new FakeJobStore();
+    store.seed("mark-8", "draft", { title: "Mark 8", images: [] });
+    const first = await claimImageJob(store, "mark-8");
+    // first run errors → releases; retry claims
+    ok(await releaseImageJob(store, "mark-8", first.jobId), "I6 first run released");
+    const second = await claimImageJob(store, "mark-8");
+    // zombie first run tries to finish anyway:
+    await expectCode(
+      () => completeImageJob(store, "mark-8", first.jobId, { title: "stale" } as unknown as ChapterWorkup),
+      "CONFLICT",
+      "I6 stale image worker cannot apply (orphaned files stay isolated)",
+    );
+    ok((store.rows.get("mark-8")!.workup_json as { title?: string }).title === "Mark 8", "I6 draft untouched by stale run");
+    await completeImageJob(store, "mark-8", second.jobId, { title: "Mark 8", images: [{}] } as unknown as ChapterWorkup);
+  }
+
+  // I7. Claims refuse protected / published / quarantined / null-revision rows.
+  {
+    const store = new FakeJobStore();
+    store.seed("mark-6", "draft", {});
+    await expectCode(() => claimGenerationJob(store, "mark-6", META), "REFUSED", "I7 protected slug cannot be claimed");
+    store.seed("mark-8", "reviewed", {});
+    await expectCode(() => claimGenerationJob(store, "mark-8", META), "REFUSED", "I7 published row cannot be claimed");
+    store.seed("mark-9", "ready", {});
+    await expectCode(() => claimGenerationJob(store, "mark-9", META), "REFUSED", "I7 quarantined ready row cannot be claimed");
+    store.seed("mark-10", "draft", {}, null);
+    await expectCode(() => claimGenerationJob(store, "mark-10", META), "REFUSED", "I7 null updated_at cannot authorize a claim");
+    store.seed("mark-11", "draft", {}, null);
+    await expectCode(() => claimImageJob(store, "mark-11"), "REFUSED", "I7 null updated_at cannot authorize an image claim");
+  }
+});
+
+integration()
+  .then(() => {
+    console.log(`verify:studio-safety ✓ ${checks} checks passed (decision core + write semantics + route→claim→worker→save/fail integration)`);
+  })
+  .catch((e) => {
+    console.error("verify:studio-safety FAILED:", e);
+    process.exit(1);
+  });

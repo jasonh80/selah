@@ -94,6 +94,11 @@ export function decideMutation(action: MutationAction, slug: string, lookup: Row
   if (!transition.allowed.includes(status)) {
     return refuse(`"${slug}" is "${status}" — ${action} only acts on: ${transition.allowed.join(", ")}`);
   }
+  // Fail closed on missing revision: a null updated_at can never authorize a
+  // mutation (Codex re-review item 5) — without it, stale-write pinning is void.
+  if (lookup.row.updatedAt === null || lookup.row.updatedAt === "") {
+    return refuse(`"${slug}" has no updated_at revision — cannot pin the write, refusing (fail closed)`);
+  }
   return { allowed: true, reason: "ok", expected: { status, updatedAt: lookup.row.updatedAt } };
 }
 
