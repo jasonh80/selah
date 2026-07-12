@@ -38,8 +38,10 @@ export function ScriptureReader({ data }: { data: ChapterWorkup }) {
   const showEsv = version === "ESV" && esv.found && Boolean(esv.text);
   const verseNotes = getVerseNotes(data.slug);
 
+  // The #chapter anchor id lives on the ScriptureDisclosure region that wraps
+  // this reader (exactly one id on the page).
   return (
-    <section id="chapter" className="scroll-mt-20 space-y-3">
+    <section className="space-y-3">
       <div className="flex items-end justify-between gap-3">
         <h2 className="text-section text-primary">Read the Chapter</h2>
         <VersionSelect versions={[...VERSIONS]} value={version} onChange={(v) => setVersion(v as typeof version)} prefix />

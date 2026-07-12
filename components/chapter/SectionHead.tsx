@@ -10,8 +10,10 @@ export function SectionHead({
   sub?: string;
   action?: string;
 }) {
+  // mb-2 (was mb-3): this heading frame repeats before every major section, so
+  // the extra 4px compounded page-wide (Phase 1A density pass, screenshot-backed).
   return (
-    <div className="mb-3 flex items-end justify-between gap-3">
+    <div className="mb-2 flex items-end justify-between gap-3">
       <div>
         {eyebrow && <p className="text-eyebrow">{eyebrow}</p>}
         <h2 className="text-section mt-0.5 text-primary">{title}</h2>

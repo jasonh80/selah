@@ -7,12 +7,11 @@ import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
 import { GeneratedImagesSection } from "@/components/chapter/GeneratedImagesSection";
 import { InsightCardGrid } from "@/components/chapter/InsightCardGrid";
-import { ScriptureReader } from "@/components/chapter/ScriptureReader";
+import { ScriptureDisclosure } from "@/components/chapter/ScriptureDisclosure";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
 import { TransparencySection } from "@/components/chapter/TransparencySection";
-import { ChapterControls } from "@/components/chapter/ChapterControls";
 import { SceneCheckSection } from "@/components/chapter/SceneCheckSection";
 import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
 import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection";
@@ -29,10 +28,14 @@ import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection"
 export function ChapterView({ data, source }: { data: ChapterWorkup; source?: string }) {
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
-      <main className="min-w-0 space-y-6 pb-12 pt-3 lg:pt-5">
+      {/* space-y-5 (was 6): the 24px page rhythm compounded across ~11 section
+          boundaries; 20px keeps the hierarchy while removing dead height. */}
+      <main className="min-w-0 space-y-5 pb-10 pt-3 lg:pt-5">
         <div className="space-y-3">
           <ChapterHero data={data} />
-          <ChapterControls />
+          {/* Controls + the page's ONLY ScriptureReader (collapsed disclosure
+              directly beneath — Scripture is one tap from the top). */}
+          <ScriptureDisclosure data={data} />
         </div>
 
         <div className="space-y-3">
@@ -48,7 +51,6 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
         <AuthorAudienceEvidence data={data} />
         <InsightCardGrid data={data} />
         <WhatPeopleAskSection data={data} />
-        <ScriptureReader data={data} />
         <MapsSection data={data} />
         <ChaptersSection data={data} />
         <GoDeeperSection data={data} />
