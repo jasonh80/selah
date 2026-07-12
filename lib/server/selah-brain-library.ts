@@ -1,6 +1,7 @@
 // SERVER-ONLY. The canonical Selah Brain rule library (v1.1), kept in version
 // control and seeded into Supabase idempotently. This file is the source of
 // truth for the seed; live toggles/edits then happen in the DB.
+import { createHash } from "node:crypto";
 import library from "./selah-brain-library.v1_1.json";
 
 export interface SeedRule {
@@ -16,21 +17,46 @@ export interface SeedRule {
   sources?: string[];
 }
 
+export interface SeedApproval {
+  approved_by: string;
+  approved_at: string;
+  evidence: string;
+  library_version: string;
+  content_digest: string;
+}
+
 interface InjectionPolicy {
   always_on_rule_ids: string[];
   max_contextual_rules_per_generation: number;
+  max_contextual_rules_by_stage?: Record<string, number>;
   quality_gate_rule_ids: string[];
   governance_rule_ids_not_injected_into_copy_prompt: string[];
 }
 
 const lib = library as unknown as {
   version: string;
+  status: string;
+  seed_approval: SeedApproval | null;
   rule_count: number;
   rules: SeedRule[];
   injection_policy: InjectionPolicy;
 };
 
 export const LIBRARY_VERSION = lib.version;
+export const LIBRARY_STATUS = lib.status;
+export const LIBRARY_SEED_APPROVAL = lib.seed_approval;
 export const SEED_RULES: SeedRule[] = lib.rules;
 export const INJECTION_POLICY = lib.injection_policy;
 export const MAX_CONTEXTUAL = lib.injection_policy.max_contextual_rules_per_generation;
+export const MAX_CONTEXTUAL_BY_STAGE =
+  lib.injection_policy.max_contextual_rules_by_stage ?? {};
+
+// Bind owner approval to the exact version-controlled artifact while excluding
+// the two fields that change when approval is recorded. JSON import order is
+// stable, so this digest is deterministic in Studio, verification, and Netlify.
+const digestableLibrary = { ...(library as Record<string, unknown>) };
+delete digestableLibrary.status;
+delete digestableLibrary.seed_approval;
+export const LIBRARY_CONTENT_DIGEST = createHash("sha256")
+  .update(JSON.stringify(digestableLibrary))
+  .digest("hex");

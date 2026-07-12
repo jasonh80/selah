@@ -1,8 +1,8 @@
 {
-  "packet_id": "mark-8-11-2026-07-v1",
-  "version": "1.0",
+  "packet_id": "mark-8-11-2026-07-v2",
+  "version": "1.1",
   "status": "review_only",
-  "library_version": "1.5",
+  "library_version": "1.6",
   "authoring_policy": {
     "fresh_authorship_required": true,
     "benchmark_wording_available_during_generation": false,
@@ -81,6 +81,10 @@
         {
           "id": "M8-09",
           "text": "Map only responsible regions: probable eastern/Decapolis context, unidentified Dalmanutha, debated Bethsaida, and the villages around Caesarea Philippi. Use uncertainty regions rather than false pins or a verified route. Images remain people-first and must not merge separate moments or import parallel-Gospel details."
+        },
+        {
+          "id": "M8-10",
+          "text": "Image candidates should distinguish the chapter's movements rather than repeat a feeding tableau: the seven baskets after the crowd has eaten can carry the evidence-and-memory theme; a restrained subjective partial-sight treatment may illuminate the staged healing; and a Peter-rebuke scene should retain the other disciples because Jesus turns and sees them. Never place the remembered baskets in the boat, depict Satan as a visible figure, or portray Peter as possessed. These are candidates, not mandatory image slots; Selah still chooses the strongest chapter-shaped set."
         }
       ]
     },

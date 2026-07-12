@@ -3,9 +3,13 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  librarySeedApproved,
+  planLibrarySeed,
   selectRulesFromRows,
+  type ExistingLibraryRuleRow,
   type RuleRow,
 } from "../lib/server/selah-brain";
+import { LIBRARY_CONTENT_DIGEST } from "../lib/server/selah-brain-library";
 
 type LibraryRule = {
   id: string;
@@ -22,16 +26,34 @@ type LibraryRule = {
 
 type Library = {
   version: string;
+  status: string;
+  seed_approval: {
+    approved_by: string;
+    approved_at: string;
+    evidence: string;
+    library_version: string;
+    content_digest: string;
+  } | null;
   rule_count: number;
   source_count: number;
   rules: LibraryRule[];
-  source_ledger: unknown[];
+  source_ledger: {
+    title: string;
+    genre_or_use: string;
+    principal_intelligence: string;
+  }[];
   injection_policy: {
     always_on_rule_ids: string[];
     max_contextual_rules_per_generation: number;
+    max_contextual_rules_by_stage: Record<string, number>;
     quality_gate_rule_ids: string[];
     governance_rule_ids_not_injected_into_copy_prompt: string[];
   };
+  conflict_ledger: {
+    topic: string;
+    earlier: string;
+    resolution: string;
+  }[];
 };
 
 type GuidancePacket = {
@@ -173,6 +195,100 @@ for (const rule of library.rules) {
 }
 
 const byId = new Map(library.rules.map((rule) => [rule.id, rule]));
+assert.equal(library.version, "1.6", "unexpected candidate Brain version");
+assert.match(LIBRARY_CONTENT_DIGEST, /^[a-f0-9]{64}$/);
+assert.ok(
+  ["review_only", "approved_for_seed"].includes(library.status),
+  "Brain artifact has an unknown seed status",
+);
+assert.equal(
+  librarySeedApproved(library.status, library.seed_approval),
+  library.status === "approved_for_seed",
+  "seed status and recorded owner approval must agree",
+);
+if (library.status === "review_only") {
+  assert.equal(library.seed_approval, null, "review-only Brain must not claim approval");
+}
+assert.equal(
+  librarySeedApproved("approved_for_seed", {
+    approved_by: "owner",
+    approved_at: "2026-07-12T00:00:00.000Z",
+    evidence: "reviewed-change",
+    library_version: library.version,
+    content_digest: LIBRARY_CONTENT_DIGEST,
+  }),
+  true,
+  "a complete future owner approval must pass without changing verifier code",
+);
+assert.equal(
+  librarySeedApproved("approved_for_seed", {
+    approved_by: "owner",
+    approved_at: "2026-07-12T00:00:00.000Z",
+    evidence: "stale-review",
+    library_version: library.version,
+    content_digest: "0".repeat(64),
+  }),
+  false,
+  "stale approval must not authorize changed Brain content",
+);
+assert.equal(library.rule_count, 98, "unexpected candidate rule count");
+assert.equal(library.source_count, 34, "unexpected candidate source count");
+assert.equal(library.injection_policy.max_contextual_rules_per_generation, 12);
+assert.deepEqual(library.injection_policy.max_contextual_rules_by_stage, {
+  image_prompt: 18,
+  image_review: 18,
+});
+const recentAuditTitle =
+  "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit";
+assert.ok(
+  library.source_ledger.some(
+    (source) => source.title === recentAuditTitle,
+  ),
+  "recent signed-in benchmark correction audit must retain provenance",
+);
+const ledgerTitles = new Set(library.source_ledger.map((source) => source.title));
+for (const rule of library.rules) {
+  for (const source of rule.sources ?? []) {
+    assert.ok(
+      ledgerTitles.has(source),
+      `${rule.id} references missing source-ledger title: ${source}`,
+    );
+  }
+}
+assert.match(byId.get("SB-004")?.text ?? "", /stands under Scripture/i);
+assert.match(byId.get("SB-004")?.text ?? "", /never its distinctive wording/i);
+assert.match(byId.get("SB-032")?.text ?? "", /facial expression/i);
+assert.match(byId.get("SB-032")?.text ?? "", /jewelry, accessories/i);
+assert.match(byId.get("SB-032")?.text ?? "", /historically plausible detail/i);
+assert.match(byId.get("SB-074")?.text ?? "", /explicitly describes/i);
+assert.match(byId.get("SB-074")?.text ?? "", /text's own manifestation/i);
+assert.match(byId.get("SB-074")?.text ?? "", /received or reflected/i);
+for (const id of ["SB-030", "SB-031", "SB-032", "SB-036", "SB-039"]) {
+  assert.ok(byId.get(id)?.stages.includes("image_prompt"), `${id} needs image_prompt`);
+  assert.ok(byId.get(id)?.stages.includes("image_review"), `${id} needs image_review`);
+}
+for (const id of ["SB-004", "SB-030", "SB-031", "SB-032", "SB-036", "SB-039", "SB-074", "SB-124"]) {
+  assert.ok(
+    byId.get(id)?.sources?.includes(recentAuditTitle),
+    `${id} must cite the recent benchmark audit`,
+  );
+}
+for (const id of ["SB-005", "SB-033", "SB-035"]) {
+  assert.deepEqual(
+    byId.get(id)?.stages,
+    ["copy_generation", "copy_review"],
+    `${id} must remain copy-only`,
+  );
+}
+assert.ok(byId.get("SB-074")?.stages.includes("copy_review"));
+assert.deepEqual(byId.get("SB-120")?.stages, ["copy_review"]);
+assert.ok(!byId.get("SB-124")?.stages.includes("image_prompt"));
+assert.ok(byId.get("SB-124")?.stages.includes("image_review"));
+const glowConflict = library.conflict_ledger.find(
+  (entry) => entry.topic === "No generic glow vs text-explicit supernatural effect",
+);
+assert.match(glowConflict?.earlier ?? "", /person bearing a received effect/i);
+assert.doesNotMatch(glowConflict?.earlier ?? "", /reflected glory is explicit/i);
 const configuredCore = new Set(
   library.injection_policy.always_on_rule_ids,
 );
@@ -269,7 +385,204 @@ for (const slug of ["mark-8", "mark-9", "mark-10", "mark-11"]) {
   selections[slug] = selection.contextualIds;
 }
 
+const expectedImageContextual = [
+  "SB-208",
+  "SB-032",
+  "SB-036",
+  "SB-039",
+  "SB-070",
+  "SB-072",
+  "SB-073",
+  "SB-074",
+  "SB-075",
+  "SB-076",
+  "SB-077",
+  "SB-078",
+  "SB-206",
+  "SB-207",
+  "SB-071",
+  "SB-079",
+  "SB-080",
+];
+for (const slug of ["mark-8", "mark-9", "mark-10", "mark-11"]) {
+  const promptSelection = selectRulesFromRows(rows, slug, "image_prompt");
+  assert.deepEqual(promptSelection.coreIds, ["SB-030", "SB-031"]);
+  assert.deepEqual(
+    promptSelection.contextualIds,
+    expectedImageContextual,
+    `${slug} image-prompt profile drifted`,
+  );
+  assert.deepEqual(promptSelection.qaIds, [], "image authorship must not inject QA gates");
+
+  const reviewSelection = selectRulesFromRows(rows, slug, "image_review");
+  assert.deepEqual(reviewSelection.contextualIds, expectedImageContextual);
+  assert.deepEqual(
+    reviewSelection.qaIds,
+    ["SB-124"],
+    `${slug} image review needs the anachronism gate`,
+  );
+}
+const craftsmanshipImageSelection = selectRulesFromRows(
+  rows,
+  "exodus-31",
+  "image_prompt",
+);
+assert.deepEqual(craftsmanshipImageSelection.contextualIds, [
+  "SB-032",
+  "SB-036",
+  "SB-039",
+  "SB-070",
+  "SB-072",
+  "SB-073",
+  "SB-074",
+  "SB-075",
+  "SB-076",
+  "SB-077",
+  "SB-078",
+  "SB-206",
+  "SB-207",
+  "SB-136",
+  "SB-137",
+  "SB-071",
+  "SB-079",
+  "SB-080",
+]);
+for (const slug of ["exodus-33", "exodus-34"]) {
+  const selection = selectRulesFromRows(rows, slug, "image_prompt");
+  assert.ok(selection.contextualIds.includes("SB-074"), `${slug} needs SB-074`);
+  assert.ok(!selection.contextualIds.includes("SB-136"), `${slug} must not get craft-only SB-136`);
+  assert.ok(!selection.contextualIds.includes("SB-137"), `${slug} must not get craft-only SB-137`);
+}
+const copyReviewSelection = selectRulesFromRows(rows, "mark-8", "copy_review");
+assert.deepEqual(copyReviewSelection.qaIds, [
+  "SB-120",
+  "SB-121",
+  "SB-122",
+  "SB-123",
+  "SB-124",
+  "SB-125",
+]);
+const scopedQa: RuleRow = {
+  rule_id: "TEST-QA-GOSPEL",
+  title: "Gospel-only QA probe",
+  rule_text: "Gospel-only review rule.",
+  category: "quality",
+  scope: "genre",
+  genre: "gospel narrative",
+  priority: "qa",
+  stages: ["image_review"],
+};
+assert.ok(
+  selectRulesFromRows([...rows, scopedQa], "mark-8", "image_review").qaIds.includes(
+    scopedQa.rule_id,
+  ),
+);
+assert.ok(
+  !selectRulesFromRows([...rows, scopedQa], "psalm-23", "image_review").qaIds.includes(
+    scopedQa.rule_id,
+  ),
+  "genre-scoped QA must not leak into another genre",
+);
+
+const canonicalExisting: ExistingLibraryRuleRow[] = library.rules.map((rule) => ({
+  rule_id: rule.id,
+  title: rule.title,
+  rule_text: rule.text,
+  category: rule.category,
+  scope: rule.scope,
+  genre: rule.genre ?? null,
+  priority: rule.priority,
+  stages: rule.stages,
+  source_titles: rule.sources ?? [],
+  version: library.version,
+  active: rule.active !== false,
+  archived: false,
+}));
+const unchangedSeedPlan = planLibrarySeed(
+  canonicalExisting,
+  "2026-07-12T00:00:00.000Z",
+);
+assert.equal(unchangedSeedPlan.inserts.length, 0);
+assert.equal(unchangedSeedPlan.updates.length, 0);
+assert.equal(unchangedSeedPlan.unchanged, library.rule_count);
+assert.deepEqual(unchangedSeedPlan.unexpectedRuleIds, []);
+
+const versionOnlyPlan = planLibrarySeed(
+  canonicalExisting.map((row) => ({ ...row, version: "1.5" })),
+  "2026-07-12T00:00:00.000Z",
+);
+assert.equal(
+  versionOnlyPlan.updates.length,
+  0,
+  "a library-version bump alone must not rewrite every live rule",
+);
+assert.equal(versionOnlyPlan.unchanged, library.rule_count);
+
+const unexpectedRulePlan = planLibrarySeed([
+  ...canonicalExisting,
+  {
+    ...canonicalExisting[0],
+    rule_id: "SB-999",
+    title: "Unexpected canonical rule",
+  },
+]);
+assert.deepEqual(
+  unexpectedRulePlan.unexpectedRuleIds,
+  ["SB-999"],
+  "removed or unknown canonical rules must fail closed for explicit retirement review",
+);
+
+const priorWiseCounsel =
+  "Sound warm, confident, perceptive, pastoral, visual, and historically grounded—like a wise Bible teacher and trusted counselor, not a generic assistant.";
+const staleSeedRows = canonicalExisting.map((row) => {
+  if (row.rule_id === "SB-004") {
+    return {
+      ...row,
+      rule_text: priorWiseCounsel,
+      version: "1.5",
+      active: false,
+      archived: true,
+    };
+  }
+  if (row.rule_id === "SB-030") {
+    return {
+      ...row,
+      stages: ["copy_generation", "copy_review"],
+      source_titles: [],
+      version: "1.5",
+    };
+  }
+  return row;
+});
+const reconciliationPlan = planLibrarySeed(
+  staleSeedRows,
+  "2026-07-12T00:00:00.000Z",
+);
+assert.deepEqual(reconciliationPlan.unexpectedRuleIds, []);
+assert.deepEqual(
+  reconciliationPlan.updates.map((update) => update.ruleId),
+  ["SB-004", "SB-030"],
+  "seed planning must catch wording and metadata-only changes",
+);
+const textUpdate = reconciliationPlan.updates[0];
+assert.equal(textUpdate.previousText, priorWiseCounsel);
+assert.equal(textUpdate.previousVersion, "1.5");
+assert.ok(!("active" in textUpdate.values));
+assert.ok(!("archived" in textUpdate.values));
+const metadataUpdate = reconciliationPlan.updates[1];
+assert.equal(metadataUpdate.previousText, undefined);
+assert.deepEqual(metadataUpdate.values.stages, [
+  "copy_generation",
+  "copy_review",
+  "image_prompt",
+  "image_review",
+]);
+assert.deepEqual(metadataUpdate.values.source_titles, [recentAuditTitle]);
+assert.equal(metadataUpdate.values.version, "1.6");
+
 assert.equal(guidance.status, "review_only", "guidance must not be active");
+assert.equal(guidance.packet_id, "mark-8-11-2026-07-v2");
+assert.equal(guidance.version, "1.1");
 assert.equal(
   guidance.library_version,
   library.version,
@@ -384,6 +697,15 @@ for (const comparisonOnly of [
     `comparison-only wording leaked into loadable guidance: ${comparisonOnly}`,
   );
 }
+assert.equal(noteCounts["mark-8"], 10, "Mark 8 needs the reviewed image delta");
+assert.ok(
+  guidance.chapters["mark-8"].notes.some(
+    (note) =>
+      note.id === "M8-10" &&
+      /candidates, not mandatory image slots/i.test(note.text),
+  ),
+  "M8-10 must preserve image candidates without forcing a fixed plan",
+);
 assert.equal(
   new Set(allNoteIds).size,
   allNoteIds.length,
@@ -418,6 +740,10 @@ console.log(
       rules: library.rules.length,
       sources: library.source_ledger.length,
       core: actualCore.size,
+      seedArtifact: {
+        status: library.status,
+        contentDigest: LIBRARY_CONTENT_DIGEST,
+      },
       selections,
       guidance: {
         packetId: guidance.packet_id,

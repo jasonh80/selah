@@ -5,6 +5,7 @@
   "description": "Selah — your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm run verify:brain",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

@@ -49,12 +49,21 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 ## Selah Brain (the quality system)
 
 - **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 is the last
-  verified live library). The version-controlled seed has a review-only v1.5
-  candidate with 98 rules. Supabase remains the live source of truth: a merged
-  JSON change is not active until the owner separately approves seeding and a
-  post-seed manifest proves the live IDs and wording.
-- Layers: core (always-on) · contextual (max 12, selected by genre/stage) ·
+  verified live library). The version-controlled seed has a review-only v1.6
+  candidate with 98 rules. Its artifact status is fail-closed `review_only`, so
+  it cannot be seeded until a separately reviewed artifact is marked
+  `approved_for_seed` and records owner, timestamp, review evidence, version, and
+  an exact content digest. `npm run build` runs the Brain verifier first. Supabase
+  remains the live source of truth: a merged JSON
+  change is not active until the owner separately approves seeding and a
+  post-seed manifest proves the live IDs, wording, stages, and provenance.
+- Layers: core (always-on) · contextual (max 12 for copy and 18 for image
+  stages, selected by genre/stage) ·
   qa (review only) · governance (never in prose prompts).
+- The v1.6 recent-chat audit adds humble fellow-learner voice, prevents visual
+  details from smuggling unsupported claims, and makes text/inference/safety
+  rules eligible for image stages. Image-stage Brain retrieval is still not
+  wired into production; metadata alone does not govern a generated image.
 - **Approved examples** (`selah_approved_examples`): the Mark 6 Daily Rundown is
   the gold-standard *voice* exemplar for gospel narrative; an image-direction
   example exists for the feeding scene. 1–2 examples retrieved per generation.
@@ -95,7 +104,7 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 ## Next up
 
 - **Current release sprint: Mark 8–11**, with Tuesday 2026-07-14 as the stretch
-  target. Selah Brain should author fresh drafts after the safety PR, v1.5,
+  target. Selah Brain should author fresh drafts after the safety PR, v1.6,
   chapter guidance, rights-cleared source, exact Mark 6 voice exemplar, and
   fail-closed manifest are reviewed. Each generation and publication still
   requires explicit owner approval.

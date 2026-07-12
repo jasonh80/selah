@@ -14,11 +14,16 @@ packet and comparison rubric; neither file is active in the live Brain.
 The recent workups are benchmarks, not final chapter copy. Selah Brain should
 author a fresh workup for each chapter after:
 
-1. the v1.5 rule diff is independently reviewed and approved;
+1. the v1.6 rule diff is independently reviewed and approved;
 2. these chapter-only notes are owner-approved and added with `scope=chapter`;
 3. the retrieval manifest proves that the intended rules, notes, example, and
    rights-cleared source are present;
 4. the owner explicitly authorizes that chapter's generation run.
+
+The signed-in inventory audit confirmed recent Mark 8, Mark 9, and Mark 10
+benchmark chats. It did not find a distinct Mark 11 workup by title or passage
+search, so Mark 11 remains independently researched review guidance and must
+not be represented as transcript-derived learning.
 
 The generation reader currently retrieves at most ten chapter notes. Each list
 below therefore stays within that real limit. A note is deliberately dense: it
@@ -80,6 +85,14 @@ Clearly**.
    Philippi. Use uncertainty regions rather than false pins or a verified route.
    Images remain people-first and must not merge separate moments or import
    parallel-Gospel details.
+10. Image candidates should distinguish the chapter's movements rather than
+   repeat a feeding tableau: the seven baskets after the crowd has eaten can
+   carry the evidence-and-memory theme; a restrained subjective partial-sight
+   treatment may illuminate the staged healing; and a Peter-rebuke scene should
+   retain the other disciples because Jesus turns and sees them. Never place
+   the remembered baskets in the boat, depict Satan as a visible figure, or
+   portray Peter as possessed. These are candidates, not mandatory image slots;
+   Selah still chooses the strongest chapter-shaped set.
 
 ## Mark 9 (`mark-9`)
 
