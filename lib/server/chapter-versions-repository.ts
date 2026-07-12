@@ -3,6 +3,7 @@
 // so a new generation never overwrites an earlier one. Fails soft.
 import type { ChapterWorkup } from "../types";
 import { getSupabaseAdmin } from "./supabase";
+import { chapterMutationDecision } from "./protected-chapters";
 
 const TABLE = "chapter_workup_versions";
 
@@ -75,6 +76,11 @@ export async function getVersionWorkup(slug: string, version: number): Promise<C
 // Restore an existing archived version as the working draft (kept 'draft').
 // Does NOT create a new version — the archive is unchanged. Never publishes.
 export async function restoreVersion(slug: string, version: number): Promise<boolean> {
+  const decision = await chapterMutationDecision(slug, "restoreVersion");
+  if (!decision.allowed) {
+    console.error(`[selah] mutation guard: ${decision.reason}`);
+    return false;
+  }
   const db = getSupabaseAdmin();
   if (!db) return false;
   const workup = await getVersionWorkup(slug, version);
@@ -97,6 +103,11 @@ export async function applyMergedDraft(
   workup: ChapterWorkup,
   label?: string,
 ): Promise<{ ok: boolean; version: number | null }> {
+  const decision = await chapterMutationDecision(slug, "applyMergedDraft");
+  if (!decision.allowed) {
+    console.error(`[selah] mutation guard: ${decision.reason}`);
+    return { ok: false, version: null };
+  }
   const db = getSupabaseAdmin();
   if (!db) return { ok: false, version: null };
   const up = await db

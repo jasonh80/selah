@@ -14,6 +14,7 @@ import {
 } from "@/lib/server/chapter-workups-repository";
 import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
 import { imageGenAllowed, checkImageModel } from "@/lib/server/images";
+import { chapterMutationDecision } from "@/lib/server/protected-chapters";
 import {
   snapshotVersion,
   listVersions,
@@ -76,7 +77,13 @@ export async function POST(req: Request) {
     if (!draft) return NextResponse.json({ ok: false, error: "no stored row for slug" }, { status: 404 });
     const status = await publishChapter(slug);
     await logGenerationAudit({ action: "publish", slug, status: status ? "succeeded" : "failed" });
-    return NextResponse.json({ ok: Boolean(status), slug, status });
+    if (!status) {
+      return NextResponse.json(
+        { ok: false, slug, error: "publish refused — the chapter may already be published (published chapters are immutable)" },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ ok: true, slug, status });
   }
 
   // ---- poll a chapter's status (for the Generate Draft progress UI) ----
@@ -132,7 +139,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: Boolean(workup), workup });
   }
   if (action === "version_restore") {
-    const ok = await restoreVersion(String(body.slug ?? ""), Number(body.version));
+    const slug = String(body.slug ?? "");
+    const guard = await chapterMutationDecision(slug, "version_restore");
+    if (!guard.allowed) {
+      return NextResponse.json({ ok: false, error: guard.reason }, { status: 403 });
+    }
+    const ok = await restoreVersion(slug, Number(body.version));
     return NextResponse.json({ ok });
   }
   if (action === "versions_snapshot") {
@@ -140,8 +152,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: version !== null, version });
   }
   if (action === "version_apply") {
+    const slug = String(body.slug ?? "");
+    const guard = await chapterMutationDecision(slug, "version_apply");
+    if (!guard.allowed) {
+      return NextResponse.json({ ok: false, error: guard.reason }, { status: 403 });
+    }
     const result = await applyMergedDraft(
-      String(body.slug ?? ""),
+      slug,
       body.workup as ChapterWorkup,
       typeof body.label === "string" ? body.label : undefined,
     );
@@ -157,6 +174,10 @@ export async function POST(req: Request) {
   // ---- image generation (Image Preview stage; separate kill switch) ----
   if (action === "generate_images") {
     const slug = String(body.slug ?? "");
+    const guard = await chapterMutationDecision(slug, "generate_images");
+    if (!guard.allowed) {
+      return NextResponse.json({ ok: false, error: guard.reason }, { status: 403 });
+    }
     if (!(await imageGenAllowed(slug))) {
       return NextResponse.json(
         { ok: false, error: "Image generation not allowed — needs Image Generation ON, the slug allowlisted, and an approved image plan." },
@@ -218,6 +239,11 @@ export async function POST(req: Request) {
   // ---- generate a draft (text only) ----
   if (action === "generate") {
     const slug = String(body.slug ?? "");
+    // Issue #8 mutation guard: published/protected chapters cannot be regenerated.
+    const guard = await chapterMutationDecision(slug, "generate");
+    if (!guard.allowed) {
+      return NextResponse.json({ ok: false, error: guard.reason }, { status: 403 });
+    }
     const confirm = body.confirm === true || body.confirm === "yes";
     const settings = await getGenerationSettings();
 

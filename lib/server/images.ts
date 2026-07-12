@@ -7,6 +7,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { getDraftWorkup, updateChapterWorkupJson } from "./chapter-workups-repository";
 import { recordCostEvent } from "./cost-events-repository";
 import { getGenerationSettings } from "./generation-settings";
+import { chapterMutationDecision } from "./protected-chapters";
 
 // Fallback default only — the ACTIVE model comes from Supabase settings
 // (selected_image_model, Studio-controlled). Never silently falls back: the
@@ -203,6 +204,13 @@ export interface ImageGenResult {
  */
 export async function generateAndStoreChapterImages(slug: string): Promise<ImageGenResult> {
   const model = await activeImageModel();
+  // Issue #8 mutation guard — BEFORE any model spend: published/protected
+  // chapters cannot have their images regenerated or overwritten.
+  const decision = await chapterMutationDecision(slug, "generateAndStoreChapterImages");
+  if (!decision.allowed) {
+    console.error(`[selah] mutation guard: ${decision.reason}`);
+    return { ok: false, slug, model, error: decision.reason };
+  }
   if (!(await imageGenAllowed(slug))) {
     return { ok: false, slug, model, error: "image generation not allowed for this slug" };
   }
