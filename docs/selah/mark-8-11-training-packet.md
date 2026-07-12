@@ -20,6 +20,12 @@ author a fresh workup for each chapter after:
    rights-cleared source are present;
 4. the owner explicitly authorizes that chapter's generation run.
 
+Private Mark/Exodus benchmark prose stays outside the authoring prompt and is
+used only for independent comparison after generation. The exact approved Mark
+6 voice exemplar is the narrow exception: the writer may see it to learn Selah's
+register, but must not reuse its distinctive lines, titles, or phrasing. A
+separate freshness review remains required before owner acceptance.
+
 The signed-in inventory audit confirmed recent Mark 8, Mark 9, and Mark 10
 benchmark chats. It did not find a distinct Mark 11 workup by title or passage
 search, so Mark 11 remains independently researched review guidance and must
@@ -211,9 +217,10 @@ Comparison direction (not an assigned title): **The King Who Looks for
 Fruit**. Alternate comparison direction: **When Jesus Looks Around**.
 
 1. Preserve Mark's three-day narrative sequence: entry, late Temple inspection,
-   and return to Bethany (1–11); next-day fig tree and Temple action (12–19);
-   following-morning withered tree, prayer and forgiveness teaching, and authority
-   challenge (20–33). Do not label Sunday, Monday, or Tuesday as text-explicit.
+   and return to Bethany (1–11); next-day fig tree (12–14) and Temple action
+   (15–19); following-morning withered tree, prayer and forgiveness teaching
+   (20–26), and authority challenge (27–33). Do not label Sunday, Monday, or
+   Tuesday as text-explicit.
 2. Mark names one unridden young animal, cloaks, and leafy material cut from
    fields. A donkey is highly probable from Zechariah and parallel accounts, but
    Mark's noun is broader. Mark does not identify palms, waving, the two

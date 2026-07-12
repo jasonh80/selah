@@ -51,6 +51,7 @@ export async function generateChapterWorkup(input: {
   slug: string;
   bibleVersion?: string;
   bibleText?: string;
+  generationSourceLabel?: string;
   model?: string;
   globalRules?: string[];
   chapterNotes?: string[];
@@ -65,6 +66,7 @@ export async function generateChapterWorkup(input: {
     chapter: input.chapter,
     bibleVersion: input.bibleVersion,
     bibleText: input.bibleText,
+    generationSourceLabel: input.generationSourceLabel,
     globalRules: input.globalRules,
     chapterNotes: input.chapterNotes,
     examples: input.examples,

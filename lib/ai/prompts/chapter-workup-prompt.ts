@@ -6,6 +6,9 @@ export interface ChapterWorkupPromptInput {
   chapter: number;
   bibleVersion?: string;
   bibleText?: string;
+  // Server-owned label for the rights-cleared generation source. This is
+  // deliberately separate from the reader-display version above.
+  generationSourceLabel?: string;
   // Active Selah Brain rules (apply to every chapter) and review notes specific
   // to THIS chapter. Both come from the dedicated Selah Brain tables.
   globalRules?: string[];
@@ -15,7 +18,24 @@ export interface ChapterWorkupPromptInput {
 }
 
 export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): string {
-  const { book, chapter, bibleVersion, bibleText, globalRules, chapterNotes, examples } = input;
+  const {
+    book,
+    chapter,
+    bibleVersion,
+    bibleText,
+    generationSourceLabel,
+    globalRules,
+    chapterNotes,
+    examples,
+  } = input;
+  if (bibleText !== undefined && !bibleText.trim()) {
+    throw new Error("Generation source text cannot be empty");
+  }
+  if (bibleText !== undefined && !generationSourceLabel?.trim()) {
+    throw new Error(
+      "A server-owned generation source label is required when source text is supplied",
+    );
+  }
   const slug = `${book.toLowerCase().replace(/\s+/g, "-")}-${chapter}`;
   const rulesBlock =
     globalRules && globalRules.length
@@ -63,7 +83,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "chapter": ${chapter},
   "slug": "${slug}",
   "title": "${book} ${chapter}",
-  "subtitle": "<short evocative subtitle>",
+  "subtitle": "<fresh, chapter-specific editorial title; do not copy example wording>",
   "status": "draft",
   "version": "1",
   "theme": "<one short line, e.g. 'Holy access to God'>",
@@ -96,8 +116,8 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     ]
   },
   "maps": {
-    "modern": { "title": "Modern Map", "description": "<what it shows today>", "uncertaintyNote": "<optional>" },
-    "historic": { "title": "Historic Map", "description": "<the biblical-world view>", "uncertaintyNote": "<optional>" }
+    "modern": { "title": "Modern Map", "description": "<what it shows today>", "uncertaintyNote": "<required scope/precision note>" },
+    "historic": { "title": "Historic Map", "description": "<the biblical-world view>", "uncertaintyNote": "<required scope/precision note>" }
   },
   "keyObjects": [
     { "title": "<object/place>", "description": "<short>" }
@@ -111,7 +131,10 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     { "type": "human", "title": "Human Moment", "description": "<a character/emotional moment: What did this feel like?>", "prompt": "<vivid prompt>", "alt": "<alt>", "caption": "<caption>", "status": "placeholder" }
   ],
   "verseByVerse": [
-    { "range": "<e.g. '1-6'>", "title": "<short>", "explanation": "<brief, no quoted verse text>" }
+    { "startVerse": 1, "endVerse": 6, "rangeLabel": "1–6", "title": "<short>", "explanation": "<brief, no quoted verse text>" }
+  ],
+  "whatPeopleAsk": [
+    { "question": "<a real question readers ask about THIS chapter>", "answer": "<warm, accurate, useful answer; no quoted verse text>" }
   ],
   "goDeeper": {
     "learnMore": [ { "title": "<short>", "description": "<short>" } ],
@@ -159,7 +182,9 @@ SCENE CHECKS (picture it accurately)
   people commonly imagine wrongly (wrong building, wrong clothing, wrong scale,
   English text on objects, a tidy scene that was really chaotic/dangerous, etc.).
   Do not force them. Tone: warm, visual, confident, historically grounded, lightly
-  witty when it fits — like a wise friend, not a textbook.
+  witty when it fits — like a wise friend, not a textbook. When supplied chapter
+  review notes identify real visual corrections, include at least one; otherwise
+  an empty array is better than a forced card.
 - "visualAccuracyNotes" are crisp, concrete corrections that will later be fed to
   image generation as guardrails. Be specific (materials, scale in feet, no English
   lettering, era-appropriate script, etc.).
@@ -201,12 +226,32 @@ SECTION DEPTH (this is the heart of Selah)
   imagination, verse-by-verse movement, and a warm, accurate Jesus connection.
 - Be specific, not generic. If a section could apply to almost any chapter, rewrite it.
 
+PASSAGE FLOW & QUESTIONS
+- "verseByVerse" is the machine-checkable chapter spine. Use one entry for every
+  natural scene or argument movement. Keep entries ordered and cover the whole
+  chapter from verse 1 through the final verse with no gaps or overlaps. Narrative
+  chapters commonly need 5-10 entries; do not compress a broad chapter into an
+  arbitrary 2-4 items. "startVerse" and "endVerse" are inclusive integers;
+  "rangeLabel" is display copy only.
+- "whatPeopleAsk" must contain 5-8 questions people genuinely ask about THIS
+  chapter. Answer the real concern beneath each question in Selah's warm,
+  plainspoken voice. Include difficult historical, theological, textual, or
+  pastoral questions when the chapter raises them. Never invent certainty,
+  promise an automatic outcome, blame suffering, or use an answer to bypass
+  safety, medical care, justice, or wise pastoral care.
+
 RULES
 - "generatedImages" MUST have exactly 3 entries in this order: establishing, detail, human, each with status "placeholder".
 - "primaryCharacters" is an array of strings; "keyObjects", "keyPeople", "sections", "chapterSpecificTopics" are arrays of OBJECTS.
-- Provide 2-4 items for timeline.items, keyObjects, keyPeople, verseByVerse, and each goDeeper group; 3-7 chapterSpecificTopics.
+- Provide 2-4 items for timeline.items and each goDeeper group; 2-6 keyObjects
+  and keyPeople; 3-7 chapterSpecificTopics; 5-8 whatPeopleAsk items. Passage-flow
+  length is determined by complete chapter coverage, not a fixed small count.
 - Mark the timeline item for THIS chapter with "active": true.
+- "bibleText.version" records the reader-display version only. It does not identify
+  the generation source; generation provenance is server-owned and bound separately.
 - Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${rulesBlock}${chapterBlock}${examplesBlock}${
-    bibleText ? `\n\nUse this chapter text as your source (do not quote it verbatim in output):\n"""\n${bibleText}\n"""` : ""
+    bibleText
+      ? `\n\nSERVER-SUPPLIED GENERATION SOURCE (${generationSourceLabel?.trim()})\nUse this source to understand the chapter. Do not quote it verbatim in output. Source rights, version, and digest must be authorized separately by the fail-closed generation manifest. This source is separate from the reader-display version recorded in bibleText.version:\n"""\n${bibleText.trim()}\n"""`
+      : ""
   }`;
 }

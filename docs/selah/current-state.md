@@ -100,6 +100,12 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   `lib/server/mark-sprint-guidance.v1.json`; it is not loaded into Supabase or
   connected to generation. The OEB 2025.6 CC0 source is a candidate, not yet
   vendored or approved for a run.
+- A local `mark-sprint-copy-review-v1.0` authoring contract now verifies the
+  Mark 8–11 structural floor (full passage movements, FAQ, content modules,
+  placeholder image shape, and no embedded verse array). It is not wired to
+  Studio and does not prove provenance, freshness, semantic accuracy, rendered
+  map/image completion, or owner approval. Those remain fail-closed manifest,
+  source-aware comparison, completion, and human-review gates.
 
 ## Next up
 

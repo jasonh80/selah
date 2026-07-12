@@ -63,7 +63,9 @@ type GuidancePacket = {
   library_version: string;
   authoring_policy: {
     fresh_authorship_required: boolean;
-    benchmark_wording_available_during_generation: boolean;
+    private_benchmark_wording_available_during_generation: boolean;
+    approved_voice_example_content_available_during_generation: boolean;
+    post_generation_freshness_review_required: boolean;
     owner_authorization_required: boolean;
     maximum_notes_per_chapter: number;
   };
@@ -581,8 +583,8 @@ assert.deepEqual(metadataUpdate.values.source_titles, [recentAuditTitle]);
 assert.equal(metadataUpdate.values.version, "1.6");
 
 assert.equal(guidance.status, "review_only", "guidance must not be active");
-assert.equal(guidance.packet_id, "mark-8-11-2026-07-v2");
-assert.equal(guidance.version, "1.1");
+assert.equal(guidance.packet_id, "mark-8-11-2026-07-v3");
+assert.equal(guidance.version, "1.2");
 assert.equal(
   guidance.library_version,
   library.version,
@@ -594,9 +596,19 @@ assert.equal(
   "Selah Brain must author a fresh chapter",
 );
 assert.equal(
-  guidance.authoring_policy.benchmark_wording_available_during_generation,
+  guidance.authoring_policy.private_benchmark_wording_available_during_generation,
   false,
-  "benchmark wording must stay out of authoring context",
+  "private benchmark wording must stay out of authoring context",
+);
+assert.equal(
+  guidance.authoring_policy.approved_voice_example_content_available_during_generation,
+  true,
+  "the exact approved Mark 6 voice example is the deliberate exception",
+);
+assert.equal(
+  guidance.authoring_policy.post_generation_freshness_review_required,
+  true,
+  "freshness still requires an independent post-generation review",
 );
 assert.equal(
   guidance.authoring_policy.owner_authorization_required,
