@@ -24,6 +24,7 @@ import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
 // changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
 // Supabase configured AND text_generation_enabled AND the slug allowlisted there.
 export async function generationAllowed(slug: string): Promise<boolean> {
+  if (isProtectedMarkSprintGenerationIdentity({ slug })) return false;
   if (!isOpenAIConfigured() || !isSupabaseConfigured()) return false;
   const s = await getGenerationSettings();
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);
@@ -51,14 +52,27 @@ export function assertGenericChapterGenerationAllowed(input: {
   book: string;
   chapter: number;
 }): void {
-  const normalizedBook = input.book.trim().toLowerCase();
-  const protectedBookChapter =
-    normalizedBook === "mark" && [8, 9, 10, 11].includes(input.chapter);
-  if (isMarkSprintSlug(input.slug) || protectedBookChapter) {
+  if (isProtectedMarkSprintGenerationIdentity(input)) {
     throw new Error(
-      `${input.slug} is blocked: the protected ESV source + generation-manifest-v2 runner is not connected`,
+      `${input.slug} is blocked: the protected ESV generation runner is not connected`,
     );
   }
+}
+
+export function isProtectedMarkSprintGenerationIdentity(input: {
+  slug: string;
+  book?: string;
+  chapter?: number;
+}): boolean {
+  const normalizedSlug = input.slug.trim().toLowerCase();
+  const protectedSlug =
+    isMarkSprintSlug(normalizedSlug) || /^mark-0*(?:8|9|10|11)$/u.test(normalizedSlug);
+  const normalizedBook = input.book?.trim().toLowerCase() ?? "";
+  const protectedBookChapter =
+    normalizedBook === "mark" &&
+    typeof input.chapter === "number" &&
+    [8, 9, 10, 11].includes(input.chapter);
+  return protectedSlug || protectedBookChapter;
 }
 
 export async function generateChapterWorkup(input: {
@@ -142,6 +156,9 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   const parsed = parseSlug(slug);
   if (!parsed) return null;
   const { book, chapter } = parsed;
+  // This must precede settings reads that lead to audits, placeholder claims,
+  // background work, or any other mutation. The protected runner is separate.
+  assertGenericChapterGenerationAllowed({ slug, book, chapter });
   const bibleVersion = "ESV";
   let costLogged = false;
 

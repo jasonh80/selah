@@ -98,6 +98,9 @@ function buildChapterWorkupPromptInternal(
 Use PRIMARY CHAPTER for this workup. CONTEXT BEFORE and CONTEXT AFTER may only
 ground surrounding-chapter Book Flow. Do not blend their events into the
 primary chapter. Do not quote or reproduce source wording in the output.
+Footnote callouts and bodies, when present, are translator/editorial notes—not
+verse text. They may inform an explicitly labeled textual note but must never be
+silently presented as the words of Scripture.
 The protected runner must bind source handling, API options, references, text
 digests, ordered bundle digest, and owner decision in the fail-closed generation
 manifest before sending this request, even when reader display also uses ESV.

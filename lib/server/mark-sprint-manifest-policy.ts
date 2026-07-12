@@ -16,6 +16,7 @@ import {
   INJECTION_POLICY,
   SEED_RULES,
 } from "./selah-brain-library";
+import { MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST } from "./mark-sprint-esv-contract";
 
 export const MARK_SPRINT_SLUGS = [
   "mark-8",
@@ -150,7 +151,7 @@ export interface MarkSprintManifestRequirements {
     ownerDecisionDigest: string;
     ownerSelectionStatus: string;
     runtimeConnectionStatus: string;
-    expectedRequestOptionsDigest: null;
+    expectedRequestOptionsDigest: string;
     expectedPassages: Array<{
       role: "context_before" | "primary" | "context_after";
       requestedReference: string;
@@ -265,7 +266,7 @@ export function buildMarkSprintManifestPolicy(
           guidance.source_requirement.owner_selection_status,
         runtimeConnectionStatus:
           guidance.source_requirement.runtime_connection_status,
-        expectedRequestOptionsDigest: null,
+        expectedRequestOptionsDigest: MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST,
         expectedPassages: [
           {
             role: "context_before" as const,

@@ -1,8 +1,16 @@
-# Generation Manifest v2
+# Generation Manifest v2 and protected v3 candidate
 
 > Offline, review-only groundwork. This does not read or write Supabase, alter
 > Studio, allowlist a slug, create a draft row, dispatch a job, call a model, or
 > authorize generation.
+
+V2 is preserved unchanged as historical evidence. V3 is a separate contract;
+it does not reinterpret or auto-upgrade a v2 approval. V3 binds the exact safe
+ESV source-bundle projection (assembler/normalizer/validator revisions, fixed
+request options, passage and response evidence, ranges, marker counts, and
+bundle digest) plus the one exact, deeply frozen OpenAI Chat Completions request.
+The request explicitly sets `store: false`; this is a provider-side storage
+opt-out request, not a claim of zero retention.
 
 Before a future Mark 8–11 authoring run can spend money or mutate a chapter, a
 server-owned preflight must bind the exact:
@@ -36,10 +44,11 @@ not claim byte-for-byte file identity.
 
 The version-controlled Mark policy must remain blocked. Brain v1.7 and the Mark
 guidance packet are review-only; the live Brain match has not been proved. The
-owner selected ESV on 2026-07-12, but the protected API source assembler,
-request-option digest, passage digests, and bundle digest do not exist. The
-exact stored exemplar ID and digest are absent; the assembled prompt does not
-yet exist; and no per-run owner authorization has been recorded.
+owner selected ESV on 2026-07-12. A protected assembler, fixed request-option
+digest, source-overlap gate, and v3 request/manifest composition candidate now
+exist only as synthetic-tested offline code. No real passage digest, stored
+example identity, live Brain/note snapshot, owner-approved per-run manifest,
+one-use fetch/run/persistence authorization, or connected Studio worker exists.
 
 The source decision is documented in `scripture-source-policy.md`. The manifest
 records the published-terms ambiguity honestly and never contains ESV text or
@@ -49,9 +58,11 @@ Run the offline proof with:
 
 ```text
 npm run verify:manifest
+npm run verify:source
+npm run verify:manifest-v3
 ```
 
-The verifier includes one synthetic approved manifest and rejects changed,
+The verifiers include synthetic approved manifests and reject changed,
 missing, duplicated, reordered, inactive, ambiguous, or unapproved material.
 The normal `npm run build` preflight runs this verifier after the Brain and
 authoring-contract checks.
@@ -71,6 +82,12 @@ that is only a fixture. Before wiring, one server-only request builder must
 produce the immutable object used both for hashing and for the SDK call; the
 worker must recompute its digest immediately before dispatch. Separately
 constructing a “manifest request” and a “runtime request” is not acceptable.
+
+V3 readiness, preflight, and passing-overlap capabilities are process-local,
+non-transferable evidence. They are deliberately reusable for exact verification
+and do not authorize a fetch, model call, database write, or publication. Runtime
+must add separately authenticated, expiring, slug/scope/revision-bound nonces and
+atomically consume them once at the corresponding external boundary.
 
 Run authorization, expiry, one-use tokens, concurrency locking, runtime draft
 QA, freshness comparison, and publish approval are intentionally separate

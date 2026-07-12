@@ -14,7 +14,11 @@ import {
   buildMarkSprintManifestPolicy,
   MARK_SPRINT_SLUGS,
 } from "../lib/server/mark-sprint-manifest-policy";
-import { assertGenericChapterGenerationAllowed } from "../lib/server/generate-chapter-workup";
+import { MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST } from "../lib/server/mark-sprint-esv-contract";
+import {
+  assertGenericChapterGenerationAllowed,
+  isProtectedMarkSprintGenerationIdentity,
+} from "../lib/server/generate-chapter-workup";
 
 const raw = {
   requestSystem: "PRIVATE SYSTEM MESSAGE\nDo not return me.",
@@ -360,7 +364,6 @@ for (const slug of MARK_SPRINT_SLUGS) {
     "brain_artifact_not_approved",
     "brain_live_match_missing",
     "source_not_connected",
-    "source_request_options_digest_missing",
     "source_passage_digests_missing",
     "source_digest_missing",
     "model_request_digest_missing",
@@ -405,6 +408,10 @@ for (const slug of MARK_SPRINT_SLUGS) {
   assert.equal(policy.requirements.source.commercialUseAllowed, false);
   assert.equal(policy.requirements.source.ownerSelectionStatus, "approved");
   assert.equal(policy.requirements.source.runtimeConnectionStatus, "not_connected");
+  assert.equal(
+    policy.requirements.source.expectedRequestOptionsDigest,
+    MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST,
+  );
   assert.equal(policy.requirements.source.readerAndGenerationSourcesAreDistinct, false);
   const serializedPolicy = JSON.stringify(policy);
   assert.ok(!serializedPolicy.includes("Preserve every movement"));
@@ -422,7 +429,7 @@ assert.throws(
       book: "Mark",
       chapter: 8,
     }),
-  /protected ESV source \+ generation-manifest-v2 runner is not connected/,
+  /protected ESV generation runner is not connected/,
   "generic generation must refuse the Mark sprint before OpenAI configuration or calls",
 );
 for (const protectedIdentity of [
@@ -430,12 +437,26 @@ for (const protectedIdentity of [
   { slug: "unexpected-slug", book: " mark ", chapter: 9 },
   { slug: "mark-10", book: "Other", chapter: 1 },
 ]) {
+  assert.equal(
+    isProtectedMarkSprintGenerationIdentity(protectedIdentity),
+    true,
+    `protected identity was not rejected before ordinary-flow mutation: ${JSON.stringify(protectedIdentity)}`,
+  );
   assert.throws(
     () => assertGenericChapterGenerationAllowed(protectedIdentity),
-    /protected ESV source \+ generation-manifest-v2 runner is not connected/,
+    /protected ESV generation runner is not connected/,
     `generic generation accepted protected identity ${JSON.stringify(protectedIdentity)}`,
   );
 }
+assert.equal(
+  isProtectedMarkSprintGenerationIdentity({ slug: "mark-0008" }),
+  true,
+  "zero-padded Mark sprint alias reached the ordinary flow",
+);
+assert.equal(
+  isProtectedMarkSprintGenerationIdentity({ slug: "mark-7" }),
+  false,
+);
 assert.doesNotThrow(() =>
   assertGenericChapterGenerationAllowed({
     slug: "mark-7",

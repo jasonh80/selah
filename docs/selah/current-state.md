@@ -109,11 +109,19 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   primary ESV chapter plus one adjacent ESV chapter on each side, each and the
   ordered bundle digest-bound without storing text in the repo, manifest, logs,
   or workup. See `docs/selah/scripture-source-policy.md`.
-- Generation Manifest v2 is offline, review-only groundwork. It binds exact
-  model, prompt, Brain rules, chapter notes, exemplar, source, and owner-approved
-  manifest digests, and intentionally reports every current Mark sprint chapter
-  blocked. It is not wired to Studio or a worker; see
+- Generation Manifest v2 remains frozen historical groundwork. A separate
+  offline v3 candidate now binds the richer protected ESV response evidence,
+  exact frozen OpenAI Chat Completions request (`store: false`), Brain rules,
+  chapter notes, exemplar, source-overlap result, and owner-approved manifest
+  digest without persisting private text. V3 capabilities are process-local
+  evidence, not run authorization. It is not wired to Studio or a worker; see
   `docs/selah/generation-manifest.md`.
+- The protected ESV source assembler and overlap gate are synthetic-tested only.
+  They validate the ESV's omitted disputed verse numbers in these Mark windows,
+  reject partial/oversized/mismatched responses, retain cancellation through
+  body reads, keep source text non-enumerable, and block copied wording hidden
+  within or across JSON fields. Ordinary Mark 8–11 generation now refuses before
+  allowlist or chapter-row mutation. No runtime path imports the assembler.
 - A local `mark-sprint-copy-review-v1.0` authoring contract now verifies the
   Mark 8–11 structural floor (full passage movements, FAQ, content modules,
   placeholder image shape, and no embedded verse array). It is not wired to
