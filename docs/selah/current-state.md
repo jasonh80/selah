@@ -122,7 +122,13 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   below the publishable floor, benchmark-level voice/source/freshness, and a
   sufficient typed remediation plan. It remains review-only, cannot perform the
   semantic judgment itself, calls a qualifying result `benchmark_ready`, and
-  always leaves that draft at `needs_owner_review`; see
+  always leaves that draft at `needs_owner_review`. The v2 offline evaluator
+  now refuses owner readiness unless three separately keyed authenticated
+  receipts (owner approval, reviewer assignment, automated validation), the
+  active review/registry heads, complete resolution/privacy reports, and the
+  content score all agree. Its test keys are ephemeral; it is not wired to
+  Studio and cannot be operational until a protected server assembler supplies
+  the authority policy and current state; see
   `docs/selah/benchmark-quality-review.md`.
 
 ## Next up

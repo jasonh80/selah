@@ -25,6 +25,9 @@ session for an already-audited release candidate, not the first quality check.
 - Benchmark set / digest:
 - Benchmark rubric / digest:
 - Artifact registry / resolver version / evidence and remediation reports:
+- Trusted registry record / revision / current-head digest:
+- Evidence authority policy / approval key / assignment key / validation key:
+- Active review ID / assignment ID / verification time:
 - Benchmark review / digest:
 
 The structural machine gate must say **PASS** and contain zero blockers. The
@@ -34,11 +37,18 @@ does not prove the editorial judgments are true. Any content, image, rule,
 note, example, source, model, prompt, or review change invalidates this card
 and requires new digests and reports.
 
-The current local evaluator is only a structural floor. It is not yet bound to a
-generation manifest or workup digest, so it cannot prove that Selah Brain, the
-approved model, rules, notes, source, prompt, or exemplar authored the draft.
-Those identities must fail closed in the future pre-generation manifest before
-this card can be used operationally.
+An owner-ready v2 report requires the content gate and authenticated-evidence
+gate together. Browser-supplied keys, clocks, assignment IDs, report verdicts,
+or registry heads are never acceptable evidence. Until the protected Studio
+assembler loads those values from current server state, this card remains an
+offline review template only.
+
+The separate local copy-review evaluator is only a structural floor. The v2
+benchmark evaluator binds manifest and workup identities, but neither evaluator
+is connected to real canonical Studio records yet. Therefore the offline suite
+still cannot prove operationally that Selah Brain, the approved model, rules,
+notes, source, prompt, or exemplar authored a real draft. The protected server
+assembler must load and bind those identities before this card can be used.
 
 ## Independent benchmark review
 

@@ -2,9 +2,17 @@
 // review. It validates and scores already-produced review evidence; it does not
 // perform the semantic review, call a model, mutate a draft, or authorize
 // publication. Requirements must be assembled from authenticated server-owned
-// records, never ordinary request JSON.
+// records, never ordinary request JSON. The trusted context is a composition-
+// root input: no route may deserialize its authority policy, clock, key IDs,
+// active assignment, resolver/scanner versions, or current heads from a client.
 import rubricJson from "../ai/quality/selah-benchmark-rubric.v1.json";
 import { sha256Canonical } from "./generation-manifest";
+import {
+  verifyAuthenticatedBenchmarkEvidence,
+  type AuthenticatedBenchmarkEvidenceV1,
+  type BenchmarkEvidenceExpectationsV1,
+  type TrustedBenchmarkEvidenceAuthorityPolicyV1,
+} from "./selah-benchmark-evidence";
 
 type RubricCriterion = {
   id: string;
@@ -263,8 +271,22 @@ export interface BenchmarkReviewSubmissionV1 {
   }>;
 }
 
-export interface BenchmarkReviewReportV1 {
-  reportVersion: "selah-benchmark-review-v1";
+export interface TrustedBenchmarkReviewContextV1 {
+  contextVersion: "selah-trusted-benchmark-review-context-v1";
+  authorityPolicy: TrustedBenchmarkEvidenceAuthorityPolicyV1;
+  authenticatedEvidence: AuthenticatedBenchmarkEvidenceV1;
+  verificationTime: string;
+  resolverVersion: string;
+  privacyScannerVersion: string;
+  author: {
+    id: string;
+    version: string;
+  };
+  currentState: BenchmarkEvidenceExpectationsV1["trustedCurrentState"];
+}
+
+export interface BenchmarkReviewReportV2 {
+  reportVersion: "selah-benchmark-review-v2";
   artifact: "chapter_workup";
   stage: "benchmark_comparison";
   slug: string;
@@ -292,6 +314,15 @@ export interface BenchmarkReviewReportV1 {
   machineVerdict: "pass" | "block";
   qualityVerdict: "benchmark_ready" | "targeted_revision" | "block";
   overallStatus: "blocked" | "targeted_revision" | "needs_owner_review";
+  contentMachineVerdict: "pass" | "block";
+  contentReadyForOwnerReview: boolean;
+  authenticatedEvidenceReady: boolean;
+  authenticatedEvidenceBundleDigest: string;
+  evidenceAuthorityPolicyId: string;
+  evidenceApprovalKeyId: string;
+  evidenceAssignmentKeyId: string;
+  evidenceValidationKeyId: string;
+  verificationTime: string;
   readyForOwnerReview: boolean;
   reviewSnapshotAvailable: boolean;
   blockingCriterionIds: string[];
@@ -303,6 +334,7 @@ export interface BenchmarkReviewReportV1 {
 const DIGEST = /^[a-f0-9]{64}$/;
 const SAFE_SLUG = /^mark-(?:8|9|10|11)$/;
 const SAFE_RESOLVER_VERSION = /^[a-z0-9][a-z0-9._-]{0,79}$/;
+const SAFE_ARTIFACT_PATH = /^[A-Za-z][A-Za-z0-9-]*:\/[A-Za-z0-9_./~:-]+$/;
 const REVIEWER_KINDS = new Set<BenchmarkReviewerKind>([
   "owner",
   "human_editor",
@@ -340,8 +372,15 @@ function assertExactKeys(value: Record<string, unknown>, path: string, allowed: 
   }
 }
 
-function assertDenseArray(value: unknown, path: string): asserts value is unknown[] {
+function assertDenseArray(
+  value: unknown,
+  path: string,
+  maximumLength?: number,
+): asserts value is unknown[] {
   if (!Array.isArray(value)) throw new Error(`invalid benchmark review array at ${path}`);
+  if (maximumLength !== undefined && value.length > maximumLength) {
+    throw new Error(`benchmark review ${path} exceeds maximum`);
+  }
   for (let index = 0; index < value.length; index++) {
     if (!(index in value)) throw new Error(`sparse benchmark review array at ${path}`);
   }
@@ -533,7 +572,7 @@ function assertRuntimeShape(
   for (const key of Object.keys(submission.attestations) as Array<keyof typeof submission.attestations>) {
     assertBoolean(submission.attestations[key], `submission.attestations.${key}`);
   }
-  assertDenseArray(submission.criteria, "submission.criteria");
+  assertDenseArray(submission.criteria, "criteria", rubric.criteria.length);
   submission.criteria.forEach((criterion, index) => {
     assertPlainRecord(criterion, `submission.criteria[${index}]`);
     assertExactKeys(criterion, `submission.criteria[${index}]`, [
@@ -546,11 +585,19 @@ function assertRuntimeShape(
     assertString(criterion.id, `submission.criteria[${index}].id`);
     assertNumber(criterion.rating, `submission.criteria[${index}].rating`);
     assertString(criterion.rationale, `submission.criteria[${index}].rationale`);
-    assertDenseArray(criterion.evidencePaths, `submission.criteria[${index}].evidencePaths`);
+    assertDenseArray(
+      criterion.evidencePaths,
+      `evidence paths at submission.criteria[${index}]`,
+      MAX_EVIDENCE_PATHS,
+    );
     criterion.evidencePaths.forEach((path, pathIndex) =>
       assertString(path, `submission.criteria[${index}].evidencePaths[${pathIndex}]`),
     );
-    assertDenseArray(criterion.revisionTargets, `submission.criteria[${index}].revisionTargets`);
+    assertDenseArray(
+      criterion.revisionTargets,
+      `revision targets at submission.criteria[${index}]`,
+      MAX_REVISION_TARGETS,
+    );
     criterion.revisionTargets.forEach((target, targetIndex) => {
       assertPlainRecord(target, `submission.criteria[${index}].revisionTargets[${targetIndex}]`);
       assertExactKeys(target, `submission.criteria[${index}].revisionTargets[${targetIndex}]`, [
@@ -566,6 +613,43 @@ function assertRuntimeShape(
       );
     });
   });
+}
+
+function assertTrustedContextShape(value: TrustedBenchmarkReviewContextV1): void {
+  assertPlainRecord(value, "trustedContext");
+  assertExactKeys(value, "trustedContext", [
+    "contextVersion",
+    "authorityPolicy",
+    "authenticatedEvidence",
+    "verificationTime",
+    "resolverVersion",
+    "privacyScannerVersion",
+    "author",
+    "currentState",
+  ]);
+  if (value.contextVersion !== "selah-trusted-benchmark-review-context-v1") {
+    throw new Error("invalid trusted benchmark review context version");
+  }
+  for (const key of ["verificationTime", "resolverVersion", "privacyScannerVersion"] as const) {
+    assertString(value[key], `trustedContext.${key}`);
+  }
+  if (
+    Number.isNaN(Date.parse(value.verificationTime)) ||
+    !SAFE_RESOLVER_VERSION.test(value.resolverVersion) ||
+    !SAFE_RESOLVER_VERSION.test(value.privacyScannerVersion)
+  ) {
+    throw new Error("invalid trusted benchmark review context identity");
+  }
+  assertPlainRecord(value.authorityPolicy, "trustedContext.authorityPolicy");
+  assertPlainRecord(value.authenticatedEvidence, "trustedContext.authenticatedEvidence");
+  assertPlainRecord(value.author, "trustedContext.author");
+  assertExactKeys(value.author, "trustedContext.author", ["id", "version"]);
+  assertString(value.author.id, "trustedContext.author.id");
+  assertString(value.author.version, "trustedContext.author.version");
+  if (!value.author.id.trim() || !value.author.version.trim()) {
+    throw new Error("invalid trusted benchmark author identity");
+  }
+  assertPlainRecord(value.currentState, "trustedContext.currentState");
 }
 
 function projectRequirements(
@@ -624,6 +708,7 @@ function projectReviewContent(submission: BenchmarkReviewSubmissionV1): unknown 
   };
 }
 
+/** Content identity only. Authentication requires the owner-approval signed receipt. */
 export function benchmarkApprovalEvidenceDigest(input: {
   setId: string;
   setDigest: string;
@@ -634,6 +719,7 @@ export function benchmarkApprovalEvidenceDigest(input: {
   return sha256Canonical({ type: "benchmark-set-approval-v1", ...input });
 }
 
+/** Content identity only. Authentication requires the role-scoped signed receipt. */
 export function reviewerAssignmentEvidenceDigest(input: {
   kind: BenchmarkReviewerKind;
   id: string;
@@ -742,8 +828,10 @@ export function getSelahBenchmarkRubric(): BenchmarkRubric {
 export function evaluateSelahBenchmarkReview(
   requirements: BenchmarkReviewRequirementsV1,
   submission: BenchmarkReviewSubmissionV1,
-): BenchmarkReviewReportV1 {
+  trustedContext: TrustedBenchmarkReviewContextV1,
+): BenchmarkReviewReportV2 {
   assertRuntimeShape(requirements, submission);
+  assertTrustedContextShape(trustedContext);
   const findings: BenchmarkReviewFinding[] = [];
   const add = (code: string, path: string, message: string) =>
     findings.push({ code, path, message });
@@ -755,6 +843,11 @@ export function evaluateSelahBenchmarkReview(
       add("INVALID_DIGEST", path, `${path} must use a lowercase SHA-256 digest`);
     } else if (expected !== actual) {
       add("DIGEST_MISMATCH", path, `${path} does not match the bound artifact digest`);
+    }
+  };
+  const digestShape = (path: string, value: string) => {
+    if (!DIGEST.test(value)) {
+      add("INVALID_DIGEST", path, `${path} must use a lowercase SHA-256 digest`);
     }
   };
 
@@ -980,9 +1073,8 @@ export function evaluateSelahBenchmarkReview(
     reviewContentDigest,
     requirements.reviewValidation.reviewContentDigest,
   );
-  digest(
+  digestShape(
     "reviewValidation.artifactRegistryDigest",
-    requirements.reviewValidation.artifactRegistryDigest,
     requirements.reviewValidation.artifactRegistryDigest,
   );
   if (!SAFE_RESOLVER_VERSION.test(requirements.reviewValidation.resolverVersion)) {
@@ -1013,9 +1105,8 @@ export function evaluateSelahBenchmarkReview(
       add("REVIEW_VALIDATION_BLOCKED", `requirements.reviewValidation.${key}`, message);
     }
   }
-  digest(
+  digestShape(
     "reviewValidation.evidenceResolutionReportDigest",
-    requirements.reviewValidation.evidenceResolutionReportDigest,
     requirements.reviewValidation.evidenceResolutionReportDigest,
   );
   digest(
@@ -1032,9 +1123,8 @@ export function evaluateSelahBenchmarkReview(
     }),
     requirements.reviewValidation.evidenceResolutionBindingDigest,
   );
-  digest(
+  digestShape(
     "reviewValidation.remediationResolutionReportDigest",
-    requirements.reviewValidation.remediationResolutionReportDigest,
     requirements.reviewValidation.remediationResolutionReportDigest,
   );
   digest(
@@ -1052,9 +1142,8 @@ export function evaluateSelahBenchmarkReview(
     }),
     requirements.reviewValidation.remediationResolutionBindingDigest,
   );
-  digest(
+  digestShape(
     "reviewValidation.privacyScanReportDigest",
-    requirements.reviewValidation.privacyScanReportDigest,
     requirements.reviewValidation.privacyScanReportDigest,
   );
   digest(
@@ -1134,6 +1223,7 @@ export function evaluateSelahBenchmarkReview(
         (path) =>
           !path.trim() ||
           path.length > MAX_EVIDENCE_PATH_LENGTH ||
+          !SAFE_ARTIFACT_PATH.test(path) ||
           !rubric.evidence_policy.allowed_prefixes.some((prefix) => path.startsWith(prefix)),
       )
     ) {
@@ -1200,7 +1290,11 @@ export function evaluateSelahBenchmarkReview(
         target.domain === "regenerate_clean"
           ? target.path === prefix
           : target.path.startsWith(prefix) && target.path.length > prefix.length;
-      if (!pathMatchesDomain || target.path.length > MAX_EVIDENCE_PATH_LENGTH) {
+      if (
+        !pathMatchesDomain ||
+        target.path.length > MAX_EVIDENCE_PATH_LENGTH ||
+        !SAFE_ARTIFACT_PATH.test(target.path)
+      ) {
         add(
           "INVALID_REVISION_TARGET",
           `${targetPath}.path`,
@@ -1275,6 +1369,82 @@ export function evaluateSelahBenchmarkReview(
     }
   }
 
+  const contentFindings = stableFindings(findings);
+  const evidencePaths = submission.criteria.flatMap((criterion) =>
+    criterion.evidencePaths.map((path) => ({ criterionId: criterion.id, path })),
+  );
+  const remediationTargets = submission.criteria.flatMap((criterion) =>
+    criterion.revisionTargets.map((target) => ({
+      criterionId: criterion.id,
+      domain: target.domain,
+      path: target.path,
+    })),
+  );
+  const privacyFieldPaths = submission.criteria.flatMap((criterion, criterionIndex) => [
+    `submission.criteria[${criterionIndex}].rationale`,
+    ...criterion.revisionTargets.map(
+      (_target, targetIndex) =>
+        `submission.criteria[${criterionIndex}].revisionTargets[${targetIndex}].instruction`,
+    ),
+  ]);
+  const authenticatedEvidenceVerification = verifyAuthenticatedBenchmarkEvidence(
+    trustedContext.authorityPolicy,
+    trustedContext.authenticatedEvidence,
+    {
+      subject: { ...requirements.subject },
+      prerequisiteVerdicts: {
+        generationManifestReady: requirements.prerequisites.generationManifestReady,
+        structuralMachineVerdict: requirements.prerequisites.structuralMachineVerdict,
+        sourceOverlapMachineVerdict: requirements.prerequisites.sourceOverlapMachineVerdict,
+        freshnessMachineVerdict: requirements.prerequisites.freshnessMachineVerdict,
+      },
+      draftDigest: requirements.prerequisites.draftDigest,
+      generationManifestDigest: requirements.prerequisites.generationManifestDigest,
+      structuralReportDigest: requirements.prerequisites.structuralReportDigest,
+      sourceOverlapReportDigest: requirements.prerequisites.sourceOverlapReportDigest,
+      freshnessReportDigest: requirements.prerequisites.freshnessReportDigest,
+      approvedVoiceExampleDigest: requirements.prerequisites.approvedVoiceExampleDigest,
+      benchmarkSetId: requirements.benchmark.setId,
+      benchmarkSetDigest: requirements.benchmark.setDigest,
+      benchmarkApproval: {
+        recordId: requirements.benchmark.approval.recordId,
+        approvedBy: requirements.benchmark.approval.approvedBy,
+        approvedAt: requirements.benchmark.approval.approvedAt,
+      },
+      comparisonMode: requirements.benchmark.comparisonMode,
+      reviewer: {
+        kind: requirements.reviewerAssignment.kind,
+        id: requirements.reviewerAssignment.id,
+        version: requirements.reviewerAssignment.version,
+      },
+      author: { ...trustedContext.author },
+      independentFromAuthor: requirements.reviewerAssignment.independentFromAuthor,
+      rubricDigest: SELAH_BENCHMARK_RUBRIC_DIGEST,
+      evidencePolicyDigest: SELAH_BENCHMARK_EVIDENCE_POLICY_DIGEST,
+      reviewContentDigest,
+      resolverVersion: trustedContext.resolverVersion,
+      evidenceResolution: {
+        reportDigest: requirements.reviewValidation.evidenceResolutionReportDigest,
+        verdict: requirements.reviewValidation.evidenceResolutionVerdict,
+      },
+      remediationResolution: {
+        reportDigest: requirements.reviewValidation.remediationResolutionReportDigest,
+        verdict: requirements.reviewValidation.remediationResolutionVerdict,
+      },
+      privacyScan: {
+        reportDigest: requirements.reviewValidation.privacyScanReportDigest,
+        verdict: requirements.reviewValidation.privacyScanVerdict,
+      },
+      privacyScannerVersion: trustedContext.privacyScannerVersion,
+      evidencePaths,
+      remediationTargets,
+      privacyFieldPaths,
+      verificationTime: trustedContext.verificationTime,
+      trustedCurrentState: trustedContext.currentState,
+    },
+  );
+  findings.push(...authenticatedEvidenceVerification.findings);
+
   const projectedRequirements = projectRequirements(requirements);
   const projectedSubmission = projectSubmission(submission);
   const requirementsDigest = sha256Canonical(projectedRequirements);
@@ -1282,10 +1452,10 @@ export function evaluateSelahBenchmarkReview(
   const sortedFindings = stableFindings(findings);
 
   let weightedScore: number | null = null;
-  let qualityVerdict: BenchmarkReviewReportV1["qualityVerdict"] = "block";
+  let qualityVerdict: BenchmarkReviewReportV2["qualityVerdict"] = "block";
   let blockingCriterionIds: string[] = [];
   let revisionCriterionIds: string[] = [];
-  if (sortedFindings.length === 0) {
+  if (contentFindings.length === 0) {
     const ratingById = new Map(submission.criteria.map((criterion) => [criterion.id, criterion.rating]));
     const rawScore = rubric.criteria.reduce(
       (total, criterion) => total + criterion.weight * (ratingById.get(criterion.id)! / 4),
@@ -1317,80 +1487,24 @@ export function evaluateSelahBenchmarkReview(
     }
   }
 
+  const contentMachineVerdict = contentFindings.length === 0 ? "pass" : "block";
+  const authenticatedEvidenceReady = authenticatedEvidenceVerification.ok;
   const machineVerdict = sortedFindings.length === 0 ? "pass" : "block";
-  const overallStatus: BenchmarkReviewReportV1["overallStatus"] =
+  const contentReadyForOwnerReview =
+    contentMachineVerdict === "pass" && qualityVerdict === "benchmark_ready";
+  const readyForOwnerReview =
+    contentReadyForOwnerReview && authenticatedEvidenceReady && machineVerdict === "pass";
+  const overallStatus: BenchmarkReviewReportV2["overallStatus"] =
     machineVerdict === "block" || qualityVerdict === "block"
       ? "blocked"
       : qualityVerdict === "targeted_revision"
         ? "targeted_revision"
         : "needs_owner_review";
-  const readyForOwnerReview =
-    machineVerdict === "pass" && qualityVerdict === "benchmark_ready";
-
-  const expectedPrivacyBinding = privacyScanBindingDigest({
-    reviewContentDigest,
-    benchmarkSetDigest: requirements.benchmark.setDigest,
-    approvedVoiceExampleDigest: requirements.prerequisites.approvedVoiceExampleDigest,
-    privacyScanReportDigest: requirements.reviewValidation.privacyScanReportDigest,
-    privacyScanVerdict: requirements.reviewValidation.privacyScanVerdict,
-  });
-  const privacyGatePassed =
-    requirements.reviewValidation.privacyScanVerdict === "pass" &&
-    DIGEST.test(requirements.reviewValidation.privacyScanReportDigest) &&
-    DIGEST.test(requirements.benchmark.setDigest) &&
-    DIGEST.test(requirements.prerequisites.approvedVoiceExampleDigest) &&
-    DIGEST.test(requirements.reviewValidation.reviewContentDigest) &&
-    requirements.reviewValidation.reviewContentDigest === reviewContentDigest &&
-    DIGEST.test(requirements.reviewValidation.privacyScanBindingDigest) &&
-    requirements.reviewValidation.privacyScanBindingDigest === expectedPrivacyBinding;
-  const expectedEvidenceBinding = evidenceResolutionBindingDigest({
-    draftDigest: requirements.prerequisites.draftDigest,
-    reviewContentDigest,
-    artifactRegistryDigest: requirements.reviewValidation.artifactRegistryDigest,
-    rubricDigest: SELAH_BENCHMARK_RUBRIC_DIGEST,
-    evidencePolicyDigest: SELAH_BENCHMARK_EVIDENCE_POLICY_DIGEST,
-    resolverVersion: SAFE_RESOLVER_VERSION.test(requirements.reviewValidation.resolverVersion)
-      ? requirements.reviewValidation.resolverVersion
-      : "invalid-resolver",
-    evidenceResolutionReportDigest: requirements.reviewValidation.evidenceResolutionReportDigest,
-    evidenceResolutionVerdict: requirements.reviewValidation.evidenceResolutionVerdict,
-  });
-  const evidenceGatePassed =
-    requirements.reviewValidation.evidenceResolutionVerdict === "pass" &&
-    DIGEST.test(requirements.reviewValidation.evidenceResolutionReportDigest) &&
-    DIGEST.test(requirements.prerequisites.draftDigest) &&
-    DIGEST.test(requirements.reviewValidation.artifactRegistryDigest) &&
-    SAFE_RESOLVER_VERSION.test(requirements.reviewValidation.resolverVersion) &&
-    DIGEST.test(requirements.reviewValidation.reviewContentDigest) &&
-    requirements.reviewValidation.reviewContentDigest === reviewContentDigest &&
-    DIGEST.test(requirements.reviewValidation.evidenceResolutionBindingDigest) &&
-    requirements.reviewValidation.evidenceResolutionBindingDigest === expectedEvidenceBinding;
-  const expectedRemediationBinding = remediationResolutionBindingDigest({
-    draftDigest: requirements.prerequisites.draftDigest,
-    reviewContentDigest,
-    artifactRegistryDigest: requirements.reviewValidation.artifactRegistryDigest,
-    rubricDigest: SELAH_BENCHMARK_RUBRIC_DIGEST,
-    evidencePolicyDigest: SELAH_BENCHMARK_EVIDENCE_POLICY_DIGEST,
-    resolverVersion: requirements.reviewValidation.resolverVersion,
-    remediationResolutionReportDigest:
-      requirements.reviewValidation.remediationResolutionReportDigest,
-    remediationResolutionVerdict: requirements.reviewValidation.remediationResolutionVerdict,
-  });
-  const remediationGatePassed =
-    requirements.reviewValidation.remediationResolutionVerdict === "pass" &&
-    DIGEST.test(requirements.reviewValidation.remediationResolutionReportDigest) &&
-    DIGEST.test(requirements.reviewValidation.artifactRegistryDigest) &&
-    SAFE_RESOLVER_VERSION.test(requirements.reviewValidation.resolverVersion) &&
-    DIGEST.test(requirements.reviewValidation.reviewContentDigest) &&
-    requirements.reviewValidation.reviewContentDigest === reviewContentDigest &&
-    DIGEST.test(requirements.reviewValidation.remediationResolutionBindingDigest) &&
-    requirements.reviewValidation.remediationResolutionBindingDigest ===
-      expectedRemediationBinding;
   const reviewSnapshotAvailable =
-    privacyGatePassed && evidenceGatePassed && remediationGatePassed;
+    authenticatedEvidenceReady && contentMachineVerdict === "pass";
 
-  const reportWithoutDigest: Omit<BenchmarkReviewReportV1, "reviewDigest"> = {
-    reportVersion: "selah-benchmark-review-v1" as const,
+  const reportWithoutDigest: Omit<BenchmarkReviewReportV2, "reviewDigest"> = {
+    reportVersion: "selah-benchmark-review-v2" as const,
     artifact: "chapter_workup" as const,
     stage: "benchmark_comparison" as const,
     slug: subjectIsValid ? requirements.subject.slug : "invalid-subject",
@@ -1421,6 +1535,15 @@ export function evaluateSelahBenchmarkReview(
     machineVerdict,
     qualityVerdict,
     overallStatus,
+    contentMachineVerdict,
+    contentReadyForOwnerReview,
+    authenticatedEvidenceReady,
+    authenticatedEvidenceBundleDigest: authenticatedEvidenceVerification.bundleDigest,
+    evidenceAuthorityPolicyId: authenticatedEvidenceVerification.authorityPolicyId,
+    evidenceApprovalKeyId: authenticatedEvidenceVerification.approvalKeyId,
+    evidenceAssignmentKeyId: authenticatedEvidenceVerification.assignmentKeyId,
+    evidenceValidationKeyId: authenticatedEvidenceVerification.validationKeyId,
+    verificationTime: trustedContext.verificationTime,
     readyForOwnerReview,
     reviewSnapshotAvailable,
     blockingCriterionIds,
@@ -1432,11 +1555,12 @@ export function evaluateSelahBenchmarkReview(
   return deepFreeze({ ...reportWithoutDigest, reviewDigest });
 }
 
-export function assertBenchmarkReviewReadyForOwner(
+export function assertAuthenticatedBenchmarkReviewReadyForOwner(
   requirements: BenchmarkReviewRequirementsV1,
   submission: BenchmarkReviewSubmissionV1,
-): BenchmarkReviewReportV1 {
-  const report = evaluateSelahBenchmarkReview(requirements, submission);
+  trustedContext: TrustedBenchmarkReviewContextV1,
+): BenchmarkReviewReportV2 {
+  const report = evaluateSelahBenchmarkReview(requirements, submission, trustedContext);
   if (!report.readyForOwnerReview) {
     throw new Error(
       `benchmark review is not ready for owner review (${report.machineVerdict}/${report.qualityVerdict})`,

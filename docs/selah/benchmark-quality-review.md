@@ -1,4 +1,4 @@
-# Selah Benchmark Quality Review v1
+# Selah Benchmark Quality Review v2
 
 > Offline, review-only groundwork. This does not call a model, read or write
 > Supabase, change Studio, generate a chapter or image, or authorize publishing.
@@ -77,44 +77,64 @@ completion gate after copy is frozen.
 
 ## What the validator proves
 
-`lib/server/selah-benchmark-review.ts` is a pure validator and scorer. It can
-prove that a review submission:
+`lib/server/selah-benchmark-review.ts` is a pure validator and scorer. Its v2
+owner-readiness result now requires both the content/rubric gate and the
+authenticated-evidence gate. It can prove that a review submission:
 
 - names the exact chapter;
 - is bound to lowercase SHA-256 identities for the generation manifest,
   structural, overlap, freshness, evidence-resolution, and privacy reports,
   draft, approved voice exemplar, benchmark set, and rubric;
 - follows the complete ordered rubric;
-- matches a server-owned benchmark approval and independent reviewer assignment;
+- matches separately signed benchmark approval, reviewer-assignment, and
+  review-validation receipts, with a different trusted key for each role;
+- binds the authenticated assignment to one review ID, one active time window,
+  the exact draft author, and a distinct independent reviewer;
 - contains bounded rationale and criterion-appropriate evidence namespaces;
-- is bound to a passing, versioned server resolution report for those evidence
-  paths and the complete artifact-registry digest;
+- carries the complete evidence-resolution, remediation-resolution, and privacy
+  report records rather than accepting detached caller-supplied `pass` labels;
+- derives each report verdict from exact path coverage, registry resolution,
+  scan completion, and findings, then checks the signed validation receipt;
+- binds every registry subpath to its canonical root record, revision, type,
+  and digest, and rejects a bundle replayed after the trusted registry or draft
+  head changes;
 - includes typed, actionable workup, manifest, review-process, or clean-run
   remediation targets that also pass a criterion-aware resolver;
 - cannot reach owner review below the score, criterion, source, or freshness
   floors; and
 - produces separate deterministic requirements, submission, content, and final
   review digests; and
-- returns an immutable, privacy-cleared owner snapshot only after the privacy
-  binding passes.
+- returns an immutable, privacy-cleared owner snapshot only after content and
+  authenticated evidence both pass.
 
 It cannot prove that a rationale is true, that a score is wise, that private
 wording was actually withheld, or that two passages are theologically
-equivalent. Those require authenticated server context, source-aware tools,
-and human/editorial judgment.
+equivalent. A registry subpath is trusted only when the future protected
+assembler derives it atomically from the canonical artifact; the pure contract
+cannot reconstruct an artifact from a digest. Those limits still require
+source-aware tools, protected server state, and human/editorial judgment.
 
 ## Future trusted boundary
 
-Studio must never accept the requirements object, approval state, benchmark
-digest, reviewer identity, independence flag, or prerequisite readiness from
-ordinary browser input. A protected server assembler must derive them from
-immutable, authenticated records and re-check them before publication.
+Studio must never accept the requirements object, authority policy, trusted
+clock, active review/assignment IDs, registry head, resolver/scanner versions,
+approval state, reviewer identity, independence flag, or prerequisite readiness
+from ordinary browser input. A protected server assembler must derive them from
+immutable, authenticated records and re-check them before publication. The
+current code deliberately has no route, worker, database, or Studio wiring.
 
-The assembler must load each canonical report and derive its digest and verdict
-atomically; it may not accept a report digest and a separate caller-supplied
-`pass`. The reproducible SHA-256 binding helpers prove consistency, not
-authenticity. Issue #8 must sign and persist the complete run envelope before a
-quality result can be trusted operationally.
+The assembler must load each canonical artifact and report, derive registry
+entries, digests, and verdicts atomically, and issue role-scoped receipts. It
+may not accept an authority, public key, historical clock, registry entry,
+report digest, or separate caller-supplied `pass`. The older reproducible
+SHA-256 binding helpers remain content-identity checks, not authentication.
+Issue #8 must persist the complete revision-bound run envelope before a quality
+result can be trusted operationally.
+
+No production private key exists in this branch. The offline verifier creates
+three ephemeral Ed25519 test keypairs in memory. A later approved runtime design
+must use protected, independently rotatable signing keys; it must not reuse
+`DEV_ADMIN_TOKEN`, an API key, or any secret committed to the repository.
 
 The pure evaluator deep-freezes its returned report, but future persistence and
 publishing must still reassemble trusted requirements, re-run the evaluator,
@@ -129,5 +149,9 @@ Run the offline proof with:
 npm run verify:benchmark
 ```
 
-The verifier uses synthetic prose only, exercises fail-closed mutations, and
-does not claim that a real chapter passed the semantic rubric.
+The verifier uses synthetic prose and ephemeral keys only. It exercises the
+content mutations plus forged approvals, attacker keys, role collapse, expired
+assignments, review replay, stale registry heads, unresolved reports, missing
+privacy coverage, private-text findings, detached registry subpaths, sparse
+arrays, and author/reviewer conflicts. It does not claim that a real chapter
+passed the semantic rubric.
