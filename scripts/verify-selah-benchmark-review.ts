@@ -816,6 +816,34 @@ expectAuthenticatedBlocked(
   "AUTHENTICATED_EVIDENCE_MISMATCH",
 );
 expectAuthenticatedBlocked(
+  "review ID reused as a receipt ID",
+  (_r, _s, context) => {
+    const old = context.authenticatedEvidence.reviewerAssignment;
+    context.authenticatedEvidence.reviewerAssignment = signReceipt(
+      old.payload,
+      context.currentState.reviewId,
+      assignmentAuthority.authority,
+      assignmentAuthority.privateKey,
+      old.issuedAt,
+    );
+  },
+  "AUTHENTICATED_EVIDENCE_ID_REPLAY",
+);
+expectAuthenticatedBlocked(
+  "assignment ID reused as a receipt ID",
+  (_r, _s, context) => {
+    const old = context.authenticatedEvidence.reviewValidation;
+    context.authenticatedEvidence.reviewValidation = signReceipt(
+      old.payload,
+      context.currentState.assignmentId,
+      validationAuthority.authority,
+      validationAuthority.privateKey,
+      old.issuedAt,
+    );
+  },
+  "AUTHENTICATED_EVIDENCE_ID_REPLAY",
+);
+expectAuthenticatedBlocked(
   "unresolved evidence report labeled pass",
   (_r, _s, context) => {
     context.authenticatedEvidence.evidenceResolutionReport.results[0].status = "missing";
@@ -874,6 +902,27 @@ expectAuthenticatedBlocked(
     const sparse: ArtifactRegistryEntryV1[] = [];
     sparse.length = context.authenticatedEvidence.artifactRegistry.entries.length;
     context.authenticatedEvidence.artifactRegistry.entries = sparse;
+  },
+  "AUTHENTICATED_EVIDENCE_MALFORMED",
+);
+expectAuthenticatedBlocked(
+  "dot segment in authenticated registry path",
+  (_r, _s, context) => {
+    const entry = context.authenticatedEvidence.artifactRegistry.entries.find(
+      (candidate) => candidate.path !== candidate.rootPath,
+    )!;
+    const namespace = entry.rootPath.slice(0, entry.rootPath.indexOf(":/") + 2);
+    entry.path = `${namespace}./synthetic-field`;
+  },
+  "AUTHENTICATED_EVIDENCE_MALFORMED",
+);
+expectAuthenticatedBlocked(
+  "dot-dot segment in authenticated registry root path",
+  (_r, _s, context) => {
+    const entry = context.authenticatedEvidence.artifactRegistry.entries.find(
+      (candidate) => candidate.path !== candidate.rootPath,
+    )!;
+    entry.rootPath = "workup:/../__artifact__";
   },
   "AUTHENTICATED_EVIDENCE_MALFORMED",
 );
@@ -1114,6 +1163,23 @@ expectMachineBlocked(
   "nonsense evidence namespace",
   (_r, s) => { s.criteria[0].evidencePaths = ["nonsense-one", "nonsense-two"]; },
   "INVALID_EVIDENCE_PATH",
+);
+expectMachineBlocked(
+  "dot segment in evidence path",
+  (_r, s) => { s.criteria[0].evidencePaths[0] = "workup:/summary/./movement"; },
+  "INVALID_EVIDENCE_PATH",
+);
+expectMachineBlocked(
+  "dot-dot segment in remediation path",
+  (_r, s) => {
+    s.criteria[0].rating = 2;
+    s.criteria[0].revisionTargets = [{
+      domain: "workup",
+      path: "workup:/summary/../application",
+      instruction: "Resolve the named field directly without path normalization or traversal aliases.",
+    }];
+  },
+  "INVALID_REVISION_TARGET",
 );
 expectMachineBlocked(
   "freshness evidence missing",

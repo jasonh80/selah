@@ -556,6 +556,16 @@ function verifyAuthenticatedBenchmarkEvidenceUnchecked(
       "Review and assignment IDs must be distinct",
     );
   }
+  if (
+    receiptIds.has(assignmentPayload.reviewId) ||
+    receiptIds.has(assignmentPayload.assignmentId)
+  ) {
+    add(
+      "AUTHENTICATED_EVIDENCE_ID_REPLAY",
+      "authenticatedEvidence",
+      "Review and assignment IDs must not reuse a receipt identity",
+    );
+  }
   const reportIds = [
     bundle.evidenceResolutionReport.reportId,
     bundle.remediationResolutionReport.reportId,
@@ -1493,7 +1503,9 @@ function isBoundedPath(value: unknown): value is string {
 }
 
 function isRegistryPath(value: unknown): value is string {
-  return isBoundedPath(value) && REGISTRY_PATH.test(value);
+  if (!isBoundedPath(value) || !REGISTRY_PATH.test(value)) return false;
+  const pathBody = value.slice(value.indexOf(":/") + 2);
+  return !pathBody.split("/").some((segment) => segment === "." || segment === "..");
 }
 
 function assertPlainRecord(value: unknown, path: string): asserts value is Record<string, unknown> {

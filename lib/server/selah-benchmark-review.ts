@@ -352,6 +352,12 @@ const MAX_EVIDENCE_PATH_LENGTH = 300;
 const MAX_REVISION_TARGETS = 8;
 const MAX_REVISION_INSTRUCTION = 1_000;
 
+function isSafeArtifactPath(value: string): boolean {
+  if (!SAFE_ARTIFACT_PATH.test(value)) return false;
+  const pathBody = value.slice(value.indexOf(":/") + 2);
+  return !pathBody.split("/").some((segment) => segment === "." || segment === "..");
+}
+
 function assertPlainRecord(value: unknown, path: string): asserts value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`invalid benchmark review object at ${path}`);
@@ -1223,7 +1229,7 @@ export function evaluateSelahBenchmarkReview(
         (path) =>
           !path.trim() ||
           path.length > MAX_EVIDENCE_PATH_LENGTH ||
-          !SAFE_ARTIFACT_PATH.test(path) ||
+          !isSafeArtifactPath(path) ||
           !rubric.evidence_policy.allowed_prefixes.some((prefix) => path.startsWith(prefix)),
       )
     ) {
@@ -1293,7 +1299,7 @@ export function evaluateSelahBenchmarkReview(
       if (
         !pathMatchesDomain ||
         target.path.length > MAX_EVIDENCE_PATH_LENGTH ||
-        !SAFE_ARTIFACT_PATH.test(target.path)
+        !isSafeArtifactPath(target.path)
       ) {
         add(
           "INVALID_REVISION_TARGET",

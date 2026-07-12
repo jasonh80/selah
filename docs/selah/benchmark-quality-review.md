@@ -33,9 +33,12 @@ No one result can substitute for the other two.
    for which no recent private chapter workup was found, uses cross-chapter
    voice/quality comparison plus its independently researched guidance.
 6. Resolve every evidence and remediation path against one versioned artifact
-   registry that binds the draft, manifest, structural/overlap/freshness
-   reports, guidance, render evidence, rubric policy, and resolver version;
-   also scan all review prose for private benchmark or exemplar leakage.
+   registry. It always binds canonical roots for the draft, manifest,
+   structural/overlap/freshness reports, voice exemplar, benchmark set, and
+   rubric; it also binds guidance, render evidence, or another approved
+   namespace whenever the review cites that namespace. The authenticated
+   reports separately bind the resolver version. Also scan all review prose
+   for private benchmark or exemplar leakage.
 7. Persist only conclusions, ratings, resolved evidence paths, and fresh targeted
    revision instructions—never private benchmark excerpts.
 8. Revise only the failed fields—or correct the manifest/review process or run
@@ -113,6 +116,11 @@ equivalent. A registry subpath is trusted only when the future protected
 assembler derives it atomically from the canonical artifact; the pure contract
 cannot reconstruct an artifact from a digest. Those limits still require
 source-aware tools, protected server state, and human/editorial judgment.
+
+The eight canonical roots named above are unconditional. Guidance, render, and
+other approved namespace roots are conditional: the registry must contain and
+bind them whenever a submitted evidence path or remediation target cites them;
+unused namespaces are not claimed as part of a review snapshot.
 
 ## Future trusted boundary
 
