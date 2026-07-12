@@ -100,6 +100,11 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   `lib/server/mark-sprint-guidance.v1.json`; it is not loaded into Supabase or
   connected to generation. The OEB 2025.6 CC0 source is a candidate, not yet
   vendored or approved for a run.
+- Generation Manifest v1 is offline, review-only groundwork. It binds exact
+  model, prompt, Brain rules, chapter notes, exemplar, source, and owner-approved
+  manifest digests, and intentionally reports every current Mark sprint chapter
+  blocked. It is not wired to Studio or a worker; see
+  `docs/selah/generation-manifest.md`.
 - A local `mark-sprint-copy-review-v1.0` authoring contract now verifies the
   Mark 8–11 structural floor (full passage movements, FAQ, content modules,
   placeholder image shape, and no embedded verse array). It is not wired to

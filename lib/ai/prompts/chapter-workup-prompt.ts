@@ -1,6 +1,8 @@
 // Builds the prompt that asks the model for ONE shared global Selah chapter
 // workup. No API call here — this only assembles the instruction string.
 
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v2";
+
 export interface ChapterWorkupPromptInput {
   book: string;
   chapter: number;
