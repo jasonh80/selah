@@ -1,4 +1,4 @@
-# Generation Manifest v1
+# Generation Manifest v2
 
 > Offline, review-only groundwork. This does not read or write Supabase, alter
 > Studio, allowlist a slug, create a draft row, dispatch a job, call a model, or
@@ -16,9 +16,12 @@ server-owned preflight must bind the exact:
   digests;
 - approved guidance packet and ordered, stored chapter-note identities;
 - one active Mark 6 voice exemplar by stored ID and content digest;
-- rights-cleared generation source identity, approval state, primary reference,
-  adjacent-chapter context reference, and one content digest for the ordered
-  source bundle; and
+- owner-selected generation source provider, ESV edition, endpoint, published
+  terms status, owner-directed use basis, noncommercial constraint, and
+  owner-decision digest;
+- fixed API-option digest plus ordered context-before/primary/context-after
+  references and individual text digests;
+- a canonical digest for the complete ordered source bundle; and
 - owner-approved digest of the resulting manifest.
 
 The manifest contains identities, status flags, and SHA-256 digests only. It
@@ -32,10 +35,15 @@ not claim byte-for-byte file identity.
 ## Current result
 
 The version-controlled Mark policy must remain blocked. Brain v1.7 and the Mark
-guidance packet are review-only; the live Brain match has not been proved; the
-OEB source and its digest are not connected; the exact stored exemplar ID and
-digest are absent; the assembled prompt does not yet exist; and no per-run owner
-authorization has been recorded.
+guidance packet are review-only; the live Brain match has not been proved. The
+owner selected ESV on 2026-07-12, but the protected API source assembler,
+request-option digest, passage digests, and bundle digest do not exist. The
+exact stored exemplar ID and digest are absent; the assembled prompt does not
+yet exist; and no per-run owner authorization has been recorded.
+
+The source decision is documented in `scripture-source-policy.md`. The manifest
+records the published-terms ambiguity honestly and never contains ESV text or
+an API key.
 
 Run the offline proof with:
 

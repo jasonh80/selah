@@ -69,15 +69,33 @@ type GuidancePacket = {
     owner_authorization_required: boolean;
     maximum_notes_per_chapter: number;
   };
+  owner_source_decision: {
+    decision_id: string;
+    decided_at: string;
+    decision: string;
+    scope: string;
+    model_training_authorized: boolean;
+    formal_ai_analysis_permission_confirmed: boolean;
+    commercial_use_authorized: boolean;
+    oeb_allowed: boolean;
+  };
   source_requirement: {
+    provider: string;
     name: string;
     version: string;
-    rights: string;
-    url: string;
-    status: string;
+    api_endpoint: string;
+    terms_url: string;
+    permissions_url: string;
+    use_basis: string;
+    published_terms_ai_analysis_status: string;
+    commercial_use_allowed: boolean;
+    owner_selection_status: string;
+    runtime_connection_status: string;
     source_text_included: boolean;
     reader_display_version: string;
     reader_and_generation_sources_are_distinct: boolean;
+    retrieval_policy: string;
+    storage_policy: string;
     context_chapters_each_side: number;
     context_purpose: string;
   };
@@ -596,8 +614,8 @@ assert.deepEqual(metadataUpdate.values.source_titles, [recentAuditTitle]);
 assert.equal(metadataUpdate.values.version, "1.7");
 
 assert.equal(guidance.status, "review_only", "guidance must not be active");
-assert.equal(guidance.packet_id, "mark-8-11-2026-07-v4");
-assert.equal(guidance.version, "1.3");
+assert.equal(guidance.packet_id, "mark-8-11-2026-07-v5");
+assert.equal(guidance.version, "1.4");
 assert.equal(
   guidance.library_version,
   library.version,
@@ -629,34 +647,83 @@ assert.equal(
   "owner authorization must remain required",
 );
 assert.equal(
-  guidance.source_requirement.status,
-  "candidate_not_connected",
-  "source must remain visibly unconnected until reviewed",
+  guidance.owner_source_decision.decision_id,
+  "mark-sprint-esv-source-2026-07-12",
+);
+assert.equal(guidance.owner_source_decision.decided_at, "2026-07-12");
+assert.equal(
+  guidance.owner_source_decision.decision,
+  "use_esv_api_for_prompt_time_analysis",
+);
+assert.equal(guidance.owner_source_decision.model_training_authorized, false);
+assert.equal(
+  guidance.owner_source_decision.formal_ai_analysis_permission_confirmed,
+  false,
+);
+assert.equal(guidance.owner_source_decision.commercial_use_authorized, false);
+assert.equal(guidance.owner_source_decision.oeb_allowed, false);
+assert.equal(guidance.source_requirement.owner_selection_status, "approved");
+assert.equal(
+  guidance.source_requirement.runtime_connection_status,
+  "not_connected",
+  "owner selection must not be mistaken for runtime connection",
 );
 assert.equal(
   guidance.source_requirement.source_text_included,
   false,
   "the guidance packet must not bundle source text",
 );
-assert.equal(guidance.source_requirement.name, "Open English Bible");
-assert.equal(guidance.source_requirement.version, "2025.6");
-assert.equal(guidance.source_requirement.rights, "CC0");
+assert.equal(guidance.source_requirement.provider, "Crossway");
+assert.equal(guidance.source_requirement.name, "English Standard Version");
+assert.equal(guidance.source_requirement.version, "ESV Text Edition: 2025");
 assert.equal(
-  guidance.source_requirement.url,
-  "https://openenglishbible.org/oeb/2025.6/read/b041.html",
+  guidance.source_requirement.api_endpoint,
+  "https://api.esv.org/v3/passage/text/",
 );
+assert.equal(guidance.source_requirement.terms_url, "https://api.esv.org/");
+assert.equal(
+  guidance.source_requirement.permissions_url,
+  "https://www.crossway.org/permissions/",
+);
+assert.equal(
+  guidance.source_requirement.use_basis,
+  "owner_direction_noncommercial_ministry_api_use",
+);
+assert.equal(
+  guidance.source_requirement.published_terms_ai_analysis_status,
+  "not_explicit_owner_accepts_uncertainty",
+);
+assert.equal(guidance.source_requirement.commercial_use_allowed, false);
 assert.equal(guidance.source_requirement.reader_display_version, "ESV");
 assert.equal(
   guidance.source_requirement.reader_and_generation_sources_are_distinct,
-  true,
-  "generation and reader sources must not be mislabeled",
+  false,
+  "the owner selected ESV for both generation analysis and reader display",
+);
+assert.equal(
+  guidance.source_requirement.retrieval_policy,
+  "official_api_server_side_only",
+);
+assert.equal(
+  guidance.source_requirement.storage_policy,
+  "no_repo_no_logs_no_public_generation_output",
 );
 assert.equal(
   guidance.source_requirement.context_chapters_each_side,
   1,
-  "book-flow authorship must receive one rights-cleared adjacent chapter on each side",
+  "book-flow authorship must receive one owner-approved adjacent chapter on each side",
 );
 assert.equal(guidance.source_requirement.context_purpose, "grounded_book_flow_only");
+assert.doesNotMatch(
+  guidanceRaw,
+  /Open English Bible|OEB 2025\.6|rights-cleared/i,
+  "loadable guidance still carries the rejected source policy",
+);
+assert.doesNotMatch(
+  reviewPacket,
+  /Open English Bible|OEB 2025\.6|rights-cleared/i,
+  "review packet still carries the rejected source policy",
+);
 assert.equal(guidance.expected_model, "gpt-5.5");
 assert.deepEqual(guidance.required_voice_example, {
   title: "Mark 6 Daily Rundown",
@@ -816,7 +883,10 @@ console.log(
         packetId: guidance.packet_id,
         status: guidance.status,
         noteCounts,
-        sourceStatus: guidance.source_requirement.status,
+        sourceOwnerSelectionStatus:
+          guidance.source_requirement.owner_selection_status,
+        sourceRuntimeConnectionStatus:
+          guidance.source_requirement.runtime_connection_status,
       },
     },
     null,

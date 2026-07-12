@@ -18,6 +18,7 @@ import { snapshotVersion } from "./chapter-versions-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import { selectRulesForGeneration, getChapterReviewNoteTexts } from "./selah-brain";
 import { getRelevantExamples, TEXT_EXAMPLE_TYPES } from "./selah-examples";
+import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
 
 // Routine generation control now lives in Supabase (generation_settings), so it
 // changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
@@ -45,18 +46,32 @@ interface GenOutput {
   outputTokens: number;
 }
 
+export function assertGenericChapterGenerationAllowed(input: {
+  slug: string;
+  book: string;
+  chapter: number;
+}): void {
+  const normalizedBook = input.book.trim().toLowerCase();
+  const protectedBookChapter =
+    normalizedBook === "mark" && [8, 9, 10, 11].includes(input.chapter);
+  if (isMarkSprintSlug(input.slug) || protectedBookChapter) {
+    throw new Error(
+      `${input.slug} is blocked: the protected ESV source + generation-manifest-v2 runner is not connected`,
+    );
+  }
+}
+
 export async function generateChapterWorkup(input: {
   book: string;
   chapter: number;
   slug: string;
   bibleVersion?: string;
-  bibleText?: string;
-  generationSourceLabel?: string;
   model?: string;
   globalRules?: string[];
   chapterNotes?: string[];
   examples?: { title: string; exampleType: string; content: string }[];
 }): Promise<GenOutput> {
+  assertGenericChapterGenerationAllowed(input);
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
   const model = input.model || CHAPTER_WORKUP_TEXT_MODEL;
@@ -65,8 +80,6 @@ export async function generateChapterWorkup(input: {
     book: input.book,
     chapter: input.chapter,
     bibleVersion: input.bibleVersion,
-    bibleText: input.bibleText,
-    generationSourceLabel: input.generationSourceLabel,
     globalRules: input.globalRules,
     chapterNotes: input.chapterNotes,
     examples: input.examples,

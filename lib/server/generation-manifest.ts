@@ -18,7 +18,19 @@ export type NoteDigestIdentity = DigestIdentity & {
   storedRowId: string;
 };
 
-export interface GenerationManifestRequirementsV1 {
+export type GenerationSourcePassageRole =
+  | "context_before"
+  | "primary"
+  | "context_after";
+
+export interface GenerationSourcePassageIdentity {
+  role: GenerationSourcePassageRole;
+  requestedReference: string;
+  canonicalReference: string;
+  textDigest: string;
+}
+
+export interface GenerationManifestRequirementsV2 {
   artifact: "chapter_workup";
   stage: "copy_generation";
   subject: {
@@ -51,18 +63,25 @@ export interface GenerationManifestRequirementsV1 {
     contentDigest: string;
   };
   source: {
+    provider: string;
     name: string;
     version: string;
-    rights: string;
-    url: string;
-    reference: string;
-    contextReference: string;
-    contentDigest: string;
+    apiEndpoint: string;
+    termsUrl: string;
+    permissionsUrl: string;
+    useBasis: string;
+    publishedTermsAiAnalysisStatus: string;
+    commercialUseAllowed: false;
+    ownerDecisionId: string;
+    ownerDecisionDigest: string;
+    requestOptionsDigest: string;
+    passages: GenerationSourcePassageIdentity[];
+    bundleDigest: string;
   };
   approvedManifestDigest: string | null;
 }
 
-export interface GenerationManifestMaterialsV1 {
+export interface GenerationManifestMaterialsV2 {
   artifact: "chapter_workup";
   stage: "copy_generation";
   subject: {
@@ -96,35 +115,42 @@ export interface GenerationManifestMaterialsV1 {
     contentDigest: string;
   }>;
   source: {
+    provider: string;
     name: string;
     version: string;
-    rights: string;
-    url: string;
-    reference: string;
-    contextReference: string;
-    approved: boolean;
+    apiEndpoint: string;
+    termsUrl: string;
+    permissionsUrl: string;
+    useBasis: string;
+    publishedTermsAiAnalysisStatus: string;
+    commercialUseAllowed: false;
+    ownerDecisionId: string;
+    ownerDecisionDigest: string;
+    requestOptionsDigest: string;
+    passages: GenerationSourcePassageIdentity[];
+    bundleDigest: string;
+    ownerSelected: boolean;
     connected: boolean;
     contentPresent: boolean;
-    contentDigest: string;
   };
 }
 
-export interface GenerationManifestV1 {
-  manifestVersion: "generation-manifest-v1";
+export interface GenerationManifestV2 {
+  manifestVersion: "generation-manifest-v2";
   artifact: "chapter_workup";
   stage: "copy_generation";
-  subject: GenerationManifestMaterialsV1["subject"];
-  model: GenerationManifestMaterialsV1["model"];
-  prompt: GenerationManifestMaterialsV1["prompt"];
-  brain: GenerationManifestMaterialsV1["brain"];
-  guidance: GenerationManifestMaterialsV1["guidance"];
-  examples: GenerationManifestMaterialsV1["examples"];
-  source: GenerationManifestMaterialsV1["source"];
+  subject: GenerationManifestMaterialsV2["subject"];
+  model: GenerationManifestMaterialsV2["model"];
+  prompt: GenerationManifestMaterialsV2["prompt"];
+  brain: GenerationManifestMaterialsV2["brain"];
+  guidance: GenerationManifestMaterialsV2["guidance"];
+  examples: GenerationManifestMaterialsV2["examples"];
+  source: GenerationManifestMaterialsV2["source"];
 }
 
 export interface ManifestPreflightResult {
   ready: boolean;
-  manifest: GenerationManifestV1;
+  manifest: GenerationManifestV2;
   manifestDigest: string;
   findings: ManifestFinding[];
 }
@@ -169,6 +195,25 @@ export function sha256Canonical(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
 }
 
+export function computeGenerationSourceBundleDigest(source: {
+  provider: string;
+  name: string;
+  version: string;
+  apiEndpoint: string;
+  requestOptionsDigest: string;
+  passages: GenerationSourcePassageIdentity[];
+}): string {
+  return sha256Canonical({
+    schemaVersion: "esv-api-source-bundle-v1",
+    provider: source.provider,
+    name: source.name,
+    version: source.version,
+    apiEndpoint: source.apiEndpoint,
+    requestOptionsDigest: source.requestOptionsDigest,
+    passages: source.passages.map((passage) => ({ ...passage })),
+  });
+}
+
 const DIGEST = /^[a-f0-9]{64}$/;
 
 function duplicateIds(items: Array<{ id: string }>): string[] {
@@ -200,8 +245,8 @@ function assertDenseRecordArray(value: unknown, path: string): asserts value is 
 }
 
 function assertManifestRuntimeShape(
-  requirements: GenerationManifestRequirementsV1,
-  materials: GenerationManifestMaterialsV1,
+  requirements: GenerationManifestRequirementsV2,
+  materials: GenerationManifestMaterialsV2,
 ): void {
   assertPlainRecord(requirements, "requirements");
   assertPlainRecord(requirements.subject, "requirements.subject");
@@ -213,6 +258,7 @@ function assertManifestRuntimeShape(
   assertDenseRecordArray(requirements.guidance.notes, "requirements.guidance.notes");
   assertPlainRecord(requirements.example, "requirements.example");
   assertPlainRecord(requirements.source, "requirements.source");
+  assertDenseRecordArray(requirements.source.passages, "requirements.source.passages");
 
   assertPlainRecord(materials, "materials");
   assertPlainRecord(materials.subject, "materials.subject");
@@ -224,11 +270,12 @@ function assertManifestRuntimeShape(
   assertDenseRecordArray(materials.guidance.notes, "materials.guidance.notes");
   assertDenseRecordArray(materials.examples, "materials.examples");
   assertPlainRecord(materials.source, "materials.source");
+  assertDenseRecordArray(materials.source.passages, "materials.source.passages");
 }
 
 export function evaluateGenerationManifest(
-  requirements: GenerationManifestRequirementsV1,
-  materials: GenerationManifestMaterialsV1,
+  requirements: GenerationManifestRequirementsV2,
+  materials: GenerationManifestMaterialsV2,
 ): ManifestPreflightResult {
   assertManifestRuntimeShape(requirements, materials);
   const findings: ManifestFinding[] = [];
@@ -314,8 +361,18 @@ export function evaluateGenerationManifest(
     "id", "title", "genre", "exampleType", "contentDigest",
   ]);
   rejectUnknown("requirements.source", requirements.source as unknown as Record<string, unknown>, [
-    "name", "version", "rights", "url", "reference", "contextReference", "contentDigest",
+    "provider", "name", "version", "apiEndpoint", "termsUrl", "permissionsUrl",
+    "useBasis", "publishedTermsAiAnalysisStatus", "commercialUseAllowed",
+    "ownerDecisionId", "ownerDecisionDigest", "requestOptionsDigest", "passages",
+    "bundleDigest",
   ]);
+  requirements.source.passages.forEach((passage, index) =>
+    rejectUnknown(
+      `requirements.source.passages[${index}]`,
+      passage as unknown as Record<string, unknown>,
+      ["role", "requestedReference", "canonicalReference", "textDigest"],
+    ),
+  );
 
   rejectUnknown("materials", materials as unknown as Record<string, unknown>, [
     "artifact", "stage", "subject", "model", "prompt", "brain", "guidance", "examples", "source",
@@ -349,8 +406,18 @@ export function evaluateGenerationManifest(
     ]),
   );
   rejectUnknown("source", materials.source as unknown as Record<string, unknown>, [
-    "name", "version", "rights", "url", "reference", "contextReference", "approved", "connected", "contentPresent", "contentDigest",
+    "provider", "name", "version", "apiEndpoint", "termsUrl", "permissionsUrl",
+    "useBasis", "publishedTermsAiAnalysisStatus", "commercialUseAllowed",
+    "ownerDecisionId", "ownerDecisionDigest", "requestOptionsDigest", "passages",
+    "bundleDigest", "ownerSelected", "connected", "contentPresent",
   ]);
+  materials.source.passages.forEach((passage, index) =>
+    rejectUnknown(
+      `source.passages[${index}]`,
+      passage as unknown as Record<string, unknown>,
+      ["role", "requestedReference", "canonicalReference", "textDigest"],
+    ),
+  );
 
   const identity = (path: string, value: unknown) => {
     if (typeof value !== "string" || !value.trim()) {
@@ -373,16 +440,98 @@ export function evaluateGenerationManifest(
     ["example.title", requirements.example.title, materials.examples[0]?.title],
     ["example.genre", requirements.example.genre, materials.examples[0]?.genre],
     ["example.exampleType", requirements.example.exampleType, materials.examples[0]?.exampleType],
+    ["source.provider", requirements.source.provider, materials.source.provider],
     ["source.name", requirements.source.name, materials.source.name],
     ["source.version", requirements.source.version, materials.source.version],
-    ["source.rights", requirements.source.rights, materials.source.rights],
-    ["source.url", requirements.source.url, materials.source.url],
-    ["source.reference", requirements.source.reference, materials.source.reference],
-    ["source.contextReference", requirements.source.contextReference, materials.source.contextReference],
+    ["source.apiEndpoint", requirements.source.apiEndpoint, materials.source.apiEndpoint],
+    ["source.termsUrl", requirements.source.termsUrl, materials.source.termsUrl],
+    ["source.permissionsUrl", requirements.source.permissionsUrl, materials.source.permissionsUrl],
+    ["source.useBasis", requirements.source.useBasis, materials.source.useBasis],
+    [
+      "source.publishedTermsAiAnalysisStatus",
+      requirements.source.publishedTermsAiAnalysisStatus,
+      materials.source.publishedTermsAiAnalysisStatus,
+    ],
+    ["source.ownerDecisionId", requirements.source.ownerDecisionId, materials.source.ownerDecisionId],
   ];
   for (const [path, expected, actual] of identityPairs) {
     identity(`requirements.${path}`, expected);
     identity(`materials.${path}`, actual);
+  }
+  const sourceRoles: GenerationSourcePassageRole[] = [
+    "context_before",
+    "primary",
+    "context_after",
+  ];
+  if (
+    requirements.source.passages.length !== sourceRoles.length ||
+    materials.source.passages.length !== sourceRoles.length
+  ) {
+    add(
+      "SOURCE_PASSAGE_SET_MISMATCH",
+      "source.passages",
+      "Source bundle must contain ordered context-before, primary, and context-after passages",
+    );
+  }
+  const sourcePassageLength = Math.max(
+    requirements.source.passages.length,
+    materials.source.passages.length,
+    sourceRoles.length,
+  );
+  for (let index = 0; index < sourcePassageLength; index++) {
+    const expected = requirements.source.passages[index];
+    const actual = materials.source.passages[index];
+    const role = sourceRoles[index];
+    if (!expected || !actual || !role) continue;
+    identity(`requirements.source.passages[${index}].role`, expected.role);
+    identity(
+      `requirements.source.passages[${index}].requestedReference`,
+      expected.requestedReference,
+    );
+    identity(
+      `requirements.source.passages[${index}].canonicalReference`,
+      expected.canonicalReference,
+    );
+    identity(`materials.source.passages[${index}].role`, actual.role);
+    identity(
+      `materials.source.passages[${index}].requestedReference`,
+      actual.requestedReference,
+    );
+    identity(
+      `materials.source.passages[${index}].canonicalReference`,
+      actual.canonicalReference,
+    );
+    same(`source.passages[${index}].role`, role, expected.role);
+    same(`source.passages[${index}].role`, expected.role, actual.role);
+    same(
+      `source.passages[${index}].requestedReference`,
+      expected.requestedReference,
+      actual.requestedReference,
+    );
+    same(
+      `source.passages[${index}].canonicalReference`,
+      expected.canonicalReference,
+      actual.canonicalReference,
+    );
+    digest(
+      `source.passages[${index}].textDigest`,
+      expected.textDigest,
+      actual.textDigest,
+    );
+  }
+  for (const [path, passages] of [
+    ["requirements.source.passages", requirements.source.passages],
+    ["source.passages", materials.source.passages],
+  ] as const) {
+    const requested = passages.map((passage) => passage.requestedReference);
+    const canonical = passages.map((passage) => passage.canonicalReference);
+    if (new Set(requested).size !== requested.length || new Set(canonical).size !== canonical.length) {
+      add(
+        "SOURCE_PASSAGE_DUPLICATE",
+        path,
+        "Source bundle passage references must be distinct",
+      );
+    }
   }
   requirements.brain.rules.forEach((rule, index) => identity(`requirements.brain.rules[${index}].id`, rule.id));
   materials.brain.rules.forEach((rule, index) => identity(`materials.brain.rules[${index}].id`, rule.id));
@@ -442,16 +591,81 @@ export function evaluateGenerationManifest(
     if (example.active !== true) add("EXAMPLE_NOT_ACTIVE", "example.active", "Approved voice example is inactive");
   }
 
-  for (const key of ["name", "version", "rights", "url", "reference", "contextReference"] as const) {
+  for (const key of [
+    "provider",
+    "name",
+    "version",
+    "apiEndpoint",
+    "termsUrl",
+    "permissionsUrl",
+    "useBasis",
+    "publishedTermsAiAnalysisStatus",
+    "ownerDecisionId",
+  ] as const) {
     same(`source.${key}`, requirements.source[key], materials.source[key]);
   }
-  digest("source.contentDigest", requirements.source.contentDigest, materials.source.contentDigest);
-  if (materials.source.approved !== true) add("SOURCE_NOT_APPROVED", "source.approved", "Generation source is not approved");
+  same(
+    "source.commercialUseAllowed",
+    requirements.source.commercialUseAllowed,
+    materials.source.commercialUseAllowed,
+  );
+  if (
+    requirements.source.commercialUseAllowed !== false ||
+    materials.source.commercialUseAllowed !== false
+  ) {
+    add(
+      "SOURCE_COMMERCIAL_USE_FORBIDDEN",
+      "source.commercialUseAllowed",
+      "The standard ESV API source policy is noncommercial only",
+    );
+  }
+  digest(
+    "source.ownerDecisionDigest",
+    requirements.source.ownerDecisionDigest,
+    materials.source.ownerDecisionDigest,
+  );
+  digest(
+    "source.requestOptionsDigest",
+    requirements.source.requestOptionsDigest,
+    materials.source.requestOptionsDigest,
+  );
+  digest(
+    "source.bundleDigest",
+    requirements.source.bundleDigest,
+    materials.source.bundleDigest,
+  );
+  const computedRequirementBundleDigest = computeGenerationSourceBundleDigest(
+    requirements.source,
+  );
+  const computedMaterialBundleDigest = computeGenerationSourceBundleDigest(
+    materials.source,
+  );
+  if (requirements.source.bundleDigest !== computedRequirementBundleDigest) {
+    add(
+      "SOURCE_BUNDLE_DIGEST_INVALID",
+      "requirements.source.bundleDigest",
+      "Required source bundle digest does not match its ordered passage identities",
+    );
+  }
+  if (materials.source.bundleDigest !== computedMaterialBundleDigest) {
+    add(
+      "SOURCE_BUNDLE_DIGEST_INVALID",
+      "source.bundleDigest",
+      "Source bundle digest does not match its ordered passage identities",
+    );
+  }
+  if (materials.source.ownerSelected !== true) {
+    add(
+      "SOURCE_NOT_OWNER_SELECTED",
+      "source.ownerSelected",
+      "The owner has not selected this generation source",
+    );
+  }
   if (materials.source.connected !== true) add("SOURCE_NOT_CONNECTED", "source.connected", "Generation source is not connected");
   if (materials.source.contentPresent !== true) add("SOURCE_CONTENT_MISSING", "source.contentPresent", "Generation source content is missing");
 
-  const manifest: GenerationManifestV1 = {
-    manifestVersion: "generation-manifest-v1",
+  const manifest: GenerationManifestV2 = {
+    manifestVersion: "generation-manifest-v2",
     artifact: materials.artifact,
     stage: materials.stage,
     subject: {
@@ -495,16 +709,24 @@ export function evaluateGenerationManifest(
       contentDigest: item.contentDigest,
     })),
     source: {
+      provider: materials.source.provider,
       name: materials.source.name,
       version: materials.source.version,
-      rights: materials.source.rights,
-      url: materials.source.url,
-      reference: materials.source.reference,
-      contextReference: materials.source.contextReference,
-      approved: materials.source.approved,
+      apiEndpoint: materials.source.apiEndpoint,
+      termsUrl: materials.source.termsUrl,
+      permissionsUrl: materials.source.permissionsUrl,
+      useBasis: materials.source.useBasis,
+      publishedTermsAiAnalysisStatus:
+        materials.source.publishedTermsAiAnalysisStatus,
+      commercialUseAllowed: materials.source.commercialUseAllowed,
+      ownerDecisionId: materials.source.ownerDecisionId,
+      ownerDecisionDigest: materials.source.ownerDecisionDigest,
+      requestOptionsDigest: materials.source.requestOptionsDigest,
+      passages: materials.source.passages.map((passage) => ({ ...passage })),
+      bundleDigest: materials.source.bundleDigest,
+      ownerSelected: materials.source.ownerSelected,
       connected: materials.source.connected,
       contentPresent: materials.source.contentPresent,
-      contentDigest: materials.source.contentDigest,
     },
   };
   const manifestDigest = sha256Canonical(manifest);

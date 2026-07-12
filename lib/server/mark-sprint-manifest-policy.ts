@@ -38,18 +38,35 @@ interface GuidancePacket {
     post_generation_freshness_review_required: boolean;
     owner_authorization_required: boolean;
   };
+  owner_source_decision: {
+    decision_id: string;
+    decided_at: string;
+    decision: string;
+    scope: string;
+    model_training_authorized: boolean;
+    formal_ai_analysis_permission_confirmed: boolean;
+    commercial_use_authorized: boolean;
+    oeb_allowed: boolean;
+  };
   source_requirement: {
+    provider: string;
     name: string;
     version: string;
-    rights: string;
-    url: string;
-    status: string;
+    api_endpoint: string;
+    terms_url: string;
+    permissions_url: string;
+    use_basis: string;
+    published_terms_ai_analysis_status: string;
+    commercial_use_allowed: boolean;
+    owner_selection_status: string;
+    runtime_connection_status: string;
     source_text_included: boolean;
     reader_display_version: string;
     reader_and_generation_sources_are_distinct: boolean;
+    retrieval_policy: string;
+    storage_policy: string;
     context_chapters_each_side: number;
     context_purpose: string;
-    content_digest?: string;
   };
   expected_model: string;
   required_rule_ids: {
@@ -76,7 +93,10 @@ export type MarkSprintPolicyBlockerCode =
   | "brain_live_match_missing"
   | "brain_library_mismatch"
   | "required_brain_rule_missing"
+  | "source_owner_selection_missing"
   | "source_not_connected"
+  | "source_request_options_digest_missing"
+  | "source_passage_digests_missing"
   | "source_digest_missing"
   | "model_request_digest_missing"
   | "chapter_note_row_ids_missing"
@@ -117,17 +137,32 @@ export interface MarkSprintManifestRequirements {
   };
   chapterNotes: { id: string; textDigest: string; expectedStoredRowId: null }[];
   source: {
+    provider: string;
     name: string;
     version: string;
-    rights: string;
-    url: string;
-    reference: string;
-    contextReference: string;
-    status: string;
-    expectedContentDigest: string | null;
+    apiEndpoint: string;
+    termsUrl: string;
+    permissionsUrl: string;
+    useBasis: string;
+    publishedTermsAiAnalysisStatus: string;
+    commercialUseAllowed: false;
+    ownerDecisionId: string;
+    ownerDecisionDigest: string;
+    ownerSelectionStatus: string;
+    runtimeConnectionStatus: string;
+    expectedRequestOptionsDigest: null;
+    expectedPassages: Array<{
+      role: "context_before" | "primary" | "context_after";
+      requestedReference: string;
+      expectedCanonicalReference: string;
+      expectedTextDigest: null;
+    }>;
+    expectedBundleDigest: null;
     sourceTextIncluded: boolean;
     readerDisplayVersion: string;
     readerAndGenerationSourcesAreDistinct: boolean;
+    retrievalPolicy: string;
+    storagePolicy: string;
   };
   voiceExample: {
     title: string;
@@ -208,25 +243,58 @@ export function buildMarkSprintManifestPolicy(
       textDigest: sha256Text(note.text),
       expectedStoredRowId: null,
     })),
-    source: {
-      name: guidance.source_requirement.name,
-      version: guidance.source_requirement.version,
-      rights: guidance.source_requirement.rights,
-      url: guidance.source_requirement.url,
-      reference: `Mark ${slug.split("-")[1]}`,
-      contextReference: (() => {
-        const chapter = Number(slug.split("-")[1]);
-        const radius = guidance.source_requirement.context_chapters_each_side;
-        return `Mark ${Math.max(1, chapter - radius)}–${chapter + radius} context; Mark ${chapter} primary (${guidance.source_requirement.context_purpose})`;
-      })(),
-      status: guidance.source_requirement.status,
-      expectedContentDigest:
-        guidance.source_requirement.content_digest?.trim() || null,
-      sourceTextIncluded: guidance.source_requirement.source_text_included,
-      readerDisplayVersion: guidance.source_requirement.reader_display_version,
-      readerAndGenerationSourcesAreDistinct:
-        guidance.source_requirement.reader_and_generation_sources_are_distinct,
-    },
+    source: (() => {
+      const chapter = Number(slug.split("-")[1]);
+      const radius = guidance.source_requirement.context_chapters_each_side;
+      const before = Math.max(1, chapter - radius);
+      const after = chapter + radius;
+      return {
+        provider: guidance.source_requirement.provider,
+        name: guidance.source_requirement.name,
+        version: guidance.source_requirement.version,
+        apiEndpoint: guidance.source_requirement.api_endpoint,
+        termsUrl: guidance.source_requirement.terms_url,
+        permissionsUrl: guidance.source_requirement.permissions_url,
+        useBasis: guidance.source_requirement.use_basis,
+        publishedTermsAiAnalysisStatus:
+          guidance.source_requirement.published_terms_ai_analysis_status,
+        commercialUseAllowed: false as const,
+        ownerDecisionId: guidance.owner_source_decision.decision_id,
+        ownerDecisionDigest: sha256Canonical(guidance.owner_source_decision),
+        ownerSelectionStatus:
+          guidance.source_requirement.owner_selection_status,
+        runtimeConnectionStatus:
+          guidance.source_requirement.runtime_connection_status,
+        expectedRequestOptionsDigest: null,
+        expectedPassages: [
+          {
+            role: "context_before" as const,
+            requestedReference: `Mark ${before}`,
+            expectedCanonicalReference: `Mark ${before}`,
+            expectedTextDigest: null,
+          },
+          {
+            role: "primary" as const,
+            requestedReference: `Mark ${chapter}`,
+            expectedCanonicalReference: `Mark ${chapter}`,
+            expectedTextDigest: null,
+          },
+          {
+            role: "context_after" as const,
+            requestedReference: `Mark ${after}`,
+            expectedCanonicalReference: `Mark ${after}`,
+            expectedTextDigest: null,
+          },
+        ],
+        expectedBundleDigest: null,
+        sourceTextIncluded: guidance.source_requirement.source_text_included,
+        readerDisplayVersion: guidance.source_requirement.reader_display_version,
+        readerAndGenerationSourcesAreDistinct:
+          guidance.source_requirement.reader_and_generation_sources_are_distinct,
+        retrievalPolicy: guidance.source_requirement.retrieval_policy,
+        storagePolicy: guidance.source_requirement.storage_policy,
+      };
+    })(),
     voiceExample: {
       title: guidance.required_voice_example.title,
       genre: guidance.required_voice_example.genre,
@@ -278,20 +346,44 @@ export function buildMarkSprintManifestPolicy(
       message: `Required Brain rule ${id} is absent from the candidate library.`,
     });
   }
-  if (guidance.source_requirement.status !== "connected_and_approved") {
+  if (guidance.source_requirement.owner_selection_status !== "approved") {
     blockers.push({
-      code: "source_not_connected",
-      expected: "connected_and_approved",
-      actual: guidance.source_requirement.status,
-      message: "The rights-cleared generation source is still only a candidate.",
+      code: "source_owner_selection_missing",
+      expected: "approved",
+      actual: guidance.source_requirement.owner_selection_status,
+      message: "The owner has not selected the generation Scripture source.",
     });
   }
-  if (!requirements.source.expectedContentDigest) {
+  if (guidance.source_requirement.runtime_connection_status !== "connected") {
+    blockers.push({
+      code: "source_not_connected",
+      expected: "connected",
+      actual: guidance.source_requirement.runtime_connection_status,
+      message: "The owner-selected ESV API source is not connected to the protected runner.",
+    });
+  }
+  if (!requirements.source.expectedRequestOptionsDigest) {
+    blockers.push({
+      code: "source_request_options_digest_missing",
+      expected: "exact SHA-256 digest of the fixed ESV API request options",
+      actual: null,
+      message: "The protected runner has not supplied fixed ESV API request options.",
+    });
+  }
+  if (requirements.source.expectedPassages.some((passage) => !passage.expectedTextDigest)) {
+    blockers.push({
+      code: "source_passage_digests_missing",
+      expected: "exact normalized text digest for every ordered ESV passage",
+      actual: null,
+      message: "The protected runner has not supplied the ordered ESV passage digests.",
+    });
+  }
+  if (!requirements.source.expectedBundleDigest) {
     blockers.push({
       code: "source_digest_missing",
-      expected: "exact SHA-256 digest of the normalized authorized source text",
+      expected: "exact SHA-256 digest of the complete ordered ESV source bundle",
       actual: null,
-      message: "The guidance packet does not bind the normalized source content.",
+      message: "The protected runner has not supplied the ordered ESV bundle digest.",
     });
   }
   blockers.push({

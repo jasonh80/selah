@@ -101,11 +101,15 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   manifest fails closed before any mutation or model call.
 - The review-only Mark 8–11 guidance packet is versioned in
   `lib/server/mark-sprint-guidance.v1.json`; it is not loaded into Supabase or
-  connected to generation. The OEB 2025.6 CC0 source is a candidate, not yet
-  vendored or approved for a run. The candidate contract includes one adjacent
-  OEB chapter on each side so book-flow claims are source-grounded rather than
-  supplied from model memory.
-- Generation Manifest v1 is offline, review-only groundwork. It binds exact
+  connected to generation. The owner selected the official ESV API as the
+  prompt-time analysis source on 2026-07-12; OEB is not used. The published
+  terms do not explicitly address third-party model analysis, and the owner's
+  decision accepts that uncertainty for this noncommercial ministry use without
+  claiming a special Crossway license. The protected contract requires the
+  primary ESV chapter plus one adjacent ESV chapter on each side, each and the
+  ordered bundle digest-bound without storing text in the repo, manifest, logs,
+  or workup. See `docs/selah/scripture-source-policy.md`.
+- Generation Manifest v2 is offline, review-only groundwork. It binds exact
   model, prompt, Brain rules, chapter notes, exemplar, source, and owner-approved
   manifest digests, and intentionally reports every current Mark sprint chapter
   blocked. It is not wired to Studio or a worker; see
@@ -116,7 +120,7 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   Studio and does not prove provenance, freshness, semantic accuracy, rendered
   map/image completion, or owner approval. Those remain fail-closed manifest,
   source-aware comparison, completion, and human-review gates.
-- A local `selah-benchmark-rubric-v1` candidate now turns the strongest recent
+- A local `selah-benchmark-rubric-v2` candidate now turns the strongest recent
   Mark/Exodus workup standard into a thirteen-dimension, evidence-backed
   editorial review. Its provisional gate requires at least 85/100, no criterion
   below the publishable floor, benchmark-level voice/source/freshness, and a
@@ -135,9 +139,9 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 
 - **Current release sprint: Mark 8–11**, with Tuesday 2026-07-14 as the stretch
   target. Selah Brain should author fresh drafts after the safety PR, v1.7,
-  chapter guidance, rights-cleared source, exact Mark 6 voice exemplar, and
-  fail-closed manifest are reviewed. Each generation and publication still
-  requires explicit owner approval.
+  chapter guidance, owner-approved ESV source contract, exact Mark 6 voice
+  exemplar, and fail-closed manifest are reviewed. Each generation and
+  publication still requires explicit owner approval.
 
 ## Cost reference (Mark 6 actuals, logged estimates)
 

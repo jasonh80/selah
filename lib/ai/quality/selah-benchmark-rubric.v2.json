@@ -1,5 +1,5 @@
 {
-  "contract_version": "selah-benchmark-rubric-v1",
+  "contract_version": "selah-benchmark-rubric-v2",
   "artifact": "chapter_workup",
   "stage": "benchmark_comparison",
   "benchmark_set_id": "strong-recent-mark-exodus-workups-2026-07",
@@ -218,15 +218,15 @@
     },
     {
       "id": "BMQ-12",
-      "key": "source_and_rights_integrity",
-      "title": "Source and rights integrity",
+      "key": "source_selection_and_handling_integrity",
+      "title": "Source selection and handling integrity",
       "weight": 2,
-      "question": "Is the draft traceable to the approved rights-cleared authoring source while keeping licensed reader text and server-owned provenance out of generated copy?",
+      "question": "Is the draft traceable to the owner-selected authoring source and exact use/handling policy while keeping ESV text and server-owned provenance out of generated copy?",
       "minimum_evidence_paths": 2,
       "indicators": [
-        "The generation manifest binds the approved source, prompt, Brain, guidance, and exemplar.",
-        "Generated output does not store licensed Scripture verses or mislabel the authoring source as the reader translation.",
-        "Source identity and textual variants remain available to the reviewer."
+        "The generation manifest binds the owner decision, Crossway/ESV identity, edition, endpoint, request options, ordered passage digests, bundle digest, prompt, Brain, guidance, and exemplar.",
+        "Generated output, logs, reports, and manifests do not store ESV passage text or claim a special Crossway AI license.",
+        "The primary chapter and adjacent Book Flow context remain role-distinct and source identity remains available to the reviewer."
       ]
     },
     {

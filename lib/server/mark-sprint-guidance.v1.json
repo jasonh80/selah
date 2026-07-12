@@ -1,6 +1,6 @@
 {
-  "packet_id": "mark-8-11-2026-07-v4",
-  "version": "1.3",
+  "packet_id": "mark-8-11-2026-07-v5",
+  "version": "1.4",
   "status": "review_only",
   "library_version": "1.7",
   "authoring_policy": {
@@ -11,15 +11,33 @@
     "owner_authorization_required": true,
     "maximum_notes_per_chapter": 10
   },
+  "owner_source_decision": {
+    "decision_id": "mark-sprint-esv-source-2026-07-12",
+    "decided_at": "2026-07-12",
+    "decision": "use_esv_api_for_prompt_time_analysis",
+    "scope": "mark-8-11-noncommercial-ministry-authoring",
+    "model_training_authorized": false,
+    "formal_ai_analysis_permission_confirmed": false,
+    "commercial_use_authorized": false,
+    "oeb_allowed": false
+  },
   "source_requirement": {
-    "name": "Open English Bible",
-    "version": "2025.6",
-    "rights": "CC0",
-    "url": "https://openenglishbible.org/oeb/2025.6/read/b041.html",
-    "status": "candidate_not_connected",
+    "provider": "Crossway",
+    "name": "English Standard Version",
+    "version": "ESV Text Edition: 2025",
+    "api_endpoint": "https://api.esv.org/v3/passage/text/",
+    "terms_url": "https://api.esv.org/",
+    "permissions_url": "https://www.crossway.org/permissions/",
+    "use_basis": "owner_direction_noncommercial_ministry_api_use",
+    "published_terms_ai_analysis_status": "not_explicit_owner_accepts_uncertainty",
+    "commercial_use_allowed": false,
+    "owner_selection_status": "approved",
+    "runtime_connection_status": "not_connected",
     "source_text_included": false,
     "reader_display_version": "ESV",
-    "reader_and_generation_sources_are_distinct": true,
+    "reader_and_generation_sources_are_distinct": false,
+    "retrieval_policy": "official_api_server_side_only",
+    "storage_policy": "no_repo_no_logs_no_public_generation_output",
     "context_chapters_each_side": 1,
     "context_purpose": "grounded_book_flow_only"
   },

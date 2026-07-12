@@ -17,7 +17,7 @@ author a fresh workup for each chapter after:
 1. the v1.7 rule diff is independently reviewed and approved;
 2. these chapter-only notes are owner-approved and added with `scope=chapter`;
 3. the retrieval manifest proves that the intended rules, notes, example, and
-   rights-cleared source are present;
+   owner-approved source bundle are present;
 4. the owner explicitly authorizes that chapter's generation run.
 
 Private Mark/Exodus benchmark prose stays outside the authoring prompt and is
@@ -38,14 +38,19 @@ global rule. Direction labels and memorable benchmark phrases are
 comparison-only; they must not be loaded into the authoring prompt or copied as
 titles, taglines, prayers, or application language.
 
-Primary rights-cleared source candidate for this New Testament sprint:
-[Open English Bible 2025.6](https://openenglishbible.org/oeb/2025.6/read/b041.html)
-(CC0). It is not the ESV and must never be labeled as ESV. Edition-specific
-wording and textual variants still require human review against the licensed
-reader display. To ground the new book-flow rule without relying on model
-memory, the approved authoring bundle must include the primary Mark chapter
-plus one OEB chapter on each side; the manifest binds the ordered bundle and
-its context reference as one immutable source identity.
+Owner-selected prompt-time source for this New Testament sprint: the official
+Crossway ESV API, **ESV Text Edition: 2025**. This is noncommercial ministry
+analysis context, not model training. Crossway's published terms do not
+explicitly address third-party model analysis; the owner accepts that
+uncertainty without claiming a special Crossway license. See
+`scripture-source-policy.md`.
+
+To ground Book Flow without relying on model memory, the protected server
+bundle must contain the primary ESV Mark chapter plus one ESV chapter on each
+side. Each passage is role-labeled and digest-bound; a canonical bundle digest
+also binds their order and fixed API options. ESV text must remain transient and
+must not be committed, logged, persisted in a generated workup, or reproduced
+in output.
 
 ## Mark 8 (`mark-8`)
 
@@ -308,7 +313,7 @@ word-for-word similarity but for:
 10. no copying of private-source wording merely because it was a benchmark.
 
 Operational comparison uses the versioned 100-point rubric in
-`lib/ai/quality/selah-benchmark-rubric.v1.json`. It expands these ten concerns
+`lib/ai/quality/selah-benchmark-rubric.v2.json`. It expands these ten concerns
 into thirteen independently evidenced dimensions. The provisional gate
 requires at least 85/100 with no dimension below the publishable floor and
 requires benchmark-level Selah voice, source integrity, and fresh authorship.

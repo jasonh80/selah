@@ -2,27 +2,84 @@ import assert from "node:assert/strict";
 import {
   assertGenerationManifestReady,
   canonicalJson,
+  computeGenerationSourceBundleDigest,
   evaluateGenerationManifest,
   sha256Canonical,
   sha256Text,
-  type GenerationManifestMaterialsV1,
-  type GenerationManifestRequirementsV1,
+  type GenerationManifestMaterialsV2,
+  type GenerationManifestRequirementsV2,
+  type GenerationSourcePassageIdentity,
 } from "../lib/server/generation-manifest";
 import {
   buildMarkSprintManifestPolicy,
   MARK_SPRINT_SLUGS,
 } from "../lib/server/mark-sprint-manifest-policy";
+import { assertGenericChapterGenerationAllowed } from "../lib/server/generate-chapter-workup";
 
 const raw = {
   requestSystem: "PRIVATE SYSTEM MESSAGE\nDo not return me.",
   requestUser: "PRIVATE ASSEMBLED USER PROMPT\nDo not return me.",
-  source: "PRIVATE ORDERED RIGHTS-CLEARED PRIMARY + CONTEXT SOURCE BUNDLE\nDo not return me.",
+  sourceBefore: "PRIVATE ESV CONTEXT-BEFORE SOURCE\nDo not return me.",
+  sourcePrimary: "PRIVATE ESV PRIMARY SOURCE\nDo not return me.",
+  sourceAfter: "PRIVATE ESV CONTEXT-AFTER SOURCE\nDo not return me.",
   example: "PRIVATE APPROVED EXAMPLE\nDo not return me.",
   ruleOne: "Private rule one text.",
   ruleTwo: "Private rule two text.",
   noteOne: "Private note one text.",
   noteTwo: "Private note two text.",
 };
+const ownerSourceDecision = {
+  decisionId: "mark-sprint-esv-source-2026-07-12",
+  decision: "use_esv_api_for_prompt_time_analysis",
+  noncommercialOnly: true,
+  modelTrainingAuthorized: false,
+  formalAiAnalysisPermissionConfirmed: false,
+};
+const sourceRequestOptions = {
+  endpoint: "passage/text",
+  includePassageReferences: true,
+  includeVerseNumbers: true,
+  includeFootnotes: true,
+  includeFootnoteBody: true,
+  includeHeadings: true,
+  includeShortCopyright: true,
+};
+const sourcePassages: GenerationSourcePassageIdentity[] = [
+  {
+    role: "context_before",
+    requestedReference: "Mark 7",
+    canonicalReference: "Mark 7",
+    textDigest: sha256Text(raw.sourceBefore),
+  },
+  {
+    role: "primary",
+    requestedReference: "Mark 8",
+    canonicalReference: "Mark 8",
+    textDigest: sha256Text(raw.sourcePrimary),
+  },
+  {
+    role: "context_after",
+    requestedReference: "Mark 9",
+    canonicalReference: "Mark 9",
+    textDigest: sha256Text(raw.sourceAfter),
+  },
+];
+const sourceIdentity = {
+  provider: "Crossway",
+  name: "English Standard Version",
+  version: "ESV Text Edition: 2025",
+  apiEndpoint: "https://api.esv.org/v3/passage/text/",
+  termsUrl: "https://api.esv.org/",
+  permissionsUrl: "https://www.crossway.org/permissions/",
+  useBasis: "owner_direction_noncommercial_ministry_api_use",
+  publishedTermsAiAnalysisStatus: "not_explicit_owner_accepts_uncertainty",
+  commercialUseAllowed: false as const,
+  ownerDecisionId: ownerSourceDecision.decisionId,
+  ownerDecisionDigest: sha256Canonical(ownerSourceDecision),
+  requestOptionsDigest: sha256Canonical(sourceRequestOptions),
+  passages: sourcePassages,
+};
+const sourceBundleDigest = computeGenerationSourceBundleDigest(sourceIdentity);
 const modelRequest = {
   model: "gpt-5.5",
   reasoning_effort: "low",
@@ -34,7 +91,7 @@ const modelRequest = {
   response_format: { type: "json_object" },
 };
 
-const requirements: GenerationManifestRequirementsV1 = {
+const requirements: GenerationManifestRequirementsV2 = {
   artifact: "chapter_workup",
   stage: "copy_generation",
   subject: {
@@ -57,8 +114,8 @@ const requirements: GenerationManifestRequirementsV1 = {
     ],
   },
   guidance: {
-    packetId: "mark-8-11-2026-07-v4",
-    version: "1.3",
+    packetId: "mark-8-11-2026-07-v5",
+    version: "1.4",
     digest: sha256Canonical({ packet: "v3", notes: 2 }),
     notes: [
       { id: "M8-01", storedRowId: "row-note-1", digest: sha256Text(raw.noteOne) },
@@ -73,18 +130,13 @@ const requirements: GenerationManifestRequirementsV1 = {
     contentDigest: sha256Text(raw.example),
   },
   source: {
-    name: "Open English Bible",
-    version: "2025.6",
-    rights: "CC0",
-    url: "https://openenglishbible.org/oeb/2025.6/read/b041.html",
-    reference: "Mark 8",
-    contextReference: "Mark 7–9 context; Mark 8 primary (grounded_book_flow_only)",
-    contentDigest: sha256Text(raw.source),
+    ...sourceIdentity,
+    bundleDigest: sourceBundleDigest,
   },
   approvedManifestDigest: null,
 };
 
-const materials: GenerationManifestMaterialsV1 = {
+const materials: GenerationManifestMaterialsV2 = {
   artifact: "chapter_workup",
   stage: "copy_generation",
   subject: { ...requirements.subject },
@@ -107,7 +159,7 @@ const materials: GenerationManifestMaterialsV1 = {
   examples: [{ ...requirements.example, active: true }],
   source: {
     ...requirements.source,
-    approved: true,
+    ownerSelected: true,
     connected: true,
     contentPresent: true,
   },
@@ -120,7 +172,7 @@ assert.deepEqual(preview.findings.map((finding) => finding.code), [
 ]);
 assert.throws(() => assertGenerationManifestReady(preview));
 
-const approvedRequirements: GenerationManifestRequirementsV1 = {
+const approvedRequirements: GenerationManifestRequirementsV2 = {
   ...requirements,
   approvedManifestDigest: preview.manifestDigest,
 };
@@ -138,8 +190,8 @@ let mutationCases = 0;
 function expectBlocked(
   label: string,
   mutate: (
-    requirementCopy: GenerationManifestRequirementsV1,
-    materialCopy: GenerationManifestMaterialsV1,
+    requirementCopy: GenerationManifestRequirementsV2,
+    materialCopy: GenerationManifestMaterialsV2,
   ) => void,
   code: string,
 ): void {
@@ -190,15 +242,52 @@ expectBlocked("inactive example", (_r, m) => { m.examples[0].active = false; }, 
 expectBlocked("example string active", (_r, m) => { (m.examples[0] as unknown as Record<string, unknown>).active = "true"; }, "EXAMPLE_NOT_ACTIVE");
 expectBlocked("wrong example", (_r, m) => { m.examples[0].id = "other"; }, "IDENTITY_MISMATCH");
 expectBlocked("changed example", (_r, m) => { m.examples[0].contentDigest = sha256Text(`${raw.example}!`); }, "DIGEST_MISMATCH");
-expectBlocked("source unapproved", (_r, m) => { m.source.approved = false; }, "SOURCE_NOT_APPROVED");
+expectBlocked("source not owner selected", (_r, m) => { m.source.ownerSelected = false; }, "SOURCE_NOT_OWNER_SELECTED");
 expectBlocked("source unconnected", (_r, m) => { m.source.connected = false; }, "SOURCE_NOT_CONNECTED");
 expectBlocked("source absent", (_r, m) => { m.source.contentPresent = false; }, "SOURCE_CONTENT_MISSING");
-expectBlocked("source string approved", (_r, m) => { (m.source as unknown as Record<string, unknown>).approved = "false"; }, "SOURCE_NOT_APPROVED");
+expectBlocked("source string owner-selected", (_r, m) => { (m.source as unknown as Record<string, unknown>).ownerSelected = "false"; }, "SOURCE_NOT_OWNER_SELECTED");
 expectBlocked("source numeric connected", (_r, m) => { (m.source as unknown as Record<string, unknown>).connected = 1; }, "SOURCE_NOT_CONNECTED");
 expectBlocked("source null content", (_r, m) => { (m.source as unknown as Record<string, unknown>).contentPresent = null; }, "SOURCE_CONTENT_MISSING");
-expectBlocked("changed source", (_r, m) => { m.source.contentDigest = sha256Text(`${raw.source}!`); }, "DIGEST_MISMATCH");
-expectBlocked("wrong source context", (_r, m) => { m.source.contextReference = "Mark 8 only"; }, "IDENTITY_MISMATCH");
-expectBlocked("blank source digest", (_r, m) => { m.source.contentDigest = ""; }, "INVALID_DIGEST");
+expectBlocked("wrong source provider", (_r, m) => { m.source.provider = "Other"; }, "IDENTITY_MISMATCH");
+expectBlocked("old OEB source identity", (_r, m) => {
+  m.source.name = "Open English Bible";
+  m.source.version = "2025.6";
+  m.source.useBasis = "other";
+}, "IDENTITY_MISMATCH");
+expectBlocked("wrong ESV endpoint", (_r, m) => {
+  m.source.apiEndpoint = "https://api.esv.org/v3/passage/html/";
+}, "IDENTITY_MISMATCH");
+expectBlocked("commercial ESV use", (r, m) => {
+  (r.source as unknown as Record<string, unknown>).commercialUseAllowed = true;
+  (m.source as unknown as Record<string, unknown>).commercialUseAllowed = true;
+}, "SOURCE_COMMERCIAL_USE_FORBIDDEN");
+expectBlocked("changed owner source decision", (_r, m) => {
+  m.source.ownerDecisionDigest = sha256Canonical({ ...ownerSourceDecision, decision: "other" });
+}, "DIGEST_MISMATCH");
+expectBlocked("changed ESV request options", (_r, m) => {
+  m.source.requestOptionsDigest = sha256Canonical({ ...sourceRequestOptions, includeFootnotes: false });
+}, "DIGEST_MISMATCH");
+expectBlocked("changed primary source text", (_r, m) => {
+  m.source.passages[1].textDigest = sha256Text(`${raw.sourcePrimary}!`);
+}, "DIGEST_MISMATCH");
+expectBlocked("reordered source passages", (_r, m) => {
+  m.source.passages.reverse();
+}, "IDENTITY_MISMATCH");
+expectBlocked("missing source passage", (_r, m) => {
+  m.source.passages.pop();
+}, "SOURCE_PASSAGE_SET_MISMATCH");
+expectBlocked("duplicate source reference", (_r, m) => {
+  m.source.passages[2] = { ...m.source.passages[0], role: "context_after" };
+}, "SOURCE_PASSAGE_DUPLICATE");
+expectBlocked("wrong primary canonical reference", (_r, m) => {
+  m.source.passages[1].canonicalReference = "Mark 9";
+}, "IDENTITY_MISMATCH");
+expectBlocked("changed source bundle digest", (_r, m) => {
+  m.source.bundleDigest = "0".repeat(64);
+}, "DIGEST_MISMATCH");
+expectBlocked("blank source bundle digest", (_r, m) => {
+  m.source.bundleDigest = "";
+}, "INVALID_DIGEST");
 expectBlocked("blank matching identity", (r, m) => { r.model.id = ""; m.model.id = ""; }, "INVALID_IDENTITY");
 expectBlocked("stale owner approval", (r) => { r.approvedManifestDigest = "f".repeat(64); }, "MANIFEST_APPROVAL_MISMATCH");
 
@@ -210,14 +299,14 @@ assert.throws(
   /sparse manifest array/,
 );
 
-const taintedMaterials = structuredClone(materials) as GenerationManifestMaterialsV1 &
+const taintedMaterials = structuredClone(materials) as GenerationManifestMaterialsV2 &
   Record<string, unknown>;
 taintedMaterials.rawTopLevel = "PRIVATE TOP-LEVEL WORDING";
 Object.assign(taintedMaterials.prompt, { rawRequest: modelRequest });
 Object.assign(taintedMaterials.brain.rules[0], { ruleText: raw.ruleOne });
 Object.assign(taintedMaterials.guidance.notes[0], { noteText: raw.noteOne });
 Object.assign(taintedMaterials.examples[0], { rawExample: raw.example });
-Object.assign(taintedMaterials.source, { rawSource: raw.source });
+Object.assign(taintedMaterials.source, { rawSource: raw.sourcePrimary, apiKey: "PRIVATE API KEY" });
 const tainted = evaluateGenerationManifest(approvedRequirements, taintedMaterials);
 assert.equal(tainted.ready, false);
 assert.ok(tainted.findings.some((finding) => finding.code === "UNKNOWN_FIELD"));
@@ -229,12 +318,15 @@ for (const protectedText of [
   raw.ruleOne,
   raw.noteOne,
   raw.example,
-  raw.source,
+  raw.sourceBefore,
+  raw.sourcePrimary,
+  raw.sourceAfter,
+  "PRIVATE API KEY",
 ]) {
   assert.ok(!serializedTainted.includes(protectedText), "tainted material leaked into manifest result");
 }
 const taintedRequirements = structuredClone(approvedRequirements) as
-  GenerationManifestRequirementsV1 & Record<string, unknown>;
+  GenerationManifestRequirementsV2 & Record<string, unknown>;
 Object.assign(taintedRequirements.source, { licenseExpiry: "PRIVATE NEW REQUIREMENT" });
 const taintedRequirementResult = evaluateGenerationManifest(taintedRequirements, materials);
 assert.equal(taintedRequirementResult.ready, false);
@@ -268,6 +360,8 @@ for (const slug of MARK_SPRINT_SLUGS) {
     "brain_artifact_not_approved",
     "brain_live_match_missing",
     "source_not_connected",
+    "source_request_options_digest_missing",
+    "source_passage_digests_missing",
     "source_digest_missing",
     "model_request_digest_missing",
     "chapter_note_row_ids_missing",
@@ -277,6 +371,41 @@ for (const slug of MARK_SPRINT_SLUGS) {
   ]) {
     assert.ok(codes.includes(code as never), `${slug} missing current-state blocker ${code}`);
   }
+  assert.ok(
+    !codes.includes("source_owner_selection_missing"),
+    `${slug} lost the owner's ESV source selection`,
+  );
+  const chapter = Number(slug.split("-")[1]);
+  assert.deepEqual(
+    policy.requirements.source.expectedPassages.map((passage) => ({
+      role: passage.role,
+      requestedReference: passage.requestedReference,
+      expectedCanonicalReference: passage.expectedCanonicalReference,
+    })),
+    [
+      {
+        role: "context_before",
+        requestedReference: `Mark ${chapter - 1}`,
+        expectedCanonicalReference: `Mark ${chapter - 1}`,
+      },
+      {
+        role: "primary",
+        requestedReference: `Mark ${chapter}`,
+        expectedCanonicalReference: `Mark ${chapter}`,
+      },
+      {
+        role: "context_after",
+        requestedReference: `Mark ${chapter + 1}`,
+        expectedCanonicalReference: `Mark ${chapter + 1}`,
+      },
+    ],
+  );
+  assert.equal(policy.requirements.source.name, "English Standard Version");
+  assert.equal(policy.requirements.source.version, "ESV Text Edition: 2025");
+  assert.equal(policy.requirements.source.commercialUseAllowed, false);
+  assert.equal(policy.requirements.source.ownerSelectionStatus, "approved");
+  assert.equal(policy.requirements.source.runtimeConnectionStatus, "not_connected");
+  assert.equal(policy.requirements.source.readerAndGenerationSourcesAreDistinct, false);
   const serializedPolicy = JSON.stringify(policy);
   assert.ok(!serializedPolicy.includes("Preserve every movement"));
   assert.ok(!serializedPolicy.includes("Partial-to-clear sight"));
@@ -286,11 +415,40 @@ for (const slug of MARK_SPRINT_SLUGS) {
   policyBlockers[slug] = codes;
 }
 
+assert.throws(
+  () =>
+    assertGenericChapterGenerationAllowed({
+      slug: "mark-8",
+      book: "Mark",
+      chapter: 8,
+    }),
+  /protected ESV source \+ generation-manifest-v2 runner is not connected/,
+  "generic generation must refuse the Mark sprint before OpenAI configuration or calls",
+);
+for (const protectedIdentity of [
+  { slug: "mark-08", book: "Mark", chapter: 8 },
+  { slug: "unexpected-slug", book: " mark ", chapter: 9 },
+  { slug: "mark-10", book: "Other", chapter: 1 },
+]) {
+  assert.throws(
+    () => assertGenericChapterGenerationAllowed(protectedIdentity),
+    /protected ESV source \+ generation-manifest-v2 runner is not connected/,
+    `generic generation accepted protected identity ${JSON.stringify(protectedIdentity)}`,
+  );
+}
+assert.doesNotThrow(() =>
+  assertGenericChapterGenerationAllowed({
+    slug: "mark-7",
+    book: "Mark",
+    chapter: 7,
+  }),
+);
+
 console.log(
   JSON.stringify(
     {
       ok: true,
-      contract: "generation-manifest-v1",
+      contract: "generation-manifest-v2",
       syntheticGreenManifestDigest: green.manifestDigest,
       mutationCases,
       currentPolicyReady: false,

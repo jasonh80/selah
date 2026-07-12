@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildChapterWorkupPrompt } from "../lib/ai/prompts/chapter-workup-prompt";
+import {
+  buildChapterWorkupPrompt,
+  buildProtectedChapterWorkupPrompt,
+} from "../lib/ai/prompts/chapter-workup-prompt";
 import {
   parseChapterWorkupJson,
   type GeneratedChapterWorkup,
@@ -692,42 +695,95 @@ assert.equal(rendered.modernMap.title, base.maps.modern.title);
 assert.equal(rendered.characters[0]?.description, base.keyPeople[0]?.description);
 
 const mark8Notes = guidance.chapters["mark-8"].notes.map((note) => note.text);
-const prompt = buildChapterWorkupPrompt({
+const prompt = buildProtectedChapterWorkupPrompt({
   book: "Mark",
   chapter: 8,
   bibleVersion: "ESV",
-  bibleText: "[rights-cleared source fixture omitted]",
-  generationSourceLabel: "OEB 2025.6 synthetic verification label",
+  generationSource: {
+    label: "ESV Text Edition: 2025 synthetic verification bundle",
+    sections: [
+      { role: "context_before", reference: "Mark 7", text: "[private context-before fixture]" },
+      { role: "primary", reference: "Mark 8", text: "[private primary fixture]" },
+      { role: "context_after", reference: "Mark 9", text: "[private context-after fixture]" },
+    ],
+  },
   globalRules: ["Synthetic active rule for contract verification."],
   chapterNotes: mark8Notes,
 });
+const genericPromptWithInjectedSource = buildChapterWorkupPrompt({
+  book: "Mark",
+  chapter: 7,
+  bibleVersion: "ESV",
+  generationSource: {
+    label: "must not enter generic prompt",
+    sections: [
+      { role: "context_before", reference: "Mark 6", text: "private-before" },
+      { role: "primary", reference: "Mark 7", text: "private-primary" },
+      { role: "context_after", reference: "Mark 8", text: "private-after" },
+    ],
+  },
+} as unknown as Parameters<typeof buildChapterWorkupPrompt>[0]);
+assert.doesNotMatch(genericPromptWithInjectedSource, /must not enter generic prompt|private-primary/);
+assert.doesNotMatch(genericPromptWithInjectedSource, /SERVER-SUPPLIED GENERATION SOURCE/);
 assert.throws(
   () =>
-    buildChapterWorkupPrompt({
+    buildProtectedChapterWorkupPrompt({
       book: "Mark",
       chapter: 8,
       bibleVersion: "ESV",
-      bibleText: "[unlabeled source fixture]",
+      generationSource: {
+        label: "   ",
+        sections: [
+          { role: "context_before", reference: "Mark 7", text: "before" },
+          { role: "primary", reference: "Mark 8", text: "primary" },
+          { role: "context_after", reference: "Mark 9", text: "after" },
+        ],
+      },
     }),
   /generation source label is required/i,
 );
 assert.throws(
   () =>
-    buildChapterWorkupPrompt({
+    buildProtectedChapterWorkupPrompt({
       book: "Mark",
       chapter: 8,
-      bibleText: "   ",
-      generationSourceLabel: "OEB 2025.6 synthetic verification label",
+      generationSource: {
+        label: "ESV Text Edition: 2025 synthetic verification bundle",
+        sections: [
+          { role: "context_before", reference: "Mark 7", text: "before" },
+          { role: "primary", reference: "Mark 8", text: "   " },
+          { role: "context_after", reference: "Mark 9", text: "after" },
+        ],
+      },
     }),
-  /source text cannot be empty/i,
+  /non-empty context-before, primary, and context-after sections in order/i,
+);
+assert.throws(
+  () =>
+    buildProtectedChapterWorkupPrompt({
+      book: "Mark",
+      chapter: 8,
+      generationSource: {
+        label: "ESV Text Edition: 2025 synthetic verification bundle",
+        sections: [
+          { role: "primary", reference: "Mark 8", text: "primary" },
+          { role: "context_before", reference: "Mark 7", text: "before" },
+          { role: "context_after", reference: "Mark 9", text: "after" },
+        ],
+      },
+    }),
+  /non-empty context-before, primary, and context-after sections in order/i,
 );
 assert.match(prompt, /"whatPeopleAsk"/);
 assert.match(prompt, /"startVerse"/);
 assert.match(prompt, /5-8 questions/);
 assert.match(prompt, /no gaps or overlaps/i);
-assert.match(prompt, /SERVER-SUPPLIED GENERATION SOURCE \(OEB 2025\.6/);
-assert.match(prompt, /rights, version, and digest must be authorized/i);
-assert.match(prompt, /reader-display version/i);
+assert.match(prompt, /SERVER-SUPPLIED GENERATION SOURCE \(ESV Text Edition: 2025/);
+assert.match(prompt, /CONTEXT BEFORE \(Mark 7; BOOK FLOW ONLY\)/);
+assert.match(prompt, /PRIMARY CHAPTER \(Mark 8\)/);
+assert.match(prompt, /CONTEXT AFTER \(Mark 9; BOOK FLOW ONLY\)/);
+assert.match(prompt, /Do not blend their events into the\s+primary chapter/i);
+assert.match(prompt, /even when reader display also uses ESV/i);
 
 for (const slug of ["mark-8", "mark-9", "mark-10", "mark-11"] as const) {
   const expected = getMarkSprintChapterContract(slug);

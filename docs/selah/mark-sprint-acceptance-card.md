@@ -84,7 +84,7 @@ strong and weak workups, so the code calls a qualifying result
 `needs_owner_review`; it is not a publication approval.
 
 The versioned rubric is
-`lib/ai/quality/selah-benchmark-rubric.v1.json`. The pure validator and scorer
+`lib/ai/quality/selah-benchmark-rubric.v2.json`. The pure validator and scorer
 are `lib/server/selah-benchmark-review.ts`, verified offline by
 `npm run verify:benchmark`. Private benchmark wording may be consulted by the
 independent post-generation reviewer, but it must not enter the persisted

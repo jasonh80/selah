@@ -49,7 +49,7 @@ No one result can substitute for the other two.
 ## Editorial bar
 
 The versioned rubric is
-`lib/ai/quality/selah-benchmark-rubric.v1.json`. It weighs thirteen dimensions
+`lib/ai/quality/selah-benchmark-rubric.v2.json`. It weighs thirteen dimensions
 to 100 points. Advancement to owner review currently requires:
 
 - at least a provisional 85/100;

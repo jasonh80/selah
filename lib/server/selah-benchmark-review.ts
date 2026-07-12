@@ -5,7 +5,7 @@
 // records, never ordinary request JSON. The trusted context is a composition-
 // root input: no route may deserialize its authority policy, clock, key IDs,
 // active assignment, resolver/scanner versions, or current heads from a client.
-import rubricJson from "../ai/quality/selah-benchmark-rubric.v1.json";
+import rubricJson from "../ai/quality/selah-benchmark-rubric.v2.json";
 import { sha256Canonical } from "./generation-manifest";
 import {
   verifyAuthenticatedBenchmarkEvidence,
