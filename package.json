@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "verify:brain": "node scripts/verify-selah-brain.mjs",
+    "verify:brain": "node --import tsx scripts/verify-selah-brain.ts",
     "validate:workup": "tsx scripts/validate-workup.ts",
     "check:workup": "npm run validate:workup",
     "seed:exodus-27": "tsx scripts/seed-exodus-27.ts",

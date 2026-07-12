@@ -155,7 +155,7 @@ const GENRE_PROFILE: Record<string, { companions: string[]; categories: string[]
   "craftsmanship/vocation": { companions: ["SB-130", "SB-131", "SB-132", "SB-133", "SB-134", "SB-136", "SB-137"], categories: ["vocation", "visuals", "reverence"] },
 };
 
-interface RuleRow {
+export interface RuleRow {
   rule_id: string | null;
   title: string;
   rule_text: string;
@@ -180,30 +180,48 @@ export interface RuleSelection {
   counts: { core: number; contextual: number; excludedQa: number; excludedGovernance: number; activeTotal: number };
 }
 
-// Selective retrieval: core rules always; contextual chosen by genre/category and
-// capped; QA/governance excluded by stage. This is what feeds chapter generation.
-export async function selectRulesForGeneration(
+function emptyRuleSelection(slug: string): RuleSelection {
+  return {
+    genre: genreForSlug(slug),
+    coreIds: [],
+    contextualIds: [],
+    texts: [],
+    counts: {
+      core: 0,
+      contextual: 0,
+      excludedQa: 0,
+      excludedGovernance: 0,
+      activeTotal: 0,
+    },
+  };
+}
+
+// Pure selection engine shared by production and offline verification. The
+// caller supplies active, non-archived rows; this function applies the exact
+// stage, core/contextual, genre, priority, score, ordering, and cap behavior.
+export function selectRulesFromRows(
+  rows: RuleRow[],
   slug: string,
   stage = "copy_generation",
-): Promise<RuleSelection> {
-  const empty: RuleSelection = { genre: null, coreIds: [], contextualIds: [], texts: [], counts: { core: 0, contextual: 0, excludedQa: 0, excludedGovernance: 0, activeTotal: 0 } };
-  const db = getSupabaseAdmin();
-  if (!db) return empty;
-  const { data, error } = await db
-    .from("selah_brain_rules")
-    .select("rule_id,title,rule_text,category,scope,genre,priority,stages")
-    .eq("active", true)
-    .eq("archived", false);
-  if (error || !data) return empty;
-  const rows = data as RuleRow[];
+  maxContextual = MAX_CONTEXTUAL,
+): RuleSelection {
   const genre = genreForSlug(slug);
   const profile = (genre && GENRE_PROFILE[genre]) || { companions: [], categories: [] };
 
   const excludedQa = rows.filter((r) => r.priority === "qa").length;
   const excludedGovernance = rows.filter((r) => r.priority === "governance").length;
 
-  const eligible = rows.filter((r) => stageEligible(r.stages, stage) && r.priority !== "governance" && r.priority !== "qa");
-  const core = eligible.filter((r) => r.priority === "core");
+  const eligible = rows.filter(
+    (r) =>
+      stageEligible(r.stages, stage) &&
+      r.priority !== "governance" &&
+      r.priority !== "qa",
+  );
+  const core = eligible
+    .filter((r) => r.priority === "core")
+    .sort((a, b) =>
+      (a.rule_id || a.title).localeCompare(b.rule_id || b.title),
+    );
 
   function score(r: RuleRow): number {
     if (r.scope === "genre") return r.genre === genre ? 100 : -1;
@@ -217,18 +235,54 @@ export async function selectRulesForGeneration(
     .filter((r) => r.priority === "contextual")
     .map((r) => ({ r, s: score(r) }))
     .filter((x) => x.s >= 0)
-    .sort((a, b) => b.s - a.s || (a.r.rule_id || "zzz").localeCompare(b.r.rule_id || "zzz"))
-    .slice(0, MAX_CONTEXTUAL)
+    .sort(
+      (a, b) =>
+        b.s - a.s ||
+        (a.r.rule_id || "zzz").localeCompare(b.r.rule_id || "zzz"),
+    )
+    .slice(0, maxContextual)
     .map((x) => x.r);
 
   const ordered = [...core, ...contextual];
   return {
     genre,
     coreIds: core.map((r) => r.rule_id || r.title),
-    contextualIds: contextual.map((r) => r.rule_id || `(review) ${r.title}`),
-    texts: [...new Set(ordered.map((r) => String(r.rule_text || "").trim()).filter(Boolean))],
-    counts: { core: core.length, contextual: contextual.length, excludedQa, excludedGovernance, activeTotal: rows.length },
+    contextualIds: contextual.map(
+      (r) => r.rule_id || `(review) ${r.title}`,
+    ),
+    texts: [
+      ...new Set(
+        ordered
+          .map((r) => String(r.rule_text || "").trim())
+          .filter(Boolean),
+      ),
+    ],
+    counts: {
+      core: core.length,
+      contextual: contextual.length,
+      excludedQa,
+      excludedGovernance,
+      activeTotal: rows.length,
+    },
   };
+}
+
+// Selective retrieval: core rules always; contextual chosen by genre/category and
+// capped; QA/governance excluded by stage. This is what feeds chapter generation.
+export async function selectRulesForGeneration(
+  slug: string,
+  stage = "copy_generation",
+): Promise<RuleSelection> {
+  const empty = emptyRuleSelection(slug);
+  const db = getSupabaseAdmin();
+  if (!db) return empty;
+  const { data, error } = await db
+    .from("selah_brain_rules")
+    .select("rule_id,title,rule_text,category,scope,genre,priority,stages")
+    .eq("active", true)
+    .eq("archived", false);
+  if (error || !data) return empty;
+  return selectRulesFromRows(data as RuleRow[], slug, stage);
 }
 
 // ---- idempotent seed from the version-controlled library --------------------
@@ -269,8 +323,33 @@ export async function seedFromLibrary(): Promise<{
       toInsert.push(row);
     } else if (seen.get(r.id) !== r.text) {
       // Preserve the prior wording, then update.
-      await db.from("selah_brain_rule_history").insert({ rule_id: r.id, rule_text: seen.get(r.id), version: "pre-update" });
-      await db.from("selah_brain_rules").update(row).eq("rule_id", r.id);
+      const history = await db.from("selah_brain_rule_history").insert({
+        rule_id: r.id,
+        rule_text: seen.get(r.id),
+        version: "pre-update",
+      });
+      if (history.error) {
+        return {
+          inserted: 0,
+          updated,
+          unchanged,
+          total: SEED_RULES.length,
+          error: `history failed for ${r.id}: ${history.error.message}`,
+        };
+      }
+      const update = await db
+        .from("selah_brain_rules")
+        .update(row)
+        .eq("rule_id", r.id);
+      if (update.error) {
+        return {
+          inserted: 0,
+          updated,
+          unchanged,
+          total: SEED_RULES.length,
+          error: `update failed for ${r.id}: ${update.error.message}`,
+        };
+      }
       updated++;
     } else {
       unchanged++;

@@ -4,7 +4,8 @@
 > `studio-workflow.md` for how chapters get made. Keep this file updated at
 > every milestone (publish, system change, model change).
 
-_Last updated: 2026-07-06 (build r78, after Mark 6 publish)._
+_Last updated: 2026-07-12 (live build still r78; Mark 8–11 preparation is not
+active in production)._
 
 ## What Selah is
 
@@ -16,7 +17,8 @@ through Scripture.** Tagline: *Pause. Reflect. Elevate.* Principle:
 - Repo: https://github.com/jasonh80/selah (branch `main` auto-deploys via Netlify)
 - Stack: Next.js 14 App Router + Tailwind + TypeScript · Supabase (content, rules,
   settings, storage) · OpenAI (text + images) · ESV API (scripture) · Esri (maps)
-- No local Node on the owner's Mac — all builds happen on Netlify via git push.
+- The owner's Mac now has Node 24 for fast local development. Netlify remains on
+  Node 20, so release validation must still prove production parity.
 
 ## Live chapters
 
@@ -46,9 +48,11 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 
 ## Selah Brain (the quality system)
 
-- **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 library also
-  in repo at `lib/server/selah-brain-library.v1_1.json` — Supabase is the live
-  source of truth; the JSON is the seed).
+- **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 is the last
+  verified live library). The version-controlled seed has a review-only v1.5
+  candidate with 98 rules. Supabase remains the live source of truth: a merged
+  JSON change is not active until the owner separately approves seeding and a
+  post-seed manifest proves the live IDs and wording.
 - Layers: core (always-on) · contextual (max 12, selected by genre/stage) ·
   qa (review only) · governance (never in prose prompts).
 - **Approved examples** (`selah_approved_examples`): the Mark 6 Daily Rundown is
@@ -80,12 +84,21 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 - No auth, no personalization, no payments, no live "Ask Selah" tool,
   no Street View ("Standing There" shows a roadmap placeholder by design).
 - Budget limit field in settings is stored but **not enforced**.
+- Generation currently treats missing Brain rules, chapter notes, examples, and
+  source text as soft failures. **Do not generate Mark 8–11** until their Studio
+  manifest fails closed before any mutation or model call.
+- The review-only Mark 8–11 guidance packet is versioned in
+  `lib/server/mark-sprint-guidance.v1.json`; it is not loaded into Supabase or
+  connected to generation. The OEB 2025.6 CC0 source is a candidate, not yet
+  vendored or approved for a run.
 
 ## Next up
 
-- **Likely next chapter: Exodus 29** (priestly consecration). Scene-check
-  accuracy notes already exist in `lib/content/chapter-content.ts`. Genre
-  profile: tabernacle/priesthood. Requires explicit owner approval to start.
+- **Current release sprint: Mark 8–11**, with Tuesday 2026-07-14 as the stretch
+  target. Selah Brain should author fresh drafts after the safety PR, v1.5,
+  chapter guidance, rights-cleared source, exact Mark 6 voice exemplar, and
+  fail-closed manifest are reviewed. Each generation and publication still
+  requires explicit owner approval.
 
 ## Cost reference (Mark 6 actuals, logged estimates)
 
