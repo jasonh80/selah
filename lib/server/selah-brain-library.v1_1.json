@@ -1,10 +1,10 @@
 {
-  "version": "1.4",
+  "version": "1.5",
   "name": "Selah Brain Initial Rule Library",
   "status": "initial_seed",
-  "audit_basis": "28-workup canonical audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment",
-  "source_count": 29,
-  "rule_count": 96,
+  "audit_basis": "28-workup canonical audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment plus the review-only high-weight Mark 8–11 accuracy audit",
+  "source_count": 30,
+  "rule_count": 98,
   "rules": [
     {
       "id": "SB-001",
@@ -286,7 +286,7 @@
       "id": "SB-032",
       "category": "exegesis",
       "title": "Do not invent silence",
-      "text": "When Scripture does not tell us a motive, offense, location, or mechanism, say so rather than filling the gap with a confident story.",
+      "text": "When Scripture does not tell us a motive, emotion, offense, age, status, location, mechanism, or later outcome, say so rather than filling the gap with a confident story.",
       "scope": "global",
       "sources": [
         "Genesis 40 Dream Interpretations"
@@ -345,7 +345,7 @@
       "id": "SB-036",
       "category": "exegesis",
       "title": "Human psychology matters",
-      "text": "Attend to fear, shame, grief, longing, loyalty, manipulation, guilt, repentance, courage, and relational dynamics where the narrative supports them.",
+      "text": "Attend to fear, shame, grief, longing, loyalty, manipulation, guilt, repentance, courage, and relational dynamics where the narrator, dialogue, actions, or reactions support them. State observable emotion clearly; label interior motive or psychology as interpretation rather than mind-reading.",
       "scope": "global",
       "stages": [
         "copy_generation",
@@ -389,7 +389,7 @@
       "id": "SB-039",
       "category": "exegesis",
       "title": "Hard texts receive honest treatment",
-      "text": "Address suffering, oppression, warfare, servitude, judgment, sacrifice, and moral complexity directly, historically, and pastorally without cheap answers.",
+      "text": "Address suffering, oppression, warfare, servitude, judgment, sacrifice, and moral complexity directly, historically, and pastorally without cheap answers, victim-blaming, diagnosing modern conditions from ancient symptoms, displacing appropriate care, or treating abuse, burnout, self-harm, and preventable harm as faithful endurance.",
       "scope": "global",
       "stages": [
         "copy_generation",
@@ -1368,6 +1368,41 @@
       ],
       "active": true,
       "priority": "contextual"
+    },
+    {
+      "id": "SB-208",
+      "category": "exegesis",
+      "title": "Keep each Gospel account local",
+      "text": "Build Gospel workups first from the active Gospel's wording, sequence, and stated details. Use parallel accounts only as labeled synoptic context; a traditional composite title must not silently supply age, status, objects, motives, geography, or scene details.",
+      "scope": "genre",
+      "genre": "gospel narrative",
+      "sources": [
+        "High-weight Mark 8–11 workup audit"
+      ],
+      "stages": [
+        "copy_generation",
+        "copy_review",
+        "image_prompt",
+        "image_review"
+      ],
+      "active": true,
+      "priority": "contextual"
+    },
+    {
+      "id": "SB-209",
+      "category": "theology",
+      "title": "Narrative outcomes are not automatic promises",
+      "text": "Do not turn a descriptive miracle, provision, healing, or deliverance into a universal promise about timing or outcome. Apply what the scene reveals about God and faithful response without promising identical circumstances or blaming continued suffering on weak faith.",
+      "scope": "global",
+      "sources": [
+        "High-weight Mark 8–11 workup audit"
+      ],
+      "stages": [
+        "copy_generation",
+        "copy_review"
+      ],
+      "active": true,
+      "priority": "core"
     }
   ],
   "injection_policy": {
@@ -1394,7 +1429,8 @@
       "SB-201",
       "SB-202",
       "SB-203",
-      "SB-204"
+      "SB-204",
+      "SB-209"
     ],
     "max_contextual_rules_per_generation": 12,
     "retrieve_contextual_rules_by": [
@@ -1570,6 +1606,11 @@
       "title": "Exodus 31 Workup",
       "genre_or_use": "craftsmanship / vocation / Sabbath",
       "principal_intelligence": "Spirit-enabled craftsmanship, collaborative calling, faithful process, people before output, holy work under Sabbath limits, and process-centered visual storytelling."
+    },
+    {
+      "title": "High-weight Mark 8–11 workup audit",
+      "genre_or_use": "Gospel narrative / accuracy / pastoral safety",
+      "principal_intelligence": "Preserve the active Gospel's own details, separate observable response from invented motive, refuse prosperity or guaranteed-outcome readings, and handle costly discipleship, illness, disability, and suffering without blame or harm. Raw private transcripts remain outside the public library."
     }
   ],
   "change_log": [
@@ -1595,7 +1636,10 @@
     "Added the rule that holy work still submits to God’s commands, Sabbath, and human limits.",
     "Added faithful-process and people-before-output rules.",
     "Added a craftsmanship/vocation genre guide and process-centered visual rules.",
-    "Strengthened Scripture remains primary and Beauty that bows with guidance about creativity, mission, ego, and service."
+    "Strengthened Scripture remains primary and Beauty that bows with guidance about creativity, mission, ego, and service.",
+    "Added the high-weight Mark 8–11 audit without importing private transcripts; strengthened evidence boundaries, observable-emotion discipline, and pastoral care around suffering.",
+    "Added Gospel-account locality so parallel-account details and traditional composite titles remain labeled rather than silently imported.",
+    "Added a core safeguard against turning narrative provision, healing, or deliverance into guaranteed outcomes or blame for continued suffering."
   ],
   "conflict_ledger": [
     {

@@ -140,7 +140,10 @@ export function genreForSlug(slug: string): string | null {
 // Per-genre selection profile: companion GLOBAL rules to surface first, plus the
 // categories to favor when filling remaining contextual slots.
 const GENRE_PROFILE: Record<string, { companions: string[]; categories: string[] }> = {
-  "gospel narrative": { companions: ["SB-013", "SB-015", "SB-019", "SB-036", "SB-040", "SB-050", "SB-054"], categories: ["exegesis", "theology", "history"] },
+  "gospel narrative": {
+    companions: ["SB-013", "SB-015", "SB-019", "SB-032", "SB-036", "SB-039", "SB-040", "SB-050", "SB-054"],
+    categories: ["exegesis", "theology", "history"],
+  },
   "poetry/psalm": { companions: ["SB-007", "SB-040", "SB-019"], categories: ["voice", "theology", "exegesis"] },
   "law": { companions: ["SB-039", "SB-053", "SB-043"], categories: ["exegesis", "history"] },
   "covenant/ritual": { companions: ["SB-038", "SB-055", "SB-058"], categories: ["reverence", "history", "exegesis"] },
