@@ -22,18 +22,21 @@ const SOURCE_PHRASE =
 const EXAMPLE_CONTENT =
   "PRIVATE RUNTIME EXAMPLE warm wise Mark voice without copied wording.";
 const policy = buildMarkSprintManifestPolicy(SLUG);
-const seedById = new Map(SEED_RULES.map((rule) => [rule.id, rule]));
 
-const brainRows: MarkSprintLiveBrainRuleRow[] =
-  policy.requirements.brain.requiredRules.map((required) => {
-    const seed = seedById.get(required.id);
-    assert.ok(seed);
+const brainRows: MarkSprintLiveBrainRuleRow[] = SEED_RULES.map((seed) => {
     return {
-      id: `db-${required.id}`,
-      rule_id: required.id,
+      id: `db-${seed.id}`,
+      rule_id: seed.id,
+      title: seed.title,
       rule_text: seed.text,
+      category: seed.category,
+      scope: seed.scope,
+      genre: seed.genre ?? null,
+      priority: seed.priority,
+      stages: [...seed.stages],
+      source_titles: [...(seed.sources ?? [])],
       version: LIBRARY_VERSION,
-      active: true,
+      active: seed.active,
       archived: false,
     };
   });

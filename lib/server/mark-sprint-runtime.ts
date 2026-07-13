@@ -47,7 +47,14 @@ type FetchLike = (
 export interface MarkSprintLiveBrainRuleRow {
   id: string;
   rule_id: string | null;
+  title: string;
   rule_text: string;
+  category: string;
+  scope: string;
+  genre: string | null;
+  priority: string;
+  stages: readonly string[];
+  source_titles: readonly string[];
   version: string;
   active: boolean;
   archived: boolean;
@@ -106,7 +113,9 @@ export function createSupabaseMarkSprintRuntimeReadPorts(
     async readBrainRuleRows(ruleIds: readonly string[]) {
       const { data, error } = await db
         .from("selah_brain_rules")
-        .select("id,rule_id,rule_text,version,active,archived")
+        .select(
+          "id,rule_id,title,rule_text,category,scope,genre,priority,stages,source_titles,version,active,archived",
+        )
         .in("rule_id", [...ruleIds]);
       return rowsOrThrow<readonly MarkSprintLiveBrainRuleRow[]>(data, error);
     },
@@ -334,21 +343,20 @@ function staticEvidence(
 
 function validateLiveBrain(
   rows: readonly MarkSprintLiveBrainRuleRow[],
-  expectedRules: readonly { id: string; text: string }[],
+  promptRules: readonly { id: string; text: string }[],
 ): {
   blockers: MarkSprintRuntimeEvidenceBlocker[];
   rules: Array<{ id: string; text: string }>;
 } {
   const blockers: MarkSprintRuntimeEvidenceBlocker[] = [];
-  const expectedIds = new Set(expectedRules.map((rule) => rule.id));
+  const expectedIds = new Set(SEED_RULES.map((rule) => rule.id));
   const missing: string[] = [];
   const mismatch = new Set<string>();
-  const rules: Array<{ id: string; text: string }> = [];
 
   for (const row of rows) {
     if (!expectedIds.has(row?.rule_id ?? "")) mismatch.add(row?.rule_id ?? "unknown");
   }
-  for (const expected of expectedRules) {
+  for (const expected of SEED_RULES) {
     const matches = rows.filter((row) => row?.rule_id === expected.id);
     if (!matches.length) {
       missing.push(expected.id);
@@ -362,15 +370,21 @@ function validateLiveBrain(
     if (
       typeof row.id !== "string" ||
       !row.id.trim() ||
+      row.title !== expected.title ||
       row.rule_text !== expected.text ||
+      row.category !== expected.category ||
+      row.scope !== expected.scope ||
+      row.genre !== (expected.genre ?? null) ||
+      row.priority !== expected.priority ||
+      canonicalJson(row.stages) !== canonicalJson(expected.stages) ||
+      canonicalJson(row.source_titles) !== canonicalJson(expected.sources ?? []) ||
       row.version !== LIBRARY_VERSION ||
-      row.active !== true ||
+      row.active !== expected.active ||
       row.archived !== false
     ) {
       mismatch.add(expected.id);
       continue;
     }
-    rules.push({ id: expected.id, text: expected.text });
   }
   if (missing.length) {
     blockers.push(
@@ -390,7 +404,7 @@ function validateLiveBrain(
       ),
     );
   }
-  return { blockers, rules };
+  return { blockers, rules: promptRules.map((rule) => ({ ...rule })) };
 }
 
 function validateLiveNotes(
@@ -540,7 +554,7 @@ export async function prepareMarkSprintRuntimePreview(
     exampleType: policy.requirements.voiceExample.exampleType,
   };
   const reads = await Promise.allSettled([
-    input.ports.readBrainRuleRows(versioned.rules.map((rule) => rule.id)),
+    input.ports.readBrainRuleRows(SEED_RULES.map((rule) => rule.id)),
     input.ports.readChapterNoteRows(slug),
     input.ports.readVoiceExampleRows(identity),
   ] as const);
