@@ -99,7 +99,7 @@ export async function updateGenerationSettings(
   return data ? { ...FALLBACK, ...data } : null;
 }
 
-export async function logGenerationAudit(entry: {
+export interface GenerationAuditEntry {
   action: string;
   slug?: string;
   model?: string;
@@ -107,14 +107,16 @@ export async function logGenerationAudit(entry: {
   actualCost?: number;
   status: "started" | "succeeded" | "failed";
   message?: string;
-}): Promise<void> {
+}
+
+async function writeGenerationAudit(entry: GenerationAuditEntry): Promise<boolean> {
   if (auditFailureForTesting) throw new Error("simulated generation audit outage");
   if (auditCapture) {
     auditCapture.push({ ...entry });
-    return;
+    return true;
   }
   const db = getSupabaseAdmin();
-  if (!db) return;
+  if (!db) return false;
   const { error } = await db.from("generation_audit_log").insert({
     action: entry.action,
     slug: entry.slug ?? null,
@@ -124,5 +126,20 @@ export async function logGenerationAudit(entry: {
     status: entry.status,
     message: entry.message ?? null,
   });
-  if (error) console.error("[selah] logGenerationAudit failed:", error.message);
+  if (error) {
+    console.error("[selah] logGenerationAudit failed:", error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function logGenerationAudit(entry: GenerationAuditEntry): Promise<void> {
+  await writeGenerationAudit(entry);
+}
+
+/** Used when a caller must know whether the activity row was durably saved. */
+export async function logGenerationAuditVerified(
+  entry: GenerationAuditEntry,
+): Promise<boolean> {
+  return writeGenerationAudit(entry);
 }

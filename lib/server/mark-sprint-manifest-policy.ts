@@ -17,6 +17,12 @@ import {
   SEED_RULES,
 } from "./selah-brain-library";
 import { MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST } from "./mark-sprint-esv-contract";
+import {
+  MARK_8_SETUP_NOTES,
+  MARK_8_STUDIO_SETUP_APPROVAL,
+  mark8ScopedSetupApprovalApplies,
+  type Mark8StudioSetupApproval,
+} from "./mark8-studio-setup-contract";
 
 export const MARK_SPRINT_SLUGS = [
   "mark-8",
@@ -136,7 +142,11 @@ export interface MarkSprintManifestRequirements {
     liveMatchRequired: true;
     liveMatchEvidence: null;
   };
-  chapterNotes: { id: string; textDigest: string; expectedStoredRowId: null }[];
+  chapterNotes: {
+    id: string;
+    textDigest: string;
+    expectedStoredRowId: string | null;
+  }[];
   source: {
     provider: string;
     name: string;
@@ -195,6 +205,7 @@ export function isMarkSprintSlug(value: string): value is MarkSprintSlug {
  */
 export function buildMarkSprintManifestPolicy(
   slug: MarkSprintSlug,
+  options: { mark8NotesApproval?: Mark8StudioSetupApproval | null } = {},
 ): MarkSprintManifestPolicy {
   const requiredCoreRuleIds = [...INJECTION_POLICY.always_on_rule_ids].sort();
   const requiredContextualRuleIds = [
@@ -210,6 +221,18 @@ export function buildMarkSprintManifestPolicy(
     LIBRARY_SEED_APPROVAL,
     LIBRARY_VERSION,
     LIBRARY_CONTENT_DIGEST,
+  );
+  // The separate receipt approves only the ten Mark 8 notes. Selah Brain must
+  // still pass its own existing artifact approval below, and Mark 9–11 can
+  // never use this receipt.
+  const exactMark8NotesApproved = mark8ScopedSetupApprovalApplies(
+    slug,
+    Object.prototype.hasOwnProperty.call(options, "mark8NotesApproval")
+      ? options.mark8NotesApproval ?? null
+      : MARK_8_STUDIO_SETUP_APPROVAL,
+  );
+  const mark8StoredNoteIds = new Map(
+    MARK_8_SETUP_NOTES.map((note) => [note.guidanceId, note.rowId]),
   );
 
   const requirements: MarkSprintManifestRequirements = {
@@ -242,7 +265,8 @@ export function buildMarkSprintManifestPolicy(
     chapterNotes: guidance.chapters[slug].notes.map((note) => ({
       id: note.id,
       textDigest: sha256Text(note.text),
-      expectedStoredRowId: null,
+      expectedStoredRowId:
+        slug === "mark-8" ? mark8StoredNoteIds.get(note.id) ?? null : null,
     })),
     source: (() => {
       const chapter = Number(slug.split("-")[1]);
@@ -309,7 +333,10 @@ export function buildMarkSprintManifestPolicy(
   };
 
   const blockers: MarkSprintPolicyBlocker[] = [];
-  if (guidance.status !== "approved_for_generation") {
+  if (
+    guidance.status !== "approved_for_generation" &&
+    !exactMark8NotesApproved
+  ) {
     blockers.push({
       code: "guidance_not_approved",
       expected: "approved_for_generation",
@@ -393,12 +420,14 @@ export function buildMarkSprintManifestPolicy(
     actual: null,
     message: "The final request can only be bound after live materials are prepared.",
   });
-  blockers.push({
-    code: "chapter_note_row_ids_missing",
-    expected: "exact stored row ID for every ordered chapter note",
-    actual: null,
-    message: "The packet has note IDs and text digests but no live stored row identities.",
-  });
+  if (requirements.chapterNotes.some((note) => !note.expectedStoredRowId)) {
+    blockers.push({
+      code: "chapter_note_row_ids_missing",
+      expected: "exact stored row ID for every ordered chapter note",
+      actual: null,
+      message: "The packet has note IDs and text digests but no live stored row identities.",
+    });
+  }
   blockers.push({
     code: "voice_example_id_missing",
     expected: "exact stored ID of the approved Mark 6 voice example",

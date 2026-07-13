@@ -12,6 +12,11 @@ import {
   MARK_8_STUDIO_SLUG,
 } from "@/lib/studio-mark8-preflight";
 import { studioPreviewUrl } from "@/lib/studio-preview";
+import {
+  buildMark8StudioSetupRequest,
+  decideMark8StudioSetup,
+  type Mark8StudioSetupDecision,
+} from "@/lib/studio-mark8-setup";
 
 // Selah Studio — a calm, guided publishing flow (not a developer console).
 // Choose Chapter → Generate Draft → Preview Text → Create & Review Images →
@@ -113,6 +118,9 @@ export default function SelahStudioPage() {
   const [preparingMark8, setPreparingMark8] = useState(false);
   const [mark8ManifestDigest, setMark8ManifestDigest] = useState<string | null>(null);
   const [mark8Blockers, setMark8Blockers] = useState<string[]>([]);
+  const [mark8SetupDecision, setMark8SetupDecision] = useState<Mark8StudioSetupDecision | null>(null);
+  const [mark8SetupBusy, setMark8SetupBusy] = useState(false);
+  const [mark8SetupMsg, setMark8SetupMsg] = useState("");
 
   const [previewed, setPreviewed] = useState(false);
   const [verdict, setVerdict] = useState<Verdict>("");
@@ -138,6 +146,7 @@ export default function SelahStudioPage() {
   const [examples, setExamples] = useState<Example[] | null>(null);
 
   const activeSlug = useRef("");
+  const mark8SetupRequest = useRef(0);
   const mark8PreflightRequest = useRef(0);
   const imageStatusRequest = useRef(0);
   const currentImageReviewDigest = useRef("");
@@ -220,6 +229,10 @@ export default function SelahStudioPage() {
     setPreparingMark8(false);
     setMark8ManifestDigest(null);
     setMark8Blockers([]);
+    setMark8SetupDecision(null);
+    setMark8SetupBusy(false);
+    setMark8SetupMsg("");
+    mark8SetupRequest.current++;
     mark8PreflightRequest.current++;
     resetReview();
     const target = slugFor(nextBook, nextChapter) ?? "";
@@ -228,6 +241,7 @@ export default function SelahStudioPage() {
   }
 
   async function loadChapterStatus(target: string) {
+    if (target === MARK_8_STUDIO_SLUG) void loadMark8Setup(target);
     setPhase("checking");
     setStatusProblem(false);
     setGenMsg("");
@@ -327,12 +341,71 @@ export default function SelahStudioPage() {
     }
   }
 
+  async function loadMark8Setup(target: string) {
+    if (target !== MARK_8_STUDIO_SLUG) return;
+    const requestId = ++mark8SetupRequest.current;
+    setMark8SetupDecision(null);
+    setMark8SetupMsg("");
+    try {
+      const response = await api("POST", {
+        action: "mark8_setup_status",
+        slug: target,
+      });
+      if (activeSlug.current !== target || mark8SetupRequest.current !== requestId) return;
+      setMark8SetupDecision(decideMark8StudioSetup(response));
+    } catch {
+      if (activeSlug.current === target && mark8SetupRequest.current === requestId) {
+        setMark8SetupDecision({ kind: "error" });
+      }
+    }
+  }
+
+  async function setupMark8() {
+    const target = slug;
+    const decision = mark8SetupDecision;
+    if (target !== MARK_8_STUDIO_SLUG || decision?.kind !== "setup") return;
+    const requestId = ++mark8SetupRequest.current;
+    setMark8SetupBusy(true);
+    setMark8SetupMsg("");
+    try {
+      const response = await api("POST", buildMark8StudioSetupRequest(decision));
+      if (activeSlug.current !== target || mark8SetupRequest.current !== requestId) return;
+      const next = decideMark8StudioSetup(response);
+      setMark8SetupDecision(next);
+      if (next.kind !== "ready") {
+        setMark8SetupMsg(
+          typeof response.error === "string"
+            ? response.error
+            : "Studio could not safely finish Mark 8 setup.",
+        );
+      }
+    } catch {
+      if (activeSlug.current === target && mark8SetupRequest.current === requestId) {
+        setMark8SetupDecision({ kind: "error" });
+        setMark8SetupMsg("Studio could not safely finish Mark 8 setup.");
+      }
+    } finally {
+      if (activeSlug.current === target && mark8SetupRequest.current === requestId) {
+        setMark8SetupBusy(false);
+      }
+    }
+  }
+
   function onGenerateClick() {
     const imageWorkLocked =
       slug === MARK_8_STUDIO_SLUG &&
       (imagePhase === "checking" || imagePhase === "queued" || imagePhase === "running" ||
         imageStatus?.state === "failed" || imageStatus?.state === "blocked");
-    if (!slug || phase === "checking" || phase === "generating" || preparingMark8 || statusProblem || published || imageWorkLocked) return;
+    if (
+      !slug ||
+      phase === "checking" ||
+      phase === "generating" ||
+      preparingMark8 ||
+      statusProblem ||
+      published ||
+      imageWorkLocked ||
+      (slug === MARK_8_STUDIO_SLUG && mark8SetupDecision?.kind !== "ready")
+    ) return;
     if (slug === MARK_8_STUDIO_SLUG) {
       if ((imageStatus?.stored ?? 0) > 0 && !approvedImageDiscard) {
         setConfirming(false);
@@ -886,6 +959,7 @@ export default function SelahStudioPage() {
     settings.image_generation_enabled !== true ||
     confirmedSettings.current?.image_generation_enabled !== true;
   const isMark8 = slug === MARK_8_STUDIO_SLUG;
+  const mark8SetupReady = !isMark8 || mark8SetupDecision?.kind === "ready";
   const draftReady = phase === "ready";
   const exactImagesReady =
     imagePhase === "ready" &&
@@ -952,7 +1026,48 @@ export default function SelahStudioPage() {
 
       {/* Step 2 — Generate Draft */}
       <Step n={2} title="Generate Draft" state={step2}>
-        {statusProblem ? (
+        {isMark8 && mark8SetupDecision === null && (
+          <p className="text-[13px] text-secondary">Checking Mark 8 setup…</p>
+        )}
+        {isMark8 && mark8SetupDecision?.kind === "locked" && (
+          <div className="rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] font-semibold text-primary">Mark 8 setup is locked</p>
+            <p className="mt-1 text-[13px] text-secondary">
+              The exact Selah Brain and 10 Mark 8 notes still need your approval.
+            </p>
+          </div>
+        )}
+        {isMark8 && mark8SetupDecision?.kind === "setup" && (
+          <div className="rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] text-primary">
+              Load the approved {mark8SetupDecision.ruleCount} Selah Brain rules and {mark8SetupDecision.noteCount} Mark 8 notes into private Studio? This creates no draft and publishes nothing.
+            </p>
+            <button
+              type="button"
+              onClick={() => void setupMark8()}
+              disabled={mark8SetupBusy}
+              className={`${primary} mt-2.5`}
+            >
+              {mark8SetupBusy ? "Setting up…" : "Set up Mark 8"}
+            </button>
+          </div>
+        )}
+        {isMark8 && mark8SetupDecision?.kind === "error" && (
+          <div className="rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] text-jesus-red">
+              {mark8SetupMsg || "Studio could not safely check Mark 8 setup."}
+            </p>
+            <button type="button" onClick={() => void loadMark8Setup(slug)} className={`${ghost} mt-2.5`}>
+              Check setup again
+            </button>
+          </div>
+        )}
+        {isMark8 && mark8SetupDecision?.kind === "ready" && (
+          <p className="mb-2.5 text-[13px] font-medium text-accent-strong">
+            ✓ Selah Brain and Mark 8 notes are ready
+          </p>
+        )}
+        {mark8SetupReady && (statusProblem ? (
           <button type="button" onClick={() => void loadChapterStatus(slug)} className={ghost}>
             Check chapter again
           </button>
@@ -1057,7 +1172,7 @@ export default function SelahStudioPage() {
               </button>
             </div>
           </div>
-        )}
+        ))}
 
         {mark8Blockers.length > 0 && (
           <div role="alert" className="mt-3 rounded-lg border bg-card-soft p-3">
@@ -1068,7 +1183,7 @@ export default function SelahStudioPage() {
           </div>
         )}
 
-        {textOff && (
+        {mark8SetupReady && textOff && (
           <p className="mt-2.5 text-[13px] text-secondary">
             Draft creation is paused. Turn it on and save in <span className="text-primary">Settings &amp; history</span> below to begin.
           </p>

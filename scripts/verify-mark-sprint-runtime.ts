@@ -17,6 +17,7 @@ import {
   expectedMarkChapterVerseMarkers,
 } from "../lib/server/mark-sprint-esv-contract";
 import { LIBRARY_VERSION, SEED_RULES } from "../lib/server/selah-brain-library";
+import { MARK_8_SETUP_NOTES } from "../lib/server/mark8-studio-setup-contract";
 
 const SLUG = "mark-8" as const;
 const API_KEY = "PRIVATE RUNTIME TEST KEY";
@@ -45,8 +46,11 @@ const brainRows: MarkSprintLiveBrainRuleRow[] = SEED_RULES.map((seed) => {
 });
 
 const guidanceNotes = guidanceArtifact.chapters[SLUG].notes;
+const managedNoteIds = new Map(
+  MARK_8_SETUP_NOTES.map((note) => [note.guidanceId, note.rowId]),
+);
 const noteRows: MarkSprintLiveChapterNoteRow[] = guidanceNotes.map((note) => ({
-  id: `db-${note.id}`,
+  id: managedNoteIds.get(note.id) ?? `missing-${note.id}`,
   slug: SLUG,
   note: note.text,
   scope: "chapter",
@@ -179,6 +183,15 @@ async function main(): Promise<void> {
   );
   await expectEvidenceBlock(
     ports({ notes: noteRows.slice(1) }),
+    "LIVE_CHAPTER_NOTES_MISSING",
+  );
+  await expectEvidenceBlock(
+    ports({
+      notes: [
+        { ...noteRows[0], id: "same-text-but-unapproved-row" },
+        ...noteRows.slice(1),
+      ],
+    }),
     "LIVE_CHAPTER_NOTES_MISSING",
   );
   await expectEvidenceBlock(

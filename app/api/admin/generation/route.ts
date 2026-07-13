@@ -3,6 +3,7 @@ import {
   getGenerationSettings,
   updateGenerationSettings,
   logGenerationAudit,
+  logGenerationAuditVerified,
 } from "@/lib/server/generation-settings";
 import {
   generationAllowed,
@@ -85,6 +86,11 @@ import {
   STUDIO_PREVIEW_MAX_AGE_SECONDS,
   studioPreviewCookiePath,
 } from "@/lib/server/studio-preview-access";
+import {
+  getMark8StudioSetupStatus,
+  isMark8StudioSetupError,
+  runMark8StudioSetup,
+} from "@/lib/server/mark8-studio-setup";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -149,6 +155,113 @@ export async function POST(req: Request) {
       path,
     });
     return response;
+  }
+
+  // ---- exact private Mark 8 Brain + notes setup ----
+  // This path never generates, fetches Scripture, changes settings, creates
+  // images, or publishes. Both version-controlled approvals must already pass.
+  if (action === "mark8_setup_status") {
+    if (String(body.slug ?? "") !== MARK_8_STUDIO_SLUG) {
+      return NextResponse.json({ ok: false, error: "Mark 8 setup is unavailable." }, { status: 400 });
+    }
+    try {
+      return NextResponse.json({ ok: true, setup: await getMark8StudioSetupStatus() });
+    } catch {
+      return NextResponse.json({ ok: false, error: "Studio could not check Mark 8 setup." }, { status: 503 });
+    }
+  }
+  if (action === "mark8_setup") {
+    const auditSetup = async (
+      status: "started" | "succeeded" | "failed",
+      message: string,
+    ) => {
+      const recorded = await logGenerationAuditVerified({
+        action: "mark8_setup",
+        slug: MARK_8_STUDIO_SLUG,
+        status,
+        message,
+      });
+      if (!recorded) throw new Error("Mark 8 setup audit unavailable");
+    };
+    if (String(body.slug ?? "") !== MARK_8_STUDIO_SLUG || body.confirm !== true) {
+      try {
+        await auditSetup("failed", "refused:invalid_confirmation");
+      } catch {
+        console.error("[selah] Mark 8 setup refusal audit unavailable");
+      }
+      return NextResponse.json({ ok: false, error: "Mark 8 setup confirmation is required." }, { status: 400 });
+    }
+    const setupDigest = typeof body.setupDigest === "string" ? body.setupDigest : "";
+    if (!LOWERCASE_SHA256.test(setupDigest)) {
+      try {
+        await auditSetup("failed", "refused:invalid_receipt");
+      } catch {
+        console.error("[selah] Mark 8 setup refusal audit unavailable");
+      }
+      return NextResponse.json({ ok: false, error: "The exact Mark 8 setup receipt is required." }, { status: 400 });
+    }
+    try {
+      await auditSetup("started", "owner-confirmed private setup");
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "Studio could not record the Mark 8 setup start. Nothing changed." },
+        { status: 500 },
+      );
+    }
+    try {
+      const result = await runMark8StudioSetup(setupDigest);
+      try {
+        await auditSetup("succeeded", "99 Brain rules + 10 Mark 8 notes verified");
+        return NextResponse.json({ ok: true, setup: result.status, result: result.result });
+      } catch {
+        // The verified setup writes are authoritative. Never tell the owner
+        // they failed merely because the later activity record was unavailable.
+        let setup = result.status;
+        try {
+          const reread = await getMark8StudioSetupStatus();
+          if (reread.complete) setup = reread;
+        } catch {
+          // runMark8StudioSetup already performed an exact post-write readback.
+        }
+        return NextResponse.json({
+          ok: true,
+          setup,
+          result: result.result,
+          auditWarning: "Mark 8 setup succeeded, but its activity record is unavailable.",
+        });
+      }
+    } catch (error) {
+      const refused =
+        isMark8StudioSetupError(error) &&
+        ["UNAPPROVED", "DIGEST_MISMATCH", "REVIEW_REQUIRED"].includes(error.code);
+      try {
+        await auditSetup(
+          "failed",
+          `${refused ? "refused" : "failed"}:${isMark8StudioSetupError(error) ? error.code : "unknown"}`,
+        );
+      } catch {
+        console.error("[selah] Mark 8 setup failure audit unavailable");
+      }
+      const status = isMark8StudioSetupError(error)
+        ? error.code === "UNAPPROVED"
+          ? 403
+          : error.code === "DIGEST_MISMATCH" || error.code === "REVIEW_REQUIRED"
+            ? 409
+            : 500
+        : 500;
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            status === 403
+              ? "Selah Brain and the exact Mark 8 notes still need approval."
+              : status === 409
+                ? "Mark 8 setup changed or needs review. Nothing else was started."
+                : "Studio could not safely finish Mark 8 setup.",
+        },
+        { status },
+      );
+    }
   }
 
   // ---- read-only Mark 8 owner preparation ----

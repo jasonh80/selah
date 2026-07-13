@@ -452,6 +452,11 @@ function validateLiveNotes(
   slug: MarkSprintSlug,
   rows: readonly MarkSprintLiveChapterNoteRow[],
   expectedNotes: readonly GuidanceNote[],
+  requirements: readonly {
+    id: string;
+    textDigest: string;
+    expectedStoredRowId: string | null;
+  }[],
 ): {
   blockers: MarkSprintRuntimeEvidenceBlocker[];
   notes: Array<{ id: string; storedRowId: string; text: string }>;
@@ -461,16 +466,30 @@ function validateLiveNotes(
   const mismatch = new Set<string>();
   const usedRowIds = new Set<string>();
   const notes: Array<{ id: string; storedRowId: string; text: string }> = [];
-  const expectedTexts = new Set(expectedNotes.map((note) => note.text));
+  const requirementsById = new Map(requirements.map((note) => [note.id, note]));
+  const expectedStoredIds = new Set(
+    requirements.flatMap((note) =>
+      note.expectedStoredRowId ? [note.expectedStoredRowId] : [],
+    ),
+  );
+  const legacyExpectedTexts = new Set(
+    expectedNotes.flatMap((note) =>
+      requirementsById.get(note.id)?.expectedStoredRowId ? [] : [note.text],
+    ),
+  );
   // Ordinary owner feedback can sit beside the approved guidance. Only rows
-  // matching this versioned packet enter its exact manifest set; duplicate or
-  // malformed matching rows still fail closed.
+  // matching deterministic IDs (Mark 8) or legacy exact text (still-blocked
+  // Mark 9–11) enter the manifest set.
   const guidanceRows = rows.filter((row) =>
-    expectedTexts.has(row?.note ?? ""),
+    expectedStoredIds.has(row?.id ?? "") ||
+    legacyExpectedTexts.has(row?.note ?? ""),
   );
 
   for (const expected of expectedNotes) {
-    const matches = guidanceRows.filter((row) => row?.note === expected.text);
+    const requirement = requirementsById.get(expected.id);
+    const matches = requirement?.expectedStoredRowId
+      ? guidanceRows.filter((row) => row?.id === requirement.expectedStoredRowId)
+      : guidanceRows.filter((row) => row?.note === expected.text);
     if (!matches.length) {
       missing.push(expected.id);
       continue;
@@ -485,6 +504,11 @@ function validateLiveNotes(
       !row.id.trim() ||
       row.slug !== slug ||
       row.scope !== "chapter" ||
+      row.note !== expected.text ||
+      !requirement ||
+      sha256Text(row.note) !== requirement.textDigest ||
+      (requirement.expectedStoredRowId !== null &&
+        row.id !== requirement.expectedStoredRowId) ||
       usedRowIds.has(row.id)
     ) {
       mismatch.add(expected.id);
@@ -673,6 +697,7 @@ export async function prepareMarkSprintRuntime(
     slug,
     (reads[1] as PromiseFulfilledResult<readonly MarkSprintLiveChapterNoteRow[]>).value,
     versioned.notes,
+    policy.requirements.chapterNotes,
   );
   const example = validateLiveExample(
     (reads[2] as PromiseFulfilledResult<readonly MarkSprintLiveVoiceExampleRow[]>).value,
@@ -720,9 +745,9 @@ export async function prepareMarkSprintRuntime(
   const brainApproved = !policy.blockers.some(
     (blocker) => blocker.code === "brain_artifact_not_approved",
   );
-  const guidanceApproved =
-    policy.requirements.guidance.status ===
-    policy.requirements.guidance.requiredApprovedStatus;
+  const guidanceApproved = !policy.blockers.some(
+    (blocker) => blocker.code === "guidance_not_approved",
+  );
   const preparation = {
     bundle,
     subject: {

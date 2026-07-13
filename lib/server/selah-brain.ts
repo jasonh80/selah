@@ -456,6 +456,7 @@ function sameSeedValue(current: unknown, expected: unknown): boolean {
 export function planLibrarySeed(
   existingRows: ExistingLibraryRuleRow[],
   updatedAt = new Date().toISOString(),
+  options: { requireExactVersion?: boolean } = {},
 ): LibrarySeedPlan {
   const existingById = new Map(
     existingRows.map((row) => [row.rule_id, row]),
@@ -486,7 +487,8 @@ export function planLibrarySeed(
     const currentValues = current as unknown as Record<string, unknown>;
     const changed = Object.entries(canonical).some(
       ([key, expected]) =>
-        key !== "version" && !sameSeedValue(currentValues[key], expected),
+        (key !== "version" || options.requireExactVersion === true) &&
+        !sameSeedValue(currentValues[key], expected),
     );
     if (!changed) {
       unchanged++;
@@ -548,7 +550,11 @@ export async function seedFromLibrary(): Promise<{
       error: existing.error?.message ?? "rules query returned no data",
     };
   }
-  const plan = planLibrarySeed(existing.data as ExistingLibraryRuleRow[]);
+  const plan = planLibrarySeed(
+    existing.data as ExistingLibraryRuleRow[],
+    new Date().toISOString(),
+    { requireExactVersion: true },
+  );
   if (plan.unexpectedRuleIds.length) {
     return {
       inserted: 0,

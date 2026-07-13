@@ -15,6 +15,7 @@ import {
   MARK_SPRINT_SLUGS,
 } from "../lib/server/mark-sprint-manifest-policy";
 import { MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST } from "../lib/server/mark-sprint-esv-contract";
+import { MARK_8_SETUP_NOTES } from "../lib/server/mark8-studio-setup-contract";
 import {
   assertGenericChapterGenerationAllowed,
   isProtectedMarkSprintGenerationIdentity,
@@ -367,12 +368,24 @@ for (const slug of MARK_SPRINT_SLUGS) {
     "source_passage_digests_missing",
     "source_digest_missing",
     "model_request_digest_missing",
-    "chapter_note_row_ids_missing",
     "voice_example_id_missing",
     "voice_example_digest_missing",
     "owner_authorization_missing",
   ]) {
     assert.ok(codes.includes(code as never), `${slug} missing current-state blocker ${code}`);
+  }
+  if (slug === "mark-8") {
+    assert.ok(!codes.includes("chapter_note_row_ids_missing"));
+    assert.deepEqual(
+      policy.requirements.chapterNotes.map((note) => note.expectedStoredRowId),
+      MARK_8_SETUP_NOTES.map((note) => note.rowId),
+      "Mark 8 policy must bind the ten deterministic setup rows",
+    );
+  } else {
+    assert.ok(
+      codes.includes("chapter_note_row_ids_missing"),
+      `${slug} must remain blocked without deterministic note rows`,
+    );
   }
   assert.ok(
     !codes.includes("source_owner_selection_missing"),
