@@ -53,11 +53,12 @@ assembler must load and bind those identities before this card can be used.
 ## Independent benchmark review
 
 Rate each dimension from **0–4** and cite resolved evidence paths. A 4 means
-comparable to the strongest approved Selah workups; 3 means responsible and
+comparable to Mark 6, Selah's only refined app-quality benchmark; relevant Mark
+study chats may support coverage and accuracy checks. A 3 means responsible and
 publishable but not consistently benchmark-level; 2 requires targeted
 remediation; 1 or 0 blocks. A remediation must name an exact workup, manifest,
 review-process, or clean-generation target and describe the quality needed
-without quoting private benchmark wording.
+without quoting private reference or exemplar wording.
 
 | ID | Weight | Review dimension | Rating / evidence / targeted revision |
 |---|---:|---|---|

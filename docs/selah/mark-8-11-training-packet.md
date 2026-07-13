@@ -300,8 +300,9 @@ If any expected element is missing, generation does not start.
 
 ## Comparison rubric after generation
 
-The generated draft is compared with the corrected workup benchmark, not for
-word-for-word similarity but for:
+The generated draft is compared with Mark 6 for refined app quality. Relevant
+Mark study chats may check same-chapter coverage and accuracy, not set the
+quality bar. Review is never for word-for-word similarity:
 
 1. complete coverage of the chapter's movements;
 2. Mark-local facts and labeled synoptic context;
@@ -312,7 +313,7 @@ word-for-word similarity but for:
 7. chapter-shaped prayer and application without promises, blame, or harm;
 8. image/map/completion readiness;
 9. no licensed Bible text in generated output;
-10. no copying of private-source wording merely because it was a benchmark.
+10. no copying of private study-chat or Mark 6 exemplar wording.
 
 Operational comparison uses the versioned 100-point rubric in
 `lib/ai/quality/selah-benchmark-rubric.v2.json`. It expands these ten concerns
