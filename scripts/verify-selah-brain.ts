@@ -31,6 +31,7 @@ type LibraryRule = {
 
 type Library = {
   version: string;
+  audit_basis: string;
   status: string;
   seed_approval: {
     approved_by: string;
@@ -68,7 +69,7 @@ type GuidancePacket = {
   library_version: string;
   authoring_policy: {
     fresh_authorship_required: boolean;
-    private_benchmark_wording_available_during_generation: boolean;
+    private_study_reference_wording_available_during_generation: boolean;
     approved_voice_example_content_available_during_generation: boolean;
     post_generation_freshness_review_required: boolean;
     owner_authorization_required: boolean;
@@ -222,7 +223,7 @@ for (const rule of library.rules) {
 }
 
 const byId = new Map(library.rules.map((rule) => [rule.id, rule]));
-assert.equal(library.version, "1.7", "unexpected candidate Brain version");
+assert.equal(library.version, "1.8", "unexpected candidate Brain version");
 assert.match(LIBRARY_CONTENT_DIGEST, /^[a-f0-9]{64}$/);
 assert.ok(
   libraryContentDigestMatchesSnapshot(),
@@ -287,18 +288,41 @@ assert.equal(
 );
 assert.equal(library.rule_count, 99, "unexpected candidate rule count");
 assert.equal(library.source_count, 35, "unexpected candidate source count");
+assert.match(
+  library.audit_basis,
+  /Mark 6 alone is the refined app-quality benchmark/i,
+  "Brain provenance must name Mark 6 as the sole refined app benchmark",
+);
+const exodus27Source = library.source_ledger.find(
+  (source) => source.title === "Exodus 27 Overview",
+);
+assert.match(
+  exodus27Source?.genre_or_use ?? "",
+  /technical render fixture only/i,
+  "Exodus 27 must remain classified as a technical fixture",
+);
+assert.match(
+  exodus27Source?.principal_intelligence ?? "",
+  /must not teach Selah voice, depth, interpretation, or app-quality standards/i,
+  "Exodus 27 must never become a quality-training source",
+);
+assert.equal(
+  library.rules.some((rule) => rule.sources?.includes("Exodus 27 Overview")),
+  false,
+  "no Brain rule may cite the weak Exodus 27 shell",
+);
 assert.equal(library.injection_policy.max_contextual_rules_per_generation, 12);
 assert.deepEqual(library.injection_policy.max_contextual_rules_by_stage, {
   image_prompt: 18,
   image_review: 18,
 });
 const recentAuditTitle =
-  "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit";
+  "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit";
 assert.ok(
   library.source_ledger.some(
     (source) => source.title === recentAuditTitle,
   ),
-  "recent signed-in benchmark correction audit must retain provenance",
+  "recent signed-in study-chat lesson audit must retain provenance",
 );
 const ledgerTitles = new Set(library.source_ledger.map((source) => source.title));
 for (const rule of library.rules) {
@@ -310,6 +334,7 @@ for (const rule of library.rules) {
   }
 }
 assert.match(byId.get("SB-004")?.text ?? "", /stands under Scripture/i);
+assert.match(byId.get("SB-004")?.text ?? "", /approved Mark 6 example/i);
 assert.match(byId.get("SB-004")?.text ?? "", /never its distinctive wording/i);
 assert.match(byId.get("SB-032")?.text ?? "", /facial expression/i);
 assert.match(byId.get("SB-032")?.text ?? "", /jewelry, accessories/i);
@@ -324,7 +349,7 @@ for (const id of ["SB-030", "SB-031", "SB-032", "SB-036", "SB-039"]) {
 for (const id of ["SB-004", "SB-030", "SB-031", "SB-032", "SB-036", "SB-039", "SB-074", "SB-124"]) {
   assert.ok(
     byId.get(id)?.sources?.includes(recentAuditTitle),
-    `${id} must cite the recent benchmark audit`,
+    `${id} must cite the recent study-chat lesson audit`,
   );
 }
 for (const id of ["SB-005", "SB-033", "SB-035"]) {
@@ -643,7 +668,7 @@ assert.deepEqual(metadataUpdate.values.stages, [
   "image_review",
 ]);
 assert.deepEqual(metadataUpdate.values.source_titles, [recentAuditTitle]);
-assert.equal(metadataUpdate.values.version, "1.7");
+assert.equal(metadataUpdate.values.version, "1.8");
 
 assert.equal(guidance.status, "review_only", "guidance must not be active");
 assert.equal(guidance.packet_id, "mark-8-11-2026-07-v5");
@@ -659,9 +684,9 @@ assert.equal(
   "Selah Brain must author a fresh chapter",
 );
 assert.equal(
-  guidance.authoring_policy.private_benchmark_wording_available_during_generation,
+  guidance.authoring_policy.private_study_reference_wording_available_during_generation,
   false,
-  "private benchmark wording must stay out of authoring context",
+  "private study-reference wording must stay out of authoring context",
 );
 assert.equal(
   guidance.authoring_policy.approved_voice_example_content_available_during_generation,

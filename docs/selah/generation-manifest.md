@@ -42,7 +42,7 @@ not claim byte-for-byte file identity.
 
 ## Current result
 
-The version-controlled Mark policy must remain blocked. Brain v1.7 and the Mark
+The version-controlled Mark policy must remain blocked. Brain v1.8 and the Mark
 guidance packet are review-only; the live Brain match has not been proved. The
 owner selected ESV on 2026-07-12. A protected assembler, fixed request-option
 digest, source-overlap gate, and v3 request/manifest composition candidate now

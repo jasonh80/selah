@@ -113,7 +113,7 @@ export interface ReviewerAssignmentReceiptPayloadV1 {
   benchmarkSetDigest: string;
   rubricDigest: string;
   approvedVoiceExampleDigest: string;
-  comparisonMode: "same_chapter_private_benchmark" | "cross_chapter_quality_only";
+  comparisonMode: "same_chapter_study_reference" | "mark6_quality_only";
 }
 
 export interface ReviewValidationReceiptPayloadV1 {
@@ -250,7 +250,7 @@ export interface BenchmarkEvidenceExpectationsV1 {
     approvedBy: string;
     approvedAt: string;
   };
-  comparisonMode: "same_chapter_private_benchmark" | "cross_chapter_quality_only";
+  comparisonMode: "same_chapter_study_reference" | "mark6_quality_only";
   reviewer: BenchmarkEvidenceReviewer;
   author: {
     id: string;
@@ -1308,7 +1308,7 @@ function assertAssignmentPayloadShape(value: ReviewerAssignmentReceiptPayloadV1)
     !DIGEST.test(value.benchmarkSetDigest) ||
     !DIGEST.test(value.rubricDigest) ||
     !DIGEST.test(value.approvedVoiceExampleDigest) ||
-    !["same_chapter_private_benchmark", "cross_chapter_quality_only"].includes(value.comparisonMode)
+    !["same_chapter_study_reference", "mark6_quality_only"].includes(value.comparisonMode)
   ) throw new Error("invalid reviewer assignment payload");
   assertPlainRecord(value.author, "reviewerAssignment.payload.author");
   assertExactKeys(value.author, "reviewerAssignment.payload.author", ["id", "version"]);
@@ -1429,7 +1429,7 @@ function assertExpectationsShape(value: BenchmarkEvidenceExpectationsV1): void {
   }
   if (
     !SAFE_ID.test(value.benchmarkSetId) ||
-    !["same_chapter_private_benchmark", "cross_chapter_quality_only"].includes(value.comparisonMode) ||
+    !["same_chapter_study_reference", "mark6_quality_only"].includes(value.comparisonMode) ||
     value.independentFromAuthor !== true ||
     !SAFE_ID.test(value.resolverVersion) ||
     !SAFE_ID.test(value.privacyScannerVersion) ||

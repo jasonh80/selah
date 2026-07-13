@@ -2,7 +2,7 @@
   "contract_version": "selah-benchmark-rubric-v2",
   "artifact": "chapter_workup",
   "stage": "benchmark_comparison",
-  "benchmark_set_id": "strong-recent-mark-exodus-workups-2026-07",
+  "benchmark_set_id": "mark6-refined-plus-mark-study-references-2026-07",
   "policy": {
     "private_benchmark_wording_available_to_author": false,
     "private_benchmark_wording_available_to_independent_reviewer": true,
@@ -20,7 +20,7 @@
     "1": "Major weakness; block.",
     "2": "Below the publishable bar; targeted revision required.",
     "3": "Responsible and publishable, but not consistently benchmark-level.",
-    "4": "Comparable to the strongest approved Selah workups."
+    "4": "Comparable to Mark 6, Selah's only refined app-quality benchmark."
   },
   "evidence_policy": {
     "allowed_prefixes": [

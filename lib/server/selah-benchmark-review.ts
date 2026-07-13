@@ -145,8 +145,8 @@ export const SELAH_BENCHMARK_EVIDENCE_POLICY_DIGEST = sha256Canonical({
 export const SELAH_BENCHMARK_SET_ID = rubric.benchmark_set_id;
 
 export type BenchmarkComparisonMode =
-  | "same_chapter_private_benchmark"
-  | "cross_chapter_quality_only";
+  | "same_chapter_study_reference"
+  | "mark6_quality_only";
 export type BenchmarkReviewerKind = "owner" | "human_editor" | "independent_model";
 export type BenchmarkCriterionRating = 0 | 1 | 2 | 3 | 4;
 export type BenchmarkRevisionDomain =
@@ -159,10 +159,10 @@ const MARK_SPRINT_SUBJECTS: Record<
   string,
   { book: "Mark"; chapter: number; comparisonMode: BenchmarkComparisonMode }
 > = {
-  "mark-8": { book: "Mark", chapter: 8, comparisonMode: "same_chapter_private_benchmark" },
-  "mark-9": { book: "Mark", chapter: 9, comparisonMode: "same_chapter_private_benchmark" },
-  "mark-10": { book: "Mark", chapter: 10, comparisonMode: "same_chapter_private_benchmark" },
-  "mark-11": { book: "Mark", chapter: 11, comparisonMode: "cross_chapter_quality_only" },
+  "mark-8": { book: "Mark", chapter: 8, comparisonMode: "same_chapter_study_reference" },
+  "mark-9": { book: "Mark", chapter: 9, comparisonMode: "same_chapter_study_reference" },
+  "mark-10": { book: "Mark", chapter: 10, comparisonMode: "same_chapter_study_reference" },
+  "mark-11": { book: "Mark", chapter: 11, comparisonMode: "mark6_quality_only" },
 };
 
 export type BenchmarkReviewFinding = {

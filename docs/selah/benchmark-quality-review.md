@@ -6,9 +6,11 @@
 ## Purpose
 
 Selah Brain should write each chapter freshly from the approved Scripture
-source, rules, chapter guidance, and one digest-bound voice exemplar. The
-strongest recent Mark and Exodus workups establish the editorial quality bar;
-their private wording is not an authoring source.
+source, rules, chapter guidance, and one digest-bound voice exemplar. Mark 6 is
+Selah's only refined app-quality benchmark. Recent Mark study chats may provide
+reusable lessons and same-chapter review references; Exodus 33–34 may provide
+narrow lessons. Exodus 27 is only a weak technical render fixture. None of
+their private wording is an authoring source.
 
 The benchmark review answers a different question from structural QA:
 
@@ -28,10 +30,11 @@ No one result can substitute for the other two.
    exemplar the author was allowed to see.
 4. Bind the exact draft, manifest, structural, overlap, freshness, benchmark,
    and exemplar digests.
-5. Give an authenticated independent reviewer access to the draft and the
-   appropriate benchmark mode. Mark 8–10 use same-chapter comparison; Mark 11,
-   for which no recent private chapter workup was found, uses cross-chapter
-   voice/quality comparison plus its independently researched guidance.
+5. Give an authenticated independent reviewer access to the draft, Mark 6 as
+   the quality benchmark, and the appropriate study-reference mode. Mark 8–10
+   may use their same-chapter chats for coverage and accuracy checks; Mark 11,
+   for which no recent private chapter workup was found, uses Mark 6 quality
+   comparison plus its independently researched guidance.
 6. Resolve every evidence and remediation path against one versioned artifact
    registry. It always binds canonical roots for the draft, manifest,
    structural/overlap/freshness reports, voice exemplar, benchmark set, and
@@ -65,10 +68,11 @@ requires targeted revision. A score is internal editorial evidence, not a
 public promise or a substitute for judgment.
 
 The 85 threshold and weights are deliberately marked **provisional**. They must
-be calibrated by scoring Mark 6, the strongest recent Mark/Exodus workups, and
-several known weaker older workups. Until that exercise demonstrates useful
-separation, a passing code result is called `benchmark_ready`, not “proven
-comparable.”
+be calibrated by scoring Mark 6 as the refined positive benchmark and several
+known weaker workups as negative controls. Recent Mark chats may test
+chapter-specific coverage and accuracy, but do not become app-quality
+benchmarks. Until that exercise demonstrates useful separation, a passing code
+result is called `benchmark_ready`, not “proven comparable.”
 
 BMQ-11 reviews only the truthfulness and usefulness of copy-stage Scene Checks
 and visual directions. It does not prove the final image count, hero choice,

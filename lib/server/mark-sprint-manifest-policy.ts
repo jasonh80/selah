@@ -34,7 +34,7 @@ interface GuidancePacket {
   library_version: string;
   authoring_policy: {
     fresh_authorship_required: boolean;
-    private_benchmark_wording_available_during_generation: boolean;
+    private_study_reference_wording_available_during_generation: boolean;
     approved_voice_example_content_available_during_generation: boolean;
     post_generation_freshness_review_required: boolean;
     owner_authorization_required: boolean;

@@ -2,10 +2,10 @@
   "packet_id": "mark-8-11-2026-07-v5",
   "version": "1.4",
   "status": "review_only",
-  "library_version": "1.7",
+  "library_version": "1.8",
   "authoring_policy": {
     "fresh_authorship_required": true,
-    "private_benchmark_wording_available_during_generation": false,
+    "private_study_reference_wording_available_during_generation": false,
     "approved_voice_example_content_available_during_generation": true,
     "post_generation_freshness_review_required": true,
     "owner_authorization_required": true,
@@ -126,7 +126,7 @@
         },
         {
           "id": "M9-04",
-          "text": "The father's mixed faith is brought honestly to Jesus and met without shame. Treat faith as potentially genuine even when emotionally quiet, divided, or plainly expressed; write this insight freshly rather than reproducing a benchmark line. Do not promise this episode's timing or outcome to every suffering family. Continued suffering is never proof of deficient faith."
+          "text": "The father's mixed faith is brought honestly to Jesus and met without shame. Treat faith as potentially genuine even when emotionally quiet, divided, or plainly expressed; write this insight freshly rather than reproducing a study-chat line. Do not promise this episode's timing or outcome to every suffering family. Continued suffering is never proof of deficient faith."
         },
         {
           "id": "M9-05",
@@ -253,6 +253,6 @@
     "chapter-shaped prayer and application without promises, blame, or harm",
     "image, map, and completion readiness",
     "no licensed Bible text in generated output",
-    "no copied benchmark wording"
+    "no copied private reference or exemplar wording"
   ]
 }

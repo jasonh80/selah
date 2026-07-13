@@ -11,25 +11,27 @@ packet and comparison rubric; neither file is active in the live Brain.
 
 ## How this packet is used
 
-The recent workups are benchmarks, not final chapter copy. Selah Brain should
-author a fresh workup for each chapter after:
+The recent Mark chats are lesson sources and same-chapter review references,
+not refined app benchmarks or final chapter copy. Mark 6 alone sets the refined
+app-quality bar. Selah Brain should author a fresh workup for each chapter after:
 
-1. the v1.7 rule diff is independently reviewed and approved;
+1. the v1.8 rule diff is independently reviewed and approved;
 2. these chapter-only notes are owner-approved and added with `scope=chapter`;
 3. the retrieval manifest proves that the intended rules, notes, example, and
    owner-approved source bundle are present;
 4. the owner explicitly authorizes that chapter's generation run.
 
-Private Mark/Exodus benchmark prose stays outside the authoring prompt and is
-used only for independent comparison after generation. The exact approved Mark
-6 voice exemplar is the narrow exception: the writer may see it to learn Selah's
-register, but must not reuse its distinctive lines, titles, or phrasing. A
-separate freshness review remains required before owner acceptance.
+Private study-chat prose stays outside the authoring prompt and may be used only
+for independent coverage or accuracy checks after generation. The exact
+approved Mark 6 voice exemplar is the narrow exception: the writer may see it
+to learn Selah's register, but must not reuse its distinctive lines, titles, or
+phrasing. A separate freshness review remains required before owner acceptance.
 
 The signed-in inventory audit confirmed recent Mark 8, Mark 9, and Mark 10
-benchmark chats. It did not find a distinct Mark 11 workup by title or passage
-search, so Mark 11 remains independently researched review guidance and must
-not be represented as transcript-derived learning.
+study chats. They may provide lessons and chapter-specific review references.
+It did not find a distinct Mark 11 workup by title or passage search, so Mark 11
+remains independently researched review guidance and must not be represented as
+transcript-derived learning.
 
 The generation reader currently retrieves at most ten chapter notes. Each list
 below therefore stays within that real limit. A note is deliberately dense: it
@@ -134,7 +136,7 @@ Side**. Controlling emphasis: listening to Jesus.
 4. The father's mixed faith is brought honestly to Jesus and met without shame.
    Treat faith as potentially genuine even when emotionally quiet,
    divided, or plainly expressed; write this insight freshly rather than
-   reproducing a benchmark line. Do not promise this episode's timing or outcome
+   reproducing a study-chat line. Do not promise this episode's timing or outcome
    to every suffering family. Continued suffering is never proof of deficient
    faith.
 5. Prayer in 9:29 means dependence on God, not a technique, power ranking,

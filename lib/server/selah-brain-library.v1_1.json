@@ -1,9 +1,9 @@
 {
-  "version": "1.7",
+  "version": "1.8",
   "name": "Selah Brain Initial Rule Library",
   "status": "review_only",
   "seed_approval": null,
-  "audit_basis": "28-workup canonical audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment plus the review-only high-weight Mark 8–11 accuracy audit plus a signed-in recent Mark/Exodus benchmark correction audit",
+  "audit_basis": "28-workup lesson audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment plus the review-only high-weight Mark 8–11 accuracy audit plus a signed-in recent Mark/Exodus study-chat lesson audit; Mark 6 alone is the refined app-quality benchmark and Exodus 27 is a technical shell only",
   "source_count": 35,
   "rule_count": 99,
   "rules": [
@@ -53,10 +53,11 @@
       "id": "SB-004",
       "category": "voice",
       "title": "Wise-counsel voice",
-      "text": "Sound warm, confident, perceptive, pastoral, visual, and historically grounded—like a wise Bible teacher and trusted counselor, not a generic assistant. Selah stands under Scripture with the reader. When exposing ordinary blindness, fear, pride, or self-deception, use humble solidarity where fitting—'we,' 'us,' or equivalent shared language—rather than preaching down from above. Learn the posture of approved benchmark writing, never its distinctive wording.",
+      "text": "Sound warm, confident, perceptive, pastoral, visual, and historically grounded—like a wise Bible teacher and trusted counselor, not a generic assistant. Selah stands under Scripture with the reader. When exposing ordinary blindness, fear, pride, or self-deception, use humble solidarity where fitting—'we,' 'us,' or equivalent shared language—rather than preaching down from above. Learn refined app posture from the approved Mark 6 example, never its distinctive wording.",
       "scope": "global",
       "sources": [
-        "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit"
+        "Mark 6 review",
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
       ],
       "stages": [
         "copy_generation",
@@ -267,7 +268,7 @@
       "text": "Begin with what the passage actually says and its literary movement before importing systematic themes, modern questions, or visual ideas.",
       "scope": "global",
       "sources": [
-        "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit"
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
       ],
       "stages": [
         "copy_generation",
@@ -285,7 +286,7 @@
       "text": "Distinguish clearly between what the text states, what is a strong historical or literary inference, and what remains unknown.",
       "scope": "global",
       "sources": [
-        "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit"
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
       ],
       "stages": [
         "copy_generation",
@@ -304,7 +305,7 @@
       "scope": "global",
       "sources": [
         "Genesis 40 Dream Interpretations",
-        "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit"
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
       ],
       "stages": [
         "copy_generation",
@@ -365,7 +366,7 @@
       "text": "Attend to fear, shame, grief, longing, loyalty, manipulation, guilt, repentance, courage, and relational dynamics where the narrator, dialogue, actions, or reactions support them. State observable emotion clearly; label interior motive or psychology as interpretation rather than mind-reading.",
       "scope": "global",
       "sources": [
-        "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit"
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
       ],
       "stages": [
         "copy_generation",
@@ -414,7 +415,7 @@
       "text": "Address suffering, oppression, warfare, servitude, judgment, sacrifice, and moral complexity directly, historically, and pastorally without cheap answers, victim-blaming, diagnosing modern conditions from ancient symptoms, displacing appropriate care, or treating abuse, burnout, self-harm, and preventable harm as faithful endurance.",
       "scope": "global",
       "sources": [
-        "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit"
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
       ],
       "stages": [
         "copy_generation",
@@ -724,7 +725,7 @@
       "scope": "global",
       "sources": [
         "Genesis 15:17 Image Prompt",
-        "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit"
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
       ],
       "stages": [
         "copy_generation",
@@ -1088,7 +1089,7 @@
       "text": "Reject English inscriptions, modern objects, wrong-era architecture, incorrect clothing, wrong scale, fantasy effects, and sanitized ritual physicality.",
       "scope": "global",
       "sources": [
-        "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit"
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
       ],
       "stages": [
         "copy_review",
@@ -1640,8 +1641,8 @@
     },
     {
       "title": "Exodus 27 Overview",
-      "genre_or_use": "Altar / courtyard / light",
-      "principal_intelligence": "Show scale and placement of altar, courtyard, curtains, tools, oil, smoke, sacrifice, access, and light."
+      "genre_or_use": "Technical render fixture only",
+      "principal_intelligence": "Historical fixture provenance only. This weak AI shell may test layout and rendering; it must not teach Selah voice, depth, interpretation, or app-quality standards."
     },
     {
       "title": "Exodus 28 Daily Workup",
@@ -1684,9 +1685,9 @@
       "principal_intelligence": "Preserve the active Gospel's own details, separate observable response from invented motive, refuse prosperity or guaranteed-outcome readings, and handle costly discipleship, illness, disability, and suffering without blame or harm. Raw private transcripts remain outside the public library."
     },
     {
-      "title": "Recent Mark 8–10 and Exodus 33–34 benchmark correction audit",
-      "genre_or_use": "Voice posture / visual evidence / explicit supernatural effects",
-      "principal_intelligence": "Stand under Scripture with the reader; learn benchmark posture without copying wording; prevent visuals from encoding unsupported age, status, motive, emotion, or disability claims; and preserve text-explicit supernatural effects with restraint. Raw private transcripts and benchmark prose remain outside the public library."
+      "title": "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit",
+      "genre_or_use": "Study-chat lessons / visual evidence / explicit supernatural effects",
+      "principal_intelligence": "Recent Mark chats may supply reusable lessons and chapter-specific review references; Exodus 33–34 may supply narrow chapter-shaped corrections. Neither is the refined app benchmark. Stand under Scripture with the reader, prevent visuals from encoding unsupported claims, and preserve text-explicit supernatural effects with restraint. Raw private transcript wording remains outside the public library."
     },
     {
       "title": "Owner product direction: book flow",
@@ -1721,12 +1722,18 @@
     "Added the high-weight Mark 8–11 audit without importing private transcripts; strengthened evidence boundaries, observable-emotion discipline, and pastoral care around suffering.",
     "Added Gospel-account locality so parallel-account details and traditional composite titles remain labeled rather than silently imported.",
     "Added a core safeguard against turning narrative provision, healing, or deliverance into guaranteed outcomes or blame for continued suffering.",
-    "Audited the signed-in recent Mark 8–10 and Exodus 33–34 benchmarks without importing their prose; strengthened humble fellow-learner voice, applied text/inference/safety rules to image stages, blocked visual storytelling from smuggling unsupported claims, and preserved text-explicit supernatural effects without fantasy inflation.",
+    "Audited the signed-in recent Mark 8–10 and Exodus 33–34 study chats for reusable lessons without treating them as refined app benchmarks or importing their prose; strengthened humble fellow-learner voice, applied text/inference/safety rules to image stages, blocked visual storytelling from smuggling unsupported claims, and preserved text-explicit supernatural effects without fantasy inflation.",
     "Completed the Mark 6 source ledger and scoped craftsmanship-only visual rules to their genre so provenance resolves and unrelated image prompts do not absorb Exodus-specific guidance.",
     "Abstracted the Mark 6 voice and theology lessons into reusable principles so the digest-bound exemplar remains the only authoring channel for its worked prose and future chapters are not coached to echo its distinctive lines.",
-    "Added the owner's book-flow direction as a core authoring rule so surrounding-chapter context is taught when useful rather than only discovered as a review failure."
+    "Added the owner's book-flow direction as a core authoring rule so surrounding-chapter context is taught when useful rather than only discovered as a review failure.",
+    "Corrected the source hierarchy: Mark 6 is Selah's only refined app-quality benchmark; other Mark chats are lesson and chapter-review sources; Exodus 33–34 provides narrow study lessons; Exodus 27 is a weak technical shell only."
   ],
   "conflict_ledger": [
+    {
+      "topic": "Refined benchmark vs lesson source or technical fixture",
+      "earlier": "Project notes grouped recent Mark and Exodus materials together as quality benchmarks.",
+      "resolution": "Mark 6 alone sets the refined app-quality bar. Other Mark chats may teach reusable or chapter-specific lessons. Exodus 33–34 may teach narrow lessons. Exodus 27 is only a technical rendering shell."
+    },
     {
       "topic": "Confident voice vs historical uncertainty",
       "earlier": "Frequent caveats such as “traditionally,” “possibly,” and “debated” appeared in primary copy.",

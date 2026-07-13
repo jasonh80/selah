@@ -54,6 +54,11 @@ assert.equal(rubric.policy.owner_approval_still_required, true);
 assert.equal(rubric.policy.private_benchmark_wording_available_to_author, false);
 assert.equal(rubric.policy.distinctive_benchmark_wording_may_be_used_in_revision_instructions, false);
 assert.match(SELAH_BENCHMARK_RUBRIC_DIGEST, /^[a-f0-9]{64}$/);
+assert.equal(
+  SELAH_BENCHMARK_SET_ID,
+  "mark6-refined-plus-mark-study-references-2026-07",
+);
+assert.match(rubric.rating_scale["4"], /Mark 6/);
 
 function rationale(title: string): string {
   return `${title} is supported by the named draft and comparison evidence. This is synthetic contract-validation prose only; it is not a real editorial judgment or publishable review.`;
@@ -175,7 +180,7 @@ const submission: BenchmarkReviewSubmissionV1 = {
   benchmark: {
     setId: SELAH_BENCHMARK_SET_ID,
     setDigest: benchmarkSetDigest,
-    comparisonMode: "same_chapter_private_benchmark",
+    comparisonMode: "same_chapter_study_reference",
     rubricVersion: SELAH_BENCHMARK_RUBRIC_VERSION,
     rubricDigest: SELAH_BENCHMARK_RUBRIC_DIGEST,
   },
@@ -223,7 +228,7 @@ const requirements: BenchmarkReviewRequirementsV1 = {
   benchmark: {
     setId: SELAH_BENCHMARK_SET_ID,
     setDigest: benchmarkSetDigest,
-    comparisonMode: "same_chapter_private_benchmark",
+    comparisonMode: "same_chapter_study_reference",
     approval: {
       recordId: "synthetic-owner-approval-record",
       approvedBy: "synthetic-owner",
@@ -663,10 +668,10 @@ assert.equal(green.readyForOwnerReview, true, "the returned report must be immut
 
 const mark11Submission = structuredClone(submission);
 mark11Submission.subject = { slug: "mark-11", book: "Mark", chapter: 11 };
-mark11Submission.benchmark.comparisonMode = "cross_chapter_quality_only";
+mark11Submission.benchmark.comparisonMode = "mark6_quality_only";
 const mark11Requirements = structuredClone(requirements);
 mark11Requirements.subject = { ...mark11Submission.subject };
-mark11Requirements.benchmark.comparisonMode = "cross_chapter_quality_only";
+mark11Requirements.benchmark.comparisonMode = "mark6_quality_only";
 const mark11Context = buildTrustedContext(mark11Requirements, mark11Submission);
 const mark11Green = evaluateSelahBenchmarkReview(mark11Requirements, mark11Submission, mark11Context);
 assert.equal(mark11Green.machineVerdict, "pass");
@@ -1098,7 +1103,7 @@ expectMachineBlocked(
   (r, s) => {
     r.subject = { slug: "mark-11", book: "Mark", chapter: 11 };
     s.subject = { ...r.subject };
-    r.benchmark.comparisonMode = "same_chapter_private_benchmark";
+    r.benchmark.comparisonMode = "same_chapter_study_reference";
     s.benchmark.comparisonMode = r.benchmark.comparisonMode;
   },
   "INVALID_COMPARISON_MODE",
