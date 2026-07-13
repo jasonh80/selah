@@ -18,6 +18,10 @@ import {
   type GenerationModelRequestV3,
 } from "./generation-manifest-v3";
 import type { MarkSprintEsvSourceBundle } from "./mark-sprint-esv-source";
+import {
+  takeConsumedTextJobCapabilityForDispatch,
+  type ConsumedTextJobCapability,
+} from "./generation-jobs";
 
 if (typeof window !== "undefined") {
   throw new Error("Mark sprint draft pipeline is server-only");
@@ -25,6 +29,7 @@ if (typeof window !== "undefined") {
 
 export type MarkSprintDraftPipelineErrorCode =
   | "PREFLIGHT_INVALID"
+  | "RUN_AUTHORIZATION_INVALID"
   | "MODEL_EXECUTION_FAILED"
   | "MODEL_RESPONSE_INVALID"
   | "SOURCE_OVERLAP_BLOCKED"
@@ -70,6 +75,8 @@ export interface RunProtectedMarkSprintDraftInput {
   sourceBundle: MarkSprintEsvSourceBundle;
   modelRequest: GenerationModelRequestV3;
   preflight: GenerationManifestV3PreflightCapability;
+  jobId: string;
+  consumedJobCapability: ConsumedTextJobCapability;
   executor: MarkSprintModelExecutorPort;
 }
 
@@ -135,6 +142,15 @@ export async function runProtectedMarkSprintDraft(
     );
   } catch {
     throw new MarkSprintDraftPipelineError("PREFLIGHT_INVALID");
+  }
+  try {
+    takeConsumedTextJobCapabilityForDispatch(input.consumedJobCapability, {
+      slug: input.sourceBundle.slug,
+      jobId: input.jobId,
+      approvedManifestDigest: input.preflight.manifestDigest,
+    });
+  } catch {
+    throw new MarkSprintDraftPipelineError("RUN_AUTHORIZATION_INVALID");
   }
 
   let execution: MarkSprintModelExecutionResult;

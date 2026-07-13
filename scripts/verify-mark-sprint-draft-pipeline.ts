@@ -23,6 +23,68 @@ import {
   type MarkSprintModelExecutorPort,
 } from "../lib/server/mark-sprint-draft-pipeline";
 import { sha256Canonical, sha256Text } from "../lib/server/generation-manifest";
+import {
+  claimGenerationJob,
+  consumeGenerationClaim,
+  type ConsumedTextJobCapability,
+  type JobPredicates,
+  type JobRow,
+  type JobStorePort,
+} from "../lib/server/generation-jobs";
+
+class FakeJobStore implements JobStorePort {
+  private rows = new Map<
+    string,
+    { status: string; updatedAt: string; workupJson: Record<string, unknown> }
+  >();
+  private tick = 0;
+
+  async read(slug: string): Promise<JobRow | null> {
+    const row = this.rows.get(slug);
+    return row ? { ...row } : null;
+  }
+
+  async insert(
+    slug: string,
+    payload: Record<string, unknown>,
+  ): Promise<"ok" | "duplicate"> {
+    if (this.rows.has(slug)) return "duplicate";
+    this.rows.set(slug, {
+      status: String(payload.status),
+      updatedAt: `T${++this.tick}`,
+      workupJson: payload.workup_json as Record<string, unknown>,
+    });
+    return "ok";
+  }
+
+  async update(
+    slug: string,
+    predicates: JobPredicates,
+    next: Record<string, unknown>,
+  ): Promise<number> {
+    const row = this.rows.get(slug);
+    if (!row || row.status !== predicates.status) return 0;
+    if (
+      predicates.updatedAt !== undefined &&
+      predicates.updatedAt !== null &&
+      row.updatedAt !== predicates.updatedAt
+    ) {
+      return 0;
+    }
+    for (const check of predicates.json ?? []) {
+      const actual = row.workupJson[check.key];
+      if (check.equals === null ? actual != null : actual !== check.equals) {
+        return 0;
+      }
+    }
+    if ("status" in next) row.status = String(next.status);
+    if ("workup_json" in next) {
+      row.workupJson = next.workup_json as Record<string, unknown>;
+    }
+    row.updatedAt = `T${++this.tick}`;
+    return 1;
+  }
+}
 
 async function expectPipelineError(
   run: Promise<unknown>,
@@ -57,6 +119,28 @@ async function main(): Promise<void> {
     modelRequest,
   });
 
+  async function authorization(
+    approvedManifestDigest = preflight.manifestDigest,
+  ): Promise<{
+    jobId: string;
+    consumedJobCapability: ConsumedTextJobCapability;
+  }> {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", {
+      book: "Mark",
+      chapter: 8,
+      title: "Mark 8",
+      approvedManifestDigest,
+    });
+    const consumedJobCapability = await consumeGenerationClaim(
+      store,
+      "mark-8",
+      jobId,
+      approvedManifestDigest,
+    );
+    return { jobId, consumedJobCapability };
+  }
+
   function executor(rawDraftJson: string): {
     port: MarkSprintModelExecutorPort;
     calls: () => number;
@@ -77,12 +161,57 @@ async function main(): Promise<void> {
     };
   }
 
+  async function expectAuthorizationBlock(
+    auth: {
+      jobId: string;
+      consumedJobCapability: ConsumedTextJobCapability;
+    },
+  ): Promise<void> {
+    const blocked = executor("{}");
+    const error = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: blocked.port,
+      }),
+      "RUN_AUTHORIZATION_INVALID",
+    );
+    assert.equal(blocked.calls(), 0, "invalid run authority reached the model");
+    assert.equal(error.tokenUsage, null);
+  }
+
+  await expectAuthorizationBlock({
+    jobId: "forged-job",
+    consumedJobCapability: {} as ConsumedTextJobCapability,
+  });
+
+  const clonedAuthorization = await authorization();
+  await expectAuthorizationBlock({
+    jobId: clonedAuthorization.jobId,
+    consumedJobCapability: structuredClone(
+      clonedAuthorization.consumedJobCapability,
+    ),
+  });
+
+  const crossJobAuthorization = await authorization();
+  await expectAuthorizationBlock({
+    ...crossJobAuthorization,
+    jobId: `${crossJobAuthorization.jobId}-other`,
+  });
+
+  const wrongDigestAuthorization = await authorization("b".repeat(64));
+  await expectAuthorizationBlock(wrongDigestAuthorization);
+
   const invalidSchema = executor('{"slug":"mark-8"}');
+  const schemaAuthorization = await authorization();
   const schemaError = await expectPipelineError(
     runProtectedMarkSprintDraft({
       sourceBundle,
       modelRequest,
       preflight,
+      ...schemaAuthorization,
       executor: invalidSchema.port,
     }),
     "MODEL_RESPONSE_INVALID",
@@ -97,11 +226,13 @@ async function main(): Promise<void> {
   const copiedSource = passingDraft("mark-8");
   copiedSource.summary = `${SOURCE_PHRASE}. ${copiedSource.summary}`;
   const overlap = executor(JSON.stringify(copiedSource));
+  const overlapAuthorization = await authorization();
   const overlapError = await expectPipelineError(
     runProtectedMarkSprintDraft({
       sourceBundle,
       modelRequest,
       preflight,
+      ...overlapAuthorization,
       executor: overlap.port,
     }),
     "SOURCE_OVERLAP_BLOCKED",
@@ -116,11 +247,13 @@ async function main(): Promise<void> {
   const wrongChapter = passingDraft("mark-8");
   wrongChapter.slug = "mark-9";
   const quality = executor(JSON.stringify(wrongChapter));
+  const qualityAuthorization = await authorization();
   const qualityError = await expectPipelineError(
     runProtectedMarkSprintDraft({
       sourceBundle,
       modelRequest,
       preflight,
+      ...qualityAuthorization,
       executor: quality.port,
     }),
     "MARK_QUALITY_BLOCKED",
@@ -136,10 +269,12 @@ async function main(): Promise<void> {
 
   const happyJson = JSON.stringify(passingDraft("mark-8"));
   const happy = executor(happyJson);
+  const happyAuthorization = await authorization();
   const result = await runProtectedMarkSprintDraft({
     sourceBundle,
     modelRequest,
     preflight,
+    ...happyAuthorization,
     executor: happy.port,
   });
   assert.equal(happy.calls(), 1, "the exact request must run once");
@@ -165,6 +300,20 @@ async function main(): Promise<void> {
     happyJson,
   );
 
+  const replay = executor(happyJson);
+  const replayError = await expectPipelineError(
+    runProtectedMarkSprintDraft({
+      sourceBundle,
+      modelRequest,
+      preflight,
+      ...happyAuthorization,
+      executor: replay.port,
+    }),
+    "RUN_AUTHORIZATION_INVALID",
+  );
+  assert.equal(replay.calls(), 0, "replayed run authority reached the model");
+  assert.equal(replayError.tokenUsage, null);
+
   const serialized = JSON.stringify(result);
   for (const privateValue of [
     SYNTHETIC_KEY,
@@ -181,11 +330,13 @@ async function main(): Promise<void> {
   assert.doesNotMatch(serialized, /SERVER-SUPPLIED GENERATION SOURCE/u);
 
   let failedCalls = 0;
+  const failedAuthorization = await authorization();
   const executionError = await expectPipelineError(
     runProtectedMarkSprintDraft({
       sourceBundle,
       modelRequest,
       preflight,
+      ...failedAuthorization,
       executor: {
         async executeExactRequest() {
           failedCalls++;
