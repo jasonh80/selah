@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
-import { imageGenAllowed, CHAPTER_IMAGE_MODEL, IMAGE_ALLOWED_SLUGS } from "@/lib/server/images";
+import {
+  imageGenAllowed,
+  CHAPTER_IMAGE_MODEL,
+  IMAGE_ALLOWED_SLUGS,
+  prepareImageJobBinding,
+} from "@/lib/server/images";
 import { triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
+import { claimImageJob, releaseImageJob, requireJobStore } from "@/lib/server/generation-jobs";
+import { isChapterMutationError } from "@/lib/server/protected-chapters";
+import { logGenerationAudit } from "@/lib/server/generation-settings";
+import { MARK_8_IMAGE_SLUG } from "@/lib/server/mark8-image-plan";
 
 // DEV/ADMIN ONLY image generation trigger. ALL of these are required:
 //   - ENABLE_DEV_ROUTES=true (else 404)
@@ -29,6 +38,13 @@ export async function GET(request: Request) {
     );
   }
 
+  if (slug === MARK_8_IMAGE_SLUG) {
+    return NextResponse.json(
+      { ok: false, error: "Mark 8 images can be started only from Selah Studio." },
+      { status: 403 },
+    );
+  }
+
   if (!(await imageGenAllowed(slug))) {
     return NextResponse.json(
       {
@@ -44,23 +60,61 @@ export async function GET(request: Request) {
     );
   }
 
+  const store = requireJobStore(slug, "dev_generate_images");
+  let binding;
+  try {
+    binding = await prepareImageJobBinding(store, slug);
+  } catch (error) {
+    const msg = isChapterMutationError(error)
+      ? `${error.code}: ${error.message}`
+      : String((error as Error).message);
+    return NextResponse.json({ ok: false, error: msg }, { status: 403 });
+  }
+
   if (!confirm) {
     return NextResponse.json({
       ok: true,
       preview: true,
       slug,
-      model: CHAPTER_IMAGE_MODEL,
+      model: binding?.model ?? CHAPTER_IMAGE_MODEL,
       willGenerate: 3,
       note: "Preview only. Add &confirm=yes to generate 3 images and store them.",
     });
   }
 
-  await triggerBackgroundImageGeneration(slug, url.host);
+  // Same discipline as the Studio route: atomic single-use claim BEFORE the
+  // trigger; a failed trigger releases the claim and every refusal is audited.
+  let jobId: string;
+  try {
+    const claim = await claimImageJob(store, slug, binding);
+    jobId = claim.jobId;
+  } catch (e) {
+    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
+    await logGenerationAudit({ action: "refused:dev_generate_images", slug, status: "failed", message: msg.slice(0, 300) });
+    const code = isChapterMutationError(e) ? (e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500) : 500;
+    return NextResponse.json({ ok: false, error: msg }, { status: code });
+  }
+  const triggered = await triggerBackgroundImageGeneration(slug, url.host, jobId, binding);
+  if (!triggered.ok) {
+    const released = await releaseImageJob(store, slug, jobId, "queued");
+    const note = released ? "image claim released" : "image claim could NOT be released; the row may still hold a stale claim";
+    await logGenerationAudit({
+      action: "refused:dev_generate_images",
+      slug,
+      status: "failed",
+      message: `trigger failed (${triggered.error ?? triggered.status}) — ${note}`,
+    });
+    return NextResponse.json(
+      { ok: false, error: `background trigger failed — ${note} (${triggered.error ?? triggered.status})` },
+      { status: released ? 502 : 500 },
+    );
+  }
   return NextResponse.json({
     ok: true,
     triggered: true,
     slug,
-    model: CHAPTER_IMAGE_MODEL,
-    note: `Generating 3 images in the background. Poll /dev/db-status?slug=${slug} until imagesStored=true.`,
+    jobId,
+    model: binding?.model ?? CHAPTER_IMAGE_MODEL,
+    note: `Generating images in the background. Poll /dev/db-status?slug=${slug} until imagesStored=true.`,
   });
 }

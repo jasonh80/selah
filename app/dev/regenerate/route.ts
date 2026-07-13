@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
-import {
-  createGeneratingChapterWorkup,
-  getChapterStatus,
-} from "@/lib/server/chapter-workups-repository";
+import { getChapterStatus } from "@/lib/server/chapter-workups-repository";
+import { claimGenerationJob, failGenerationJob, requireJobStore } from "@/lib/server/generation-jobs";
+import { isChapterMutationError } from "@/lib/server/protected-chapters";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
+import { logGenerationAudit } from "@/lib/server/generation-settings";
 import { CHAPTER_WORKUP_TEXT_MODEL } from "@/lib/server/openai";
-import { devRoutesEnabled } from "@/lib/server/dev-guard";
+import { devMutationTokenAuthorized, devRoutesEnabled } from "@/lib/server/dev-guard";
 
-// DEV/admin: the ONLY way to start a chapter generation. Two steps for safety:
-//   1. GET /dev/regenerate?slug=psalm-23           → PREVIEW (no generation)
-//   2. GET /dev/regenerate?slug=psalm-23&confirm=yes → starts a background job
-// Add &force=yes to overwrite an existing ready/reviewed row. Gated by
-// generationAllowed (flag + OpenAI + Supabase + allowlist) and optional REGEN_TOKEN.
+// DEV/admin legacy generation trigger. Two steps for safety:
+//   1. GET /dev/regenerate?slug=<slug>             → PREVIEW (no generation)
+//   2. GET /dev/regenerate?slug=<slug>&confirm=yes → starts a background job
+// There is NO force/overwrite path (issue #8): the mutation guard refuses
+// protected, published, quarantined-ready, and mid-run rows — always.
 export const dynamic = "force-dynamic";
 
 function estimatedCostRange(model: string): string {
@@ -26,11 +26,9 @@ export async function GET(request: Request) {
   if (!devRoutesEnabled()) return NextResponse.json({ error: "not found" }, { status: 404 });
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") || "";
-  const token = url.searchParams.get("token") || "";
   const confirm = url.searchParams.get("confirm") === "yes";
-  const force = url.searchParams.get("force") === "yes";
 
-  if (process.env.REGEN_TOKEN && token !== process.env.REGEN_TOKEN) {
+  if (!devMutationTokenAuthorized(request)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   if (!(await generationAllowed(slug))) {
@@ -58,36 +56,63 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ...base,
       preview: true,
-      willRegenerate: !isReady || force,
-      note: isReady && !force
-        ? "Already ready. Add &force=yes&confirm=yes to overwrite, or leave it."
+      willRegenerate: !isReady,
+      note: isReady
+        ? "This chapter is published/ready — the mutation guard will refuse regeneration. There is no force override."
         : "Add &confirm=yes to start the background generation.",
     });
   }
 
-  // Step 2: confirmed — guard rails.
-  if (status === "generating") {
-    return NextResponse.json({ ...base, ok: false, error: "already generating — wait for it to finish" });
-  }
-  if (isReady && !force) {
-    return NextResponse.json({
-      ...base,
-      ok: false,
-      error: "already ready — add &force=yes to overwrite",
-    });
-  }
-
+  // Step 2: confirmed — the typed, race-safe claim IS the guard rail. Any
+  // refusal/conflict is surfaced; no trigger follows a failed claim.
   const parsed = parseSlug(slug);
-  if (parsed) {
-    await createGeneratingChapterWorkup({
+  if (!parsed) return NextResponse.json({ ...base, ok: false, error: "unparseable slug" }, { status: 400 });
+  let jobId: string;
+  try {
+    jobId = await claimGenerationJob(requireJobStore(slug, "regenerate"), slug, {
       book: parsed.book,
       chapter: parsed.chapter,
-      slug,
       title: `${parsed.book} ${parsed.chapter}`,
       source: "generated",
     });
+  } catch (e) {
+    // Every refusal is durably audited — legacy dev routes included.
+    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
+    await logGenerationAudit({ action: "refused:regenerate", slug, status: "failed", message: msg.slice(0, 300) });
+    if (isChapterMutationError(e)) {
+      const code = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
+      return NextResponse.json({ ...base, ok: false, error: msg }, { status: code });
+    }
+    return NextResponse.json({ ...base, ok: false, error: msg }, { status: 500 });
   }
-  await triggerBackgroundGeneration(slug, url.host);
+  const triggered = await triggerBackgroundGeneration(slug, url.host, jobId);
+  if (!triggered.ok) {
+    // Report the cleanup outcome truthfully — never claim "marked failed"
+    // when the cleanup write itself failed and the row may be stranded.
+    const cleanup = await failGenerationJob(
+      requireJobStore(slug, "regenerate"),
+      slug,
+      jobId,
+      `trigger failed: ${triggered.error ?? triggered.status}`,
+      { expectedState: "queued" },
+    );
+    const cleanupNote =
+      cleanup === "marked_failed"
+        ? "job marked failed"
+        : cleanup === "conflict"
+          ? "the job already started or was superseded; nothing was overwritten"
+          : "CLEANUP WRITE FAILED — the row may still be marked generating";
+    await logGenerationAudit({
+      action: "refused:regenerate",
+      slug,
+      status: "failed",
+      message: `trigger failed (${triggered.error ?? triggered.status}) — ${cleanupNote}`,
+    });
+    return NextResponse.json(
+      { ...base, ok: false, error: `background trigger failed — ${cleanupNote} (${triggered.error ?? triggered.status})` },
+      { status: cleanup === "write_failed" ? 500 : 502 },
+    );
+  }
 
   return NextResponse.json({
     ...base,

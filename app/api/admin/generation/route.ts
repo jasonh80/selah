@@ -3,17 +3,50 @@ import {
   getGenerationSettings,
   updateGenerationSettings,
   logGenerationAudit,
-  type GenerationSettings,
+  logGenerationAuditVerified,
 } from "@/lib/server/generation-settings";
-import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
 import {
-  createGeneratingChapterWorkup,
+  generationAllowed,
+  isProtectedMarkSprintGenerationIdentity,
+  mark8GenerationAllowed,
+  parseSlug,
+} from "@/lib/server/generate-chapter-workup";
+import {
   getChapterStatus,
-  getDraftWorkup,
+  getStudioChapterStatus,
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
+import {
+  claimGenerationJob,
+  claimImageJob,
+  failGenerationJob,
+  releaseImageJob,
+  requireJobStore,
+  IMAGE_JOB_ERROR_CODE_KEY,
+  IMAGE_JOB_KEY,
+  IMAGE_JOB_MODEL_KEY,
+  IMAGE_JOB_SPENT_COUNT_KEY,
+  IMAGE_JOB_STATE_KEY,
+  ALLOW_DISCARD_COMPLETED_IMAGES,
+} from "@/lib/server/generation-jobs";
 import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
-import { imageGenAllowed, checkImageModel } from "@/lib/server/images";
+import {
+  imageGenAllowed,
+  checkImageModel,
+  prepareImageJobBinding,
+} from "@/lib/server/images";
+import {
+  deriveMark8ImagePlan,
+  mark8FinalReviewDigest,
+  MARK_8_IMAGE_ESTIMATED_COST_USD,
+  MARK_8_IMAGE_MODEL,
+  MARK_8_IMAGE_SLUG,
+} from "@/lib/server/mark8-image-plan";
+import {
+  chapterMutationDecision,
+  isChapterMutationError,
+  type MutationAction,
+} from "@/lib/server/protected-chapters";
 import {
   snapshotVersion,
   listVersions,
@@ -41,10 +74,29 @@ import {
   getRuleCounts,
   type ReviewScope,
 } from "@/lib/server/selah-brain";
+import { loadMark8RuntimePreview } from "@/lib/server/studio-mark8-preflight-loader";
+import {
+  buildMark8StudioPreflightResponse,
+  MARK_8_PREFLIGHT_ERROR,
+  MARK_8_STUDIO_SLUG,
+} from "@/lib/studio-mark8-preflight";
+import {
+  mintStudioPreviewAccess,
+  STUDIO_PREVIEW_COOKIE,
+  STUDIO_PREVIEW_MAX_AGE_SECONDS,
+  studioPreviewCookiePath,
+} from "@/lib/server/studio-preview-access";
+import {
+  getMark8StudioSetupStatus,
+  isMark8StudioSetupError,
+  runMark8StudioSetup,
+} from "@/lib/server/mark8-studio-setup";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
 export const dynamic = "force-dynamic";
+
+const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 
 function authed(req: Request): boolean {
   const expected = process.env.DEV_ADMIN_TOKEN || "";
@@ -62,27 +114,233 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const action = String(body.action ?? "");
 
+  // Durable audit for every blocked attempt (Codex finding #5), then the
+  // matching HTTP status: REFUSED→403, CONFLICT→409, WRITE_FAILED→500.
+  async function refuse(slug: string, what: string, reason: string, status: number) {
+    await logGenerationAudit({ action: `refused:${what}`, slug, status: "failed", message: reason.slice(0, 300) });
+    return NextResponse.json({ ok: false, error: reason }, { status });
+  }
+  async function guardOrRefuse(slug: string, what: string, guardAction: MutationAction) {
+    const guard = await chapterMutationDecision(slug, guardAction);
+    if (!guard.allowed) return refuse(slug, what, guard.reason, 403);
+    return null;
+  }
+  async function mapMutationError(slug: string, what: string, e: unknown) {
+    if (isChapterMutationError(e)) {
+      const status = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
+      return refuse(slug, what, `${e.code}: ${e.message}`, status);
+    }
+    return refuse(slug, what, String((e as Error).message ?? "unknown error").slice(0, 300), 500);
+  }
+
+  // ---- short-lived, read-only draft preview access ----
+  // This cookie is accepted only by /dev/preview/<slug>. It cannot authorize
+  // this admin API or any write, generation, image, or publish action.
+  if (action === "preview_access") {
+    const slug = String(body.slug ?? "");
+    const value = mintStudioPreviewAccess(slug);
+    const path = studioPreviewCookiePath(slug);
+    if (!value || !path) {
+      return NextResponse.json(
+        { ok: false, error: "Studio could not open the draft preview." },
+        { status: 400 },
+      );
+    }
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(STUDIO_PREVIEW_COOKIE, value, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: STUDIO_PREVIEW_MAX_AGE_SECONDS,
+      path,
+    });
+    return response;
+  }
+
+  // ---- exact private Mark 8 Brain + notes setup ----
+  // This path never generates, fetches Scripture, changes settings, creates
+  // images, or publishes. Both version-controlled approvals must already pass.
+  if (action === "mark8_setup_status") {
+    if (String(body.slug ?? "") !== MARK_8_STUDIO_SLUG) {
+      return NextResponse.json({ ok: false, error: "Mark 8 setup is unavailable." }, { status: 400 });
+    }
+    try {
+      return NextResponse.json({ ok: true, setup: await getMark8StudioSetupStatus() });
+    } catch {
+      return NextResponse.json({ ok: false, error: "Studio could not check Mark 8 setup." }, { status: 503 });
+    }
+  }
+  if (action === "mark8_setup") {
+    const auditSetup = async (
+      status: "started" | "succeeded" | "failed",
+      message: string,
+    ) => {
+      const recorded = await logGenerationAuditVerified({
+        action: "mark8_setup",
+        slug: MARK_8_STUDIO_SLUG,
+        status,
+        message,
+      });
+      if (!recorded) throw new Error("Mark 8 setup audit unavailable");
+    };
+    if (String(body.slug ?? "") !== MARK_8_STUDIO_SLUG || body.confirm !== true) {
+      try {
+        await auditSetup("failed", "refused:invalid_confirmation");
+      } catch {
+        console.error("[selah] Mark 8 setup refusal audit unavailable");
+      }
+      return NextResponse.json({ ok: false, error: "Mark 8 setup confirmation is required." }, { status: 400 });
+    }
+    const setupDigest = typeof body.setupDigest === "string" ? body.setupDigest : "";
+    if (!LOWERCASE_SHA256.test(setupDigest)) {
+      try {
+        await auditSetup("failed", "refused:invalid_receipt");
+      } catch {
+        console.error("[selah] Mark 8 setup refusal audit unavailable");
+      }
+      return NextResponse.json({ ok: false, error: "The exact Mark 8 setup receipt is required." }, { status: 400 });
+    }
+    try {
+      await auditSetup("started", "owner-confirmed private setup");
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "Studio could not record the Mark 8 setup start. Nothing changed." },
+        { status: 500 },
+      );
+    }
+    try {
+      const result = await runMark8StudioSetup(setupDigest);
+      try {
+        await auditSetup("succeeded", "99 Brain rules + 10 Mark 8 notes verified");
+        return NextResponse.json({ ok: true, setup: result.status, result: result.result });
+      } catch {
+        // The verified setup writes are authoritative. Never tell the owner
+        // they failed merely because the later activity record was unavailable.
+        let setup = result.status;
+        try {
+          const reread = await getMark8StudioSetupStatus();
+          if (reread.complete) setup = reread;
+        } catch {
+          // runMark8StudioSetup already performed an exact post-write readback.
+        }
+        return NextResponse.json({
+          ok: true,
+          setup,
+          result: result.result,
+          auditWarning: "Mark 8 setup succeeded, but its activity record is unavailable.",
+        });
+      }
+    } catch (error) {
+      const refused =
+        isMark8StudioSetupError(error) &&
+        ["UNAPPROVED", "DIGEST_MISMATCH", "REVIEW_REQUIRED"].includes(error.code);
+      try {
+        await auditSetup(
+          "failed",
+          `${refused ? "refused" : "failed"}:${isMark8StudioSetupError(error) ? error.code : "unknown"}`,
+        );
+      } catch {
+        console.error("[selah] Mark 8 setup failure audit unavailable");
+      }
+      const status = isMark8StudioSetupError(error)
+        ? error.code === "UNAPPROVED"
+          ? 403
+          : error.code === "DIGEST_MISMATCH" || error.code === "REVIEW_REQUIRED"
+            ? 409
+            : 500
+        : 500;
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            status === 403
+              ? "Selah Brain and the exact Mark 8 notes still need approval."
+              : status === 409
+                ? "Mark 8 setup changed or needs review. Nothing else was started."
+                : "Studio could not safely finish Mark 8 setup.",
+        },
+        { status },
+      );
+    }
+  }
+
+  // ---- read-only Mark 8 owner preparation ----
+  // Reads exact live Brain/notes/example evidence plus ESV Mark 7–9. It cannot
+  // claim a job, call a model, write Supabase, publish, or authorize a run.
+  if (action === "mark_sprint_prepare") {
+    if (String(body.slug ?? "") !== MARK_8_STUDIO_SLUG) {
+      return NextResponse.json({ ok: false, error: MARK_8_PREFLIGHT_ERROR }, { status: 400 });
+    }
+    try {
+      const preview = await loadMark8RuntimePreview();
+      return NextResponse.json(buildMark8StudioPreflightResponse(preview));
+    } catch {
+      // Do not reveal which key, service, row, or source check is unavailable.
+      return NextResponse.json({ ok: false, error: MARK_8_PREFLIGHT_ERROR }, { status: 503 });
+    }
+  }
+
   // ---- save settings ----
   if (action === "save") {
-    const updated = await updateGenerationSettings((body.settings ?? {}) as Partial<GenerationSettings>);
-    await logGenerationAudit({ action: "update_settings", status: updated ? "succeeded" : "failed" });
+    const requested = body.settings;
+    if (!requested || typeof requested !== "object" || Array.isArray(requested)) {
+      return NextResponse.json({ ok: false, error: "invalid settings" }, { status: 400 });
+    }
+    const values = requested as Record<string, unknown>;
+    if (
+      typeof values.text_generation_enabled !== "boolean" ||
+      typeof values.image_generation_enabled !== "boolean" ||
+      typeof values.require_confirm !== "boolean"
+    ) {
+      return NextResponse.json({ ok: false, error: "invalid settings" }, { status: 400 });
+    }
+    // Studio owns only the visible safety switches. Preserve the server-managed
+    // chapter allowlist, model choices, and budget even if a stale/older client
+    // includes them in its request.
+    const updated = await updateGenerationSettings({
+      text_generation_enabled: values.text_generation_enabled,
+      image_generation_enabled: values.image_generation_enabled,
+      require_confirm: values.require_confirm,
+    });
+    try {
+      await logGenerationAudit({ action: "update_settings", status: updated ? "succeeded" : "failed" });
+    } catch {
+      // The settings write is authoritative. An audit outage must not make
+      // Studio claim that a switch stayed unchanged after it actually saved.
+      console.error(`[selah] settings audit failed after ${updated ? "save" : "failed save"}`);
+    }
     return NextResponse.json({ ok: Boolean(updated), settings: updated });
   }
 
   // ---- publish a draft ----
   if (action === "publish") {
     const slug = String(body.slug ?? "");
-    const draft = await getDraftWorkup(slug);
-    if (!draft) return NextResponse.json({ ok: false, error: "no stored row for slug" }, { status: 404 });
-    const status = await publishChapter(slug);
-    await logGenerationAudit({ action: "publish", slug, status: status ? "succeeded" : "failed" });
-    return NextResponse.json({ ok: Boolean(status), slug, status });
+    try {
+      const status = await publishChapter(slug, {
+        reviewDigest:
+          typeof body.reviewDigest === "string" ? body.reviewDigest : undefined,
+      });
+      try {
+        await logGenerationAudit({ action: "publish", slug, status: "succeeded" });
+      } catch {
+        // The publish write is authoritative. An audit outage must never make
+        // Studio report failure after the chapter is already live.
+        console.error(`[selah] publish audit failed after ${slug} was published`);
+      }
+      return NextResponse.json({ ok: true, slug, status });
+    } catch (e) {
+      if (isChapterMutationError(e)) {
+        const status = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
+        return refuse(slug, "publish", e.message, status);
+      }
+      return refuse(slug, "publish", "Studio could not safely publish this chapter.", 500);
+    }
   }
 
   // ---- poll a chapter's status (for the Generate Draft progress UI) ----
   if (action === "status") {
     const slug = String(body.slug ?? "");
-    return NextResponse.json({ ok: true, slug, status: await getChapterStatus(slug) });
+    return NextResponse.json({ ok: true, slug, ...(await getStudioChapterStatus(slug)) });
   }
 
   // ---- Selah Brain review (does this feel like Selah?) ----
@@ -132,20 +390,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: Boolean(workup), workup });
   }
   if (action === "version_restore") {
-    const ok = await restoreVersion(String(body.slug ?? ""), Number(body.version));
-    return NextResponse.json({ ok });
+    const slug = String(body.slug ?? "");
+    const blocked = await guardOrRefuse(slug, "version_restore", "restoreVersion");
+    if (blocked) return blocked;
+    const ok = await restoreVersion(slug, Number(body.version));
+    if (!ok) return refuse(slug, "version_restore", "restore failed or conflicted — nothing was written", 409);
+    return NextResponse.json({ ok: true });
   }
   if (action === "versions_snapshot") {
     const version = await snapshotVersion(String(body.slug ?? ""), typeof body.label === "string" ? body.label : undefined);
     return NextResponse.json({ ok: version !== null, version });
   }
   if (action === "version_apply") {
+    const slug = String(body.slug ?? "");
+    const blocked = await guardOrRefuse(slug, "version_apply", "applyMergedDraft");
+    if (blocked) return blocked;
     const result = await applyMergedDraft(
-      String(body.slug ?? ""),
+      slug,
       body.workup as ChapterWorkup,
       typeof body.label === "string" ? body.label : undefined,
     );
-    return NextResponse.json({ ok: result.ok, version: result.version });
+    if (!result.ok) return refuse(slug, "version_apply", "merge failed or conflicted — nothing was written", 409);
+    return NextResponse.json({ ok: true, version: result.version });
   }
 
   // ---- image model availability probe (no image generated, no cost) ----
@@ -155,30 +421,163 @@ export async function POST(req: Request) {
   }
 
   // ---- image generation (Image Preview stage; separate kill switch) ----
+  // Order matters: guard → kill switch → model PROBE (no cost) → atomic
+  // single-use claim → authenticated trigger. A failed trigger RELEASES the
+  // claim (truthfully reported if release fails) — never a stranded claim.
   if (action === "generate_images") {
     const slug = String(body.slug ?? "");
+    const blocked = await guardOrRefuse(slug, "generate_images", "updateChapterWorkupJson");
+    if (blocked) return blocked;
     if (!(await imageGenAllowed(slug))) {
-      return NextResponse.json(
-        { ok: false, error: "Image generation not allowed — needs Image Generation ON, the slug allowlisted, and an approved image plan." },
-        { status: 403 },
+      return refuse(
+        slug,
+        "generate_images",
+        "Image generation not allowed — needs Image Generation ON, the slug allowlisted, and an approved image plan.",
+        403,
       );
     }
-    await logGenerationAudit({ action: "generate_images", slug, status: "started" });
-    await triggerBackgroundImageGeneration(slug, new URL(req.url).host);
-    return NextResponse.json({ ok: true, triggered: true, slug });
+    let store: ReturnType<typeof requireJobStore>;
+    try {
+      store = requireJobStore(slug, "generate_images");
+    } catch (error) {
+      return mapMutationError(slug, "generate_images", error);
+    }
+    let binding: Awaited<ReturnType<typeof prepareImageJobBinding>>;
+    try {
+      binding = await prepareImageJobBinding(store, slug);
+    } catch (error) {
+      return mapMutationError(slug, "generate_images", error);
+    }
+    if (
+      slug === MARK_8_IMAGE_SLUG &&
+      (!binding ||
+        body.approvedImagePlanDigest !== binding.planDigest ||
+        body.approvedImageModel !== binding.model ||
+        body.approvedImageCount !== binding.imageCount)
+    ) {
+      return refuse(
+        slug,
+        "generate_images",
+        "The Mark 8 image plan changed after you reviewed its count and cost. Check the plan again before spending credit.",
+        409,
+      );
+    }
+    const probe = await checkImageModel(
+      binding?.model ?? (typeof body.model === "string" ? body.model : undefined),
+    );
+    if (!probe.ok) {
+      return refuse(slug, "generate_images", `image model "${probe.model}" unavailable: ${probe.error}`, 502);
+    }
+    let imageJobId: string;
+    try {
+      const claim = await claimImageJob(store, slug, binding);
+      imageJobId = claim.jobId;
+    } catch (e) {
+      return mapMutationError(slug, "generate_images", e);
+    }
+    await logGenerationAudit({ action: "generate_images", slug, status: "started", message: `job ${imageJobId}` });
+    const triggered = await triggerBackgroundImageGeneration(
+      slug,
+      new URL(req.url).host,
+      imageJobId,
+      binding,
+    );
+    if (!triggered.ok) {
+      const released = await releaseImageJob(store, slug, imageJobId, "queued");
+      return refuse(
+        slug,
+        "generate_images",
+        `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ` +
+          (released ? "image claim released" : "image claim could NOT be released; the row may still hold a stale claim"),
+        released ? 502 : 500,
+      );
+    }
+    return NextResponse.json({ ok: true, triggered: true, slug, jobId: imageJobId });
   }
   if (action === "images_status") {
     const slug = String(body.slug ?? "");
-    const row = await getDraftWorkup(slug);
-    const imgs = row?.workup.images ?? [];
-    const stored = imgs.filter((i) => /^https?:\/\//.test(i.src));
+    let row;
+    try {
+      row = await requireJobStore(slug, "images_status").read(slug);
+    } catch {
+      return NextResponse.json({ ok: false, error: "image status unavailable" }, { status: 500 });
+    }
+    if (!row || "error" in row) {
+      return NextResponse.json(
+        { ok: false, error: row && "error" in row ? "image status unavailable" : "draft not found" },
+        { status: row ? 500 : 404 },
+      );
+    }
+    const workup = row.workupJson as unknown as ChapterWorkup;
+    const imgs = Array.isArray(workup.images) ? workup.images : [];
+    const stored = imgs.filter((image) => image.status === "complete" && /^https:\/\//u.test(image.src));
+    const rawState = row.workupJson[IMAGE_JOB_STATE_KEY];
+    const hasActiveJob = typeof row.workupJson[IMAGE_JOB_KEY] === "string";
+    const state = hasActiveJob && ["queued", "running", "failed", "blocked"].includes(String(rawState))
+      ? String(rawState)
+      : "idle";
+    const spentCountValue = Number(row.workupJson[IMAGE_JOB_SPENT_COUNT_KEY]);
+    const spentCount = Number.isSafeInteger(spentCountValue) && spentCountValue >= 0
+      ? Math.min(spentCountValue, imgs.length)
+      : 0;
+    const reviewDigest = slug === MARK_8_IMAGE_SLUG
+      ? mark8FinalReviewDigest(workup)
+      : null;
+    let estimatedCostUsd: number | undefined;
+    let mark8Plan: ReturnType<typeof deriveMark8ImagePlan> | null = null;
+    if (slug === MARK_8_IMAGE_SLUG) {
+      try {
+        mark8Plan = deriveMark8ImagePlan(workup);
+        const exactCount = mark8Plan.images.length;
+        estimatedCostUsd = Math.round(exactCount * MARK_8_IMAGE_ESTIMATED_COST_USD * 1000) / 1000;
+      } catch {
+        return NextResponse.json(
+          { ok: false, error: "Mark 8 image plan is not ready." },
+          { status: 409 },
+        );
+      }
+    }
+    const done = slug === MARK_8_IMAGE_SLUG
+      ? reviewDigest !== null
+      : imgs.length > 0 && stored.length === imgs.length;
     return NextResponse.json({
       ok: true,
       slug,
       total: imgs.length,
       stored: stored.length,
-      done: imgs.length > 0 && stored.length === imgs.length,
-      urls: stored.map((i) => ({ kind: i.kind, src: i.src })),
+      done,
+      state,
+      spentCount,
+      ...(estimatedCostUsd === undefined ? {} : { estimatedCostUsd }),
+      ...(mark8Plan === null ? {} : { planDigest: mark8Plan.digest }),
+      heroKind: workup.heroKind ?? null,
+      ...(mark8Plan !== null
+        ? { model: MARK_8_IMAGE_MODEL }
+        : hasActiveJob && typeof row.workupJson[IMAGE_JOB_MODEL_KEY] === "string"
+        ? { model: row.workupJson[IMAGE_JOB_MODEL_KEY] }
+        : {}),
+      ...(state === "blocked"
+        ? { errorCode: "cost_record_failed" }
+        : state === "failed"
+          ? {
+              errorCode:
+                row.workupJson[IMAGE_JOB_ERROR_CODE_KEY] === "completion_conflict"
+                  ? "completion_conflict"
+                  : "image_run_failed",
+            }
+          : {}),
+      images: imgs.map((image) => ({
+        kind: image.kind,
+        label: image.label,
+        description: image.description ?? "",
+        status:
+          (state === "queued" || state === "running") && image.status !== "complete"
+            ? "generating"
+            : ["placeholder", "generating", "complete", "failed"].includes(String(image.status))
+              ? image.status
+              : "placeholder",
+      })),
+      ...(reviewDigest === null ? {} : { reviewDigest }),
     });
   }
 
@@ -218,6 +617,141 @@ export async function POST(req: Request) {
   // ---- generate a draft (text only) ----
   if (action === "generate") {
     const slug = String(body.slug ?? "");
+    // Issue #8 mutation guard: published/protected chapters cannot be regenerated.
+    const blocked = await guardOrRefuse(slug, "generate", "createGeneratingChapterWorkup");
+    if (blocked) return blocked;
+    const protectedMarkSprint = isProtectedMarkSprintGenerationIdentity({ slug });
+
+    // Mark 8 is the only protected sprint chapter connected to the worker.
+    // Its owner-confirmed manifest digest is carried through the atomic claim,
+    // signed trigger, worker authentication, and every cleanup/terminal write.
+    // Mark 9–11 remain blocked and can never fall through to generic generation.
+    if (protectedMarkSprint) {
+      if (slug !== MARK_8_STUDIO_SLUG) {
+        return refuse(
+          slug,
+          "generate",
+          "blocked — only the protected Mark 8 draft runner is connected",
+          403,
+        );
+      }
+      const approvedManifestDigest =
+        typeof body.approvedManifestDigest === "string"
+          ? body.approvedManifestDigest
+          : "";
+      if (!LOWERCASE_SHA256.test(approvedManifestDigest)) {
+        return refuse(
+          slug,
+          "generate",
+          "Mark 8 requires the exact prepared manifest digest",
+          400,
+        );
+      }
+      if (body.confirm !== true) {
+        return refuse(slug, "generate", "confirmation required", 400);
+      }
+
+      let settings = await getGenerationSettings();
+      if (!settings.text_generation_enabled) {
+        return refuse(
+          slug,
+          "generate",
+          "Text Generation is OFF — turn it on in Advanced Settings.",
+          403,
+        );
+      }
+      // Studio promises chapter access is automatic. Only after the exact
+      // digest, owner confirmation, and text switch pass may this one chapter
+      // be added; malformed/unconfirmed requests never change settings.
+      if (!settings.allowed_slugs.includes(slug)) {
+        const updated = await updateGenerationSettings({
+          allowed_slugs: [...settings.allowed_slugs, slug],
+        });
+        if (!updated || !updated.allowed_slugs.includes(slug)) {
+          return refuse(
+            slug,
+            "generate",
+            "Studio could not approve Mark 8 for this private draft.",
+            500,
+          );
+        }
+        settings = updated;
+      }
+      if (!(await mark8GenerationAllowed(slug))) {
+        return refuse(
+          slug,
+          "generate",
+          "blocked — protected Mark 8 generation is not fully configured",
+          403,
+        );
+      }
+
+      const parsed = parseSlug(slug);
+      if (!parsed || parsed.book !== "Mark" || parsed.chapter !== 8) {
+        return refuse(slug, "generate", "invalid protected Mark 8 chapter", 400);
+      }
+
+      let jobId: string;
+      try {
+        jobId = await claimGenerationJob(
+          requireJobStore(slug, "generate"),
+          slug,
+          {
+            book: parsed.book,
+            chapter: parsed.chapter,
+            title: `${parsed.book} ${parsed.chapter}`,
+            source: "generated",
+            approvedManifestDigest,
+            ...(body.confirmDiscardCompletedImages === true
+              ? { allowDiscardCompletedImages: ALLOW_DISCARD_COMPLETED_IMAGES }
+              : {}),
+          },
+        );
+      } catch (e) {
+        return mapMutationError(slug, "generate", e);
+      }
+
+      const triggered = await triggerBackgroundGeneration(
+        slug,
+        new URL(req.url).host,
+        jobId,
+        approvedManifestDigest,
+      );
+      if (!triggered.ok) {
+        const cleanup = await failGenerationJob(
+          requireJobStore(slug, "generate"),
+          slug,
+          jobId,
+          `trigger failed: ${triggered.error ?? triggered.status}`,
+          {
+            expectedState: "queued",
+            approvedManifestDigest,
+          },
+        );
+        const cleanupNote =
+          cleanup === "marked_failed"
+            ? "job marked failed"
+            : cleanup === "conflict"
+              ? "the job already started or was superseded; nothing was overwritten"
+              : "CLEANUP WRITE FAILED — the row may still be marked generating";
+        return refuse(
+          slug,
+          "generate",
+          `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ${cleanupNote}`,
+          cleanup === "write_failed" ? 500 : 502,
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        triggered: true,
+        slug,
+        jobId,
+        model: settings.selected_text_model,
+        note: "Creating one private Mark 8 draft. Nothing is published.",
+      });
+    }
+
     const confirm = body.confirm === true || body.confirm === "yes";
     const settings = await getGenerationSettings();
 
@@ -245,16 +779,46 @@ export async function POST(req: Request) {
     }
 
     const parsed = parseSlug(slug);
-    if (parsed) {
-      await createGeneratingChapterWorkup({
+    if (!parsed) return refuse(slug, "generate", "unparseable slug", 400);
+    let jobId: string;
+    try {
+      // ONE atomic claim with a unique job id — the worker only verifies it.
+      // If this fails, NO trigger and NO success-shaped response follow.
+      jobId = await claimGenerationJob(requireJobStore(slug, "generate"), slug, {
         book: parsed.book,
         chapter: parsed.chapter,
-        slug,
         title: `${parsed.book} ${parsed.chapter}`,
         source: "generated",
       });
+    } catch (e) {
+      return mapMutationError(slug, "generate", e);
     }
-    await triggerBackgroundGeneration(slug, new URL(req.url).host);
+    const triggered = await triggerBackgroundGeneration(slug, new URL(req.url).host, jobId);
+    if (!triggered.ok) {
+      // The chapter must never be stranded as "generating" by a failed trigger:
+      // fail the claimed job (pinned to this job id) and report the CLEANUP
+      // OUTCOME truthfully — a failed cleanup write means the row may still
+      // say "generating", and the response must never claim otherwise.
+      const cleanup = await failGenerationJob(
+        requireJobStore(slug, "generate"),
+        slug,
+        jobId,
+        `trigger failed: ${triggered.error ?? triggered.status}`,
+        { expectedState: "queued" },
+      );
+      const cleanupNote =
+        cleanup === "marked_failed"
+          ? "job marked failed"
+          : cleanup === "conflict"
+            ? "the job already started or was superseded; nothing was overwritten"
+            : "CLEANUP WRITE FAILED — the row may still be marked generating";
+      return refuse(
+        slug,
+        "generate",
+        `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ${cleanupNote}`,
+        cleanup === "write_failed" ? 500 : 502,
+      );
+    }
     return NextResponse.json({
       ok: true,
       triggered: true,

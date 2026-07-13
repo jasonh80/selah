@@ -31,7 +31,24 @@ const FALLBACK: GenerationSettings = {
   updated_at: "",
 };
 
+// TEST SEAM (offline safety gate only): lets scripts/verify-studio-safety.ts
+// drive the REAL admin route/workers with controlled settings and capture the
+// durable audit trail in memory. Never set in production code paths.
+let settingsOverride: GenerationSettings | null = null;
+let auditCapture: Array<Record<string, unknown>> | null = null;
+let auditFailureForTesting = false;
+export function __setGenerationTestOverrides(overrides: {
+  settings?: GenerationSettings | null;
+  captureAudit?: Array<Record<string, unknown>> | null;
+  auditFailure?: boolean;
+} | null): void {
+  settingsOverride = overrides?.settings ?? null;
+  auditCapture = overrides?.captureAudit ?? null;
+  auditFailureForTesting = overrides?.auditFailure ?? false;
+}
+
 export async function getGenerationSettings(): Promise<GenerationSettings> {
+  if (settingsOverride) return settingsOverride;
   const db = getSupabaseAdmin();
   if (!db) return FALLBACK;
   const { data, error } = await db.from(TABLE).select("*").eq("id", "global").maybeSingle();
@@ -52,6 +69,19 @@ const EDITABLE_KEYS: (keyof GenerationSettings)[] = [
 export async function updateGenerationSettings(
   patch: Partial<GenerationSettings>,
 ): Promise<GenerationSettings | null> {
+  if (settingsOverride) {
+    const next: GenerationSettings = {
+      ...settingsOverride,
+      updated_at: new Date().toISOString(),
+    };
+    for (const key of EDITABLE_KEYS) {
+      if (key in patch) {
+        (next[key] as GenerationSettings[typeof key]) = patch[key] as GenerationSettings[typeof key];
+      }
+    }
+    settingsOverride = next;
+    return next;
+  }
   const db = getSupabaseAdmin();
   if (!db) return null;
   const clean: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -69,7 +99,7 @@ export async function updateGenerationSettings(
   return data ? { ...FALLBACK, ...data } : null;
 }
 
-export async function logGenerationAudit(entry: {
+export interface GenerationAuditEntry {
   action: string;
   slug?: string;
   model?: string;
@@ -77,9 +107,16 @@ export async function logGenerationAudit(entry: {
   actualCost?: number;
   status: "started" | "succeeded" | "failed";
   message?: string;
-}): Promise<void> {
+}
+
+async function writeGenerationAudit(entry: GenerationAuditEntry): Promise<boolean> {
+  if (auditFailureForTesting) throw new Error("simulated generation audit outage");
+  if (auditCapture) {
+    auditCapture.push({ ...entry });
+    return true;
+  }
   const db = getSupabaseAdmin();
-  if (!db) return;
+  if (!db) return false;
   const { error } = await db.from("generation_audit_log").insert({
     action: entry.action,
     slug: entry.slug ?? null,
@@ -89,5 +126,20 @@ export async function logGenerationAudit(entry: {
     status: entry.status,
     message: entry.message ?? null,
   });
-  if (error) console.error("[selah] logGenerationAudit failed:", error.message);
+  if (error) {
+    console.error("[selah] logGenerationAudit failed:", error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function logGenerationAudit(entry: GenerationAuditEntry): Promise<void> {
+  await writeGenerationAudit(entry);
+}
+
+/** Used when a caller must know whether the activity row was durably saved. */
+export async function logGenerationAuditVerified(
+  entry: GenerationAuditEntry,
+): Promise<boolean> {
+  return writeGenerationAudit(entry);
 }

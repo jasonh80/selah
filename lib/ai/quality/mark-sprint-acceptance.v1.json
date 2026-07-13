@@ -1,0 +1,110 @@
+{
+  "contract_version": "1.0",
+  "artifact": "chapter_workup",
+  "stage": "copy_review",
+  "expected_reader_display_version": "ESV",
+  "required_core_section_types": [
+    "big_idea",
+    "chapter_flow",
+    "historical_world",
+    "what_most_people_miss",
+    "jesus_connection",
+    "theology",
+    "application",
+    "prayer"
+  ],
+  "chapters": {
+    "mark-8": {
+      "book": "Mark",
+      "chapter": 8,
+      "expected_verse_count": 38,
+      "required_movements": [
+        { "id": "M8-M01", "startVerse": 1, "endVerse": 10 },
+        { "id": "M8-M02", "startVerse": 11, "endVerse": 13 },
+        { "id": "M8-M03", "startVerse": 14, "endVerse": 21 },
+        { "id": "M8-M04", "startVerse": 22, "endVerse": 26 },
+        { "id": "M8-M05", "startVerse": 27, "endVerse": 30 },
+        { "id": "M8-M06", "startVerse": 31, "endVerse": 33 },
+        { "id": "M8-M07", "startVerse": 34, "endVerse": 38 }
+      ],
+      "manual_guardrails": [
+        "Do not state that the feeding crowd was entirely Gentile.",
+        "Do not portray Pharisees as priests, foreigners, or visual villains.",
+        "Do not make the Pan grotto, a temple, or Mount Hermon the stated confession site.",
+        "Do not describe Peter as demon-possessed.",
+        "Do not use cross-bearing to sanctify abuse, coercion, burnout, self-harm, or preventable danger."
+      ],
+      "textual_variants": []
+    },
+    "mark-9": {
+      "book": "Mark",
+      "chapter": 9,
+      "expected_verse_count": 50,
+      "required_movements": [
+        { "id": "M9-M01", "startVerse": 1, "endVerse": 1 },
+        { "id": "M9-M02", "startVerse": 2, "endVerse": 8 },
+        { "id": "M9-M03", "startVerse": 9, "endVerse": 13 },
+        { "id": "M9-M04", "startVerse": 14, "endVerse": 29 },
+        { "id": "M9-M05", "startVerse": 30, "endVerse": 32 },
+        { "id": "M9-M06", "startVerse": 33, "endVerse": 37 },
+        { "id": "M9-M07", "startVerse": 38, "endVerse": 41 },
+        { "id": "M9-M08", "startVerse": 42, "endVerse": 50 }
+      ],
+      "manual_guardrails": [
+        "Do not identify an exact Transfiguration mountain as fact.",
+        "Do not diagnose the boy or generalize seizures, disability, or mental illness as demonic.",
+        "Do not blame the boy or father, displace medical care, or promise the same outcome to every family.",
+        "Do not literalize the hand, foot, and eye sayings as self-harm instructions.",
+        "Do not call Gehenna a perpetually burning first-century municipal dump."
+      ],
+      "textual_variants": [
+        "Mark 9:29: some manuscripts add fasting.",
+        "Mark 9:44 and 9:46: later-manuscript additions affect numbering in some editions.",
+        "Mark 9:49: wording and interpretation require edition-aware review."
+      ]
+    },
+    "mark-10": {
+      "book": "Mark",
+      "chapter": 10,
+      "expected_verse_count": 52,
+      "required_movements": [
+        { "id": "M10-M01", "startVerse": 1, "endVerse": 12 },
+        { "id": "M10-M02", "startVerse": 13, "endVerse": 16 },
+        { "id": "M10-M03", "startVerse": 17, "endVerse": 31 },
+        { "id": "M10-M04", "startVerse": 32, "endVerse": 34 },
+        { "id": "M10-M05", "startVerse": 35, "endVerse": 45 },
+        { "id": "M10-M06", "startVerse": 46, "endVerse": 52 }
+      ],
+      "manual_guardrails": [
+        "Use wealthy man for Mark-local copy; young comes from Matthew and ruler from Luke.",
+        "Do not invent a Needle Gate workaround.",
+        "Do not use the divorce teaching to trap someone in danger or force unsafe reunion.",
+        "Do not invent the wealthy man's motives, later fate, office, or age.",
+        "Do not portray Bartimaeus through fabricated diagnosis or disability spectacle."
+      ],
+      "textual_variants": []
+    },
+    "mark-11": {
+      "book": "Mark",
+      "chapter": 11,
+      "expected_verse_count": 33,
+      "required_movements": [
+        { "id": "M11-M01", "startVerse": 1, "endVerse": 11 },
+        { "id": "M11-M02", "startVerse": 12, "endVerse": 14 },
+        { "id": "M11-M03", "startVerse": 15, "endVerse": 19 },
+        { "id": "M11-M04", "startVerse": 20, "endVerse": 26 },
+        { "id": "M11-M05", "startVerse": 27, "endVerse": 33 }
+      ],
+      "manual_guardrails": [
+        "Do not present palms, a whip, the Court of the Gentiles, or dishonest exchange rates as Mark-explicit details.",
+        "Do not turn the fig-tree and Temple interpretation into a curse on Jewish people or ethnic Israel.",
+        "Do not portray Jewish leaders, merchants, or crowds as racially distinct villains.",
+        "Do not turn prayer into a prosperity guarantee or blame unanswered prayer on weak faith.",
+        "Do not define forgiveness as unsafe reunion, automatic trust, or absence of accountability."
+      ],
+      "textual_variants": [
+        "Mark 11:26: important earlier witnesses omit the added sentence found in later manuscripts."
+      ]
+    }
+  }
+}

@@ -9,21 +9,44 @@ import { estimateChapterWorkupCost } from "../ai/costs";
 import { getOpenAI, isOpenAIConfigured, CHAPTER_WORKUP_TEXT_MODEL } from "./openai";
 import { isSupabaseConfigured } from "./supabase";
 import {
-  createGeneratingChapterWorkup,
-  saveReadyChapterWorkup,
-  markChapterWorkupFailed,
-} from "./chapter-workups-repository";
+  consumeGenerationClaim,
+  completeGenerationJob,
+  failGenerationJob,
+  requireJobStore,
+} from "./generation-jobs";
+import { isChapterMutationError } from "./protected-chapters";
 import { recordCostEvent } from "./cost-events-repository";
 import { snapshotVersion } from "./chapter-versions-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import { selectRulesForGeneration, getChapterReviewNoteTexts } from "./selah-brain";
 import { getRelevantExamples, TEXT_EXAMPLE_TYPES } from "./selah-examples";
+import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
+
+// TEST SEAM (offline safety gate only): skip the env-configured checks so the
+// verify script can drive the REAL route/worker with fake settings + store —
+// the settings kill switch and allowlist still apply. Never set in production.
+let configCheckBypassForTesting = false;
+export function __setGenerationConfigBypassForTesting(v: boolean): void {
+  configCheckBypassForTesting = v;
+}
 
 // Routine generation control now lives in Supabase (generation_settings), so it
 // changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
 // Supabase configured AND text_generation_enabled AND the slug allowlisted there.
 export async function generationAllowed(slug: string): Promise<boolean> {
-  if (!isOpenAIConfigured() || !isSupabaseConfigured()) return false;
+  if (isProtectedMarkSprintGenerationIdentity({ slug })) return false;
+  if (!configCheckBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
+  const s = await getGenerationSettings();
+  return s.text_generation_enabled && s.allowed_slugs.includes(slug);
+}
+
+/**
+ * The only protected sprint chapter connected to paid work today. Mark 9–11
+ * remain fail-closed until their own owner-approved launch work is connected.
+ */
+export async function mark8GenerationAllowed(slug: string): Promise<boolean> {
+  if (slug !== "mark-8") return false;
+  if (!configCheckBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
   const s = await getGenerationSettings();
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);
 }
@@ -45,17 +68,45 @@ interface GenOutput {
   outputTokens: number;
 }
 
+export function assertGenericChapterGenerationAllowed(input: {
+  slug: string;
+  book: string;
+  chapter: number;
+}): void {
+  if (isProtectedMarkSprintGenerationIdentity(input)) {
+    throw new Error(
+      `${input.slug} is blocked from generic generation and must use its protected runner`,
+    );
+  }
+}
+
+export function isProtectedMarkSprintGenerationIdentity(input: {
+  slug: string;
+  book?: string;
+  chapter?: number;
+}): boolean {
+  const normalizedSlug = input.slug.trim().toLowerCase();
+  const protectedSlug =
+    isMarkSprintSlug(normalizedSlug) || /^mark-0*(?:8|9|10|11)$/u.test(normalizedSlug);
+  const normalizedBook = input.book?.trim().toLowerCase() ?? "";
+  const protectedBookChapter =
+    normalizedBook === "mark" &&
+    typeof input.chapter === "number" &&
+    [8, 9, 10, 11].includes(input.chapter);
+  return protectedSlug || protectedBookChapter;
+}
+
 export async function generateChapterWorkup(input: {
   book: string;
   chapter: number;
   slug: string;
   bibleVersion?: string;
-  bibleText?: string;
   model?: string;
   globalRules?: string[];
   chapterNotes?: string[];
   examples?: { title: string; exampleType: string; content: string }[];
 }): Promise<GenOutput> {
+  assertGenericChapterGenerationAllowed(input);
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
   const model = input.model || CHAPTER_WORKUP_TEXT_MODEL;
@@ -64,7 +115,6 @@ export async function generateChapterWorkup(input: {
     book: input.book,
     chapter: input.chapter,
     bibleVersion: input.bibleVersion,
-    bibleText: input.bibleText,
     globalRules: input.globalRules,
     chapterNotes: input.chapterNotes,
     examples: input.examples,
@@ -119,16 +169,48 @@ export async function generateChapterWorkup(input: {
   };
 }
 
+// TEST SEAM (offline safety gate only): replaces the paid OpenAI call so the
+// verify script can drive the REAL route → worker → terminal-write pipeline
+// with zero network and zero spend. Never set in production code paths.
+type TextGenerator = typeof generateChapterWorkup;
+let textGeneratorOverride: TextGenerator | null = null;
+export function __setTextGeneratorForTesting(fn: TextGenerator | null): void {
+  textGeneratorOverride = fn;
+}
+
 /**
  * Full missing-chapter flow (Option A, server-side blocking). Returns the
- * render-ready workup (now saved as "ready"), or null on failure (→ 404).
+ * render-ready workup (now saved as a draft), or null on failure.
  */
-export async function generateAndStoreChapter(slug: string): Promise<ChapterWorkup | null> {
+export async function generateAndStoreChapter(
+  slug: string,
+  jobId: string,
+  approvedManifestDigest?: string,
+): Promise<ChapterWorkup | null> {
   const parsed = parseSlug(slug);
   if (!parsed) return null;
   const { book, chapter } = parsed;
+  // This must precede settings reads that lead to audits, placeholder claims,
+  // background work, or any other mutation. The protected runner is separate.
+  assertGenericChapterGenerationAllowed({ slug, book, chapter });
   const bibleVersion = "ESV";
   let costLogged = false;
+  // The ROUTE took the single atomic claim; this worker atomically CONSUMES it
+  // (queued → running) — a duplicated delivery loses at that conditional write
+  // BEFORE any spend, and the refusal is durably audited.
+  const store = requireJobStore(slug, "generateAndStoreChapter");
+  try {
+    await consumeGenerationClaim(store, slug, jobId, approvedManifestDigest);
+  } catch (e) {
+    const kind = isChapterMutationError(e) && e.code === "CONFLICT" ? "generate_text_conflict" : "generate_text";
+    await logGenerationAudit({
+      action: kind,
+      slug,
+      status: "failed",
+      message: `claim not consumed: ${String((e as Error).message).slice(0, 250)} (no spend occurred)`,
+    });
+    throw e;
+  }
 
   // Admin-selected model from Supabase settings (falls back to the Netlify default).
   const settings = await getGenerationSettings();
@@ -144,17 +226,9 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   await logGenerationAudit({ action: "generate_text", slug, model, status: "started" });
 
   try {
-    await createGeneratingChapterWorkup({
-      book,
-      chapter,
-      slug,
-      title: `${book} ${chapter}`,
-      source: "generated",
-      bibleVersion,
-    });
-
-    // OpenAI call (tokens spent here).
-    const { content, inputTokens, outputTokens } = await generateChapterWorkup({
+    // OpenAI call (tokens spent here) — or the offline test generator.
+    const generate = textGeneratorOverride ?? generateChapterWorkup;
+    const { content, inputTokens, outputTokens } = await generate({
       book,
       chapter,
       slug,
@@ -182,15 +256,19 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
 
     const generated = parseChapterWorkupJson(content);
     const render = generatedToRenderWorkup(generated);
-    // Saved as a DRAFT — not served to the public until reviewed + published via
-    // /dev/publish. Preview a draft at /dev/preview/<slug>.
-    await saveReadyChapterWorkup({
+    // Terminal save is pinned to status="generating" AND this exact job ID —
+    // an older worker can never overwrite a newer run (zero rows = CONFLICT).
+    await completeGenerationJob(
+      store,
       slug,
-      workup: render,
-      status: "draft",
-      version: generated.version,
-      bibleVersion,
-    });
+      jobId,
+      {
+        workup: render,
+        version: generated.version,
+        bibleVersion,
+      },
+      approvedManifestDigest,
+    );
 
     // Archive this draft as a new version (V1 is preserved; this becomes V2, …).
     await snapshotVersion(slug, "generated draft");
@@ -207,8 +285,28 @@ export async function generateAndStoreChapter(slug: string): Promise<ChapterWork
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 300);
     console.error(`[selah] generation failed for ${slug}:`, msg);
-    await markChapterWorkupFailed(slug, msg);
-    await logGenerationAudit({ action: "generate_text", slug, model, status: "failed", message: msg });
+    // Terminal failure is pinned to this job ID; a newer run is never failed by
+    // an old worker. The outcome is reported truthfully: "conflict" = a newer
+    // run owns the row (left untouched); "write_failed" = the row may be
+    // STRANDED as generating and the audit says so.
+    const outcome = await failGenerationJob(store, slug, jobId, msg, {
+      expectedState: "running",
+      approvedManifestDigest,
+    });
+    const kind = isChapterMutationError(e) && e.code === "CONFLICT" ? "generate_text_conflict" : "generate_text";
+    const cleanupNote =
+      outcome === "marked_failed"
+        ? msg
+        : outcome === "conflict"
+          ? `${msg} (claim not owned; newer run untouched)`
+          : `${msg} (CLEANUP WRITE FAILED — row may be stranded as generating)`;
+    await logGenerationAudit({
+      action: kind,
+      slug,
+      model,
+      status: "failed",
+      message: cleanupNote,
+    });
     // If we never logged usage (OpenAI threw before returning, e.g. quota/timeout),
     // record an error event so failed spend/issues are still visible.
     if (!costLogged) {

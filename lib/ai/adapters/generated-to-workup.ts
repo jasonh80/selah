@@ -34,6 +34,7 @@ const SECTION_ICON: Record<WorkupSection["type"], string> = {
 
 const TAGLINE = "Pause. Reflect. Elevate.";
 const IMAGE_ORDER: ImageKind[] = ["establishing", "detail", "human"];
+const LEGACY_IMAGE_KINDS = new Set<ImageKind>(IMAGE_ORDER);
 const IMAGE_LABEL: Record<string, string> = {
   establishing: "Establishing Shot",
   detail: "Detail Shot",
@@ -48,25 +49,56 @@ function firstSentence(text: string, max = 120): string {
 }
 
 // Generic placeholders that exist for ANY chapter (real images come later).
-function imageFallback(kind: ImageKind): string {
-  return `/img/placeholder/${kind}.svg`;
+function imageFallback(kind: ImageKind, index = 0): string {
+  if (LEGACY_IMAGE_KINDS.has(kind)) {
+    return `/img/placeholder/${kind}.svg`;
+  }
+  // Custom plans do not get fake per-kind asset paths. Reuse an existing
+  // neutral placeholder until the separately approved image run fills `src`.
+  return `/img/placeholder/${IMAGE_ORDER[index % IMAGE_ORDER.length]}.svg`;
+}
+
+function legacyVerseBounds(range?: string): {
+  startVerse?: number;
+  endVerse?: number;
+} {
+  const match = range?.trim().match(/^(\d+)(?:\s*[-–]\s*(\d+))?$/);
+  if (!match) return {};
+  return {
+    startVerse: Number(match[1]),
+    endVerse: Number(match[2] ?? match[1]),
+  };
+}
+
+function canonicalVerseRange(startVerse?: number, endVerse?: number): string {
+  if (startVerse === undefined || endVerse === undefined) return "";
+  return startVerse === endVerse
+    ? String(startVerse)
+    : `${startVerse}–${endVerse}`;
 }
 
 export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): ChapterWorkup {
   const g = generated;
 
-  // Images, normalized into establishing → detail → human order.
+  // Keep the legacy classic trio normalized exactly as before. New
+  // chapter-driven plans retain the model's deliberate scene order.
   const byKind = new Map<ImageKind, GeneratedImage>();
   g.generatedImages.forEach((img) => byKind.set(img.type, img));
-  const images: ChapterImage[] = IMAGE_ORDER.filter((k) => byKind.has(k)).map((kind, i) => {
+  const imageOrder =
+    g.generatedImages.length === IMAGE_ORDER.length &&
+    g.generatedImages.every((image) => LEGACY_IMAGE_KINDS.has(image.type))
+      ? IMAGE_ORDER
+      : g.generatedImages.map((image) => image.type);
+  const images: ChapterImage[] = imageOrder.map((kind, i) => {
     const img = byKind.get(kind)!;
     return {
       kind,
       index: i + 1,
       label: img.title || IMAGE_LABEL[kind],
+      description: img.description,
       prompt: img.prompt,
       caption: img.caption,
-      src: img.imageUrl || imageFallback(kind),
+      src: img.imageUrl || imageFallback(kind, i),
       alt: img.alt,
       status: img.status,
     };
@@ -206,8 +238,11 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
 
     estimatedDate: g.estimatedDate,
     estimatedLocation: g.estimatedLocation,
+    modernLocationNote: g.modernLocationNote,
     jesusConnectionShort: g.jesusConnection.short,
+    primaryCharacters: g.primaryCharacters,
 
+    heroKind: g.heroKind,
     images,
     metaChips,
     navCards,
@@ -218,13 +253,21 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
     quickSummary: g.summary,
     summary: g.sceneSetter,
     context: g.historicalContext,
+    whatHappens: g.whatHappens,
     modernReadersMiss: g.whatPeopleMiss,
     jesusConnection: g.jesusConnection.full,
     application: g.application,
     prayer: g.prayer,
 
-    characters: g.keyPeople.map((p) => ({ name: p.name, role: p.role })),
+    characters: g.keyPeople.map((p) => ({
+      name: p.name,
+      role: p.role,
+      estimatedAge: p.estimatedAge,
+      description: p.description,
+      imageUrl: p.imageUrl,
+    })),
     modernMap: {
+      title: g.maps.modern.title,
       caption: g.maps.modern.description,
       src: g.maps.modern.imageUrl || "/img/placeholder/map.svg",
       alt: g.maps.modern.description,
@@ -232,6 +275,7 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
       uncertaintyNote: g.maps.modern.uncertaintyNote,
     },
     historicMap: {
+      title: g.maps.historic.title,
       caption: g.maps.historic.description,
       src: g.maps.historic.imageUrl || "/img/placeholder/map.svg",
       alt: g.maps.historic.description,
@@ -243,7 +287,29 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
       detail: it.description ?? "",
       current: it.active,
     })),
+    timelineLabel: g.timeline.label,
     keyItems,
+    verseByVerse: g.verseByVerse.map((item) => {
+      const legacy = legacyVerseBounds(item.range);
+      const hasNumericRange =
+        item.startVerse !== undefined && item.endVerse !== undefined;
+      const startVerse = hasNumericRange ? item.startVerse : legacy.startVerse;
+      const endVerse = hasNumericRange ? item.endVerse : legacy.endVerse;
+      return {
+        startVerse,
+        endVerse,
+        // Numeric bounds are authoritative for new drafts. This prevents stale or
+        // conflicting labels from displaying a different passage range.
+        rangeLabel: hasNumericRange
+          ? canonicalVerseRange(startVerse, endVerse)
+          : item.rangeLabel ?? item.range ?? canonicalVerseRange(startVerse, endVerse),
+        title: item.title,
+        explanation: item.explanation,
+        jesusConnection: item.jesusConnection,
+        application: item.application,
+      };
+    }),
+    chapterSpecificTopics: g.chapterSpecificTopics,
 
     versions: [g.bibleText.version],
     defaultVersion: g.bibleText.version,
@@ -270,6 +336,8 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
           { category: "Evidence & Artifacts", title: g.behindTheChapter.evidence.title, body: g.behindTheChapter.evidence.body },
         ]
       : undefined,
+
+    whatPeopleAsk: g.whatPeopleAsk,
 
     cost: g.cost,
   };

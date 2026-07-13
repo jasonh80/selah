@@ -1,11 +1,26 @@
 // Builds the prompt that asks the model for ONE shared global Selah chapter
 // workup. No API call here — this only assembles the instruction string.
 
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v4";
+
+export type GenerationSourceSectionRole =
+  | "context_before"
+  | "primary"
+  | "context_after";
+
+export interface ChapterWorkupGenerationSource {
+  label: string;
+  sections: Array<{
+    role: GenerationSourceSectionRole;
+    reference: string;
+    text: string;
+  }>;
+}
+
 export interface ChapterWorkupPromptInput {
   book: string;
   chapter: number;
   bibleVersion?: string;
-  bibleText?: string;
   // Active Selah Brain rules (apply to every chapter) and review notes specific
   // to THIS chapter. Both come from the dedicated Selah Brain tables.
   globalRules?: string[];
@@ -14,8 +29,51 @@ export interface ChapterWorkupPromptInput {
   examples?: { title: string; exampleType: string; content: string }[];
 }
 
-export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): string {
-  const { book, chapter, bibleVersion, bibleText, globalRules, chapterNotes, examples } = input;
+export type ProtectedChapterWorkupPromptInput = ChapterWorkupPromptInput & {
+  // This input is for the future protected composition root only. The ordinary
+  // generator deliberately has no source-bearing API.
+  generationSource: ChapterWorkupGenerationSource;
+};
+
+type InternalChapterWorkupPromptInput = ChapterWorkupPromptInput & {
+  generationSource?: ChapterWorkupGenerationSource;
+};
+
+function buildChapterWorkupPromptInternal(
+  input: InternalChapterWorkupPromptInput,
+): string {
+  const {
+    book,
+    chapter,
+    bibleVersion,
+    generationSource,
+    globalRules,
+    chapterNotes,
+    examples,
+  } = input;
+  if (generationSource) {
+    if (!generationSource.label.trim()) {
+      throw new Error("A server-owned generation source label is required");
+    }
+    const roles: GenerationSourceSectionRole[] = [
+      "context_before",
+      "primary",
+      "context_after",
+    ];
+    if (
+      generationSource.sections.length !== roles.length ||
+      generationSource.sections.some(
+        (section, index) =>
+          section.role !== roles[index] ||
+          !section.reference.trim() ||
+          !section.text.trim(),
+      )
+    ) {
+      throw new Error(
+        "Generation source must contain non-empty context-before, primary, and context-after sections in order",
+      );
+    }
+  }
   const slug = `${book.toLowerCase().replace(/\s+/g, "-")}-${chapter}`;
   const rulesBlock =
     globalRules && globalRules.length
@@ -35,6 +93,30 @@ export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): strin
           .map((e) => `--- EXAMPLE: ${e.title} (${e.exampleType}) ---\n${e.content}\n--- END EXAMPLE ---`)
           .join("\n\n")}`
       : "";
+  const generationSourceBlock = generationSource
+    ? `\n\nSERVER-SUPPLIED GENERATION SOURCE (${generationSource.label.trim()})
+Use PRIMARY CHAPTER for this workup. CONTEXT BEFORE and CONTEXT AFTER may only
+ground surrounding-chapter Book Flow. Do not blend their events into the
+primary chapter. Do not quote or reproduce source wording in the output.
+Footnote callouts and bodies, when present, are translator/editorial notes—not
+verse text. They may inform an explicitly labeled textual note but must never be
+silently presented as the words of Scripture.
+The protected runner must bind source handling, API options, references, text
+digests, ordered bundle digest, and owner decision in the fail-closed generation
+manifest before sending this request, even when reader display also uses ESV.
+
+--- CONTEXT BEFORE (${generationSource.sections[0].reference.trim()}; BOOK FLOW ONLY) ---
+${generationSource.sections[0].text.trim()}
+--- END CONTEXT BEFORE ---
+
+--- PRIMARY CHAPTER (${generationSource.sections[1].reference.trim()}) ---
+${generationSource.sections[1].text.trim()}
+--- END PRIMARY CHAPTER ---
+
+--- CONTEXT AFTER (${generationSource.sections[2].reference.trim()}; BOOK FLOW ONLY) ---
+${generationSource.sections[2].text.trim()}
+--- END CONTEXT AFTER ---`
+    : "";
 
   return `You are the content engine for Selah, a daily Bible chapter app whose only
 goal is to help people grow closer to Jesus through Scripture.
@@ -63,7 +145,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "chapter": ${chapter},
   "slug": "${slug}",
   "title": "${book} ${chapter}",
-  "subtitle": "<short evocative subtitle>",
+  "subtitle": "<fresh, chapter-specific editorial title; do not copy example wording>",
   "status": "draft",
   "version": "1",
   "theme": "<one short line, e.g. 'Holy access to God'>",
@@ -96,8 +178,8 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     ]
   },
   "maps": {
-    "modern": { "title": "Modern Map", "description": "<what it shows today>", "uncertaintyNote": "<optional>" },
-    "historic": { "title": "Historic Map", "description": "<the biblical-world view>", "uncertaintyNote": "<optional>" }
+    "modern": { "title": "Modern Map", "description": "<what it shows today>", "uncertaintyNote": "<required scope/precision note>" },
+    "historic": { "title": "Historic Map", "description": "<the biblical-world view>", "uncertaintyNote": "<required scope/precision note>" }
   },
   "keyObjects": [
     { "title": "<object/place>", "description": "<short>" }
@@ -105,13 +187,17 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "keyPeople": [
     { "name": "<name>", "role": "<role>", "description": "<short>" }
   ],
+  "heroKind": "<the type of the most interesting or impactful image below>",
   "generatedImages": [
-    { "type": "establishing", "title": "Establishing Shot", "description": "<the broad world: Where am I?>", "prompt": "<vivid, historically grounded image-generation prompt>", "alt": "<alt text>", "caption": "<caption>", "status": "placeholder" },
-    { "type": "detail", "title": "Detail Shot", "description": "<an object/ritual a modern reader may not understand: What am I looking at?>", "prompt": "<vivid prompt>", "alt": "<alt>", "caption": "<caption>", "status": "placeholder" },
-    { "type": "human", "title": "Human Moment", "description": "<a character/emotional moment: What did this feel like?>", "prompt": "<vivid prompt>", "alt": "<alt>", "caption": "<caption>", "status": "placeholder" }
+    { "type": "<chapter-specific-kebab-id>", "title": "<scene title>", "description": "<why this scene helps a reader understand this chapter>", "prompt": "<vivid, historically grounded image-generation prompt>", "alt": "<specific accessible alt text>", "caption": "<specific caption>", "status": "placeholder" },
+    { "type": "<different-chapter-specific-kebab-id>", "title": "<scene title>", "description": "<why this distinct scene matters>", "prompt": "<vivid, historically grounded prompt>", "alt": "<specific accessible alt text>", "caption": "<specific caption>", "status": "placeholder" },
+    { "type": "<third-chapter-specific-kebab-id>", "title": "<scene title>", "description": "<why this distinct scene matters>", "prompt": "<vivid, historically grounded prompt>", "alt": "<specific accessible alt text>", "caption": "<specific caption>", "status": "placeholder" }
   ],
   "verseByVerse": [
-    { "range": "<e.g. '1-6'>", "title": "<short>", "explanation": "<brief, no quoted verse text>" }
+    { "startVerse": 1, "endVerse": 6, "rangeLabel": "1–6", "title": "<short>", "explanation": "<brief, no quoted verse text>" }
+  ],
+  "whatPeopleAsk": [
+    { "question": "<a real question readers ask about THIS chapter>", "answer": "<warm, accurate, useful answer; no quoted verse text>" }
   ],
   "goDeeper": {
     "learnMore": [ { "title": "<short>", "description": "<short>" } ],
@@ -130,7 +216,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     { "id": "theology", "title": "Theology Principle", "type": "theology", "priority": 6, "isCore": true, "cardSummary": "<short>", "fullContent": "<the principle, started simple>" },
     { "id": "application", "title": "Live It", "type": "application", "priority": 7, "isCore": true, "cardSummary": "<short>", "fullContent": "<practical, invitational, no moralism>" },
     { "id": "prayer", "title": "Prayer", "type": "prayer", "priority": 8, "isCore": true, "cardSummary": "<short>", "fullContent": "<a fuller prayer>" },
-    { "id": "image-plan", "title": "Image Plan", "type": "image_plan", "priority": 20, "isCore": false, "cardSummary": "<short>", "fullContent": "<describe the 3 images: establishing, detail, human>" }
+    { "id": "image-plan", "title": "Image Plan", "type": "image_plan", "priority": 20, "isCore": false, "cardSummary": "<short>", "fullContent": "<describe why these 3 or 5 chapter-specific images reveal this chapter>" }
   ],
   "biblicalTimeline": {
     "era": "<one of: Creation/Adam & Eve, Patriarchs, Exodus & Wilderness, David/Kingdom, Exile, Life of Jesus, Early Church, Today>",
@@ -159,7 +245,9 @@ SCENE CHECKS (picture it accurately)
   people commonly imagine wrongly (wrong building, wrong clothing, wrong scale,
   English text on objects, a tidy scene that was really chaotic/dangerous, etc.).
   Do not force them. Tone: warm, visual, confident, historically grounded, lightly
-  witty when it fits — like a wise friend, not a textbook.
+  witty when it fits — like a wise friend, not a textbook. When supplied chapter
+  review notes identify real visual corrections, include at least one; otherwise
+  an empty array is better than a forced card.
 - "visualAccuracyNotes" are crisp, concrete corrections that will later be fed to
   image generation as guardrails. Be specific (materials, scale in feet, no English
   lettering, era-appropriate script, etc.).
@@ -201,12 +289,77 @@ SECTION DEPTH (this is the heart of Selah)
   imagination, verse-by-verse movement, and a warm, accurate Jesus connection.
 - Be specific, not generic. If a section could apply to almost any chapter, rewrite it.
 
+PASSAGE FLOW & QUESTIONS
+- "verseByVerse" is the machine-checkable chapter spine. Use one entry for every
+  natural scene or argument movement. Keep entries ordered and cover the whole
+  chapter from verse 1 through the final verse with no gaps or overlaps. Narrative
+  chapters commonly need 5-10 entries; do not compress a broad chapter into an
+  arbitrary 2-4 items. "startVerse" and "endVerse" are inclusive integers;
+  "rangeLabel" is display copy only.
+- "whatPeopleAsk" must contain 5-8 questions people genuinely ask about THIS
+  chapter. Answer the real concern beneath each question in Selah's warm,
+  plainspoken voice. Include difficult historical, theological, textual, or
+  pastoral questions when the chapter raises them. Never invent certainty,
+  promise an automatic outcome, blame suffering, or use an answer to bypass
+  safety, medical care, justice, or wise pastoral care.
+
+IMAGE PLAN
+- Choose exactly 3 images for a focused chapter or exactly 5 when the chapter's
+  narrative breadth genuinely needs five distinct moments. Selah chooses from
+  THIS chapter; do not fill generic establishing/detail/human buckets.
+- Every generatedImages.type is a unique, descriptive, lowercase kebab-case ID
+  (letters and numbers joined by single hyphens), such as a concise scene name.
+  Each image needs a chapter-specific title, description, historically grounded
+  prompt, useful alt text, caption, and status "placeholder". Do not include imageUrl.
+- Set heroKind to the exact type of the most interesting or impactful moment in
+  the chapter. Choose it for meaning and reader impact—not because it is the
+  first image or a conventional establishing shot.
+- Make every image prompt self-contained: photorealistic historical-documentary
+  realism, natural light, believable first-century people, worn materials,
+  lived-in spaces, and accurate terrain, objects, clothing, and scale.
+- Put the guardrails inside every image prompt: no halos or glow used as
+  shorthand, no pristine costumes, theatrical posing, modern objects, text or
+  lettering, theme-park sets, or generic European fantasy Bible art. Preserve
+  supernatural details only when this chapter itself describes them.
+- When a named person appears in more than one image, repeat consistent age,
+  appearance, clothing, and physical-condition details. Follow any supplied
+  approved cast profile exactly; never invent one when none is supplied.
+
 RULES
-- "generatedImages" MUST have exactly 3 entries in this order: establishing, detail, human, each with status "placeholder".
 - "primaryCharacters" is an array of strings; "keyObjects", "keyPeople", "sections", "chapterSpecificTopics" are arrays of OBJECTS.
-- Provide 2-4 items for timeline.items, keyObjects, keyPeople, verseByVerse, and each goDeeper group; 3-7 chapterSpecificTopics.
+- Provide 2-4 items for timeline.items and each goDeeper group; 2-6 keyObjects
+  and keyPeople; 3-7 chapterSpecificTopics; 5-8 whatPeopleAsk items. Passage-flow
+  length is determined by complete chapter coverage, not a fixed small count.
 - Mark the timeline item for THIS chapter with "active": true.
+- "bibleText.version" records the reader-display version only. Generation
+  provenance is server-owned and bound separately even when both use ESV.
 - Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${rulesBlock}${chapterBlock}${examplesBlock}${
-    bibleText ? `\n\nUse this chapter text as your source (do not quote it verbatim in output):\n"""\n${bibleText}\n"""` : ""
+    generationSourceBlock
   }`;
+}
+
+/** Build the ordinary source-free prompt used by the existing generator. */
+export function buildChapterWorkupPrompt(
+  input: ChapterWorkupPromptInput,
+): string {
+  return buildChapterWorkupPromptInternal({
+    book: input.book,
+    chapter: input.chapter,
+    bibleVersion: input.bibleVersion,
+    globalRules: input.globalRules,
+    chapterNotes: input.chapterNotes,
+    examples: input.examples,
+  });
+}
+
+/**
+ * Build a source-framed prompt for the future protected runner.
+ *
+ * This pure formatter does not authorize generation. The runner must first
+ * prove that this exact source bundle and final request are manifest-bound.
+ */
+export function buildProtectedChapterWorkupPrompt(
+  input: ProtectedChapterWorkupPromptInput,
+): string {
+  return buildChapterWorkupPromptInternal(input);
 }

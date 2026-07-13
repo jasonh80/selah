@@ -6,7 +6,7 @@
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "24"
 
 # Never cache the HTML document (browser or Netlify edge), so deploys show
 # immediately. Hashed assets under /_next/* keep their own long cache.

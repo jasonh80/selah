@@ -11,8 +11,19 @@ import { z } from "zod";
  * lib/personalization/types.ts.
  */
 
+export const GeneratedImageKindSchema = z
+  .string()
+  .min(3)
+  .max(48)
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Image kind must be a lowercase kebab-case ID",
+  );
+
 export const GeneratedImageSchema = z.object({
-  type: z.enum(["establishing", "detail", "human"]),
+  // `type` is the stored image-kind ID. The field name stays unchanged so
+  // legacy establishing/detail/human workups remain readable.
+  type: GeneratedImageKindSchema,
   title: z.string(),
   description: z.string(),
   prompt: z.string(),
@@ -22,6 +33,27 @@ export const GeneratedImageSchema = z.object({
   status: z.enum(["placeholder", "generating", "complete", "failed"]),
 });
 export type GeneratedImage = z.infer<typeof GeneratedImageSchema>;
+
+const GeneratedImagesSchema = z
+  .array(GeneratedImageSchema)
+  .refine((images) => images.length === 3 || images.length === 5, {
+    message: "Choose exactly 3 or 5 chapter-specific images",
+  })
+  .superRefine((images, ctx) => {
+    const firstIndexByType = new Map<string, number>();
+    images.forEach((image, index) => {
+      const firstIndex = firstIndexByType.get(image.type);
+      if (firstIndex !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "type"],
+          message: `Image kinds must be unique; ${image.type} also appears at index ${firstIndex}`,
+        });
+      } else {
+        firstIndexByType.set(image.type, index);
+      }
+    });
+  });
 
 const MapSchema = z.object({
   title: z.string(),
@@ -80,12 +112,60 @@ const GoDeeperSchema = z.object({
   growCloser: z.array(GoDeeperItemSchema),
 });
 
-const VerseByVerseSchema = z.object({
-  range: z.string(),
-  title: z.string(),
-  explanation: z.string(),
-  jesusConnection: z.string().optional(),
-  application: z.string().optional(),
+const VerseByVerseSchema = z
+  .object({
+    // New drafts use numeric inclusive bounds so coverage can be verified.
+    // `range` remains optional for legacy fixtures created before this contract.
+    startVerse: z.number().int().positive().optional(),
+    endVerse: z.number().int().positive().optional(),
+    rangeLabel: z.string().optional(),
+    range: z.string().optional(),
+    title: z.string(),
+    explanation: z.string(),
+    jesusConnection: z.string().optional(),
+    application: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasStart = value.startVerse !== undefined;
+    const hasEnd = value.endVerse !== undefined;
+    const hasNumericRange =
+      hasStart && hasEnd;
+    if (hasStart !== hasEnd) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide both startVerse and endVerse, or neither",
+      });
+    }
+    if (!hasNumericRange && !value.range?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide startVerse/endVerse or a legacy range",
+      });
+    }
+    if (
+      value.range?.trim() &&
+      !/^\d+(?:\s*[-–]\s*\d+)?$/.test(value.range.trim())
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["range"],
+        message: "Legacy range must be a verse number or inclusive number range",
+      });
+    }
+    if (
+      hasNumericRange &&
+      (value.startVerse as number) > (value.endVerse as number)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "startVerse must be less than or equal to endVerse",
+      });
+    }
+  });
+
+const WhatPeopleAskSchema = z.object({
+  question: z.string(),
+  answer: z.string(),
 });
 
 // Rich daily-rundown sections: a short card summary + the full expanded content,
@@ -157,7 +237,8 @@ const BiblicalTimelineSchema = z.object({
 });
 
 const BibleTextSchema = z.object({
-  // Placeholder/source metadata only — Selah does not store licensed text yet.
+  // Reader-display metadata only. Generation-source provenance is server-owned
+  // and belongs in the fail-closed manifest, not in model-authored output.
   version: z.string(),
   source: z.string().optional(),
   note: z.string().optional(),
@@ -183,7 +264,8 @@ const CostSchema = z
   })
   .optional();
 
-export const GeneratedChapterWorkupSchema = z.object({
+export const GeneratedChapterWorkupSchema = z
+  .object({
   // identity + record
   book: z.string(),
   chapter: z.number().int().positive(),
@@ -219,10 +301,14 @@ export const GeneratedChapterWorkupSchema = z.object({
   maps: z.object({ modern: MapSchema, historic: MapSchema }),
   keyObjects: z.array(KeyObjectSchema),
   keyPeople: z.array(KeyPersonSchema),
-  generatedImages: z
-    .array(GeneratedImageSchema)
-    .length(3, "Exactly 3 images: establishing, detail, human"),
+  // Optional only so workups created before chapter-selected heroes still
+  // parse. New Mark drafts must provide it through the quality gate.
+  heroKind: GeneratedImageKindSchema.optional(),
+  generatedImages: GeneratedImagesSchema,
   verseByVerse: z.array(VerseByVerseSchema),
+  // Optional only for legacy fixtures. The generation-only quality gate requires
+  // 5-8 complete items before a new draft can become Preview Ready.
+  whatPeopleAsk: z.array(WhatPeopleAskSchema).optional(),
   goDeeper: GoDeeperSchema,
 
   // Rich two-layer content (optional so older fixtures still validate; required
@@ -236,7 +322,19 @@ export const GeneratedChapterWorkupSchema = z.object({
   // metadata placeholders
   bibleText: BibleTextSchema,
   cost: CostSchema,
-});
+  })
+  .superRefine((workup, ctx) => {
+    if (
+      workup.heroKind !== undefined &&
+      !workup.generatedImages.some((image) => image.type === workup.heroKind)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["heroKind"],
+        message: "heroKind must match one generatedImages type",
+      });
+    }
+  });
 
 export type GeneratedChapterWorkup = z.infer<typeof GeneratedChapterWorkupSchema>;
 

@@ -3,7 +3,18 @@
 // scraping as the source of prompt learning. All reads fail SOFT (return empty)
 // so generation never breaks if the tables aren't there yet.
 import { getSupabaseAdmin } from "./supabase";
-import { SEED_RULES, LIBRARY_VERSION, MAX_CONTEXTUAL } from "./selah-brain-library";
+import {
+  SEED_RULES,
+  LIBRARY_CONTENT_DIGEST,
+  LIBRARY_SEED_APPROVAL,
+  LIBRARY_STATUS,
+  LIBRARY_VERSION,
+  libraryContentDigestMatchesSnapshot,
+  MAX_CONTEXTUAL,
+  MAX_CONTEXTUAL_BY_STAGE,
+  type SeedApproval,
+  type SeedRule,
+} from "./selah-brain-library";
 
 export type RuleCategory =
   | "voice"
@@ -140,7 +151,10 @@ export function genreForSlug(slug: string): string | null {
 // Per-genre selection profile: companion GLOBAL rules to surface first, plus the
 // categories to favor when filling remaining contextual slots.
 const GENRE_PROFILE: Record<string, { companions: string[]; categories: string[] }> = {
-  "gospel narrative": { companions: ["SB-013", "SB-015", "SB-019", "SB-036", "SB-040", "SB-050", "SB-054"], categories: ["exegesis", "theology", "history"] },
+  "gospel narrative": {
+    companions: ["SB-013", "SB-015", "SB-019", "SB-032", "SB-036", "SB-039", "SB-040", "SB-050", "SB-054"],
+    categories: ["exegesis", "theology", "history"],
+  },
   "poetry/psalm": { companions: ["SB-007", "SB-040", "SB-019"], categories: ["voice", "theology", "exegesis"] },
   "law": { companions: ["SB-039", "SB-053", "SB-043"], categories: ["exegesis", "history"] },
   "covenant/ritual": { companions: ["SB-038", "SB-055", "SB-058"], categories: ["reverence", "history", "exegesis"] },
@@ -152,7 +166,56 @@ const GENRE_PROFILE: Record<string, { companions: string[]; categories: string[]
   "craftsmanship/vocation": { companions: ["SB-130", "SB-131", "SB-132", "SB-133", "SB-134", "SB-136", "SB-137"], categories: ["vocation", "visuals", "reverence"] },
 };
 
-interface RuleRow {
+// Image authorship needs a different retrieval order than copy authorship.
+// These are ordered deliberately: evidence and pastoral safeguards first, then
+// scene choice, realism, continuity, count, and people-first composition. Rules
+// such as generic image labels and filler remain available below the cap, while
+// chapter-specific craft rules surface through their genre profile.
+const STAGE_PROFILE: Record<
+  string,
+  { companions: string[]; categories: string[] }
+> = {
+  image_prompt: {
+    companions: [
+      "SB-208",
+      "SB-032",
+      "SB-036",
+      "SB-039",
+      "SB-070",
+      "SB-072",
+      "SB-073",
+      "SB-074",
+      "SB-075",
+      "SB-076",
+      "SB-077",
+      "SB-078",
+      "SB-206",
+      "SB-207",
+    ],
+    categories: ["visuals", "exegesis", "history"],
+  },
+  image_review: {
+    companions: [
+      "SB-208",
+      "SB-032",
+      "SB-036",
+      "SB-039",
+      "SB-070",
+      "SB-072",
+      "SB-073",
+      "SB-074",
+      "SB-075",
+      "SB-076",
+      "SB-077",
+      "SB-078",
+      "SB-206",
+      "SB-207",
+    ],
+    categories: ["visuals", "exegesis", "history"],
+  },
+};
+
+export interface RuleRow {
   rule_id: string | null;
   title: string;
   rule_text: string;
@@ -173,39 +236,87 @@ export interface RuleSelection {
   genre: string | null;
   coreIds: string[];
   contextualIds: string[];
+  qaIds: string[];
   texts: string[];
-  counts: { core: number; contextual: number; excludedQa: number; excludedGovernance: number; activeTotal: number };
+  counts: {
+    core: number;
+    contextual: number;
+    qa: number;
+    excludedQa: number;
+    excludedGovernance: number;
+    activeTotal: number;
+  };
 }
 
-// Selective retrieval: core rules always; contextual chosen by genre/category and
-// capped; QA/governance excluded by stage. This is what feeds chapter generation.
-export async function selectRulesForGeneration(
+function emptyRuleSelection(slug: string): RuleSelection {
+  return {
+    genre: genreForSlug(slug),
+    coreIds: [],
+    contextualIds: [],
+    qaIds: [],
+    texts: [],
+    counts: {
+      core: 0,
+      contextual: 0,
+      qa: 0,
+      excludedQa: 0,
+      excludedGovernance: 0,
+      activeTotal: 0,
+    },
+  };
+}
+
+// Pure selection engine shared by production and offline verification. The
+// caller supplies active, non-archived rows; this function applies the exact
+// stage, core/contextual, genre, priority, score, ordering, and cap behavior.
+export function selectRulesFromRows(
+  rows: RuleRow[],
   slug: string,
   stage = "copy_generation",
-): Promise<RuleSelection> {
-  const empty: RuleSelection = { genre: null, coreIds: [], contextualIds: [], texts: [], counts: { core: 0, contextual: 0, excludedQa: 0, excludedGovernance: 0, activeTotal: 0 } };
-  const db = getSupabaseAdmin();
-  if (!db) return empty;
-  const { data, error } = await db
-    .from("selah_brain_rules")
-    .select("rule_id,title,rule_text,category,scope,genre,priority,stages")
-    .eq("active", true)
-    .eq("archived", false);
-  if (error || !data) return empty;
-  const rows = data as RuleRow[];
+  maxContextual?: number,
+): RuleSelection {
   const genre = genreForSlug(slug);
   const profile = (genre && GENRE_PROFILE[genre]) || { companions: [], categories: [] };
+  const stageProfile = STAGE_PROFILE[stage];
+  const contextualLimit =
+    maxContextual ?? MAX_CONTEXTUAL_BY_STAGE[stage] ?? MAX_CONTEXTUAL;
+  const isReviewStage = stage === "copy_review" || stage === "image_review";
 
-  const excludedQa = rows.filter((r) => r.priority === "qa").length;
   const excludedGovernance = rows.filter((r) => r.priority === "governance").length;
+  const qaEligible = rows
+    .filter(
+      (r) =>
+        r.priority === "qa" &&
+        stageEligible(r.stages, stage) &&
+        (r.scope !== "genre" || r.genre === genre),
+    )
+    .sort((a, b) =>
+      (a.rule_id || a.title).localeCompare(b.rule_id || b.title),
+    );
+  const qa = isReviewStage ? qaEligible : [];
+  const excludedQa = rows.filter((r) => r.priority === "qa").length - qa.length;
 
-  const eligible = rows.filter((r) => stageEligible(r.stages, stage) && r.priority !== "governance" && r.priority !== "qa");
-  const core = eligible.filter((r) => r.priority === "core");
+  const eligible = rows.filter(
+    (r) =>
+      stageEligible(r.stages, stage) &&
+      r.priority !== "governance" &&
+      r.priority !== "qa",
+  );
+  const core = eligible
+    .filter((r) => r.priority === "core")
+    .sort((a, b) =>
+      (a.rule_id || a.title).localeCompare(b.rule_id || b.title),
+    );
 
   function score(r: RuleRow): number {
-    if (r.scope === "genre") return r.genre === genre ? 100 : -1;
+    if (r.scope === "genre" && r.genre !== genre) return -1;
+    if (r.rule_id && stageProfile?.companions.includes(r.rule_id)) {
+      return 200 - stageProfile.companions.indexOf(r.rule_id);
+    }
+    if (r.scope === "genre") return 100;
     if (r.rule_id && profile.companions.includes(r.rule_id)) return 90;
     if (!r.rule_id) return 70; // user/review-created learning
+    if (stageProfile?.categories.includes(r.category)) return 65;
     if (profile.categories.includes(r.category)) return 60;
     return 20;
   }
@@ -214,21 +325,191 @@ export async function selectRulesForGeneration(
     .filter((r) => r.priority === "contextual")
     .map((r) => ({ r, s: score(r) }))
     .filter((x) => x.s >= 0)
-    .sort((a, b) => b.s - a.s || (a.r.rule_id || "zzz").localeCompare(b.r.rule_id || "zzz"))
-    .slice(0, MAX_CONTEXTUAL)
+    .sort(
+      (a, b) =>
+        b.s - a.s ||
+        (a.r.rule_id || "zzz").localeCompare(b.r.rule_id || "zzz"),
+    )
+    .slice(0, contextualLimit)
     .map((x) => x.r);
 
-  const ordered = [...core, ...contextual];
+  const ordered = [...core, ...contextual, ...qa];
   return {
     genre,
     coreIds: core.map((r) => r.rule_id || r.title),
-    contextualIds: contextual.map((r) => r.rule_id || `(review) ${r.title}`),
-    texts: [...new Set(ordered.map((r) => String(r.rule_text || "").trim()).filter(Boolean))],
-    counts: { core: core.length, contextual: contextual.length, excludedQa, excludedGovernance, activeTotal: rows.length },
+    contextualIds: contextual.map(
+      (r) => r.rule_id || `(review) ${r.title}`,
+    ),
+    qaIds: qa.map((r) => r.rule_id || `(review) ${r.title}`),
+    texts: [
+      ...new Set(
+        ordered
+          .map((r) => String(r.rule_text || "").trim())
+          .filter(Boolean),
+      ),
+    ],
+    counts: {
+      core: core.length,
+      contextual: contextual.length,
+      qa: qa.length,
+      excludedQa,
+      excludedGovernance,
+      activeTotal: rows.length,
+    },
   };
 }
 
+// Selective retrieval: core rules always; contextual chosen by genre/category
+// and stage; review stages append their QA gates; governance never enters copy.
+export async function selectRulesForGeneration(
+  slug: string,
+  stage = "copy_generation",
+): Promise<RuleSelection> {
+  const empty = emptyRuleSelection(slug);
+  const db = getSupabaseAdmin();
+  if (!db) return empty;
+  const { data, error } = await db
+    .from("selah_brain_rules")
+    .select("rule_id,title,rule_text,category,scope,genre,priority,stages")
+    .eq("active", true)
+    .eq("archived", false);
+  if (error || !data) return empty;
+  return selectRulesFromRows(data as RuleRow[], slug, stage);
+}
+
 // ---- idempotent seed from the version-controlled library --------------------
+export interface ExistingLibraryRuleRow {
+  rule_id: string;
+  title: string;
+  rule_text: string;
+  category: string;
+  scope: string;
+  genre: string | null;
+  priority: string;
+  stages: string[] | null;
+  source_titles: string[] | null;
+  version: string | null;
+  active?: boolean;
+  archived?: boolean;
+}
+
+export interface LibrarySeedUpdate {
+  ruleId: string;
+  values: Record<string, unknown>;
+  previousText?: string;
+  previousVersion?: string;
+}
+
+export interface LibrarySeedPlan {
+  inserts: Record<string, unknown>[];
+  updates: LibrarySeedUpdate[];
+  unchanged: number;
+  unexpectedRuleIds: string[];
+}
+
+export function librarySeedApproved(
+  status = LIBRARY_STATUS,
+  approval: SeedApproval | null = LIBRARY_SEED_APPROVAL,
+  libraryVersion = LIBRARY_VERSION,
+  contentDigest = LIBRARY_CONTENT_DIGEST,
+): boolean {
+  return (
+    status === "approved_for_seed" &&
+    typeof approval?.approved_by === "string" &&
+    Boolean(approval.approved_by.trim()) &&
+    typeof approval.evidence === "string" &&
+    Boolean(approval.evidence.trim()) &&
+    typeof approval.approved_at === "string" &&
+    !Number.isNaN(Date.parse(approval.approved_at)) &&
+    approval.library_version === libraryVersion &&
+    approval.content_digest === contentDigest
+  );
+}
+
+function canonicalSeedValues(rule: SeedRule): Record<string, unknown> {
+  return {
+    title: rule.title,
+    rule_text: rule.text,
+    category: rule.category,
+    scope: rule.scope,
+    genre: rule.genre ?? null,
+    priority: rule.priority,
+    stages: [...(rule.stages ?? [])],
+    source_titles: [...(rule.sources ?? [])],
+    version: LIBRARY_VERSION,
+  };
+}
+
+function sameSeedValue(current: unknown, expected: unknown): boolean {
+  if (Array.isArray(expected)) {
+    return (
+      Array.isArray(current) &&
+      current.length === expected.length &&
+      current.every((value, index) => value === expected[index])
+    );
+  }
+  return current === expected;
+}
+
+// Pure reconciliation plan used by production and offline verification. Existing
+// owner activation/archive choices are intentionally absent from update values.
+export function planLibrarySeed(
+  existingRows: ExistingLibraryRuleRow[],
+  updatedAt = new Date().toISOString(),
+  options: { requireExactVersion?: boolean } = {},
+): LibrarySeedPlan {
+  const existingById = new Map(
+    existingRows.map((row) => [row.rule_id, row]),
+  );
+  const libraryIds = new Set(SEED_RULES.map((rule) => rule.id));
+  const unexpectedRuleIds = existingRows
+    .map((row) => row.rule_id)
+    .filter((ruleId) => !libraryIds.has(ruleId))
+    .sort();
+  const inserts: Record<string, unknown>[] = [];
+  const updates: LibrarySeedUpdate[] = [];
+  let unchanged = 0;
+
+  for (const rule of SEED_RULES) {
+    const current = existingById.get(rule.id);
+    const canonical = canonicalSeedValues(rule);
+    if (!current) {
+      inserts.push({
+        rule_id: rule.id,
+        ...canonical,
+        active: rule.active !== false,
+        archived: false,
+        updated_at: updatedAt,
+      });
+      continue;
+    }
+
+    const currentValues = current as unknown as Record<string, unknown>;
+    const changed = Object.entries(canonical).some(
+      ([key, expected]) =>
+        (key !== "version" || options.requireExactVersion === true) &&
+        !sameSeedValue(currentValues[key], expected),
+    );
+    if (!changed) {
+      unchanged++;
+      continue;
+    }
+
+    updates.push({
+      ruleId: rule.id,
+      values: { ...canonical, updated_at: updatedAt },
+      ...(current.rule_text !== rule.text
+        ? {
+            previousText: current.rule_text,
+            previousVersion: current.version ?? "pre-update",
+          }
+        : {}),
+    });
+  }
+
+  return { inserts, updates, unchanged, unexpectedRuleIds };
+}
+
 export async function seedFromLibrary(): Promise<{
   inserted: number;
   updated: number;
@@ -236,48 +517,96 @@ export async function seedFromLibrary(): Promise<{
   total: number;
   error?: string;
 }> {
+  if (!libraryContentDigestMatchesSnapshot()) {
+    return {
+      inserted: 0,
+      updated: 0,
+      unchanged: 0,
+      total: SEED_RULES.length,
+      error: `library ${LIBRARY_VERSION} no longer matches its approval digest`,
+    };
+  }
+  if (!librarySeedApproved()) {
+    return {
+      inserted: 0,
+      updated: 0,
+      unchanged: 0,
+      total: SEED_RULES.length,
+      error: `library ${LIBRARY_VERSION} is ${LIBRARY_STATUS}; owner-approved seed artifact required`,
+    };
+  }
   const db = getSupabaseAdmin();
   if (!db) return { inserted: 0, updated: 0, unchanged: 0, total: 0, error: "no db" };
-  const existing = await db.from("selah_brain_rules").select("rule_id,rule_text").not("rule_id", "is", null);
-  if (existing.error) return { inserted: 0, updated: 0, unchanged: 0, total: 0, error: existing.error.message };
-  const seen = new Map<string, string>();
-  for (const row of existing.data as { rule_id: string; rule_text: string }[]) seen.set(row.rule_id, row.rule_text);
-
-  const toInsert: Record<string, unknown>[] = [];
-  let updated = 0;
-  let unchanged = 0;
-  for (const r of SEED_RULES) {
-    const row = {
-      rule_id: r.id,
-      title: r.title,
-      rule_text: r.text,
-      category: r.category,
-      scope: r.scope,
-      genre: r.genre ?? null,
-      priority: r.priority,
-      stages: r.stages ?? [],
-      source_titles: r.sources ?? [],
-      active: r.active !== false,
-      archived: false,
-      version: LIBRARY_VERSION,
-      updated_at: new Date().toISOString(),
+  const existing = await db
+    .from("selah_brain_rules")
+    .select("rule_id,title,rule_text,category,scope,genre,priority,stages,source_titles,version")
+    .not("rule_id", "is", null);
+  if (existing.error || !existing.data) {
+    return {
+      inserted: 0,
+      updated: 0,
+      unchanged: 0,
+      total: 0,
+      error: existing.error?.message ?? "rules query returned no data",
     };
-    if (!seen.has(r.id)) {
-      toInsert.push(row);
-    } else if (seen.get(r.id) !== r.text) {
-      // Preserve the prior wording, then update.
-      await db.from("selah_brain_rule_history").insert({ rule_id: r.id, rule_text: seen.get(r.id), version: "pre-update" });
-      await db.from("selah_brain_rules").update(row).eq("rule_id", r.id);
-      updated++;
-    } else {
-      unchanged++;
+  }
+  const plan = planLibrarySeed(
+    existing.data as ExistingLibraryRuleRow[],
+    new Date().toISOString(),
+    { requireExactVersion: true },
+  );
+  if (plan.unexpectedRuleIds.length) {
+    return {
+      inserted: 0,
+      updated: 0,
+      unchanged: plan.unchanged,
+      total: SEED_RULES.length,
+      error: `unexpected canonical rules require an explicit retirement review: ${plan.unexpectedRuleIds.join(", ")}`,
+    };
+  }
+  let updated = 0;
+  for (const updatePlan of plan.updates) {
+    if (updatePlan.previousText !== undefined) {
+      const history = await db.from("selah_brain_rule_history").insert({
+        rule_id: updatePlan.ruleId,
+        rule_text: updatePlan.previousText,
+        version: updatePlan.previousVersion ?? "pre-update",
+      });
+      if (history.error) {
+        return {
+          inserted: 0,
+          updated,
+          unchanged: plan.unchanged,
+          total: SEED_RULES.length,
+          error: `history failed for ${updatePlan.ruleId}: ${history.error.message}`,
+        };
+      }
     }
+    const update = await db
+      .from("selah_brain_rules")
+      .update(updatePlan.values)
+      .eq("rule_id", updatePlan.ruleId);
+    if (update.error) {
+      return {
+        inserted: 0,
+        updated,
+        unchanged: plan.unchanged,
+        total: SEED_RULES.length,
+        error: `update failed for ${updatePlan.ruleId}: ${update.error.message}`,
+      };
+    }
+    updated++;
   }
-  if (toInsert.length) {
-    const ins = await db.from("selah_brain_rules").insert(toInsert);
-    if (ins.error) return { inserted: 0, updated, unchanged, total: SEED_RULES.length, error: ins.error.message };
+  if (plan.inserts.length) {
+    const ins = await db.from("selah_brain_rules").insert(plan.inserts);
+    if (ins.error) return { inserted: 0, updated, unchanged: plan.unchanged, total: SEED_RULES.length, error: ins.error.message };
   }
-  return { inserted: toInsert.length, updated, unchanged, total: SEED_RULES.length };
+  return {
+    inserted: plan.inserts.length,
+    updated,
+    unchanged: plan.unchanged,
+    total: SEED_RULES.length,
+  };
 }
 
 // Chapter-only notes → re-applied when THAT chapter regenerates. ('both'/global
