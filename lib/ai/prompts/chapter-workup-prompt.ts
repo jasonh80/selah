@@ -314,6 +314,16 @@ IMAGE PLAN
 - Set heroKind to the exact type of the most interesting or impactful moment in
   the chapter. Choose it for meaning and reader impact—not because it is the
   first image or a conventional establishing shot.
+- Make every image prompt self-contained: photorealistic historical-documentary
+  realism, natural light, believable first-century people, worn materials,
+  lived-in spaces, and accurate terrain, objects, clothing, and scale.
+- Put the guardrails inside every image prompt: no halos or glow used as
+  shorthand, no pristine costumes, theatrical posing, modern objects, text or
+  lettering, theme-park sets, or generic European fantasy Bible art. Preserve
+  supernatural details only when this chapter itself describes them.
+- When a named person appears in more than one image, repeat consistent age,
+  appearance, clothing, and physical-condition details. Follow any supplied
+  approved cast profile exactly; never invent one when none is supplied.
 
 RULES
 - "primaryCharacters" is an array of strings; "keyObjects", "keyPeople", "sections", "chapterSpecificTopics" are arrays of OBJECTS.
