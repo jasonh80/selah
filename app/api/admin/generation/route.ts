@@ -3,7 +3,6 @@ import {
   getGenerationSettings,
   updateGenerationSettings,
   logGenerationAudit,
-  type GenerationSettings,
 } from "@/lib/server/generation-settings";
 import {
   generationAllowed,
@@ -170,8 +169,33 @@ export async function POST(req: Request) {
 
   // ---- save settings ----
   if (action === "save") {
-    const updated = await updateGenerationSettings((body.settings ?? {}) as Partial<GenerationSettings>);
-    await logGenerationAudit({ action: "update_settings", status: updated ? "succeeded" : "failed" });
+    const requested = body.settings;
+    if (!requested || typeof requested !== "object" || Array.isArray(requested)) {
+      return NextResponse.json({ ok: false, error: "invalid settings" }, { status: 400 });
+    }
+    const values = requested as Record<string, unknown>;
+    if (
+      typeof values.text_generation_enabled !== "boolean" ||
+      typeof values.image_generation_enabled !== "boolean" ||
+      typeof values.require_confirm !== "boolean"
+    ) {
+      return NextResponse.json({ ok: false, error: "invalid settings" }, { status: 400 });
+    }
+    // Studio owns only the visible safety switches. Preserve the server-managed
+    // chapter allowlist, model choices, and budget even if a stale/older client
+    // includes them in its request.
+    const updated = await updateGenerationSettings({
+      text_generation_enabled: values.text_generation_enabled,
+      image_generation_enabled: values.image_generation_enabled,
+      require_confirm: values.require_confirm,
+    });
+    try {
+      await logGenerationAudit({ action: "update_settings", status: updated ? "succeeded" : "failed" });
+    } catch {
+      // The settings write is authoritative. An audit outage must not make
+      // Studio claim that a switch stayed unchanged after it actually saved.
+      console.error(`[selah] settings audit failed after ${updated ? "save" : "failed save"}`);
+    }
     return NextResponse.json({ ok: Boolean(updated), settings: updated });
   }
 

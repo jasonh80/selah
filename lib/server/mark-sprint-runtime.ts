@@ -192,6 +192,7 @@ export interface PrepareMarkSprintRuntimePreviewInput {
   apiKey: string;
   ports: MarkSprintRuntimeReadPorts;
   fetchImpl?: FetchLike;
+  signal?: AbortSignal;
   approvedManifestDigest?: string | null;
 }
 
@@ -695,6 +696,7 @@ export async function prepareMarkSprintRuntime(
       slug,
       apiKey: input.apiKey,
       fetchImpl: input.fetchImpl,
+      signal: input.signal,
     });
   } catch {
     return runtimePreparationResult(

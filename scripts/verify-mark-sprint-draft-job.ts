@@ -195,9 +195,16 @@ async function main(): Promise<void> {
     | "model"
     | "schema"
     | "overlap"
-    | "quality";
+    | "quality"
+    | "slow_source"
+    | "slow_model"
+    | "late_model";
 
-  function harness(mode: Mode, claimDigest = manifestDigest) {
+  function harness(
+    mode: Mode,
+    claimDigest = manifestDigest,
+    runDeadlineMs = 60_000,
+  ) {
     const events: string[] = [];
     const store = new FakeJobStore(events);
     store.seed(claimDigest);
@@ -205,8 +212,11 @@ async function main(): Promise<void> {
     const audits: Array<Record<string, unknown>> = [];
     const snapshots: Array<{ slug: string; label: string; workup: unknown }> = [];
     let modelCalls = 0;
+    let modelSignalAborted = false;
+    let sourceSignalAborted = false;
     const ports: ProtectedMarkDraftJobPorts = {
       store,
+      runDeadlineMs,
       requireEsvApiKey() {
         events.push("key");
         return PRIVATE_ESV_KEY;
@@ -219,7 +229,7 @@ async function main(): Promise<void> {
           async readVoiceExampleRows() { return []; },
         };
       },
-      async prepareRuntime() {
+      async prepareRuntime(runtimeInput) {
         events.push("source");
         assert.equal(
           store.rows.get(SLUG)?.workupJson[TEXT_JOB_STATE_KEY],
@@ -246,6 +256,14 @@ async function main(): Promise<void> {
             prepared: null,
           } satisfies MarkSprintRuntimePreparationResult;
         }
+        if (mode === "slow_source") {
+          runtimeInput.signal?.addEventListener(
+            "abort",
+            () => { sourceSignalAborted = true; },
+            { once: true },
+          );
+          await new Promise<void>((resolve) => setTimeout(resolve, 60));
+        }
         return {
           preview: {
             slug: SLUG,
@@ -264,13 +282,26 @@ async function main(): Promise<void> {
         assert.equal(_prepared, prepared);
         return use(preparation);
       },
-      createModelExecutor() {
+      createModelExecutor(signal) {
         return {
           async executeExactRequest(request) {
             events.push("model");
             modelCalls++;
             assert.equal(request, modelRequest, "exact model request identity changed");
             if (mode === "model") throw new Error("PRIVATE PROVIDER ERROR");
+            if (mode === "slow_model") {
+              await new Promise<never>((_resolve, reject) => {
+                const onAbort = () => {
+                  modelSignalAborted = true;
+                  reject(new Error("offline deadline abort"));
+                };
+                if (signal.aborted) return onAbort();
+                signal.addEventListener("abort", onAbort, { once: true });
+              });
+            }
+            if (mode === "late_model") {
+              await new Promise<void>((resolve) => setTimeout(resolve, 60));
+            }
             if (mode === "schema") {
               return {
                 rawDraftJson: '{"slug":"mark-8","private":"PRIVATE RAW"}',
@@ -313,6 +344,8 @@ async function main(): Promise<void> {
       audits,
       snapshots,
       modelCalls: () => modelCalls,
+      modelSignalAborted: () => modelSignalAborted,
+      sourceSignalAborted: () => sourceSignalAborted,
     };
   }
 
@@ -435,6 +468,81 @@ async function main(): Promise<void> {
     );
   }
 
+  // One absolute run deadline covers source preparation before any model
+  // spend. A late source result is ignored after exact job cleanup.
+  {
+    const h = harness("slow_source", manifestDigest, 15);
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RUN_DEADLINE_EXCEEDED");
+    assert.equal(result.status, "failed");
+    assert.equal(h.modelCalls(), 0);
+    assert.equal(h.sourceSignalAborted(), true);
+    assert.equal(h.costs.length, 0);
+    assert.equal(h.snapshots.length, 0);
+    assert.equal(h.store.rows.get(SLUG)?.status, "failed");
+    assert.ok(JSON.stringify(h.audits).includes("RUN_DEADLINE_EXCEEDED"));
+    await new Promise<void>((resolve) => setTimeout(resolve, 80));
+    assert.equal(h.modelCalls(), 0, "late source preparation reached the model");
+    assert.equal(h.store.rows.get(SLUG)?.status, "failed");
+    assert.equal(h.snapshots.length, 0);
+  }
+
+  // An in-flight model receives the overall abort. Possible spend is recorded
+  // without inventing token usage, then the exact job is terminally failed.
+  {
+    const h = harness("slow_model", manifestDigest, 15);
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RUN_DEADLINE_EXCEEDED");
+    assert.equal(result.status, "failed");
+    assert.equal(h.modelCalls(), 1);
+    assert.equal(h.modelSignalAborted(), true);
+    assert.equal(h.store.rows.get(SLUG)?.status, "failed");
+    assert.equal(h.snapshots.length, 0);
+    assert.equal(h.costs.length, 1);
+    assert.equal(h.costs[0].metadata?.usageKnown, false);
+    assert.equal(h.costs[0].metadata?.deadlineExceeded, true);
+    assert.equal(h.costs[0].metadata?.billingUncertain, true);
+    assert.equal(h.costs[0].inputTokens, undefined);
+    assert.equal(h.costs[0].outputTokens, undefined);
+  }
+
+  // Even a non-cooperative model that ignores abort and resolves later cannot
+  // save a draft, create a snapshot, or write a second cost after cleanup.
+  {
+    const h = harness("late_model", manifestDigest, 15);
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RUN_DEADLINE_EXCEEDED");
+    assert.equal(result.status, "failed");
+    assert.equal(h.modelCalls(), 1);
+    assert.equal(h.costs.length, 1);
+    assert.equal(h.snapshots.length, 0);
+    await new Promise<void>((resolve) => setTimeout(resolve, 80));
+    assert.equal(h.store.rows.get(SLUG)?.status, "failed");
+    assert.equal(h.costs.length, 1);
+    assert.equal(h.snapshots.length, 0);
+  }
+
+  // Deadline cleanup reports conditional-write conflicts and storage failures
+  // truthfully; it never claims a failed row write succeeded.
+  for (const [cleanupFailure, expectedStatus] of [
+    ["conflict", "conflict"],
+    ["write_failed", "write_failed"],
+  ] as const) {
+    const h = harness("slow_source", manifestDigest, 15);
+    h.store.cleanupFailure = cleanupFailure;
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RUN_DEADLINE_EXCEEDED");
+    assert.equal(result.status, expectedStatus);
+    assert.equal(h.modelCalls(), 0);
+    assert.equal(h.costs.length, 0);
+    assert.equal(h.snapshots.length, 0);
+    assert.equal(h.store.rows.get(SLUG)?.status, "generating");
+  }
+
   // Happy path: one exact model call, private draft, exact digest, then snapshot.
   {
     const h = harness("happy");
@@ -535,11 +643,50 @@ async function main(): Promise<void> {
       0,
       "one protected executor call must make one provider request",
     );
+    assert.equal(
+      (receivedOptions as { timeout?: number }).timeout,
+      600_000,
+      "protected Mark 8 request overrides the shared four-minute timeout",
+    );
     assert.deepEqual(execution, {
       rawDraftJson: "{}",
       inputTokens: 7,
       outputTokens: 9,
     });
+  }
+
+  // The overall run signal reaches the exact OpenAI request without changing
+  // its identity or enabling transport retries.
+  {
+    const parent = new AbortController();
+    let received: unknown;
+    let receivedSignal: AbortSignal | null = null;
+    let receivedMaxRetries: number | null = null;
+    const executor = createExactOpenAiMarkSprintExecutor(
+      {
+        chat: {
+          completions: {
+            async create(request, options) {
+              received = request;
+              receivedSignal = options.signal;
+              receivedMaxRetries = options.maxRetries;
+              return await new Promise((_resolve, reject) => {
+                const onAbort = () => reject(new Error("offline parent abort"));
+                if (options.signal.aborted) return onAbort();
+                options.signal.addEventListener("abort", onAbort, { once: true });
+              });
+            },
+          },
+        },
+      },
+      parent.signal,
+    );
+    const pending = executor.executeExactRequest(modelRequest);
+    parent.abort();
+    await assert.rejects(pending);
+    assert.equal(received, modelRequest);
+    assert.equal(receivedMaxRetries, 0);
+    assert.equal(receivedSignal?.aborted, true);
   }
 
 

@@ -780,22 +780,57 @@ export default function SelahStudioPage() {
 
   async function saveSettings() {
     if (!settings) return;
+    const requestedSettings = {
+      text_generation_enabled: settings.text_generation_enabled,
+      image_generation_enabled: settings.image_generation_enabled,
+      require_confirm: settings.require_confirm,
+    };
     setBusy(true);
     setSettingsMsg("");
+    const confirmAfterUncertainSave = async () => {
+      try {
+        const check = await api("GET");
+        if (!check.ok) throw new Error("settings check failed");
+        const live = check.settings as GenSettings;
+        confirmedSettings.current = live;
+        setSettings(live);
+        const saved =
+          live.text_generation_enabled === requestedSettings.text_generation_enabled &&
+          live.image_generation_enabled === requestedSettings.image_generation_enabled &&
+          live.require_confirm === requestedSettings.require_confirm;
+        setSettingsMsg(
+          saved
+            ? "Saved"
+            : "Studio reconnected, but those switches were not saved. Review them and try again.",
+        );
+      } catch {
+        // The request may have reached the server even though its response was
+        // lost. Keep every spending action blocked until a later save confirms
+        // the live switches instead of guessing which state won.
+        confirmedSettings.current = null;
+        setSettingsMsg(
+          "Studio could not confirm those switches. Check your connection and save again before creating anything.",
+        );
+      }
+    };
     try {
-      const j = await api("POST", { action: "save", settings });
+      // Only send the three switches this screen actually owns. Chapter
+      // access and model choices may have changed server-side since sign-in;
+      // sending the full, stale object could silently undo those changes.
+      const j = await api("POST", {
+        action: "save",
+        settings: requestedSettings,
+      });
       if (j.ok) {
         const next = j.settings as GenSettings;
         confirmedSettings.current = next;
         setSettings(next);
         setSettingsMsg("Saved");
       } else {
-        setSettings(confirmedSettings.current);
-        setSettingsMsg("Studio could not save those switches. Nothing changed—try again.");
+        await confirmAfterUncertainSave();
       }
     } catch {
-      setSettings(confirmedSettings.current);
-      setSettingsMsg("Studio could not save those switches. Nothing changed—check your connection and try again.");
+      await confirmAfterUncertainSave();
     } finally {
       setBusy(false);
     }

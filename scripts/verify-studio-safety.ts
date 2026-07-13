@@ -852,6 +852,11 @@ const integration = async () => {
       quality?.textCredit === "used" && quality.failureMessage?.includes("quality bar"),
       "I4c quality failure reports used text credit and a useful next step",
     );
+    const deadline = safeProtectedMarkFailure("protected_mark_draft:RUN_DEADLINE_EXCEEDED");
+    ok(
+      deadline?.textCredit === "possible" && deadline.failureMessage?.includes("safe time limit"),
+      "I4c deadline failure warns that text credit may have been used",
+    );
     ok(
       safeProtectedMarkFailure("private database error") === null &&
         safeProtectedMarkFailure("protected_mark_draft:UNKNOWN_PRIVATE_CODE") === null,
@@ -1063,6 +1068,64 @@ const realRouteAndWorkers = async () => {
       const res = await adminPost(adminReq({ action: "generate", slug: GENERIC_SLUG }, "wrong-token"));
       ok(res.status === 401, "R1 bad admin token → 401");
       ok(store.rows.size === 0 && lastTrigger === null, "R1 unauthorized request claimed/triggered nothing");
+    }
+
+    // R1b. A browser that signed in before Mark 8 was automatically allowed
+    // may still hold a stale full settings object. Saving the visible image
+    // switch must not erase that server-managed chapter access or model setup.
+    {
+      __setGenerationTestOverrides({
+        settings: {
+          ...TEST_SETTINGS,
+          image_generation_enabled: false,
+          allowed_slugs: [GENERIC_SLUG, "mark-8"],
+        },
+        captureAudit: audit,
+      });
+      const res = await adminPost(adminReq({
+        action: "save",
+        settings: {
+          ...TEST_SETTINGS,
+          image_generation_enabled: true,
+          allowed_slugs: [GENERIC_SLUG],
+          selected_text_model: "stale-text-model",
+          selected_image_model: "stale-image-model",
+          daily_budget_limit_usd: 999,
+        },
+      }));
+      const saved = await getGenerationSettings();
+      ok(res.status === 200, "R1b visible Studio switches saved");
+      ok(saved.image_generation_enabled, "R1b image switch changed to ON");
+      ok(saved.allowed_slugs.includes("mark-8"), "R1b stale save preserved Mark 8 access");
+      ok(
+        saved.selected_text_model === TEST_SETTINGS.selected_text_model &&
+          saved.selected_image_model === TEST_SETTINGS.selected_image_model &&
+          saved.daily_budget_limit_usd === TEST_SETTINGS.daily_budget_limit_usd,
+        "R1b stale save preserved server-managed models and budget",
+      );
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+    }
+
+    // R1c. The switch write is authoritative. A later audit outage cannot make
+    // Studio report failure and roll its screen back after the save succeeded.
+    {
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, image_generation_enabled: false },
+        captureAudit: audit,
+        auditFailure: true,
+      });
+      const res = await adminPost(adminReq({
+        action: "save",
+        settings: {
+          text_generation_enabled: true,
+          image_generation_enabled: true,
+          require_confirm: true,
+        },
+      }));
+      const saved = await getGenerationSettings();
+      ok(res.status === 200, "R1c settings save stays successful through an audit outage");
+      ok(saved.image_generation_enabled, "R1c authoritative switch write remains saved");
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
     // R2. Protected slug through the REAL route: refused + durably audited.

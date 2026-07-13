@@ -4,7 +4,7 @@
 > `studio-workflow.md` for how chapters get made. Keep this file updated at
 > every milestone (publish, system change, model change).
 
-_Last updated: 2026-07-12 (live build still r78; Mark 8–11 preparation is not
+_Last updated: 2026-07-13 (live build still r78; Mark 8–11 preparation is not
 active in production)._
 
 ## What Selah is
@@ -17,8 +17,8 @@ through Scripture.** Tagline: *Pause. Reflect. Elevate.* Principle:
 - Repo: https://github.com/jasonh80/selah (branch `main` auto-deploys via Netlify)
 - Stack: Next.js 14 App Router + Tailwind + TypeScript · Supabase (content, rules,
   settings, storage) · OpenAI (text + images) · ESV API (scripture) · Esri (maps)
-- The owner's Mac now has Node 24 for fast local development. Netlify remains on
-  Node 20, so release validation must still prove production parity.
+- The owner's Mac uses Node 24. This launch branch moves Netlify builds to
+  supported Node 24; production changes only after an owner-approved merge.
 
 ## Live chapters
 

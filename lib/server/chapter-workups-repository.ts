@@ -78,6 +78,10 @@ export function safeProtectedMarkFailure(
     };
   }
   const failures: Record<string, Omit<StudioChapterStatus, "status">> = {
+    RUN_DEADLINE_EXCEEDED: {
+      failureMessage: "Studio reached its safe time limit. The writing AI may have started and some text credit may have been used. Check the chapter before trying again.",
+      textCredit: "possible",
+    },
     MODEL_EXECUTION_FAILED: {
       failureMessage: "The writing AI did not finish. Some text credit may have been used. Check the setup before trying again.",
       textCredit: "possible",

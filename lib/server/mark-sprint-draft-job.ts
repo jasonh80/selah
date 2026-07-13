@@ -50,6 +50,65 @@ if (typeof window !== "undefined") {
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 
+// Netlify gives background functions 15 minutes. Stop source/model work at
+// 12 minutes so cost, audit, and exact terminal-state writes retain a full
+// three-minute cleanup reserve.
+export const MARK_8_TEXT_RUN_DEADLINE_MS = 12 * 60 * 1000;
+export const MARK_8_TEXT_RUN_CLEANUP_RESERVE_MS = 3 * 60 * 1000;
+
+class TextRunDeadlineError extends Error {
+  constructor() {
+    super(
+      "Mark 8 text run reached its 12-minute safety deadline; stopping before the hosting limit",
+    );
+    this.name = "TextRunDeadlineError";
+  }
+}
+
+interface TextRunDeadline {
+  signal: AbortSignal;
+  run<T>(operation: () => Promise<T>): Promise<T>;
+  dispose(): void;
+}
+
+function createTextRunDeadline(durationMs: number): TextRunDeadline {
+  const controller = new AbortController();
+  const safeDurationMs =
+    Number.isFinite(durationMs) && durationMs > 0
+      ? durationMs
+      : MARK_8_TEXT_RUN_DEADLINE_MS;
+  const timer = setTimeout(() => controller.abort(), safeDurationMs);
+
+  return {
+    signal: controller.signal,
+    run<T>(operation: () => Promise<T>): Promise<T> {
+      if (controller.signal.aborted) {
+        return Promise.reject(new TextRunDeadlineError());
+      }
+      return new Promise<T>((resolve, reject) => {
+        let settled = false;
+        const finish = (callback: () => void) => {
+          if (settled) return;
+          settled = true;
+          controller.signal.removeEventListener("abort", onAbort);
+          callback();
+        };
+        const onAbort = () => finish(() => reject(new TextRunDeadlineError()));
+        controller.signal.addEventListener("abort", onAbort, { once: true });
+        Promise.resolve()
+          .then(operation)
+          .then(
+            (value) => finish(() => resolve(value)),
+            (error) => finish(() => reject(error)),
+          );
+      });
+    },
+    dispose(): void {
+      clearTimeout(timer);
+    },
+  };
+}
+
 export type ProtectedMarkDraftJobFailureCode =
   | "INVALID_INPUT"
   | "CLAIM_NOT_CONSUMED"
@@ -58,6 +117,7 @@ export type ProtectedMarkDraftJobFailureCode =
   | "RUNTIME_STORAGE_MISSING"
   | "PREPARATION_FAILED"
   | "PREPARATION_REFUSED"
+  | "RUN_DEADLINE_EXCEEDED"
   | "MANIFEST_DIGEST_MISMATCH"
   | "PREFLIGHT_INVALID"
   | "RUN_AUTHORIZATION_INVALID"
@@ -107,11 +167,12 @@ interface SafeAuditEntry {
 /** Injectable orchestration seams. Production construction is below. */
 export interface ProtectedMarkDraftJobPorts {
   store: JobStorePort;
+  runDeadlineMs: number;
   requireEsvApiKey(): string;
   createRuntimeReadPorts(): MarkSprintRuntimeReadPorts;
   prepareRuntime: RuntimePreparer;
   useApprovedPreparation: ApprovedPreparationConsumer;
-  createModelExecutor(): MarkSprintModelExecutorPort;
+  createModelExecutor(signal: AbortSignal): MarkSprintModelExecutorPort;
   recordCost(input: CostEventInput): Promise<void>;
   audit(entry: SafeAuditEntry): Promise<void>;
   snapshot(slug: string, label: string): Promise<number | null>;
@@ -128,7 +189,7 @@ interface OpenAIExactClient {
     completions: {
       create(
         body: unknown,
-        options: { signal: AbortSignal; maxRetries: 0 },
+        options: { signal: AbortSignal; maxRetries: 0; timeout: 600_000 },
       ): Promise<{
         choices?: Array<{ message?: { content?: string | null } }>;
         usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -140,16 +201,24 @@ interface OpenAIExactClient {
 /** Dispatches the exact frozen v3 request object once; it never clones it. */
 export function createExactOpenAiMarkSprintExecutor(
   client: OpenAIExactClient,
+  runSignal?: AbortSignal,
 ): MarkSprintModelExecutorPort {
   return Object.freeze({
     async executeExactRequest(
       request: GenerationModelRequestV3,
     ): Promise<MarkSprintModelExecutionResult> {
       const controller = new AbortController();
+      const abortFromRun = () => controller.abort();
+      if (runSignal?.aborted) controller.abort();
+      runSignal?.addEventListener("abort", abortFromRun, { once: true });
       const timer = setTimeout(() => controller.abort(), 600_000);
       try {
         const response = await client.chat.completions.create(request, {
           signal: controller.signal,
+          // The shared OpenAI client defaults to four minutes. Mark 8's large,
+          // exact draft request gets the same ten-minute provider envelope as
+          // this executor's abort timer, inside the 12-minute overall limit.
+          timeout: 600_000,
           // The exact protected executor owns retries. One execution means one
           // provider request; a transport retry would risk duplicate spend.
           maxRetries: 0,
@@ -161,6 +230,7 @@ export function createExactOpenAiMarkSprintExecutor(
         };
       } finally {
         clearTimeout(timer);
+        runSignal?.removeEventListener("abort", abortFromRun);
       }
     },
   });
@@ -266,6 +336,7 @@ async function recordModelCost(
   model: string,
   tokenUsage: { inputTokens: number; outputTokens: number } | null,
   outcomeCode: string,
+  extraMetadata: Record<string, boolean> = {},
 ): Promise<number | null> {
   const estimate = tokenUsage
     ? estimateChapterWorkupCost({
@@ -291,6 +362,7 @@ async function recordModelCost(
       outcomeCode,
       usageKnown: tokenUsage !== null,
       protectedMarkDraft: true,
+      ...extraMetadata,
     },
   });
   return estimate;
@@ -359,12 +431,23 @@ export async function runProtectedMarkDraftJob(
     );
   }
 
+  // Match the image worker's safety pattern: never race the atomic claim
+  // consume against a timer. Once this worker owns the running claim, one
+  // absolute deadline covers all source preparation and model/validation work.
+  const deadline = createTextRunDeadline(ports.runDeadlineMs);
+  const stopAndFail = async (
+    code: ProtectedMarkDraftJobFailureCode,
+  ): Promise<ProtectedMarkDraftJobResult> => {
+    deadline.dispose();
+    return failConsumedJob(ports, input, code);
+  };
+
   let apiKey: string;
   let runtimePorts: MarkSprintRuntimeReadPorts;
   try {
     apiKey = ports.requireEsvApiKey();
     if (!apiKey.trim()) {
-      return await failConsumedJob(ports, input, "ESV_KEY_MISSING");
+      return await stopAndFail("ESV_KEY_MISSING");
     }
     runtimePorts = ports.createRuntimeReadPorts();
   } catch (error) {
@@ -372,55 +455,85 @@ export async function runProtectedMarkDraftJob(
       error instanceof Error && error.name === "EsvKeyMissingError"
         ? "ESV_KEY_MISSING"
         : "RUNTIME_STORAGE_MISSING";
-    return await failConsumedJob(ports, input, code);
+    return await stopAndFail(code);
   }
 
   let runtime: MarkSprintRuntimePreparationResult;
   try {
-    runtime = await ports.prepareRuntime({
-      slug: input.slug,
-      apiKey,
-      ports: runtimePorts,
-      approvedManifestDigest: input.approvedManifestDigest,
-      ownerAuthorized: true,
-    });
+    runtime = await deadline.run(() =>
+      ports.prepareRuntime({
+        slug: input.slug,
+        apiKey,
+        ports: runtimePorts,
+        signal: deadline.signal,
+        approvedManifestDigest: input.approvedManifestDigest,
+        ownerAuthorized: true,
+      }),
+    );
   } catch {
-    return await failConsumedJob(ports, input, "PREPARATION_FAILED");
+    return await stopAndFail(
+      deadline.signal.aborted
+        ? "RUN_DEADLINE_EXCEEDED"
+        : "PREPARATION_FAILED",
+    );
+  }
+  if (deadline.signal.aborted) {
+    return await stopAndFail("RUN_DEADLINE_EXCEEDED");
   }
   if (runtime.preview.manifestDigest !== input.approvedManifestDigest) {
-    return await failConsumedJob(ports, input, "MANIFEST_DIGEST_MISMATCH");
+    return await stopAndFail("MANIFEST_DIGEST_MISMATCH");
   }
   if (!runtime.preview.readyForGeneration || !runtime.prepared) {
-    return await failConsumedJob(ports, input, "PREPARATION_REFUSED");
+    return await stopAndFail("PREPARATION_REFUSED");
   }
 
   let preparationModel = "unknown";
   let approvedPreparationOpened = false;
+  let modelRequestStarted = false;
   let result: ProtectedMarkSprintDraftResult;
   try {
-    result = await ports.useApprovedPreparation(
-      runtime.prepared,
-      async (preparation) => {
-        approvedPreparationOpened = true;
-        preparationModel = preparation.modelRequest.model;
-        return runProtectedMarkSprintDraft({
-          sourceBundle: preparation.sourceBundle,
-          modelRequest: preparation.modelRequest,
-          preflight: preparation.preflight,
-          jobId: input.jobId,
-          consumedJobCapability,
-          executor: ports.createModelExecutor(),
-        });
-      },
+    result = await deadline.run(() =>
+      Promise.resolve(
+        ports.useApprovedPreparation(
+          runtime.prepared!,
+          async (preparation) => {
+            approvedPreparationOpened = true;
+            preparationModel = preparation.modelRequest.model;
+            const exactExecutor = ports.createModelExecutor(deadline.signal);
+            const observedExecutor: MarkSprintModelExecutorPort = {
+              async executeExactRequest(request) {
+                modelRequestStarted = true;
+                return exactExecutor.executeExactRequest(request);
+              },
+            };
+            return runProtectedMarkSprintDraft({
+              sourceBundle: preparation.sourceBundle,
+              modelRequest: preparation.modelRequest,
+              preflight: preparation.preflight,
+              jobId: input.jobId,
+              consumedJobCapability,
+              executor: observedExecutor,
+            });
+          },
+        ),
+      ),
     );
   } catch (error) {
+    const deadlineExceeded =
+      deadline.signal.aborted || error instanceof TextRunDeadlineError;
+    deadline.dispose();
     const pipelineError =
       error instanceof MarkSprintDraftPipelineError ? error : null;
-    const code: ProtectedMarkDraftJobFailureCode = pipelineError?.code ??
-      (approvedPreparationOpened
-        ? "MODEL_EXECUTION_FAILED"
-        : "PREPARATION_FAILED");
+    const code: ProtectedMarkDraftJobFailureCode = deadlineExceeded
+      ? "RUN_DEADLINE_EXCEEDED"
+      : pipelineError?.code ??
+        (approvedPreparationOpened
+          ? "MODEL_EXECUTION_FAILED"
+          : "PREPARATION_FAILED");
     if (!approvedPreparationOpened) {
+      return await failConsumedJob(ports, input, code);
+    }
+    if (deadlineExceeded && !modelRequestStarted) {
       return await failConsumedJob(ports, input, code);
     }
     try {
@@ -431,12 +544,16 @@ export async function runProtectedMarkDraftJob(
         preparationModel,
         pipelineError?.tokenUsage ?? null,
         code,
+        deadlineExceeded
+          ? { deadlineExceeded: true, billingUncertain: true }
+          : {},
       );
     } catch {
       return await failConsumedJob(ports, input, "COST_LOG_FAILED");
     }
     return await failConsumedJob(ports, input, code);
   }
+  deadline.dispose();
 
   if (result.manifestDigest !== input.approvedManifestDigest) {
     try {
@@ -535,6 +652,7 @@ export async function runConfiguredProtectedMarkDraftJob(
   const store = requireJobStore(input.slug, "runConfiguredProtectedMarkDraftJob");
   const ports: ProtectedMarkDraftJobPorts = {
     store,
+    runDeadlineMs: MARK_8_TEXT_RUN_DEADLINE_MS,
     requireEsvApiKey() {
       const key = process.env.ESV_API_KEY;
       if (!key) throw new EsvKeyMissingError();
@@ -547,10 +665,13 @@ export async function runConfiguredProtectedMarkDraftJob(
     },
     prepareRuntime: prepareMarkSprintRuntime,
     useApprovedPreparation: withMarkSprintRuntimeApprovedPreparation,
-    createModelExecutor() {
+    createModelExecutor(signal) {
       const client = getOpenAI();
       if (!client) throw new Error("OpenAI unavailable");
-      return createExactOpenAiMarkSprintExecutor(client as unknown as OpenAIExactClient);
+      return createExactOpenAiMarkSprintExecutor(
+        client as unknown as OpenAIExactClient,
+        signal,
+      );
     },
     recordCost: recordCostEventStrict,
     audit: logGenerationAudit,
