@@ -14,6 +14,7 @@
     "verify:manifest": "node --import tsx scripts/verify-generation-manifest.ts",
     "verify:source": "node --import tsx scripts/verify-mark-sprint-esv-source.ts",
     "verify:manifest-v3": "node --import tsx scripts/verify-generation-manifest-v3.ts",
+    "verify:mark-runtime": "node --import tsx scripts/verify-mark-sprint-runtime.ts",
     "verify:benchmark": "node --import tsx scripts/verify-selah-benchmark-review.ts",
     "validate:workup": "node --import tsx scripts/validate-workup.ts",
     "check:workup": "npm run validate:workup",
