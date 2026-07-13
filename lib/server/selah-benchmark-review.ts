@@ -1079,9 +1079,15 @@ export function evaluateSelahBenchmarkReview(
     reviewContentDigest,
     requirements.reviewValidation.reviewContentDigest,
   );
-  digestShape(
+  digest(
     "reviewValidation.artifactRegistryDigest",
+    trustedContext.currentState.artifactRegistry.registryDigest,
     requirements.reviewValidation.artifactRegistryDigest,
+  );
+  same(
+    "reviewValidation.resolverVersion",
+    trustedContext.resolverVersion,
+    requirements.reviewValidation.resolverVersion,
   );
   if (!SAFE_RESOLVER_VERSION.test(requirements.reviewValidation.resolverVersion)) {
     add(
@@ -1523,8 +1529,10 @@ export function evaluateSelahBenchmarkReview(
     freshnessReportDigest: safeDigest(requirements.prerequisites.freshnessReportDigest),
     draftDigest: safeDigest(requirements.prerequisites.draftDigest),
     benchmarkSetDigest: safeDigest(requirements.benchmark.setDigest),
-    artifactRegistryDigest: safeDigest(requirements.reviewValidation.artifactRegistryDigest),
-    resolverVersion: requirements.reviewValidation.resolverVersion,
+    artifactRegistryDigest: safeDigest(
+      trustedContext.currentState.artifactRegistry.registryDigest,
+    ),
+    resolverVersion: trustedContext.resolverVersion,
     evidenceResolutionReportDigest: safeDigest(
       requirements.reviewValidation.evidenceResolutionReportDigest,
     ),

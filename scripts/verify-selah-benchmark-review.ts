@@ -648,6 +648,7 @@ assert.match(green.requirementsDigest, /^[a-f0-9]{64}$/);
 assert.match(green.submissionDigest, /^[a-f0-9]{64}$/);
 assert.match(green.reviewDigest, /^[a-f0-9]{64}$/);
 assert.equal(green.artifactRegistryDigest, requirements.reviewValidation.artifactRegistryDigest);
+assert.equal(green.resolverVersion, trustedContext.resolverVersion);
 assert.equal(green.evidenceAuthorityPolicyId, authorityPolicy.policyId);
 assert.equal(assertAuthenticatedBenchmarkReviewReadyForOwner(requirements, submission, trustedContext).reviewDigest, green.reviewDigest);
 assert.deepEqual(evaluateSelahBenchmarkReview(requirements, submission, trustedContext), green);
@@ -1123,9 +1124,21 @@ expectMachineBlocked(
   "REVIEW_VALIDATION_BLOCKED",
 );
 expectMachineBlocked(
-  "stale resolver receipt after registry change",
-  (r) => { r.reviewValidation.artifactRegistryDigest = "5".repeat(64); },
+  "self-rebound registry digest cannot replace the trusted registry head",
+  (r, s) => {
+    r.reviewValidation.artifactRegistryDigest = "5".repeat(64);
+    refreshTrustedBindings(r, s);
+  },
   "DIGEST_MISMATCH",
+  false,
+);
+expectMachineBlocked(
+  "self-rebound resolver version cannot replace the trusted resolver",
+  (r, s) => {
+    r.reviewValidation.resolverVersion = "forged-resolver-v9";
+    refreshTrustedBindings(r, s);
+  },
+  "IDENTITY_MISMATCH",
   false,
 );
 expectMachineBlocked(
