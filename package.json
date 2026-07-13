@@ -5,7 +5,7 @@
   "description": "Selah \u2014 your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run verify:studio-safety && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark",
+    "prebuild": "npm run verify:studio-safety && npm run verify:studio-mark8-preflight && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -21,7 +21,8 @@
     "validate:workup": "node --import tsx scripts/validate-workup.ts",
     "check:workup": "npm run validate:workup",
     "verify:supabase": "tsx scripts/verify-supabase-workups.ts",
-    "verify:studio-safety": "node --import tsx scripts/verify-studio-safety.ts"
+    "verify:studio-safety": "node --import tsx scripts/verify-studio-safety.ts",
+    "verify:studio-mark8-preflight": "node --import tsx scripts/verify-studio-mark8-preflight.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",

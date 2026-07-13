@@ -56,6 +56,12 @@ import {
   getRuleCounts,
   type ReviewScope,
 } from "@/lib/server/selah-brain";
+import { loadMark8RuntimePreview } from "@/lib/server/studio-mark8-preflight-loader";
+import {
+  buildMark8StudioPreflightResponse,
+  MARK_8_PREFLIGHT_ERROR,
+  MARK_8_STUDIO_SLUG,
+} from "@/lib/studio-mark8-preflight";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -94,6 +100,22 @@ export async function POST(req: Request) {
       return refuse(slug, what, `${e.code}: ${e.message}`, status);
     }
     return refuse(slug, what, String((e as Error).message ?? "unknown error").slice(0, 300), 500);
+  }
+
+  // ---- read-only Mark 8 owner preparation ----
+  // Reads exact live Brain/notes/example evidence plus ESV Mark 7–9. It cannot
+  // claim a job, call a model, write Supabase, publish, or authorize a run.
+  if (action === "mark_sprint_prepare") {
+    if (String(body.slug ?? "") !== MARK_8_STUDIO_SLUG) {
+      return NextResponse.json({ ok: false, error: MARK_8_PREFLIGHT_ERROR }, { status: 400 });
+    }
+    try {
+      const preview = await loadMark8RuntimePreview();
+      return NextResponse.json(buildMark8StudioPreflightResponse(preview));
+    } catch {
+      // Do not reveal which key, service, row, or source check is unavailable.
+      return NextResponse.json({ ok: false, error: MARK_8_PREFLIGHT_ERROR }, { status: 503 });
+    }
   }
 
   // ---- save settings ----

@@ -2,6 +2,14 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { BIBLE_BOOKS, chapterCount, slugFor } from "@/lib/bible/books";
+import {
+  buildStudioGenerateRequest,
+  decideMark8StudioPreflight,
+  isStudioGenerateEntryDisabled,
+  MARK_8_CONFIRMATION_MESSAGE,
+  MARK_8_PREFLIGHT_ERROR,
+  MARK_8_STUDIO_SLUG,
+} from "@/lib/studio-mark8-preflight";
 
 // Selah Studio — a calm, guided publishing flow (not a developer console).
 // Choose Chapter → Generate Draft → Preview Draft → Publish Final. All technical
@@ -72,6 +80,9 @@ export default function SelahStudioPage() {
   const [genMsg, setGenMsg] = useState("");
   const [statusProblem, setStatusProblem] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [preparingMark8, setPreparingMark8] = useState(false);
+  const [mark8ManifestDigest, setMark8ManifestDigest] = useState<string | null>(null);
+  const [mark8Blockers, setMark8Blockers] = useState<string[]>([]);
 
   const [previewed, setPreviewed] = useState(false);
   const [verdict, setVerdict] = useState<Verdict>("");
@@ -91,6 +102,7 @@ export default function SelahStudioPage() {
   const [examples, setExamples] = useState<Example[] | null>(null);
 
   const activeSlug = useRef("");
+  const mark8PreflightRequest = useRef(0);
   const slug = slugFor(book, chapter) ?? "";
 
   async function api(method: "GET" | "POST", body?: unknown) {
@@ -139,6 +151,10 @@ export default function SelahStudioPage() {
     setGenMsg("");
     setStatusProblem(false);
     setConfirming(false);
+    setPreparingMark8(false);
+    setMark8ManifestDigest(null);
+    setMark8Blockers([]);
+    mark8PreflightRequest.current++;
     resetReview();
     const target = slugFor(nextBook, nextChapter) ?? "";
     activeSlug.current = target;
@@ -234,7 +250,12 @@ export default function SelahStudioPage() {
   }
 
   function onGenerateClick() {
-    if (!slug || phase === "checking" || phase === "generating" || statusProblem || published) return;
+    if (!slug || phase === "checking" || phase === "generating" || preparingMark8 || statusProblem || published) return;
+    if (slug === MARK_8_STUDIO_SLUG) {
+      void prepareMark8ForConfirmation();
+      return;
+    }
+    if (!settings?.text_generation_enabled) return;
     if (settings?.require_confirm) {
       setConfirming(true);
       return;
@@ -242,17 +263,63 @@ export default function SelahStudioPage() {
     void doGenerate();
   }
 
+  async function prepareMark8ForConfirmation() {
+    const target = slug;
+    if (target !== MARK_8_STUDIO_SLUG) return;
+    const requestId = ++mark8PreflightRequest.current;
+    setPreparingMark8(true);
+    setConfirming(false);
+    setMark8ManifestDigest(null);
+    setMark8Blockers([]);
+    setGenMsg("");
+    activeSlug.current = target;
+
+    try {
+      const response = await api("POST", {
+        action: "mark_sprint_prepare",
+        slug: target,
+      });
+      if (activeSlug.current !== target || mark8PreflightRequest.current !== requestId) return;
+      const decision = decideMark8StudioPreflight(response);
+      if (decision.kind === "blocked") {
+        setMark8Blockers(decision.blockers);
+        return;
+      }
+      setMark8ManifestDigest(decision.manifestDigest);
+      setConfirming(true);
+    } catch {
+      if (activeSlug.current === target && mark8PreflightRequest.current === requestId) {
+        setMark8Blockers([MARK_8_PREFLIGHT_ERROR]);
+      }
+    } finally {
+      if (activeSlug.current === target && mark8PreflightRequest.current === requestId) {
+        setPreparingMark8(false);
+      }
+    }
+  }
+
   async function doGenerate() {
     const target = slug;
+    const approvedManifestDigest =
+      target === MARK_8_STUDIO_SLUG ? mark8ManifestDigest : null;
+    if (target === MARK_8_STUDIO_SLUG && !approvedManifestDigest) {
+      setConfirming(false);
+      setMark8Blockers([MARK_8_PREFLIGHT_ERROR]);
+      return;
+    }
     setConfirming(false);
     setPhase("generating");
     setGenMsg("");
+    setMark8Blockers([]);
     setStatusProblem(false);
     resetReview();
     activeSlug.current = target;
     let j: Record<string, unknown>;
     try {
-      j = await api("POST", { action: "generate", slug: target, confirm: true });
+      j = await api(
+        "POST",
+        buildStudioGenerateRequest(target, approvedManifestDigest),
+      );
     } catch {
       if (activeSlug.current !== target) return;
       setPhase("error");
@@ -262,6 +329,7 @@ export default function SelahStudioPage() {
     if (activeSlug.current !== target) return;
     if (!j.ok) {
       setPhase("error");
+      if (target === MARK_8_STUDIO_SLUG) setMark8ManifestDigest(null);
       setGenMsg(typeof j.error === "string" ? j.error : "Couldn't start the draft.");
       return;
     }
@@ -457,11 +525,24 @@ export default function SelahStudioPage() {
             Check chapter again
           </button>
         ) : !confirming ? (
-          <button type="button" onClick={onGenerateClick} disabled={phase === "checking" || phase === "generating" || textOff || published} className={primary}>
+          <button
+            type="button"
+            onClick={onGenerateClick}
+            disabled={isStudioGenerateEntryDisabled({
+              slug,
+              chapterBusy: phase === "checking" || phase === "generating",
+              preflightBusy: preparingMark8,
+              textGenerationEnabled: !textOff,
+              published,
+            })}
+            className={primary}
+          >
             {published
               ? "Already Published"
               : phase === "checking"
                 ? "Checking…"
+                : preparingMark8
+                  ? "Checking readiness…"
                 : phase === "generating"
                   ? "Generating…"
                   : draftReady
@@ -471,12 +552,34 @@ export default function SelahStudioPage() {
         ) : (
           <div className="rounded-lg border bg-card-soft p-3">
             <p className="text-[13px] text-primary">
-              Create one fresh private draft of <span className="font-semibold">{book} {chapter}</span>? It will not publish, and it uses a small amount of credit.
+              {slug === MARK_8_STUDIO_SLUG ? (
+                <>{MARK_8_CONFIRMATION_MESSAGE}</>
+              ) : (
+                <>Create one fresh private draft of <span className="font-semibold">{book} {chapter}</span>? It will not publish, and it uses a small amount of credit.</>
+              )}
             </p>
             <div className="mt-2.5 flex gap-2">
-              <button type="button" onClick={() => void doGenerate()} className={primary}>Create draft</button>
-              <button type="button" onClick={() => setConfirming(false)} className={ghost}>Cancel</button>
+              <button type="button" onClick={() => void doGenerate()} disabled={textOff} className={primary}>Create draft</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirming(false);
+                  if (slug === MARK_8_STUDIO_SLUG) setMark8ManifestDigest(null);
+                }}
+                className={ghost}
+              >
+                Cancel
+              </button>
             </div>
+          </div>
+        )}
+
+        {mark8Blockers.length > 0 && (
+          <div role="alert" className="mt-3 rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] font-semibold text-primary">Mark 8 is still locked:</p>
+            <ul className="mt-1.5 space-y-1 text-[13px] text-secondary">
+              {mark8Blockers.map((blocker) => <li key={blocker}>• {blocker}</li>)}
+            </ul>
           </div>
         )}
 
