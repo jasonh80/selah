@@ -460,9 +460,16 @@ function validateLiveNotes(
   const mismatch = new Set<string>();
   const usedRowIds = new Set<string>();
   const notes: Array<{ id: string; storedRowId: string; text: string }> = [];
+  const expectedTexts = new Set(expectedNotes.map((note) => note.text));
+  // Ordinary owner feedback can sit beside the approved guidance. Only rows
+  // matching this versioned packet enter its exact manifest set; duplicate or
+  // malformed matching rows still fail closed.
+  const guidanceRows = rows.filter((row) =>
+    expectedTexts.has(row?.note ?? ""),
+  );
 
   for (const expected of expectedNotes) {
-    const matches = rows.filter((row) => row?.note === expected.text);
+    const matches = guidanceRows.filter((row) => row?.note === expected.text);
     if (!matches.length) {
       missing.push(expected.id);
       continue;
@@ -485,7 +492,10 @@ function validateLiveNotes(
     usedRowIds.add(row.id);
     notes.push({ id: expected.id, storedRowId: row.id, text: expected.text });
   }
-  if (rows.length !== expectedNotes.length || usedRowIds.size !== rows.length) {
+  if (
+    guidanceRows.length !== expectedNotes.length ||
+    usedRowIds.size !== guidanceRows.length
+  ) {
     mismatch.add("ordered-live-set");
   }
   if (missing.length) {

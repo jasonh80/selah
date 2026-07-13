@@ -200,6 +200,26 @@ async function main(): Promise<void> {
   );
   await expectEvidenceBlock(ports({ fail: "brain" }), "LIVE_READ_FAILED");
 
+  // A normal Needs work note must not corrupt the exact guidance packet used
+  // by the next private draft.
+  sourceFetchCount = 0;
+  const withOwnerFeedback = await preview(
+    ports({
+      notes: [
+        ...noteRows,
+        {
+          id: "db-owner-feedback",
+          slug: SLUG,
+          note: "Make the application clearer before the next private draft.",
+          scope: "chapter",
+        },
+      ],
+    }),
+  );
+  assert.equal(withOwnerFeedback.evidenceReady, true);
+  assert.deepEqual(withOwnerFeedback.evidenceBlockers, []);
+  assert.equal(sourceFetchCount, 3);
+
   sourceFetchCount = 0;
   const exact = await preview(ports());
   assert.equal(sourceFetchCount, 3, "the existing loader must load the 3-chapter bundle");
