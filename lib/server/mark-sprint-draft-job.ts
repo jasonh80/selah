@@ -170,6 +170,23 @@ function cleanupStatus(outcome: FailJobOutcome): "failed" | "conflict" | "write_
   return outcome === "marked_failed" ? "failed" : outcome;
 }
 
+async function writeSafeAudit(
+  ports: ProtectedMarkDraftJobPorts,
+  entry: SafeAuditEntry,
+): Promise<boolean> {
+  try {
+    await ports.audit(entry);
+    return true;
+  } catch {
+    // The chapter/job result stays authoritative. An audit outage must never
+    // turn a saved private draft into a reported failure or hide cleanup truth.
+    console.error(
+      `[selah] protected_mark_draft audit write failed (${entry.status})`,
+    );
+    return false;
+  }
+}
+
 function withManifestDigest(
   workup: ChapterWorkup,
   manifestDigest: string,
@@ -188,7 +205,7 @@ async function auditFailure(
   manifestDigest: string,
   cleanup?: FailJobOutcome,
 ): Promise<void> {
-  await ports.audit({
+  await writeSafeAudit(ports, {
     action: "protected_mark_draft",
     slug,
     status: "failed",
@@ -455,7 +472,7 @@ export async function runProtectedMarkDraftJob(
   } catch {
     snapshotState = "write_failed";
   }
-  await ports.audit({
+  await writeSafeAudit(ports, {
     action: "protected_mark_draft",
     slug: input.slug,
     model: preparationModel,

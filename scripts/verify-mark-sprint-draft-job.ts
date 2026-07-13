@@ -381,6 +381,22 @@ async function main(): Promise<void> {
     }
   }
 
+  // Audit outages never change the truthful chapter/job outcome.
+  {
+    const saved = harness("happy");
+    saved.ports.audit = async () => { throw new Error("PRIVATE AUDIT ERROR"); };
+    const savedResult = await runProtectedMarkDraftJob(input, saved.ports);
+    assert.equal(savedResult.ok, true);
+    assert.equal(saved.store.rows.get(SLUG)?.status, "draft");
+
+    const failed = harness("review_only");
+    failed.ports.audit = async () => { throw new Error("PRIVATE AUDIT ERROR"); };
+    const failedResult = await runProtectedMarkDraftJob(input, failed.ports);
+    assert.equal(failedResult.ok, false);
+    assert.equal(failedResult.code, "PREPARATION_REFUSED");
+    assert.equal(failed.store.rows.get(SLUG)?.status, "failed");
+  }
+
   // Exact OpenAI adapter passes the genuine request object without cloning.
   {
     let received: unknown;
