@@ -3,8 +3,10 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 export const MARK_8_STUDIO_SLUG = "mark-8" as const;
 export const MARK_8_PREFLIGHT_ERROR =
   "Studio could not safely check Mark 8 readiness. Try again before creating a draft.";
+export const MARK_8_SOURCE_PREPARATION_MESSAGE =
+  "Studio will privately load Mark 7–9 from the official ESV API (125 verse-instances) to prepare this one-chapter pilot. Crossway's public terms do not specifically address this AI preparation, and you chose to proceed with that uncertainty. Nothing is sent to the writing AI, saved, or published yet.";
 export const MARK_8_CONFIRMATION_MESSAGE =
-  "This creates one private Mark 8 text draft using ESV Mark 7–9 and publishes nothing.";
+  "Studio will now use the prepared ESV Mark 7–9 context to create one private Mark 8 draft. This uses a small amount of AI credit and publishes nothing.";
 
 type EvidenceBlocker = {
   code: string;

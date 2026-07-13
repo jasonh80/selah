@@ -8,6 +8,7 @@ import {
   isStudioGenerateEntryDisabled,
   MARK_8_CONFIRMATION_MESSAGE,
   MARK_8_PREFLIGHT_ERROR,
+  MARK_8_SOURCE_PREPARATION_MESSAGE,
   MARK_8_STUDIO_SLUG,
 } from "@/lib/studio-mark8-preflight";
 import { studioPreviewUrl } from "@/lib/studio-preview";
@@ -102,6 +103,7 @@ export default function SelahStudioPage() {
   const [genMsg, setGenMsg] = useState("");
   const [statusProblem, setStatusProblem] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [confirmingMark8Source, setConfirmingMark8Source] = useState(false);
   const [preparingMark8, setPreparingMark8] = useState(false);
   const [mark8ManifestDigest, setMark8ManifestDigest] = useState<string | null>(null);
   const [mark8Blockers, setMark8Blockers] = useState<string[]>([]);
@@ -193,6 +195,7 @@ export default function SelahStudioPage() {
     setGenMsg("");
     setStatusProblem(false);
     setConfirming(false);
+    setConfirmingMark8Source(false);
     setPreparingMark8(false);
     setMark8ManifestDigest(null);
     setMark8Blockers([]);
@@ -296,7 +299,8 @@ export default function SelahStudioPage() {
   function onGenerateClick() {
     if (!slug || phase === "checking" || phase === "generating" || preparingMark8 || statusProblem || published) return;
     if (slug === MARK_8_STUDIO_SLUG) {
-      void prepareMark8ForConfirmation();
+      setConfirming(false);
+      setConfirmingMark8Source(true);
       return;
     }
     if (!settings?.text_generation_enabled) return;
@@ -311,6 +315,7 @@ export default function SelahStudioPage() {
     const target = slug;
     if (target !== MARK_8_STUDIO_SLUG) return;
     const requestId = ++mark8PreflightRequest.current;
+    setConfirmingMark8Source(false);
     setPreparingMark8(true);
     setConfirming(false);
     setMark8ManifestDigest(null);
@@ -778,6 +783,26 @@ export default function SelahStudioPage() {
           <button type="button" onClick={() => void loadChapterStatus(slug)} className={ghost}>
             Check chapter again
           </button>
+        ) : confirmingMark8Source ? (
+          <div className="rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] text-primary">{MARK_8_SOURCE_PREPARATION_MESSAGE}</p>
+            <div className="mt-2.5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void prepareMark8ForConfirmation()}
+                className={primary}
+              >
+                Prepare Mark 8
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingMark8Source(false)}
+                className={ghost}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         ) : !confirming ? (
           <button
             type="button"
@@ -801,7 +826,9 @@ export default function SelahStudioPage() {
                   ? "Generating…"
                   : draftReady
                     ? "Generate Again"
-                    : "Generate Draft"}
+                    : isMark8
+                      ? "Prepare Mark 8"
+                      : "Generate Draft"}
           </button>
         ) : (
           <div className="rounded-lg border bg-card-soft p-3">

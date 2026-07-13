@@ -6,6 +6,7 @@ import {
   isStudioGenerateEntryDisabled,
   MARK_8_CONFIRMATION_MESSAGE,
   MARK_8_PREFLIGHT_ERROR,
+  MARK_8_SOURCE_PREPARATION_MESSAGE,
 } from "../lib/studio-mark8-preflight";
 
 const ADMIN_TOKEN = "offline-mark8-studio-token";
@@ -147,8 +148,11 @@ async function main(): Promise<void> {
   );
   assert.equal(
     MARK_8_CONFIRMATION_MESSAGE,
-    "This creates one private Mark 8 text draft using ESV Mark 7–9 and publishes nothing.",
+    "Studio will now use the prepared ESV Mark 7–9 context to create one private Mark 8 draft. This uses a small amount of AI credit and publishes nothing.",
   );
+  assert.match(MARK_8_SOURCE_PREPARATION_MESSAGE, /125 verse-instances/u);
+  assert.match(MARK_8_SOURCE_PREPARATION_MESSAGE, /chose to proceed with that uncertainty/u);
+  assert.match(MARK_8_SOURCE_PREPARATION_MESSAGE, /Nothing is sent to the writing AI, saved, or published yet/u);
 
   process.env.DEV_ADMIN_TOKEN = ADMIN_TOKEN;
   const loader = await import("../lib/server/studio-mark8-preflight-loader");
