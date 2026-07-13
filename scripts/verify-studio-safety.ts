@@ -305,6 +305,9 @@ import {
   mark8FinalReviewDigest,
   MARK_8_IMAGE_MODEL,
 } from "../lib/server/mark8-image-plan";
+import {
+  validateMark8PublishCandidate,
+} from "../lib/server/chapter-workups-repository";
 import { POST as adminPost } from "../app/api/admin/generation/route";
 import textWorker, {
   __setMark8PermissionCheckerForTesting,
@@ -403,6 +406,19 @@ const MARK8_IMAGE_BINDING = {
   planDigest: deriveMark8ImagePlan(MARK8_IMAGE_WORKUP).digest,
   model: MARK_8_IMAGE_MODEL,
 };
+
+function completedMark8Workup(
+  jobId = "44444444-4444-4444-8444-444444444444",
+  origin = "https://offline-selah.supabase.co",
+): ChapterWorkup {
+  const workup = structuredClone(MARK8_IMAGE_WORKUP);
+  workup.images = workup.images.map((image) => ({
+    ...image,
+    status: "complete" as const,
+    src: `${origin}/storage/v1/object/public/chapter-images/mark-8/${jobId}/${image.kind}.png`,
+  }));
+  return workup;
+}
 const MANIFEST_DIGEST_A = "a".repeat(64);
 const MANIFEST_DIGEST_B = "b".repeat(64);
 
@@ -1831,6 +1847,161 @@ const realImagePipeline = async () => {
       ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_STATE_KEY] === "failed", "M7 owned completion conflict becomes terminal failed");
       ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_SPENT_COUNT_KEY] === 3, "M7 completion conflict exposes spent count");
       store.rows.delete("mark-8");
+    }
+
+    // N. Final publishing is bound to the exact, owner-reviewed Mark 8 workup.
+    // The same row revision that passes this check must win the conditional
+    // publish write; browser claims, stale reviews, and foreign image origins
+    // can never make placeholder or changed content immutable.
+    {
+      const savedSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://offline-selah.supabase.co";
+      try {
+        const finalWorkup = completedMark8Workup();
+        const digest = mark8FinalReviewDigest(finalWorkup);
+        ok(digest !== null, "N1 complete synthetic Mark 8 workup has a final review digest");
+        ok(
+          validateMark8PublishCandidate(
+            finalWorkup,
+            digest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          ).ok,
+          "N1 exact final review + trusted storage passes the pure publish gate",
+        );
+        ok(
+          !validateMark8PublishCandidate(
+            finalWorkup,
+            undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          ).ok,
+          "N1 missing owner review digest is refused",
+        );
+        ok(
+          !validateMark8PublishCandidate(
+            { ...finalWorkup, title: "Changed after owner review" },
+            digest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          ).ok,
+          "N1 changed final copy invalidates the owner review",
+        );
+        ok(
+          !validateMark8PublishCandidate(
+            completedMark8Workup(
+              "55555555-5555-4555-8555-555555555555",
+              "https://foreign-storage.example",
+            ),
+            mark8FinalReviewDigest(
+              completedMark8Workup(
+                "55555555-5555-4555-8555-555555555555",
+                "https://foreign-storage.example",
+              ),
+            ) ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          ).ok,
+          "N1 foreign storage origin is refused even when its digest matches",
+        );
+        const wrongBucket = completedMark8Workup();
+        wrongBucket.images = wrongBucket.images.map((image) => ({
+          ...image,
+          src: image.src.replace(
+            "/storage/v1/object/public/chapter-images/mark-8/",
+            "/storage/v1/object/public/unapproved-images/mark-8/",
+          ),
+        }));
+        ok(
+          !validateMark8PublishCandidate(
+            wrongBucket,
+            mark8FinalReviewDigest(wrongBucket) ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          ).ok,
+          "N1 same-origin images outside the approved chapter path are refused",
+        );
+        const mixedRuns = completedMark8Workup();
+        mixedRuns.images[1] = {
+          ...mixedRuns.images[1],
+          src: mixedRuns.images[1].src.replace(
+            "44444444-4444-4444-8444-444444444444",
+            "55555555-5555-4555-8555-555555555555",
+          ),
+        };
+        ok(
+          !validateMark8PublishCandidate(
+            mixedRuns,
+            digest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          ).ok,
+          "N1 images mixed from different immutable runs are refused",
+        );
+        ok(
+          !validateMark8PublishCandidate(
+            {
+              ...finalWorkup,
+              [IMAGE_JOB_KEY]: "active-job",
+              [IMAGE_JOB_STATE_KEY]: "running",
+            } as ChapterWorkup,
+            digest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          ).ok,
+          "N1 active image metadata blocks publish",
+        );
+
+        store.seed(
+          "mark-8",
+          "draft",
+          structuredClone(finalWorkup) as unknown as Record<string, unknown>,
+        );
+        const missing = await adminPost(adminReq({
+          action: "publish",
+          slug: "mark-8",
+        }));
+        ok(missing.status === 403, "N2 real admin route refuses Mark 8 without final owner review");
+        ok(store.rows.get("mark-8")!.status === "draft", "N2 refused publish leaves Mark 8 private");
+
+        const exact = await adminPost(adminReq({
+          action: "publish",
+          slug: "mark-8",
+          reviewDigest: digest,
+        }));
+        ok(exact.status === 200, "N2 real admin route accepts exact owner-reviewed Mark 8");
+        ok(store.rows.get("mark-8")!.status === "reviewed", "N2 exact publish promotes Mark 8 once");
+
+        store.seed(
+          "mark-8",
+          "draft",
+          structuredClone(finalWorkup) as unknown as Record<string, unknown>,
+        );
+        const originalUpdate = store.update.bind(store);
+        let changedBeforePublish = true;
+        store.update = async (slug, predicates, next) => {
+          if (slug === "mark-8" && changedBeforePublish && next.status === "reviewed") {
+            changedBeforePublish = false;
+            store.rows.get(slug)!.updated_at = store.now();
+          }
+          return originalUpdate(slug, predicates, next);
+        };
+        const stale = await adminPost(adminReq({
+          action: "publish",
+          slug: "mark-8",
+          reviewDigest: digest,
+        }));
+        store.update = originalUpdate;
+        ok(stale.status === 409, "N2 row change between review validation and write is a conflict");
+        ok(store.rows.get("mark-8")!.status === "draft", "N2 stale review can never publish");
+        store.rows.delete("mark-8");
+
+        store.seed("exodus-27", "draft", { slug: "exodus-27", title: "Exodus 27" });
+        const legacy = await adminPost(adminReq({
+          action: "publish",
+          slug: "exodus-27",
+        }));
+        ok(legacy.status === 200, "N3 real admin route preserves non-Mark draft publishing");
+        ok(store.rows.get("exodus-27")!.status === "reviewed", "N3 non-Mark draft publish behavior is preserved");
+        store.rows.delete("exodus-27");
+      } finally {
+        if (savedSupabaseUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+        else process.env.NEXT_PUBLIC_SUPABASE_URL = savedSupabaseUrl;
+        store.rows.delete("mark-8");
+      }
     }
   } finally {
     __setJobStoreForTesting(null);

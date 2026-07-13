@@ -1,6 +1,25 @@
 import type { ChapterWorkup } from "../types";
 import { getSupabaseAdmin, warnSupabaseMissing } from "./supabase";
-import { assertChapterMutable, ChapterMutationError } from "./protected-chapters";
+import {
+  decideMutation,
+  ChapterMutationError,
+  type RowLookup,
+} from "./protected-chapters";
+import {
+  IMAGE_JOB_ERROR_CODE_KEY,
+  IMAGE_JOB_KEY,
+  IMAGE_JOB_MODEL_KEY,
+  IMAGE_JOB_PLAN_DIGEST_KEY,
+  IMAGE_JOB_SPENT_COUNT_KEY,
+  IMAGE_JOB_STATE_KEY,
+  requireJobStore,
+  type JobRow,
+} from "./generation-jobs";
+import {
+  isStoredMark8ImageUrl,
+  mark8FinalReviewDigest,
+  MARK_8_IMAGE_SLUG,
+} from "./mark8-image-plan";
 
 // NOTE (issue #8): the generation lifecycle (claim → verify → complete/fail)
 // lives EXCLUSIVELY in generation-jobs.ts with single-use job ids. This module
@@ -23,6 +42,101 @@ const TABLE = "chapter_workups";
 const LEGACY_PUBLIC_READY_EXCEPTIONS: readonly string[] = ["psalm-23"];
 
 export type WorkupStatus = "draft" | "generating" | "ready" | "failed" | "reviewed";
+
+const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
+const MARK_8_IMAGE_JOB_KEYS = [
+  IMAGE_JOB_KEY,
+  IMAGE_JOB_STATE_KEY,
+  IMAGE_JOB_PLAN_DIGEST_KEY,
+  IMAGE_JOB_MODEL_KEY,
+  IMAGE_JOB_SPENT_COUNT_KEY,
+  IMAGE_JOB_ERROR_CODE_KEY,
+] as const;
+
+export type Mark8PublishValidation =
+  | { ok: true; reviewDigest: string }
+  | { ok: false; reason: string };
+
+/**
+ * Pure final Mark 8 publication check. The browser supplies only the digest it
+ * approved; this function recomputes the identity from the complete current
+ * workup and independently verifies the finished image run and storage origin.
+ */
+export function validateMark8PublishCandidate(
+  workup: ChapterWorkup,
+  submittedReviewDigest: string | undefined,
+  configuredSupabaseUrl: string | undefined,
+): Mark8PublishValidation {
+  if (!submittedReviewDigest || !LOWERCASE_SHA256.test(submittedReviewDigest)) {
+    return {
+      ok: false,
+      reason: "Review the final Mark 8 chapter and images again before publishing.",
+    };
+  }
+
+  const raw = workup as unknown as Record<string, unknown>;
+  if (MARK_8_IMAGE_JOB_KEYS.some((key) => Object.prototype.hasOwnProperty.call(raw, key))) {
+    return {
+      ok: false,
+      reason: "Mark 8 images are still being prepared or need attention. Finish that step before publishing.",
+    };
+  }
+
+  const freshReviewDigest = mark8FinalReviewDigest(workup);
+  if (
+    freshReviewDigest === null ||
+    !Array.isArray(workup.images) ||
+    !workup.images.every(isStoredMark8ImageUrl)
+  ) {
+    return {
+      ok: false,
+      reason: "Mark 8 needs exactly 3 or 5 finished images from one completed image run before publishing.",
+    };
+  }
+
+  let expectedOrigin: string;
+  try {
+    const configured = new URL(configuredSupabaseUrl ?? "");
+    if (configured.protocol !== "https:") throw new Error("unsafe protocol");
+    expectedOrigin = configured.origin;
+  } catch {
+    return {
+      ok: false,
+      reason: "Selah's chapter image storage is not safely configured. Nothing was published.",
+    };
+  }
+
+  const exactOrigin = workup.images.every((image) => {
+    try {
+      return new URL(image.src).origin === expectedOrigin;
+    } catch {
+      return false;
+    }
+  });
+  if (!exactOrigin) {
+    return {
+      ok: false,
+      reason: "One or more Mark 8 images are outside Selah's chapter image storage. Nothing was published.",
+    };
+  }
+
+  if (submittedReviewDigest !== freshReviewDigest) {
+    return {
+      ok: false,
+      reason: "Mark 8 changed after you reviewed it. Preview and approve the final chapter again.",
+    };
+  }
+  return { ok: true, reviewDigest: freshReviewDigest };
+}
+
+function publishLookup(row: JobRow | null | { error: string }): RowLookup {
+  if (row === null) return { kind: "missing" };
+  if ("error" in row) return { kind: "error", message: row.error };
+  return {
+    kind: "row",
+    row: { status: row.status, updatedAt: row.updatedAt },
+  };
+}
 
 /**
  * Returns the stored render workup for a chapter when a ready/reviewed row
@@ -80,28 +194,48 @@ export async function getDraftWorkup(
 }
 
 /** Promote a draft to published (status → reviewed). Returns the new status. */
-export async function publishChapter(slug: string): Promise<string> {
+export async function publishChapter(
+  slug: string,
+  options: { reviewDigest?: string } = {},
+): Promise<string> {
   // Publishing promotes exactly a DRAFT (per-action transition). Legacy "ready"
-  // rows and re-publishes are refused; the write is conditioned on the exact
-  // expected revision, selects the changed row, and sets reviewed_at.
-  const expected = await assertChapterMutable(slug, "publishChapter");
-  const db = getSupabaseAdmin();
-  if (!db) {
-    throw new ChapterMutationError("WRITE_FAILED", "publishChapter", slug, "storage is not configured");
+  // rows and re-publishes are refused. Read status + revision + full workup ONCE,
+  // validate that same snapshot, then condition the write on its exact revision.
+  const store = requireJobStore(slug, "publishChapter");
+  const row = await store.read(slug);
+  const decision = decideMutation("publishChapter", slug, publishLookup(row));
+  if (!decision.allowed || !decision.expected || row === null || "error" in row) {
+    throw new ChapterMutationError("REFUSED", "publishChapter", slug, decision.reason);
   }
+
+  if (slug === MARK_8_IMAGE_SLUG) {
+    const validation = validateMark8PublishCandidate(
+      row.workupJson as unknown as ChapterWorkup,
+      options.reviewDigest,
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+    );
+    if (!validation.ok) {
+      throw new ChapterMutationError("REFUSED", "publishChapter", slug, validation.reason);
+    }
+  }
+
   const now = new Date().toISOString();
-  let query = db
-    .from(TABLE)
-    .update({ status: "reviewed" satisfies WorkupStatus, reviewed_at: now, updated_at: now })
-    .eq("slug", slug)
-    .eq("status", expected?.status ?? "draft");
-  if (expected?.updatedAt) query = query.eq("updated_at", expected.updatedAt);
-  const { data, error } = await query.select("slug,status");
-  if (error) throw new ChapterMutationError("WRITE_FAILED", "publishChapter", slug, error.message);
-  if (!data || data.length === 0) {
+  const changed = await store.update(
+    slug,
+    { status: decision.expected.status, updatedAt: decision.expected.updatedAt },
+    {
+      status: "reviewed" satisfies WorkupStatus,
+      reviewed_at: now,
+      updated_at: now,
+    },
+  );
+  if (typeof changed === "object") {
+    throw new ChapterMutationError("WRITE_FAILED", "publishChapter", slug, changed.error);
+  }
+  if (changed !== 1) {
     throw new ChapterMutationError(
       "CONFLICT", "publishChapter", slug,
-      "row changed between validation and publish (zero-row conditional write)",
+      "This chapter changed after your review. Preview it again before publishing.",
     );
   }
   return "reviewed";

@@ -13,7 +13,6 @@ import {
 } from "@/lib/server/generate-chapter-workup";
 import {
   getChapterStatus,
-  getDraftWorkup,
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
 import {
@@ -176,14 +175,19 @@ export async function POST(req: Request) {
   // ---- publish a draft ----
   if (action === "publish") {
     const slug = String(body.slug ?? "");
-    const draft = await getDraftWorkup(slug);
-    if (!draft) return NextResponse.json({ ok: false, error: "no stored row for slug" }, { status: 404 });
     try {
-      const status = await publishChapter(slug);
+      const status = await publishChapter(slug, {
+        reviewDigest:
+          typeof body.reviewDigest === "string" ? body.reviewDigest : undefined,
+      });
       await logGenerationAudit({ action: "publish", slug, status: "succeeded" });
       return NextResponse.json({ ok: true, slug, status });
     } catch (e) {
-      return mapMutationError(slug, "publish", e);
+      if (isChapterMutationError(e)) {
+        const status = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
+        return refuse(slug, "publish", e.message, status);
+      }
+      return refuse(slug, "publish", "Studio could not safely publish this chapter.", 500);
     }
   }
 
