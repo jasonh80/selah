@@ -171,7 +171,11 @@ export function __setTextGeneratorForTesting(fn: TextGenerator | null): void {
  * Full missing-chapter flow (Option A, server-side blocking). Returns the
  * render-ready workup (now saved as a draft), or null on failure.
  */
-export async function generateAndStoreChapter(slug: string, jobId: string): Promise<ChapterWorkup | null> {
+export async function generateAndStoreChapter(
+  slug: string,
+  jobId: string,
+  approvedManifestDigest?: string,
+): Promise<ChapterWorkup | null> {
   const parsed = parseSlug(slug);
   if (!parsed) return null;
   const { book, chapter } = parsed;
@@ -185,7 +189,7 @@ export async function generateAndStoreChapter(slug: string, jobId: string): Prom
   // BEFORE any spend, and the refusal is durably audited.
   const store = requireJobStore(slug, "generateAndStoreChapter");
   try {
-    await consumeGenerationClaim(store, slug, jobId);
+    await consumeGenerationClaim(store, slug, jobId, approvedManifestDigest);
   } catch (e) {
     const kind = isChapterMutationError(e) && e.code === "CONFLICT" ? "generate_text_conflict" : "generate_text";
     await logGenerationAudit({
@@ -243,11 +247,17 @@ export async function generateAndStoreChapter(slug: string, jobId: string): Prom
     const render = generatedToRenderWorkup(generated);
     // Terminal save is pinned to status="generating" AND this exact job ID —
     // an older worker can never overwrite a newer run (zero rows = CONFLICT).
-    await completeGenerationJob(store, slug, jobId, {
-      workup: render,
-      version: generated.version,
-      bibleVersion,
-    });
+    await completeGenerationJob(
+      store,
+      slug,
+      jobId,
+      {
+        workup: render,
+        version: generated.version,
+        bibleVersion,
+      },
+      approvedManifestDigest,
+    );
 
     // Archive this draft as a new version (V1 is preserved; this becomes V2, …).
     await snapshotVersion(slug, "generated draft");
@@ -268,7 +278,7 @@ export async function generateAndStoreChapter(slug: string, jobId: string): Prom
     // an old worker. The outcome is reported truthfully: "conflict" = a newer
     // run owns the row (left untouched); "write_failed" = the row may be
     // STRANDED as generating and the audit says so.
-    const outcome = await failGenerationJob(store, slug, jobId, msg);
+    const outcome = await failGenerationJob(store, slug, jobId, msg, approvedManifestDigest);
     const kind = isChapterMutationError(e) && e.code === "CONFLICT" ? "generate_text_conflict" : "generate_text";
     const cleanupNote =
       outcome === "marked_failed"

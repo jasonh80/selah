@@ -273,7 +273,11 @@ import {
   IMAGE_JOB_KEY,
 } from "../lib/server/generation-jobs";
 import { isChapterMutationError, __setRowLookupForTesting } from "../lib/server/protected-chapters";
-import { __setTriggerTransportForTesting, type TriggerResult } from "../lib/server/trigger-generation";
+import {
+  __setTriggerTransportForTesting,
+  triggerBackgroundGeneration,
+  type TriggerResult,
+} from "../lib/server/trigger-generation";
 import {
   __setGenerationTestOverrides,
   type GenerationSettings,
@@ -737,8 +741,12 @@ const realRouteAndWorkers = async () => {
   const audit: Array<Record<string, unknown>> = [];
   const costs: CostEventInput[] = [];
   const store = new FakeJobStore();
-  let lastTrigger: { url: string; body: { slug: string; job: string; token: string } } | null = null;
+  let lastTrigger: {
+    url: string;
+    body: { slug: string; job: string; token: string; approvedManifestDigest?: string };
+  } | null = null;
   let triggerResult: TriggerResult = { ok: true, status: 202 };
+  let textGeneratorCalls = 0;
 
   __setJobStoreForTesting(store);
   __setRowLookupForTesting(storeLookup(store));
@@ -749,11 +757,14 @@ const realRouteAndWorkers = async () => {
     lastTrigger = req;
     return triggerResult;
   });
-  __setTextGeneratorForTesting(async () => ({
-    content: JSON.stringify(generatedFixture),
-    inputTokens: 0,
-    outputTokens: 0,
-  }));
+  __setTextGeneratorForTesting(async () => {
+    textGeneratorCalls++;
+    return {
+      content: JSON.stringify(generatedFixture),
+      inputTokens: 0,
+      outputTokens: 0,
+    };
+  });
 
   try {
     // R1. Route auth: no/bad admin token → 401; nothing claimed, nothing triggered.
@@ -797,6 +808,7 @@ const realRouteAndWorkers = async () => {
       ok(lastTrigger !== null, "R4 route sent an authenticated trigger");
       const { slug, job, token } = lastTrigger!.body;
       ok(slug === GENERIC_SLUG && !!job && !!token, "R4 trigger carries slug + job + signed token");
+      ok(lastTrigger!.body.approvedManifestDigest === undefined, "R4 generic trigger payload remains unchanged");
       ok(store.rows.get(GENERIC_SLUG)!.workup_json[TEXT_JOB_STATE_KEY] === "queued", "R4 claim is queued until the worker consumes");
 
       const wres = await textWorker(workerReq("generate-chapter-background", { slug, job, token }));
@@ -826,6 +838,64 @@ const realRouteAndWorkers = async () => {
       const wp = await textWorker(workerReq("generate-chapter-background", { slug: "mark-8", job: jid, token: wrongPurpose }));
       ok(wp.status === 401, "R5 image-purpose token rejected by text worker");
       ok(audit.filter((a) => a.action === "refused:worker_generate").length >= 4, "R5 worker refusals durably audited");
+    }
+
+    // R5b. Real trigger + worker bind an optional approved manifest digest.
+    {
+      store.rows.delete(GENERIC_SLUG);
+      lastTrigger = null;
+      const jobId = await claimGenerationJob(store, GENERIC_SLUG, {
+        book: "Exodus",
+        chapter: 27,
+        title: "Exodus 27",
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      });
+      const triggered = await triggerBackgroundGeneration(
+        GENERIC_SLUG,
+        "localhost:3000",
+        jobId,
+        MANIFEST_DIGEST_A,
+      );
+      ok(triggered.ok && lastTrigger !== null, "R5b real trigger accepted the bound text job");
+      ok(
+        lastTrigger!.body.approvedManifestDigest === MANIFEST_DIGEST_A,
+        "R5b trigger carries the approved manifest digest",
+      );
+
+      const body = lastTrigger!.body;
+      const callsBeforeRefusals = textGeneratorCalls;
+      const omitted = await textWorker(workerReq("generate-chapter-background", {
+        slug: body.slug,
+        job: body.job,
+        token: body.token,
+      }));
+      ok(omitted.status === 401, "R5b worker rejects an omitted bound digest");
+
+      const mismatched = await textWorker(workerReq("generate-chapter-background", {
+        ...body,
+        approvedManifestDigest: MANIFEST_DIGEST_B,
+      }));
+      ok(mismatched.status === 401, "R5b worker rejects a mismatched bound digest");
+
+      const tamperedDigest = `${MANIFEST_DIGEST_A.slice(0, -1)}b`;
+      const tampered = await textWorker(workerReq("generate-chapter-background", {
+        ...body,
+        approvedManifestDigest: tamperedDigest,
+      }));
+      ok(tampered.status === 401, "R5b worker rejects a tampered bound digest");
+
+      const replacement = body.token.endsWith("0") ? "1" : "0";
+      const tamperedToken = await textWorker(workerReq("generate-chapter-background", {
+        ...body,
+        token: `${body.token.slice(0, -1)}${replacement}`,
+      }));
+      ok(tamperedToken.status === 401, "R5b worker rejects a tampered bound token");
+      ok(textGeneratorCalls === callsBeforeRefusals, "R5b all digest/auth refusals happen before text work");
+
+      const exact = await textWorker(workerReq("generate-chapter-background", body));
+      ok(exact.status === 200, `R5b exact digest-bound worker completed (HTTP ${exact.status})`);
+      ok(textGeneratorCalls === callsBeforeRefusals + 1, "R5b exact binding performs text work once");
+      ok(store.rows.get(GENERIC_SLUG)!.status === "draft", "R5b exact bound run saved its draft");
     }
 
     // R6. Trigger failure through the REAL route: job failed + truthful response.

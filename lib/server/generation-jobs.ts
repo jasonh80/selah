@@ -73,21 +73,46 @@ function jobTokenSecret(): string {
 
 export const JOB_TOKEN_TTL_MS = 20 * 60 * 1000; // > the 15-min background budget
 
-function tokenPayload(purpose: JobPurpose, slug: string, jobId: string, exp: number): string {
-  return `selah-job-v1|${purpose}|${slug}|${jobId}|${exp}`;
+function tokenPayload(
+  purpose: JobPurpose,
+  slug: string,
+  jobId: string,
+  exp: number,
+  approvedManifestDigest?: string,
+): string {
+  const base = `selah-job-v1|${purpose}|${slug}|${jobId}|${exp}`;
+  return approvedManifestDigest === undefined
+    ? base
+    : `${base}|approvedManifestDigest=${approvedManifestDigest}`;
 }
 
 /** Sign a worker token. Throws (fail closed) when no secret is configured. */
-export function signJobToken(purpose: JobPurpose, slug: string, jobId: string, now = Date.now()): {
+export function signJobToken(
+  purpose: JobPurpose,
+  slug: string,
+  jobId: string,
+  now = Date.now(),
+  approvedManifestDigest?: string,
+): {
   token: string;
   exp: number;
 } {
+  if (approvedManifestDigest !== undefined && purpose !== "text") {
+    throw new ChapterMutationError("REFUSED", "signJobToken", slug, "manifest binding is valid only for text jobs");
+  }
+  const manifestDigest = validateApprovedManifestDigest(
+    approvedManifestDigest,
+    "signJobToken",
+    slug,
+  );
   const secret = jobTokenSecret();
   if (!secret) {
     throw new ChapterMutationError("REFUSED", "signJobToken", slug, "no job-signing secret configured — refusing to trigger unauthenticated work");
   }
   const exp = now + JOB_TOKEN_TTL_MS;
-  const sig = createHmac("sha256", secret).update(tokenPayload(purpose, slug, jobId, exp)).digest("hex");
+  const sig = createHmac("sha256", secret)
+    .update(tokenPayload(purpose, slug, jobId, exp, manifestDigest))
+    .digest("hex");
   return { token: `${exp}.${sig}`, exp };
 }
 
@@ -98,7 +123,14 @@ export function verifyJobToken(
   jobId: string,
   token: string,
   now = Date.now(),
+  approvedManifestDigest?: string,
 ): { ok: boolean; reason?: string } {
+  if (approvedManifestDigest !== undefined && purpose !== "text") {
+    return { ok: false, reason: "manifest binding is valid only for text jobs" };
+  }
+  if (approvedManifestDigest !== undefined && !LOWERCASE_SHA256.test(approvedManifestDigest)) {
+    return { ok: false, reason: "invalid approved manifest digest" };
+  }
   const secret = jobTokenSecret();
   if (!secret) return { ok: false, reason: "no job-signing secret configured" };
   const dot = token.indexOf(".");
@@ -106,7 +138,9 @@ export function verifyJobToken(
   const exp = Number(token.slice(0, dot));
   const sig = token.slice(dot + 1);
   if (!Number.isFinite(exp)) return { ok: false, reason: "malformed expiry" };
-  const expected = createHmac("sha256", secret).update(tokenPayload(purpose, slug, jobId, exp)).digest("hex");
+  const expected = createHmac("sha256", secret)
+    .update(tokenPayload(purpose, slug, jobId, exp, approvedManifestDigest))
+    .digest("hex");
   const a = Buffer.from(sig, "utf8");
   const b = Buffer.from(expected, "utf8");
   if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, reason: "bad signature" };

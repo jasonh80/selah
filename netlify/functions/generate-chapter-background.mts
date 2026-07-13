@@ -2,8 +2,9 @@
 // so deep OpenAI generation isn't killed by the request timeout.
 //
 // AUTHENTICATED single-use worker: POST-only, and every request must carry a
-// signed, expiring job token bound to (text, slug, jobId) minted by the route
-// that took the atomic claim. The worker then atomically CONSUMES the claim
+// signed, expiring job token bound to (text, slug, jobId) and, when present,
+// the approved manifest digest minted by the route that took the atomic claim.
+// The worker then atomically CONSUMES the claim
 // (queued → running) inside generateAndStoreChapter — a duplicated delivery
 // loses at that conditional write, before any paid model call. Refusals are
 // durably audited, not just logged.
@@ -29,10 +30,14 @@ export default async (req: Request) => {
   const slug = typeof body.slug === "string" ? body.slug : "";
   const jobId = typeof body.job === "string" ? body.job : "";
   const token = typeof body.token === "string" ? body.token : "";
+  if (body.approvedManifestDigest !== undefined && typeof body.approvedManifestDigest !== "string") {
+    return refuse(slug, "invalid approved manifest digest — refusing unauthenticated work", 400);
+  }
+  const approvedManifestDigest = body.approvedManifestDigest as string | undefined;
   if (!slug || !jobId) {
     return refuse(slug, "missing slug or job id — refusing unclaimed work", 400);
   }
-  const auth = verifyJobToken("text", slug, jobId, token);
+  const auth = verifyJobToken("text", slug, jobId, token, undefined, approvedManifestDigest);
   if (!auth.ok) {
     return refuse(slug, `job token rejected (${auth.reason}) — refusing unauthenticated work`, 401);
   }
@@ -40,7 +45,7 @@ export default async (req: Request) => {
     return refuse(slug, "generation not allowed for this slug", 403);
   }
   try {
-    const workup = await generateAndStoreChapter(slug, jobId);
+    const workup = await generateAndStoreChapter(slug, jobId, approvedManifestDigest);
     return new Response(JSON.stringify({ ok: Boolean(workup), slug, jobId }), {
       status: workup ? 200 : 409,
     });

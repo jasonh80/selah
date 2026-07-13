@@ -4,8 +4,9 @@
 // stranded as "generating"/claimed by a failed trigger).
 //
 // Every trigger is authenticated: POST-only, carrying a signed, expiring job
-// token bound to (purpose, slug, jobId). Workers verify the token before any
-// work; a bare or replayed-after-expiry URL does nothing.
+// token bound to (purpose, slug, jobId) and, for an approved text run, its
+// manifest digest. Workers verify the token before any work; a bare or
+// replayed-after-expiry URL does nothing.
 import { signJobToken, type JobPurpose } from "./generation-jobs";
 
 export interface TriggerResult {
@@ -16,7 +17,7 @@ export interface TriggerResult {
 
 interface TriggerRequest {
   url: string;
-  body: { slug: string; job: string; token: string };
+  body: { slug: string; job: string; token: string; approvedManifestDigest?: string };
 }
 
 async function post(reqSpec: TriggerRequest): Promise<TriggerResult> {
@@ -49,22 +50,39 @@ function baseUrl(host: string): string {
   return `${proto}://${host}`;
 }
 
-async function trigger(purpose: JobPurpose, fn: string, slug: string, host: string, jobId: string): Promise<TriggerResult> {
+async function trigger(
+  purpose: JobPurpose,
+  fn: string,
+  slug: string,
+  host: string,
+  jobId: string,
+  approvedManifestDigest?: string,
+): Promise<TriggerResult> {
   let token: string;
   try {
-    token = signJobToken(purpose, slug, jobId).token; // throws if no secret (fail closed)
+    token = signJobToken(purpose, slug, jobId, undefined, approvedManifestDigest).token; // throws if invalid/unconfigured
   } catch (e) {
     return { ok: false, error: String((e as Error).message).slice(0, 200) };
   }
   const req: TriggerRequest = {
     url: `${baseUrl(host)}/.netlify/functions/${fn}`,
-    body: { slug, job: jobId, token },
+    body: {
+      slug,
+      job: jobId,
+      token,
+      ...(approvedManifestDigest === undefined ? {} : { approvedManifestDigest }),
+    },
   };
   return triggerOverride ? triggerOverride(req) : post(req);
 }
 
-export async function triggerBackgroundGeneration(slug: string, host: string, jobId: string): Promise<TriggerResult> {
-  return trigger("text", "generate-chapter-background", slug, host, jobId);
+export async function triggerBackgroundGeneration(
+  slug: string,
+  host: string,
+  jobId: string,
+  approvedManifestDigest?: string,
+): Promise<TriggerResult> {
+  return trigger("text", "generate-chapter-background", slug, host, jobId, approvedManifestDigest);
 }
 
 export async function triggerBackgroundImageGeneration(slug: string, host: string, jobId: string): Promise<TriggerResult> {
