@@ -196,6 +196,84 @@ export interface ClaimMeta {
   bibleVersion?: string;
   /** Optional owner-approved manifest bound to this one text job. */
   approvedManifestDigest?: string;
+  /**
+   * Server-only approval to replace already completed images during a text
+   * regeneration. A browser boolean cannot satisfy this unique-symbol token;
+   * an authenticated server caller must import and pass it deliberately.
+   */
+  allowDiscardCompletedImages?: typeof ALLOW_DISCARD_COMPLETED_IMAGES;
+}
+
+export const ALLOW_DISCARD_COMPLETED_IMAGES = Symbol(
+  "selah.allow-discard-completed-images",
+);
+
+const IMAGE_JOB_METADATA_KEYS = [
+  IMAGE_JOB_KEY,
+  IMAGE_JOB_STATE_KEY,
+  IMAGE_JOB_PLAN_DIGEST_KEY,
+  IMAGE_JOB_MODEL_KEY,
+  IMAGE_JOB_SPENT_COUNT_KEY,
+  IMAGE_JOB_ERROR_CODE_KEY,
+] as const;
+
+const PAID_IMAGE_JOB_STATES = new Set(["queued", "running", "failed", "blocked"]);
+
+/**
+ * Text completion replaces the entire workup, including its images. Refuse
+ * that lifecycle while paid image work is active or unresolved, and require
+ * an explicit server-only approval before replacing completed image assets.
+ */
+function assertTextClaimMayReplaceImages(
+  slug: string,
+  row: JobRow | null | { error: string },
+  meta: ClaimMeta,
+): void {
+  if (row === null || "error" in row) return;
+  const json = row.workupJson;
+  const presentMetadata = IMAGE_JOB_METADATA_KEYS.filter((key) =>
+    Object.prototype.hasOwnProperty.call(json, key),
+  );
+  if (presentMetadata.length > 0) {
+    const rawState = json[IMAGE_JOB_STATE_KEY];
+    const state = typeof rawState === "string" && PAID_IMAGE_JOB_STATES.has(rawState)
+      ? ` (${rawState})`
+      : "";
+    throw new ChapterMutationError(
+      "REFUSED",
+      "claimGenerationJob",
+      slug,
+      `image job${state} is active or unresolved — refusing to replace its paid work`,
+    );
+  }
+
+  const images = json.images;
+  if (images === undefined) return;
+  if (!Array.isArray(images)) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "claimGenerationJob",
+      slug,
+      "stored images are unreadable — refusing to replace them (fail closed)",
+    );
+  }
+  const hasCompletedImages = images.some(
+    (image) =>
+      typeof image === "object" &&
+      image !== null &&
+      (image as Record<string, unknown>).status === "complete",
+  );
+  if (
+    hasCompletedImages &&
+    meta.allowDiscardCompletedImages !== ALLOW_DISCARD_COMPLETED_IMAGES
+  ) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "claimGenerationJob",
+      slug,
+      "completed images require explicit trusted approval before text regeneration can replace them",
+    );
+  }
 }
 
 // ---------------- text jobs ----------------
@@ -322,6 +400,7 @@ export async function claimGenerationJob(
   const row = await store.read(slug);
   const decision = decideMutation("createGeneratingChapterWorkup", slug, toLookup(row));
   if (!decision.allowed) throw new ChapterMutationError("REFUSED", "claimGenerationJob", slug, decision.reason);
+  assertTextClaimMayReplaceImages(slug, row, meta);
 
   const jobId = newJobId();
   const now = new Date().toISOString();
