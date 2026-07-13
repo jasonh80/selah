@@ -19,6 +19,9 @@ import {
   MARK_SPRINT_ESV_ASSEMBLER_REVISION,
   MARK_SPRINT_ESV_ENDPOINT,
   MARK_SPRINT_ESV_MAX_RESPONSE_BYTES,
+  MARK_SPRINT_ESV_MIN_AVERAGE_WORDS_PER_VERSE,
+  MARK_SPRINT_ESV_MIN_MEDIAN_WORDS_PER_VERSE,
+  MARK_SPRINT_ESV_MIN_WORDS_PER_VERSE,
   MARK_SPRINT_ESV_NORMALIZER_REVISION,
   MARK_SPRINT_ESV_OVERLAP_BLOCK_TOKENS,
   MARK_SPRINT_ESV_OVERLAP_CANDIDATE_TOKENS,
@@ -167,7 +170,14 @@ function validateNormalizedChapterText(text: string, reference: string): void {
   const verseSegments = Array.from(
     text.matchAll(/\[(\d+)\]([\s\S]*?)(?=\[\d+\]|$)/gu),
   );
-  const wordCount = (text.match(/\p{L}+(?:['’]\p{L}+)*/gu) ?? []).length;
+  const words = (value: string) =>
+    value.match(/\p{L}+(?:['’]\p{L}+)*/gu) ?? [];
+  const wordCount = words(text).length;
+  const segmentWordCounts = verseSegments
+    .map((segment) => words(segment[2] ?? "").length)
+    .sort((left, right) => left - right);
+  const lowerMedianWordCount =
+    segmentWordCounts[Math.floor((segmentWordCounts.length - 1) / 2)] ?? 0;
   if (
     !expectedMarkers ||
     text !== normalizeDigestText(text).trim() ||
@@ -179,9 +189,11 @@ function validateNormalizedChapterText(text: string, reference: string): void {
     verseSegments.some(
       (segment, index) =>
         Number(segment[1]) !== expectedMarkers[index] ||
-        !/\p{L}/u.test(segment[2] ?? ""),
+        words(segment[2] ?? "").length < MARK_SPRINT_ESV_MIN_WORDS_PER_VERSE,
     ) ||
-    wordCount < expectedMarkers.length * 3
+    wordCount <
+      expectedMarkers.length * MARK_SPRINT_ESV_MIN_AVERAGE_WORDS_PER_VERSE ||
+    lowerMedianWordCount < MARK_SPRINT_ESV_MIN_MEDIAN_WORDS_PER_VERSE
   ) {
     return sourceError(
       "SOURCE_TEXT_INVALID",

@@ -7,7 +7,10 @@ export const MARK_SPRINT_ESV_ASSEMBLER_REVISION =
   "mark-sprint-esv-assembler-v1";
 export const MARK_SPRINT_ESV_NORMALIZER_REVISION = "nfc-lf-trim-v1";
 export const MARK_SPRINT_ESV_RESPONSE_VALIDATOR_REVISION =
-  "complete-mark-chapter-response-esv-2025-v2";
+  "complete-mark-chapter-response-esv-2025-v3";
+export const MARK_SPRINT_ESV_MIN_WORDS_PER_VERSE = 3;
+export const MARK_SPRINT_ESV_MIN_AVERAGE_WORDS_PER_VERSE = 8;
+export const MARK_SPRINT_ESV_MIN_MEDIAN_WORDS_PER_VERSE = 8;
 export const MARK_SPRINT_ESV_SOURCE_BUNDLE_SCHEMA =
   "mark-sprint-esv-source-bundle-v2";
 export const MARK_SPRINT_ESV_MAX_RESPONSE_BYTES = 250_000;

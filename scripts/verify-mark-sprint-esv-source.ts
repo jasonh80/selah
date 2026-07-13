@@ -54,15 +54,37 @@ function syntheticPayload(
     multiplePassages?: boolean;
     metadataExtra?: string;
     markerOnly?: boolean;
+    lopsidedBody?: boolean;
+    thinEveryVerse?: boolean;
+    hybridSparseBody?: boolean;
   } = {},
 ) {
   const pair = expectedMarkChapterVerseIdPair(reference);
   assert.ok(pair);
+  const markers = expectedMarkChapterVerseMarkers(reference)!;
   const completeText = options.markerOnly
-    ? expectedMarkChapterVerseMarkers(reference)!
+    ? markers
         .map((verse) => `[${verse}]`)
         .join(" ")
         .padEnd(200, " ")
+    : options.lopsidedBody
+      ? markers
+          .map((verse, index) =>
+            index === 0
+              ? `[${verse}] word ${"padding ".repeat(markers.length * 8)}`
+              : `[${verse}] word`,
+          )
+          .join("\n\n")
+    : options.thinEveryVerse
+      ? markers.map((verse) => `[${verse}] one two three`).join("\n\n")
+    : options.hybridSparseBody
+      ? markers
+          .map((verse, index) =>
+            index === 0
+              ? `[${verse}] one two three ${"padding ".repeat(markers.length * 8)}`
+              : `[${verse}] one two three`,
+          )
+          .join("\n\n")
     : syntheticChapterText(reference, options.variant);
   const text = completeText.replace(
     options.omitVerse ? new RegExp(`\\[${options.omitVerse}\\][^\\[]*`, "u") : /$^/u,
@@ -383,6 +405,33 @@ await expectSourceError("marker-only chapter", "SOURCE_TEXT_INVALID", () =>
     apiKey: SYNTHETIC_KEY,
     fetchImpl: syntheticFetcher({
       payload: (reference) => syntheticPayload(reference, { markerOnly: true }),
+    }).fetchImpl,
+  }),
+);
+await expectSourceError("lopsided verse bodies", "SOURCE_TEXT_INVALID", () =>
+  loadMarkSprintEsvSourceBundle({
+    slug: "mark-8",
+    apiKey: SYNTHETIC_KEY,
+    fetchImpl: syntheticFetcher({
+      payload: (reference) => syntheticPayload(reference, { lopsidedBody: true }),
+    }).fetchImpl,
+  }),
+);
+await expectSourceError("thin whole chapter", "SOURCE_TEXT_INVALID", () =>
+  loadMarkSprintEsvSourceBundle({
+    slug: "mark-8",
+    apiKey: SYNTHETIC_KEY,
+    fetchImpl: syntheticFetcher({
+      payload: (reference) => syntheticPayload(reference, { thinEveryVerse: true }),
+    }).fetchImpl,
+  }),
+);
+await expectSourceError("hybrid sparse chapter", "SOURCE_TEXT_INVALID", () =>
+  loadMarkSprintEsvSourceBundle({
+    slug: "mark-8",
+    apiKey: SYNTHETIC_KEY,
+    fetchImpl: syntheticFetcher({
+      payload: (reference) => syntheticPayload(reference, { hybridSparseBody: true }),
     }).fetchImpl,
   }),
 );
