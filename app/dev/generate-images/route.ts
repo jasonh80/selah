@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
 import { imageGenAllowed, CHAPTER_IMAGE_MODEL, IMAGE_ALLOWED_SLUGS } from "@/lib/server/images";
 import { triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
+import { claimImageJob, releaseImageJob, requireJobStore } from "@/lib/server/generation-jobs";
+import { isChapterMutationError } from "@/lib/server/protected-chapters";
+import { logGenerationAudit } from "@/lib/server/generation-settings";
 
 // DEV/ADMIN ONLY image generation trigger. ALL of these are required:
 //   - ENABLE_DEV_ROUTES=true (else 404)
@@ -55,12 +58,39 @@ export async function GET(request: Request) {
     });
   }
 
-  await triggerBackgroundImageGeneration(slug, url.host);
+  // Same discipline as the Studio route: atomic single-use claim BEFORE the
+  // trigger; a failed trigger releases the claim and every refusal is audited.
+  let jobId: string;
+  try {
+    const claim = await claimImageJob(requireJobStore(slug, "dev_generate_images"), slug);
+    jobId = claim.jobId;
+  } catch (e) {
+    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
+    await logGenerationAudit({ action: "refused:dev_generate_images", slug, status: "failed", message: msg.slice(0, 300) });
+    const code = isChapterMutationError(e) ? (e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500) : 500;
+    return NextResponse.json({ ok: false, error: msg }, { status: code });
+  }
+  const triggered = await triggerBackgroundImageGeneration(slug, url.host, jobId);
+  if (!triggered.ok) {
+    const released = await releaseImageJob(requireJobStore(slug, "dev_generate_images"), slug, jobId);
+    const note = released ? "image claim released" : "image claim could NOT be released; the row may still hold a stale claim";
+    await logGenerationAudit({
+      action: "refused:dev_generate_images",
+      slug,
+      status: "failed",
+      message: `trigger failed (${triggered.error ?? triggered.status}) — ${note}`,
+    });
+    return NextResponse.json(
+      { ok: false, error: `background trigger failed — ${note} (${triggered.error ?? triggered.status})` },
+      { status: released ? 502 : 500 },
+    );
+  }
   return NextResponse.json({
     ok: true,
     triggered: true,
     slug,
+    jobId,
     model: CHAPTER_IMAGE_MODEL,
-    note: `Generating 3 images in the background. Poll /dev/db-status?slug=${slug} until imagesStored=true.`,
+    note: `Generating images in the background. Poll /dev/db-status?slug=${slug} until imagesStored=true.`,
   });
 }

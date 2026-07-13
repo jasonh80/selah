@@ -121,8 +121,16 @@ export function isChapterMutationError(e: unknown): e is ChapterMutationError {
   return e instanceof ChapterMutationError;
 }
 
+// TEST SEAM (offline safety gate only): lets scripts/verify-studio-safety.ts
+// point the REAL route guards at a fake store. Never set in production paths.
+let rowLookupOverride: ((slug: string) => Promise<RowLookup>) | null = null;
+export function __setRowLookupForTesting(fn: ((slug: string) => Promise<RowLookup>) | null): void {
+  rowLookupOverride = fn;
+}
+
 /** Fetch the row snapshot for the decision. Any failure maps to a refusing lookup. */
 export async function lookupChapterRow(slug: string): Promise<RowLookup> {
+  if (rowLookupOverride) return rowLookupOverride(slug);
   const db = getSupabaseAdmin();
   if (!db) return { kind: "unconfigured" };
   const { data, error } = await db

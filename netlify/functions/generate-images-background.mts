@@ -1,20 +1,50 @@
-// Netlify BACKGROUND function: generates the chapter's 3 images (slow), uploads
+// Netlify BACKGROUND function: generates the chapter's images (slow), uploads
 // them to Supabase Storage, and wires them into workup_json. 15-min budget.
-// Allowlisted + flag-gated inside generateAndStoreChapterImages. No text gen.
+//
+// AUTHENTICATED single-use worker: POST-only with a signed, expiring job token
+// bound to (image, slug, jobId). The ROUTE already probed the model and took
+// the atomic image claim; this worker atomically CONSUMES it (queued →
+// running) before any spend, so a duplicated delivery cannot double-spend.
+// Refusals are durably audited. No text generation here.
 import { generateAndStoreChapterImages, imageGenAllowed } from "../../lib/server/images";
+import { verifyJobToken } from "../../lib/server/generation-jobs";
+import { logGenerationAudit } from "../../lib/server/generation-settings";
+
+async function refuse(slug: string, reason: string, status: number): Promise<Response> {
+  await logGenerationAudit({
+    action: "refused:worker_images",
+    slug: slug || undefined,
+    status: "failed",
+    message: reason.slice(0, 300),
+  });
+  return new Response(JSON.stringify({ ok: false, error: reason }), { status });
+}
 
 export default async (req: Request) => {
-  const slug = new URL(req.url).searchParams.get("slug") || "";
+  if (req.method !== "POST") {
+    return refuse("", `method ${req.method} not allowed — worker accepts POST only`, 405);
+  }
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const slug = typeof body.slug === "string" ? body.slug : "";
+  const jobId = typeof body.job === "string" ? body.job : "";
+  const token = typeof body.token === "string" ? body.token : "";
+  if (!slug || !jobId) {
+    return refuse(slug, "missing slug or job id — refusing unclaimed image work", 400);
+  }
+  const auth = verifyJobToken("image", slug, jobId, token);
+  if (!auth.ok) {
+    return refuse(slug, `job token rejected (${auth.reason}) — refusing unauthenticated work`, 401);
+  }
   if (!(await imageGenAllowed(slug))) {
-    return new Response(JSON.stringify({ ok: false, error: "not allowed" }), { status: 403 });
+    return refuse(slug, "image generation not allowed for this slug", 403);
   }
   try {
-    const result = await generateAndStoreChapterImages(slug);
+    const result = await generateAndStoreChapterImages(slug, jobId);
     return new Response(JSON.stringify(result), { status: result.ok ? 200 : 500 });
   } catch (e) {
-    console.error("[selah] background image generation error:", (e as Error).message);
-    return new Response(JSON.stringify({ ok: false, error: String((e as Error).message) }), {
-      status: 500,
-    });
+    const msg = String((e as Error).message).slice(0, 300);
+    console.error("[selah] background image generation error:", msg);
+    await logGenerationAudit({ action: "refused:worker_images", slug, status: "failed", message: msg });
+    return new Response(JSON.stringify({ ok: false, error: msg }), { status: 500 });
   }
 };

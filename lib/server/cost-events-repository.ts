@@ -42,7 +42,19 @@ export interface CostEventRow {
   created_at: string;
 }
 
+// TEST SEAM (offline safety gate only): capture cost events in memory so the
+// verify script can assert failed/conflicted spend is recorded. Never set in
+// production code paths.
+let costCapture: CostEventInput[] | null = null;
+export function __setCostCaptureForTesting(capture: CostEventInput[] | null): void {
+  costCapture = capture;
+}
+
 export async function recordCostEvent(input: CostEventInput): Promise<void> {
+  if (costCapture) {
+    costCapture.push({ ...input });
+    return;
+  }
   const db = getSupabaseAdmin();
   if (!db) {
     warnSupabaseMissing("recordCostEvent");

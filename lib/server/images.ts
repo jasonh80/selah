@@ -8,7 +8,7 @@ import { isChapterMutationError } from "./protected-chapters";
 import { recordCostEvent } from "./cost-events-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import {
-  claimImageJob,
+  consumeImageClaim,
   completeImageJob,
   releaseImageJob,
   requireJobStore,
@@ -42,10 +42,28 @@ export async function checkImageModel(model?: string): Promise<{ ok: boolean; mo
 // will come from their workup later; for now image gen needs a plan here.)
 export const IMAGE_ALLOWED_SLUGS = ["psalm-23", "mark-6"];
 
+// TEST SEAM (offline safety gate only): skip env-configured checks and supply
+// a synthetic plan so the verify script can drive the REAL image pipeline —
+// the settings kill switch and allowlist still apply. Never set in production.
+let imageConfigBypassForTesting = false;
+let imagePlansOverride: Record<string, ImagePlan[]> | null = null;
+export function __setImageTestOverrides(overrides: {
+  configBypass?: boolean;
+  plans?: Record<string, ImagePlan[]> | null;
+} | null): void {
+  imageConfigBypassForTesting = overrides?.configBypass ?? false;
+  imagePlansOverride = overrides?.plans ?? null;
+}
+
+function plansFor(slug: string): ImagePlan[] | undefined {
+  return imagePlansOverride?.[slug] ?? IMAGE_PLANS[slug];
+}
+
 // Routine image control lives in Supabase (generation_settings.image_generation_enabled,
 // defaults OFF). Fail-CLOSED. Still requires an IMAGE_PLAN for the slug.
 export async function imageGenAllowed(slug: string): Promise<boolean> {
-  if (!isOpenAIConfigured() || !isSupabaseConfigured() || !IMAGE_PLANS[slug]) return false;
+  if (!imageConfigBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
+  if (!plansFor(slug)) return false;
   const s = await getGenerationSettings();
   return s.image_generation_enabled && s.allowed_slugs.includes(slug);
 }
@@ -203,81 +221,110 @@ export interface ImageGenResult {
   error?: string;
 }
 
+// TEST SEAM (offline safety gate only): replaces storage + the paid image call
+// so the verify script can drive the REAL worker pipeline — bucket failures,
+// upload failures, conflicts — with zero network and zero spend.
+interface ImageRuntimeDeps {
+  db: NonNullable<ReturnType<typeof getSupabaseAdmin>>;
+  generateBytes: typeof generateImageBytes;
+}
+let imageDepsOverride: Partial<ImageRuntimeDeps> | null = null;
+export function __setImageDepsForTesting(deps: Partial<ImageRuntimeDeps> | null): void {
+  imageDepsOverride = deps;
+}
+
 /**
- * Generate, store, and wire up the chapter's images. Allowlisted + flag-gated.
- * Does NOT generate or modify chapter text.
+ * Generate, store, and wire up the chapter's images for an ALREADY-CLAIMED
+ * image job. The ROUTE probed the model and took the atomic claim; this
+ * worker-side flow atomically CONSUMES it (queued → running) before any
+ * spend. Allowlisted + flag-gated. Does NOT generate or modify chapter text.
  */
-export async function generateAndStoreChapterImages(slug: string): Promise<ImageGenResult> {
+export async function generateAndStoreChapterImages(slug: string, jobId: string): Promise<ImageGenResult> {
   const model = await activeImageModel();
   if (!(await imageGenAllowed(slug))) {
     return { ok: false, slug, model, error: "image generation not allowed for this slug" };
   }
-  // Confirm the selected model exists BEFORE spending anything. NO fallback.
-  const check = await checkImageModel(model);
-  if (!check.ok) {
-    return { ok: false, slug, model, error: `image model "${model}" unavailable: ${check.error}` };
-  }
-  const db = getSupabaseAdmin();
+  const db = imageDepsOverride?.db ?? getSupabaseAdmin();
   if (!db) return { ok: false, slug, model, error: "Supabase not configured" };
 
-  // SINGLE-USE image job claim (collision-resistant UUID) taken BEFORE any
-  // model spend: a duplicate request cannot claim (409) and cannot spend twice.
-  // The claim is refused on protected/published/quarantined rows and pins the
-  // whole run — the terminal write re-asserts this exact job id.
+  // ATOMIC CONSUMPTION of the route's single-use claim: queued → running,
+  // pinned to this exact job id and the row revision. A duplicated delivery
+  // loses here with zero rows changed — BEFORE any model spend. Protected
+  // slugs and null revisions are refused inside the helper.
   const store = requireJobStore(slug, "generateAndStoreChapterImages");
-  let jobId: string;
   let workup: ChapterWorkup;
   try {
-    const claim = await claimImageJob(store, slug);
-    jobId = claim.jobId;
-    workup = claim.workup;
+    workup = await consumeImageClaim(store, slug, jobId);
   } catch (e) {
     const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
-    console.error(`[selah] image claim failed for ${slug}: ${msg}`);
-    await logGenerationAudit({ action: "image_run_refused", slug, model, status: "failed", message: msg.slice(0, 300) });
+    console.error(`[selah] image claim consumption failed for ${slug}: ${msg}`);
+    await logGenerationAudit({ action: "image_run_refused", slug, model, status: "failed", message: `${msg} (no spend occurred)`.slice(0, 300) });
     return { ok: false, slug, model, error: msg };
   }
-  if (!workup || !Array.isArray(workup.images)) {
-    await releaseImageJob(store, slug, jobId);
-    await logGenerationAudit({ action: "image_run_refused", slug, model, status: "failed", message: "stored row has no renderable workup" });
+  if (!Array.isArray(workup.images)) {
+    const released = await releaseImageJob(store, slug, jobId);
+    await logGenerationAudit({
+      action: "image_run_refused",
+      slug,
+      model,
+      status: "failed",
+      message: `stored row has no renderable workup${released ? "" : " (claim NOT released — manual cleanup needed)"}`,
+    });
     return { ok: false, slug, model, error: "no stored chapter workup for slug" };
   }
 
-  const plans = IMAGE_PLANS[slug];
-  await ensureBucket(db);
+  const plans = plansFor(slug)!; // imageGenAllowed already required a plan
+  const generate = imageDepsOverride?.generateBytes ?? generateImageBytes;
 
   // Generate + upload each image (sequential — kinder to rate limits).
   // Every run writes to its OWN immutable directory named by the job id (never
   // upsert, never a stable path): a stale/concurrent run cannot overwrite
   // published bytes at any point.
+  //
+  // The ENTIRE spend envelope — bucket setup, generation, upload — is inside
+  // one try/catch that (a) counts GENERATED images as spend even when their
+  // upload failed, (b) durably audits, and (c) releases the claim for retry.
   const stored: { kind: ImageKind; url: string; plan: ImagePlan }[] = [];
+  let generatedCount = 0;
   try {
+    await ensureBucket(db);
     for (const plan of plans) {
-      const bytes = await generateImageBytes(model, plan);
+      const bytes = await generate(model, plan);
+      generatedCount += 1; // model spend happened even if the upload below fails
       const url = await uploadImage(db, `${slug}/${jobId}/${fileFor(plan.kind)}`, bytes);
       stored.push({ kind: plan.kind, url, plan });
     }
   } catch (e) {
-    // Terminal audit for failed spend: record how far the run got, release the
-    // claim so a retry can proceed, and point at any orphaned files.
     const msg = String((e as Error).message).slice(0, 200);
-    await recordCostEvent({
-      requestType: "chapter_image_generation",
-      provider: "openai",
-      model,
-      imageCount: stored.length,
-      estimatedCostUsd: stored.length * 0.04,
-      metadata: { slug, jobId, failed: true, error: msg, completedKinds: stored.map((x) => x.kind) },
-    });
+    if (generatedCount > 0) {
+      await recordCostEvent({
+        requestType: "chapter_image_generation",
+        provider: "openai",
+        model,
+        imageCount: generatedCount,
+        estimatedCostUsd: generatedCount * 0.04,
+        metadata: {
+          slug,
+          jobId,
+          failed: true,
+          error: msg,
+          generated: generatedCount,
+          uploaded: stored.length,
+          completedKinds: stored.map((x) => x.kind),
+        },
+      });
+    }
+    const released = await releaseImageJob(store, slug, jobId);
     await logGenerationAudit({
       action: "image_run_failed",
       slug,
       model,
       status: "failed",
-      message: `spent ${stored.length}/${plans.length} images before error: ${msg}; orphaned dir: ${slug}/${jobId}/`,
+      message:
+        `generated ${generatedCount}/${plans.length}, uploaded ${stored.length} before error: ${msg}; ` +
+        `orphaned dir: ${slug}/${jobId}/${released ? "" : "; claim NOT released — manual cleanup needed"}`,
     });
-    await releaseImageJob(store, slug, jobId);
-    return { ok: false, slug, model, error: `image run failed after ${stored.length}/${plans.length} images: ${msg}` };
+    return { ok: false, slug, model, error: `image run failed after ${generatedCount}/${plans.length} images: ${msg}` };
   }
 
   // Wire stored images into workup_json.images: replace matching kinds, APPEND
@@ -318,6 +365,16 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
   } catch (e) {
     const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
     console.error(`[selah] image run for ${slug} not applied — ${msg}`);
+    // The spend already happened even though the result can't be applied —
+    // record it as a real cost event, not just an audit line.
+    await recordCostEvent({
+      requestType: "chapter_image_generation",
+      provider: "openai",
+      model,
+      imageCount: generatedCount,
+      estimatedCostUsd: generatedCount * 0.04,
+      metadata: { slug, jobId, conflict: true, error: msg, generated: generatedCount, uploaded: stored.length },
+    });
     await logGenerationAudit({
       action: "image_run_conflict",
       slug,
@@ -340,9 +397,9 @@ export async function generateAndStoreChapterImages(slug: string): Promise<Image
     requestType: "chapter_image_generation",
     provider: "openai",
     model,
-    imageCount: plans.length,
-    estimatedCostUsd: plans.length * 0.04,
-    metadata: { slug, imageTypes: plans.map((p) => p.kind) },
+    imageCount: generatedCount,
+    estimatedCostUsd: generatedCount * 0.04,
+    metadata: { slug, jobId, imageTypes: plans.map((p) => p.kind) },
   });
 
   return { ok: true, slug, model, images: stored.map((s) => ({ kind: s.kind, url: s.url })) };

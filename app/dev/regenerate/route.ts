@@ -4,6 +4,7 @@ import { getChapterStatus } from "@/lib/server/chapter-workups-repository";
 import { claimGenerationJob, failGenerationJob, requireJobStore } from "@/lib/server/generation-jobs";
 import { isChapterMutationError } from "@/lib/server/protected-chapters";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
+import { logGenerationAudit } from "@/lib/server/generation-settings";
 import { CHAPTER_WORKUP_TEXT_MODEL } from "@/lib/server/openai";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
 
@@ -76,18 +77,35 @@ export async function GET(request: Request) {
       source: "generated",
     });
   } catch (e) {
+    // Every refusal is durably audited — legacy dev routes included.
+    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
+    await logGenerationAudit({ action: "refused:regenerate", slug, status: "failed", message: msg.slice(0, 300) });
     if (isChapterMutationError(e)) {
       const code = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
-      return NextResponse.json({ ...base, ok: false, error: `${e.code}: ${e.message}` }, { status: code });
+      return NextResponse.json({ ...base, ok: false, error: msg }, { status: code });
     }
-    return NextResponse.json({ ...base, ok: false, error: String((e as Error).message) }, { status: 500 });
+    return NextResponse.json({ ...base, ok: false, error: msg }, { status: 500 });
   }
   const triggered = await triggerBackgroundGeneration(slug, url.host, jobId);
   if (!triggered.ok) {
-    await failGenerationJob(requireJobStore(slug, "regenerate"), slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+    // Report the cleanup outcome truthfully — never claim "marked failed"
+    // when the cleanup write itself failed and the row may be stranded.
+    const cleanup = await failGenerationJob(requireJobStore(slug, "regenerate"), slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+    const cleanupNote =
+      cleanup === "marked_failed"
+        ? "job marked failed"
+        : cleanup === "conflict"
+          ? "a newer run owns this chapter; nothing was overwritten"
+          : "CLEANUP WRITE FAILED — the row may still be marked generating";
+    await logGenerationAudit({
+      action: "refused:regenerate",
+      slug,
+      status: "failed",
+      message: `trigger failed (${triggered.error ?? triggered.status}) — ${cleanupNote}`,
+    });
     return NextResponse.json(
-      { ...base, ok: false, error: `background trigger failed — job marked failed (${triggered.error ?? triggered.status})` },
-      { status: 502 },
+      { ...base, ok: false, error: `background trigger failed — ${cleanupNote} (${triggered.error ?? triggered.status})` },
+      { status: cleanup === "write_failed" ? 500 : 502 },
     );
   }
 

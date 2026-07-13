@@ -31,7 +31,21 @@ const FALLBACK: GenerationSettings = {
   updated_at: "",
 };
 
+// TEST SEAM (offline safety gate only): lets scripts/verify-studio-safety.ts
+// drive the REAL admin route/workers with controlled settings and capture the
+// durable audit trail in memory. Never set in production code paths.
+let settingsOverride: GenerationSettings | null = null;
+let auditCapture: Array<Record<string, unknown>> | null = null;
+export function __setGenerationTestOverrides(overrides: {
+  settings?: GenerationSettings | null;
+  captureAudit?: Array<Record<string, unknown>> | null;
+} | null): void {
+  settingsOverride = overrides?.settings ?? null;
+  auditCapture = overrides?.captureAudit ?? null;
+}
+
 export async function getGenerationSettings(): Promise<GenerationSettings> {
+  if (settingsOverride) return settingsOverride;
   const db = getSupabaseAdmin();
   if (!db) return FALLBACK;
   const { data, error } = await db.from(TABLE).select("*").eq("id", "global").maybeSingle();
@@ -78,6 +92,10 @@ export async function logGenerationAudit(entry: {
   status: "started" | "succeeded" | "failed";
   message?: string;
 }): Promise<void> {
+  if (auditCapture) {
+    auditCapture.push({ ...entry });
+    return;
+  }
   const db = getSupabaseAdmin();
   if (!db) return;
   const { error } = await db.from("generation_audit_log").insert({

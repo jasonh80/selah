@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
 import { getDraftWorkup, publishChapter } from "@/lib/server/chapter-workups-repository";
 import { isChapterMutationError } from "@/lib/server/protected-chapters";
+import { logGenerationAudit } from "@/lib/server/generation-settings";
 
 // DEV/admin: promote a reviewed draft to published (status → reviewed, which the
 // public read-through serves). Two steps:
@@ -36,12 +37,16 @@ export async function GET(request: Request) {
 
   try {
     const newStatus = await publishChapter(slug);
+    await logGenerationAudit({ action: "publish", slug, status: "succeeded", message: "via /dev/publish" });
     return NextResponse.json({ ok: true, slug, status: newStatus, published: true });
   } catch (e) {
+    // Every refusal is durably audited — legacy dev routes included.
+    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
+    await logGenerationAudit({ action: "refused:publish", slug, status: "failed", message: msg.slice(0, 300) });
     if (isChapterMutationError(e)) {
       const code = e.code === "REFUSED" ? 403 : e.code === "CONFLICT" ? 409 : 500;
-      return NextResponse.json({ ok: false, slug, error: `${e.code}: ${e.message}` }, { status: code });
+      return NextResponse.json({ ok: false, slug, error: msg }, { status: code });
     }
-    return NextResponse.json({ ok: false, slug, error: String((e as Error).message) }, { status: 500 });
+    return NextResponse.json({ ok: false, slug, error: msg }, { status: 500 });
   }
 }

@@ -11,7 +11,13 @@ import {
   getDraftWorkup,
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
-import { claimGenerationJob, failGenerationJob, requireJobStore } from "@/lib/server/generation-jobs";
+import {
+  claimGenerationJob,
+  claimImageJob,
+  failGenerationJob,
+  releaseImageJob,
+  requireJobStore,
+} from "@/lib/server/generation-jobs";
 import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
 import { imageGenAllowed, checkImageModel } from "@/lib/server/images";
 import {
@@ -191,22 +197,45 @@ export async function POST(req: Request) {
   }
 
   // ---- image generation (Image Preview stage; separate kill switch) ----
+  // Order matters: guard → kill switch → model PROBE (no cost) → atomic
+  // single-use claim → authenticated trigger. A failed trigger RELEASES the
+  // claim (truthfully reported if release fails) — never a stranded claim.
   if (action === "generate_images") {
     const slug = String(body.slug ?? "");
     const blocked = await guardOrRefuse(slug, "generate_images", "updateChapterWorkupJson");
     if (blocked) return blocked;
     if (!(await imageGenAllowed(slug))) {
-      return NextResponse.json(
-        { ok: false, error: "Image generation not allowed — needs Image Generation ON, the slug allowlisted, and an approved image plan." },
-        { status: 403 },
+      return refuse(
+        slug,
+        "generate_images",
+        "Image generation not allowed — needs Image Generation ON, the slug allowlisted, and an approved image plan.",
+        403,
       );
     }
-    await logGenerationAudit({ action: "generate_images", slug, status: "started" });
-    const triggered = await triggerBackgroundImageGeneration(slug, new URL(req.url).host);
-    if (!triggered.ok) {
-      return refuse(slug, "generate_images", `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`})`, 502);
+    const probe = await checkImageModel(typeof body.model === "string" ? body.model : undefined);
+    if (!probe.ok) {
+      return refuse(slug, "generate_images", `image model "${probe.model}" unavailable: ${probe.error}`, 502);
     }
-    return NextResponse.json({ ok: true, triggered: true, slug });
+    let imageJobId: string;
+    try {
+      const claim = await claimImageJob(requireJobStore(slug, "generate_images"), slug);
+      imageJobId = claim.jobId;
+    } catch (e) {
+      return mapMutationError(slug, "generate_images", e);
+    }
+    await logGenerationAudit({ action: "generate_images", slug, status: "started", message: `job ${imageJobId}` });
+    const triggered = await triggerBackgroundImageGeneration(slug, new URL(req.url).host, imageJobId);
+    if (!triggered.ok) {
+      const released = await releaseImageJob(requireJobStore(slug, "generate_images"), slug, imageJobId);
+      return refuse(
+        slug,
+        "generate_images",
+        `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ` +
+          (released ? "image claim released" : "image claim could NOT be released; the row may still hold a stale claim"),
+        released ? 502 : 500,
+      );
+    }
+    return NextResponse.json({ ok: true, triggered: true, slug, jobId: imageJobId });
   }
   if (action === "images_status") {
     const slug = String(body.slug ?? "");
@@ -306,9 +335,22 @@ export async function POST(req: Request) {
     const triggered = await triggerBackgroundGeneration(slug, new URL(req.url).host, jobId);
     if (!triggered.ok) {
       // The chapter must never be stranded as "generating" by a failed trigger:
-      // fail the claimed job (pinned to this job id) and return a REAL failure.
-      await failGenerationJob(requireJobStore(slug, "generate"), slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
-      return refuse(slug, "generate", `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — job marked failed`, 502);
+      // fail the claimed job (pinned to this job id) and report the CLEANUP
+      // OUTCOME truthfully — a failed cleanup write means the row may still
+      // say "generating", and the response must never claim otherwise.
+      const cleanup = await failGenerationJob(requireJobStore(slug, "generate"), slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+      const cleanupNote =
+        cleanup === "marked_failed"
+          ? "job marked failed"
+          : cleanup === "conflict"
+            ? "a newer run owns this chapter; nothing was overwritten"
+            : "CLEANUP WRITE FAILED — the row may still be marked generating";
+      return refuse(
+        slug,
+        "generate",
+        `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ${cleanupNote}`,
+        cleanup === "write_failed" ? 500 : 502,
+      );
     }
     return NextResponse.json({
       ok: true,

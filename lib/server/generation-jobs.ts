@@ -1,24 +1,31 @@
-// SERVER-ONLY. Issue #8 PR 1: single-use generation job claims.
+// SERVER-ONLY. Issue #8: authenticated, single-use generation job claims.
 //
-// ONE atomic claim (unique collision-resistant job ID) is taken by the ROUTE;
-// the WORKER verifies that exact claim and every terminal write (save/fail)
-// re-asserts it. An older worker can never overwrite or fail a newer run:
-// its job ID no longer matches, so its conditional writes change zero rows.
+// Lifecycle: the ROUTE takes ONE atomic claim (unique job id, state "queued")
+// and hands the worker a SIGNED, EXPIRING token. The worker CONSUMES the claim
+// — an atomic conditional write flipping "queued" → "running" pinned to the
+// exact job id — so a duplicated delivery loses at the write, not at a read.
+// Every terminal write (complete/fail/release) re-asserts the job id and the
+// row revision, refuses protected slugs, and treats a missing revision as
+// fail-closed. An older worker can never overwrite, fail, or release a newer
+// run: its predicates match zero rows, which is a typed CONFLICT.
 //
-// The job ID lives inside workup_json (jsonb) — no schema change. Storage is
-// abstracted behind JobStorePort so the offline integration tests exercise the
-// REAL claim → worker → save/fail orchestration against a fake store.
-import { randomUUID } from "node:crypto";
+// Job id + state live inside workup_json (jsonb) — no schema change. Storage
+// is abstracted behind JobStorePort so the offline safety gate exercises the
+// REAL route/worker orchestration against a fake store.
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { ChapterWorkup } from "../types";
 import { getSupabaseAdmin } from "./supabase";
 import {
   decideMutation,
+  isProtectedSlug,
   ChapterMutationError,
   type RowLookup,
 } from "./protected-chapters";
 
 export const TEXT_JOB_KEY = "generationJobId";
+export const TEXT_JOB_STATE_KEY = "generationJobState";
 export const IMAGE_JOB_KEY = "imageJobId";
+export const IMAGE_JOB_STATE_KEY = "imageJobState";
 
 export interface JobRow {
   status: string;
@@ -29,8 +36,8 @@ export interface JobRow {
 export interface JobPredicates {
   status: string;
   updatedAt?: string | null; // when provided non-null, asserted on the write
-  jsonKey?: string; // e.g. TEXT_JOB_KEY
-  jsonEquals?: string | null; // required value (null = key must be absent)
+  /** Every listed workup_json key must equal its value (null = key absent). */
+  json?: { key: string; equals: string | null }[];
 }
 
 export interface JobStorePort {
@@ -50,6 +57,85 @@ export function newJobId(): string {
   return randomUUID(); // collision-resistant, never a timestamp
 }
 
+// ---------------- signed, expiring worker tokens ----------------
+
+export type JobPurpose = "text" | "image";
+
+// Reuses the existing admin secret when a dedicated one isn't configured.
+// FAIL-CLOSED: with neither set, tokens can't be signed and workers refuse all
+// requests — generation cannot run unauthenticated.
+function jobTokenSecret(): string {
+  return process.env.GENERATION_JOB_SECRET || process.env.DEV_ADMIN_TOKEN || "";
+}
+
+export const JOB_TOKEN_TTL_MS = 20 * 60 * 1000; // > the 15-min background budget
+
+function tokenPayload(purpose: JobPurpose, slug: string, jobId: string, exp: number): string {
+  return `selah-job-v1|${purpose}|${slug}|${jobId}|${exp}`;
+}
+
+/** Sign a worker token. Throws (fail closed) when no secret is configured. */
+export function signJobToken(purpose: JobPurpose, slug: string, jobId: string, now = Date.now()): {
+  token: string;
+  exp: number;
+} {
+  const secret = jobTokenSecret();
+  if (!secret) {
+    throw new ChapterMutationError("REFUSED", "signJobToken", slug, "no job-signing secret configured — refusing to trigger unauthenticated work");
+  }
+  const exp = now + JOB_TOKEN_TTL_MS;
+  const sig = createHmac("sha256", secret).update(tokenPayload(purpose, slug, jobId, exp)).digest("hex");
+  return { token: `${exp}.${sig}`, exp };
+}
+
+/** Verify a worker token: signature AND expiry. Constant-time comparison. */
+export function verifyJobToken(
+  purpose: JobPurpose,
+  slug: string,
+  jobId: string,
+  token: string,
+  now = Date.now(),
+): { ok: boolean; reason?: string } {
+  const secret = jobTokenSecret();
+  if (!secret) return { ok: false, reason: "no job-signing secret configured" };
+  const dot = token.indexOf(".");
+  if (dot <= 0) return { ok: false, reason: "malformed token" };
+  const exp = Number(token.slice(0, dot));
+  const sig = token.slice(dot + 1);
+  if (!Number.isFinite(exp)) return { ok: false, reason: "malformed expiry" };
+  const expected = createHmac("sha256", secret).update(tokenPayload(purpose, slug, jobId, exp)).digest("hex");
+  const a = Buffer.from(sig, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, reason: "bad signature" };
+  if (now > exp) return { ok: false, reason: "token expired" };
+  return { ok: true };
+}
+
+// ---------------- shared terminal-write guard ----------------
+
+/**
+ * Every consume/terminal write starts here: refuse protected slugs outright,
+ * refuse unreadable rows, and refuse rows without a pinnable revision. Returns
+ * the row so the caller can pin its conditional write to updatedAt + job id.
+ */
+async function readRowForTerminalWrite(
+  store: JobStorePort,
+  slug: string,
+  action: string,
+): Promise<JobRow> {
+  if (isProtectedSlug(slug)) {
+    throw new ChapterMutationError("REFUSED", action, slug, `"${slug}" is an explicitly protected chapter — terminal writes refuse it too`);
+  }
+  const row = await store.read(slug);
+  if (!row || (typeof row === "object" && "error" in row)) {
+    throw new ChapterMutationError("REFUSED", action, slug, "row unreadable — cannot verify claim (fail closed)");
+  }
+  if (row.updatedAt === null || row.updatedAt === "") {
+    throw new ChapterMutationError("REFUSED", action, slug, "row has no updated_at revision — cannot pin the write (fail closed)");
+  }
+  return row;
+}
+
 export interface ClaimMeta {
   book: string;
   chapter: number;
@@ -58,11 +144,13 @@ export interface ClaimMeta {
   bibleVersion?: string;
 }
 
+// ---------------- text jobs ----------------
+
 /**
- * Atomic single claim for TEXT generation (route-side; the worker never
- * re-claims). Missing row → INSERT (duplicate = conflict). Existing draft/
- * failed row → conditional update pinned to status + updated_at. The claim
- * stamps status="generating" + workup_json[TEXT_JOB_KEY]=jobId.
+ * Atomic single claim for TEXT generation (route-side; the worker consumes,
+ * never re-claims). Missing row → INSERT (duplicate = conflict). Existing
+ * draft/failed row → conditional update pinned to status + updated_at. The
+ * claim stamps status="generating", the job id, and state "queued".
  */
 export async function claimGenerationJob(
   store: JobStorePort,
@@ -92,7 +180,7 @@ export async function claimGenerationJob(
       subtitle: null,
       source: meta.source ?? "generated",
       bible_version: meta.bibleVersion ?? null,
-      workup_json: { [TEXT_JOB_KEY]: jobId },
+      workup_json: { [TEXT_JOB_KEY]: jobId, [TEXT_JOB_STATE_KEY]: "queued" },
     });
     if (inserted === "duplicate") {
       throw new ChapterMutationError("CONFLICT", "claimGenerationJob", slug, "another claim won the insert race");
@@ -108,7 +196,7 @@ export async function claimGenerationJob(
   const changed = await store.update(
     slug,
     { status: decision.expected.status, updatedAt: decision.expected.updatedAt },
-    { ...base, workup_json: { ...existingJson, [TEXT_JOB_KEY]: jobId } },
+    { ...base, workup_json: { ...existingJson, [TEXT_JOB_KEY]: jobId, [TEXT_JOB_STATE_KEY]: "queued" } },
   );
   if (typeof changed === "object") throw new ChapterMutationError("WRITE_FAILED", "claimGenerationJob", slug, changed.error);
   if (changed !== 1) {
@@ -117,28 +205,61 @@ export async function claimGenerationJob(
   return jobId;
 }
 
-/** Worker-side: verify THIS worker still owns the live claim. No spend before this. */
-export async function verifyGenerationClaim(store: JobStorePort, slug: string, jobId: string): Promise<void> {
-  if (!jobId) throw new ChapterMutationError("REFUSED", "verifyGenerationClaim", slug, "missing job id");
-  const row = await store.read(slug);
-  if (!row || (typeof row === "object" && "error" in row)) {
-    throw new ChapterMutationError("REFUSED", "verifyGenerationClaim", slug, "cannot verify claim (row unreadable)");
-  }
+/**
+ * Worker-side ATOMIC CONSUMPTION (replaces the old read-and-compare verify):
+ * flips "queued" → "running" with a conditional write pinned to status,
+ * revision, job id, AND queued state. A duplicated delivery — two workers
+ * holding the same valid token — loses here with zero rows changed, BEFORE
+ * any paid model call. Protected slugs and null revisions are refused.
+ */
+export async function consumeGenerationClaim(store: JobStorePort, slug: string, jobId: string): Promise<void> {
+  if (!jobId) throw new ChapterMutationError("REFUSED", "consumeGenerationClaim", slug, "missing job id");
+  const row = await readRowForTerminalWrite(store, slug, "consumeGenerationClaim");
   if (row.status !== "generating" || row.workupJson?.[TEXT_JOB_KEY] !== jobId) {
-    throw new ChapterMutationError("CONFLICT", "verifyGenerationClaim", slug, "claim is not owned by this worker");
+    throw new ChapterMutationError("CONFLICT", "consumeGenerationClaim", slug, "claim is not owned by this worker");
+  }
+  const changed = await store.update(
+    slug,
+    {
+      status: "generating",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: TEXT_JOB_KEY, equals: jobId },
+        { key: TEXT_JOB_STATE_KEY, equals: "queued" },
+      ],
+    },
+    {
+      workup_json: { ...row.workupJson, [TEXT_JOB_STATE_KEY]: "running" },
+      updated_at: new Date().toISOString(),
+    },
+  );
+  if (typeof changed === "object") throw new ChapterMutationError("WRITE_FAILED", "consumeGenerationClaim", slug, changed.error);
+  if (changed !== 1) {
+    throw new ChapterMutationError("CONFLICT", "consumeGenerationClaim", slug, "claim already consumed or superseded — refusing duplicate delivery");
   }
 }
 
-/** Terminal SUCCESS: pinned to status="generating" AND this exact job ID. */
+/**
+ * Terminal SUCCESS: pinned to status="generating", THIS job id, AND the
+ * consumed ("running") state — only the worker that consumed may complete.
+ */
 export async function completeGenerationJob(
   store: JobStorePort,
   slug: string,
   jobId: string,
   result: { workup: ChapterWorkup; version?: string; bibleVersion?: string },
 ): Promise<void> {
+  const row = await readRowForTerminalWrite(store, slug, "completeGenerationJob");
   const changed = await store.update(
     slug,
-    { status: "generating", jsonKey: TEXT_JOB_KEY, jsonEquals: jobId },
+    {
+      status: "generating",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: TEXT_JOB_KEY, equals: jobId },
+        { key: TEXT_JOB_STATE_KEY, equals: "running" },
+      ],
+    },
     {
       workup_json: result.workup,
       status: "draft",
@@ -155,31 +276,54 @@ export async function completeGenerationJob(
   }
 }
 
-/** Terminal FAILURE: same pinning; an old worker can never fail a newer run. Never throws. */
+export type FailJobOutcome = "marked_failed" | "conflict" | "write_failed";
+
+/**
+ * Terminal FAILURE. Pinned to this job id in either state (a route-side
+ * trigger failure happens while still "queued"; a worker failure while
+ * "running"). Never throws — but the caller MUST inspect the outcome:
+ * "conflict" means a newer run owns the row (safe to leave); "write_failed"
+ * means the row may be STRANDED as generating and the response must say so.
+ */
 export async function failGenerationJob(
   store: JobStorePort,
   slug: string,
   jobId: string,
   message: string,
-): Promise<boolean> {
+): Promise<FailJobOutcome> {
+  let row: JobRow;
+  try {
+    row = await readRowForTerminalWrite(store, slug, "failGenerationJob");
+  } catch (e) {
+    const conflictLike = isProtectedFailure(e);
+    console.error(`[selah] failGenerationJob(${slug}): ${(e as Error).message}`);
+    return conflictLike ? "conflict" : "write_failed";
+  }
+  if (row.status !== "generating" || row.workupJson?.[TEXT_JOB_KEY] !== jobId) return "conflict";
   const changed = await store.update(
     slug,
-    { status: "generating", jsonKey: TEXT_JOB_KEY, jsonEquals: jobId },
+    { status: "generating", updatedAt: row.updatedAt, json: [{ key: TEXT_JOB_KEY, equals: jobId }] },
     { status: "failed", generation_error: message.slice(0, 300), updated_at: new Date().toISOString() },
   );
-  if (typeof changed === "object" || changed !== 1) {
-    console.error(`[selah] failGenerationJob(${slug}): claim not owned; newer run left untouched`);
-    return false;
+  if (typeof changed === "object") {
+    console.error(`[selah] failGenerationJob(${slug}): write failed — row may be stranded generating: ${changed.error}`);
+    return "write_failed";
   }
-  return true;
+  return changed === 1 ? "marked_failed" : "conflict";
+}
+
+// A protected-slug refusal during cleanup means we must not touch the row at
+// all — that is a safe stop (conflict-like), not a stranded write failure.
+function isProtectedFailure(e: unknown): boolean {
+  return e instanceof ChapterMutationError && /protected chapter/.test(e.message);
 }
 
 // ---------------- image jobs (single-use; duplicates cannot double-spend) ----------------
 
 /**
- * Atomic single-use IMAGE claim on a draft row. Refuses while another image
- * claim is active (no double spend). Error paths must release via
- * releaseImageJob; a crash-stranded claim requires PR 2's durable job cleanup.
+ * Atomic single-use IMAGE claim on a draft row (route-side). Refuses while
+ * another image claim is active (no double spend). Stamps state "queued"; the
+ * worker consumes it. Error paths must release via releaseImageJob.
  */
 export async function claimImageJob(store: JobStorePort, slug: string): Promise<{ jobId: string; workup: ChapterWorkup }> {
   const row = await store.read(slug);
@@ -195,28 +339,68 @@ export async function claimImageJob(store: JobStorePort, slug: string): Promise<
     {
       status: decision.expected!.status,
       updatedAt: decision.expected!.updatedAt,
-      jsonKey: IMAGE_JOB_KEY,
-      jsonEquals: null, // key must still be absent at write time
+      json: [{ key: IMAGE_JOB_KEY, equals: null }], // key must still be absent at write time
     },
-    { workup_json: { ...json, [IMAGE_JOB_KEY]: jobId }, updated_at: new Date().toISOString() },
+    {
+      workup_json: { ...json, [IMAGE_JOB_KEY]: jobId, [IMAGE_JOB_STATE_KEY]: "queued" },
+      updated_at: new Date().toISOString(),
+    },
   );
   if (typeof changed === "object") throw new ChapterMutationError("WRITE_FAILED", "claimImageJob", slug, changed.error);
   if (changed !== 1) throw new ChapterMutationError("CONFLICT", "claimImageJob", slug, "another image claim won the race");
   return { jobId, workup: { ...(json as unknown as ChapterWorkup) } };
 }
 
-/** Terminal image SUCCESS: pinned to this claim; clears the claim key. */
+/** Worker-side atomic consumption of an image claim ("queued" → "running"). */
+export async function consumeImageClaim(store: JobStorePort, slug: string, jobId: string): Promise<ChapterWorkup> {
+  if (!jobId) throw new ChapterMutationError("REFUSED", "consumeImageClaim", slug, "missing job id");
+  const row = await readRowForTerminalWrite(store, slug, "consumeImageClaim");
+  if (row.status !== "draft" || row.workupJson?.[IMAGE_JOB_KEY] !== jobId) {
+    throw new ChapterMutationError("CONFLICT", "consumeImageClaim", slug, "image claim is not owned by this worker");
+  }
+  const changed = await store.update(
+    slug,
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_JOB_KEY, equals: jobId },
+        { key: IMAGE_JOB_STATE_KEY, equals: "queued" },
+      ],
+    },
+    {
+      workup_json: { ...row.workupJson, [IMAGE_JOB_STATE_KEY]: "running" },
+      updated_at: new Date().toISOString(),
+    },
+  );
+  if (typeof changed === "object") throw new ChapterMutationError("WRITE_FAILED", "consumeImageClaim", slug, changed.error);
+  if (changed !== 1) {
+    throw new ChapterMutationError("CONFLICT", "consumeImageClaim", slug, "image claim already consumed or superseded — refusing duplicate delivery");
+  }
+  return { ...(row.workupJson as unknown as ChapterWorkup) };
+}
+
+/** Terminal image SUCCESS: pinned to this consumed claim; clears the claim keys. */
 export async function completeImageJob(
   store: JobStorePort,
   slug: string,
   jobId: string,
   finalWorkup: ChapterWorkup,
 ): Promise<void> {
+  const row = await readRowForTerminalWrite(store, slug, "completeImageJob");
   const json = { ...(finalWorkup as unknown as Record<string, unknown>) };
   delete json[IMAGE_JOB_KEY];
+  delete json[IMAGE_JOB_STATE_KEY];
   const changed = await store.update(
     slug,
-    { status: "draft", jsonKey: IMAGE_JOB_KEY, jsonEquals: jobId },
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_JOB_KEY, equals: jobId },
+        { key: IMAGE_JOB_STATE_KEY, equals: "running" },
+      ],
+    },
     { workup_json: json, updated_at: new Date().toISOString() },
   );
   if (typeof changed === "object") throw new ChapterMutationError("WRITE_FAILED", "completeImageJob", slug, changed.error);
@@ -225,16 +409,26 @@ export async function completeImageJob(
   }
 }
 
-/** Release a claim after a failed run (pinned; never throws). */
+/**
+ * Release a claim after a failed run (pinned to job id in either state — a
+ * trigger failure releases a "queued" claim, a worker failure a "running"
+ * one). Never throws; false = claim not released (superseded or write failed).
+ */
 export async function releaseImageJob(store: JobStorePort, slug: string, jobId: string): Promise<boolean> {
-  const row = await store.read(slug);
-  if (!row || (typeof row === "object" && "error" in row)) return false;
+  let row: JobRow;
+  try {
+    row = await readRowForTerminalWrite(store, slug, "releaseImageJob");
+  } catch (e) {
+    console.error(`[selah] releaseImageJob(${slug}): ${(e as Error).message}`);
+    return false;
+  }
   if (row.workupJson?.[IMAGE_JOB_KEY] !== jobId) return false;
   const json = { ...row.workupJson };
   delete json[IMAGE_JOB_KEY];
+  delete json[IMAGE_JOB_STATE_KEY];
   const changed = await store.update(
     slug,
-    { status: "draft", jsonKey: IMAGE_JOB_KEY, jsonEquals: jobId },
+    { status: "draft", updatedAt: row.updatedAt, json: [{ key: IMAGE_JOB_KEY, equals: jobId }] },
     { workup_json: json, updated_at: new Date().toISOString() },
   );
   return typeof changed === "number" && changed === 1;
@@ -271,11 +465,11 @@ export function supabaseJobStore(): JobStorePort | null {
       if (predicates.updatedAt !== undefined && predicates.updatedAt !== null) {
         query = query.eq("updated_at", predicates.updatedAt);
       }
-      if (predicates.jsonKey) {
+      for (const check of predicates.json ?? []) {
         query =
-          predicates.jsonEquals === null
-            ? query.is(`workup_json->>${predicates.jsonKey}`, null)
-            : query.eq(`workup_json->>${predicates.jsonKey}`, predicates.jsonEquals as string);
+          check.equals === null
+            ? query.is(`workup_json->>${check.key}`, null)
+            : query.eq(`workup_json->>${check.key}`, check.equals);
       }
       const { data, error } = await query.select("slug");
       if (error) return { error: String(error.message) };
@@ -284,7 +478,16 @@ export function supabaseJobStore(): JobStorePort | null {
   };
 }
 
+// TEST SEAM (offline safety gate only): lets scripts/verify-studio-safety.ts
+// drive the REAL admin route and REAL Netlify workers against a fake store.
+// Never set in production code paths.
+let jobStoreOverride: JobStorePort | null = null;
+export function __setJobStoreForTesting(store: JobStorePort | null): void {
+  jobStoreOverride = store;
+}
+
 export function requireJobStore(slug: string, action: string): JobStorePort {
+  if (jobStoreOverride) return jobStoreOverride;
   const store = supabaseJobStore();
   if (!store) throw new ChapterMutationError("WRITE_FAILED", action, slug, "storage is not configured");
   return store;
