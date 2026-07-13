@@ -4,7 +4,8 @@
 > `studio-workflow.md` for how chapters get made. Keep this file updated at
 > every milestone (publish, system change, model change).
 
-_Last updated: 2026-07-06 (build r78, after Mark 6 publish)._
+_Last updated: 2026-07-12 (live build still r78; Mark 8–11 preparation is not
+active in production)._
 
 ## What Selah is
 
@@ -16,7 +17,8 @@ through Scripture.** Tagline: *Pause. Reflect. Elevate.* Principle:
 - Repo: https://github.com/jasonh80/selah (branch `main` auto-deploys via Netlify)
 - Stack: Next.js 14 App Router + Tailwind + TypeScript · Supabase (content, rules,
   settings, storage) · OpenAI (text + images) · ESV API (scripture) · Esri (maps)
-- No local Node on the owner's Mac — all builds happen on Netlify via git push.
+- The owner's Mac now has Node 24 for fast local development. Netlify remains on
+  Node 20, so release validation must still prove production parity.
 
 ## Live chapters
 
@@ -46,11 +48,25 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 
 ## Selah Brain (the quality system)
 
-- **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 library also
-  in repo at `lib/server/selah-brain-library.v1_1.json` — Supabase is the live
-  source of truth; the JSON is the seed).
-- Layers: core (always-on) · contextual (max 12, selected by genre/stage) ·
+- **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 is the last
+  verified live library). The version-controlled seed has a review-only v1.8
+  candidate with 99 rules. Its artifact status is fail-closed `review_only`, so
+  it cannot be seeded until a separately reviewed artifact is marked
+  `approved_for_seed` and records owner, timestamp, review evidence, version, and
+  an exact content digest. `npm run build` runs the Brain verifier first. Supabase
+  remains the live source of truth: a merged JSON
+  change is not active until the owner separately approves seeding and a
+  post-seed manifest proves the live IDs, wording, stages, and provenance.
+- Layers: core (always-on) · contextual (max 12 for copy and 18 for image
+  stages, selected by genre/stage) ·
   qa (review only) · governance (never in prose prompts).
+- The v1.8 candidate includes the recent-chat audit plus fresh-language
+  abstraction: it adds humble fellow-learner voice, prevents visual
+  details from smuggling unsupported claims, and makes text/inference/safety
+  rules eligible for image stages. It also teaches useful surrounding-chapter
+  book flow without conflating it with whole-Bible synthesis. Image-stage Brain
+  retrieval is still not wired into production; metadata alone does not govern
+  a generated image.
 - **Approved examples** (`selah_approved_examples`): the Mark 6 Daily Rundown is
   the gold-standard *voice* exemplar for gospel narrative; an image-direction
   example exists for the feeding scene. 1–2 examples retrieved per generation.
@@ -80,12 +96,60 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 - No auth, no personalization, no payments, no live "Ask Selah" tool,
   no Street View ("Standing There" shows a roadmap placeholder by design).
 - Budget limit field in settings is stored but **not enforced**.
+- Generation currently treats missing Brain rules, chapter notes, examples, and
+  source text as soft failures. **Do not generate Mark 8–11** until their Studio
+  manifest fails closed before any mutation or model call.
+- The review-only Mark 8–11 guidance packet is versioned in
+  `lib/server/mark-sprint-guidance.v1.json`; it is not loaded into Supabase or
+  connected to generation. The owner selected the official ESV API as the
+  prompt-time analysis source on 2026-07-12; OEB is not used. The published
+  terms do not explicitly address third-party model analysis, and the owner's
+  decision accepts that uncertainty for this noncommercial ministry use without
+  claiming a special Crossway license. The protected contract requires the
+  primary ESV chapter plus one adjacent ESV chapter on each side, each and the
+  ordered bundle digest-bound without storing text in the repo, manifest, logs,
+  or workup. See `docs/selah/scripture-source-policy.md`.
+- Generation Manifest v2 remains frozen historical groundwork. A separate
+  offline v3 candidate now binds the richer protected ESV response evidence,
+  exact frozen OpenAI Chat Completions request (`store: false`), Brain rules,
+  chapter notes, exemplar, source-overlap result, and owner-approved manifest
+  digest without persisting private text. V3 capabilities are process-local
+  evidence, not run authorization. It is not wired to Studio or a worker; see
+  `docs/selah/generation-manifest.md`.
+- The protected ESV source assembler and overlap gate are synthetic-tested only.
+  They validate the ESV's omitted disputed verse numbers in these Mark windows,
+  reject partial/oversized/mismatched responses, retain cancellation through
+  body reads, keep source text non-enumerable, and block copied wording hidden
+  within or across JSON fields. Ordinary Mark 8–11 generation now refuses before
+  allowlist or chapter-row mutation. No runtime path imports the assembler.
+- A local `mark-sprint-copy-review-v1.0` authoring contract now verifies the
+  Mark 8–11 structural floor (full passage movements, FAQ, content modules,
+  placeholder image shape, and no embedded verse array). It is not wired to
+  Studio and does not prove provenance, freshness, semantic accuracy, rendered
+  map/image completion, or owner approval. Those remain fail-closed manifest,
+  source-aware comparison, completion, and human-review gates.
+- A local `selah-benchmark-rubric-v2` candidate now turns the refined Mark 6
+  app-quality standard into a thirteen-dimension, evidence-backed
+  editorial review. Its provisional gate requires at least 85/100, no criterion
+  below the publishable floor, benchmark-level voice/source/freshness, and a
+  sufficient typed remediation plan. It remains review-only, cannot perform the
+  semantic judgment itself, calls a qualifying result `benchmark_ready`, and
+  always leaves that draft at `needs_owner_review`. The v2 offline evaluator
+  now refuses owner readiness unless three separately keyed authenticated
+  receipts (owner approval, reviewer assignment, automated validation), the
+  active review/registry heads, complete resolution/privacy reports, and the
+  content score all agree. Its test keys are ephemeral; it is not wired to
+  Studio and cannot be operational until a protected server assembler supplies
+  the authority policy and current state; see
+  `docs/selah/benchmark-quality-review.md`.
 
 ## Next up
 
-- **Likely next chapter: Exodus 29** (priestly consecration). Scene-check
-  accuracy notes already exist in `lib/content/chapter-content.ts`. Genre
-  profile: tabernacle/priesthood. Requires explicit owner approval to start.
+- **Current release sprint: Mark 8–11**, with Tuesday 2026-07-14 as the stretch
+  target. Selah Brain should author fresh drafts after the safety PR, v1.8,
+  chapter guidance, owner-approved ESV source contract, exact Mark 6 voice
+  exemplar, and fail-closed manifest are reviewed. Each generation and
+  publication still requires explicit owner approval.
 
 ## Cost reference (Mark 6 actuals, logged estimates)
 

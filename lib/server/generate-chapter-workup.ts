@@ -20,6 +20,7 @@ import { snapshotVersion } from "./chapter-versions-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import { selectRulesForGeneration, getChapterReviewNoteTexts } from "./selah-brain";
 import { getRelevantExamples, TEXT_EXAMPLE_TYPES } from "./selah-examples";
+import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
 
 // TEST SEAM (offline safety gate only): skip the env-configured checks so the
 // verify script can drive the REAL route/worker with fake settings + store —
@@ -33,6 +34,7 @@ export function __setGenerationConfigBypassForTesting(v: boolean): void {
 // changes from /admin/generation without a redeploy. Fail-CLOSED: needs OpenAI +
 // Supabase configured AND text_generation_enabled AND the slug allowlisted there.
 export async function generationAllowed(slug: string): Promise<boolean> {
+  if (isProtectedMarkSprintGenerationIdentity({ slug })) return false;
   if (!configCheckBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
   const s = await getGenerationSettings();
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);
@@ -55,17 +57,45 @@ interface GenOutput {
   outputTokens: number;
 }
 
+export function assertGenericChapterGenerationAllowed(input: {
+  slug: string;
+  book: string;
+  chapter: number;
+}): void {
+  if (isProtectedMarkSprintGenerationIdentity(input)) {
+    throw new Error(
+      `${input.slug} is blocked: the protected ESV generation runner is not connected`,
+    );
+  }
+}
+
+export function isProtectedMarkSprintGenerationIdentity(input: {
+  slug: string;
+  book?: string;
+  chapter?: number;
+}): boolean {
+  const normalizedSlug = input.slug.trim().toLowerCase();
+  const protectedSlug =
+    isMarkSprintSlug(normalizedSlug) || /^mark-0*(?:8|9|10|11)$/u.test(normalizedSlug);
+  const normalizedBook = input.book?.trim().toLowerCase() ?? "";
+  const protectedBookChapter =
+    normalizedBook === "mark" &&
+    typeof input.chapter === "number" &&
+    [8, 9, 10, 11].includes(input.chapter);
+  return protectedSlug || protectedBookChapter;
+}
+
 export async function generateChapterWorkup(input: {
   book: string;
   chapter: number;
   slug: string;
   bibleVersion?: string;
-  bibleText?: string;
   model?: string;
   globalRules?: string[];
   chapterNotes?: string[];
   examples?: { title: string; exampleType: string; content: string }[];
 }): Promise<GenOutput> {
+  assertGenericChapterGenerationAllowed(input);
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
   const model = input.model || CHAPTER_WORKUP_TEXT_MODEL;
@@ -74,7 +104,6 @@ export async function generateChapterWorkup(input: {
     book: input.book,
     chapter: input.chapter,
     bibleVersion: input.bibleVersion,
-    bibleText: input.bibleText,
     globalRules: input.globalRules,
     chapterNotes: input.chapterNotes,
     examples: input.examples,
@@ -146,6 +175,9 @@ export async function generateAndStoreChapter(slug: string, jobId: string): Prom
   const parsed = parseSlug(slug);
   if (!parsed) return null;
   const { book, chapter } = parsed;
+  // This must precede settings reads that lead to audits, placeholder claims,
+  // background work, or any other mutation. The protected runner is separate.
+  assertGenericChapterGenerationAllowed({ slug, book, chapter });
   const bibleVersion = "ESV";
   let costLogged = false;
   // The ROUTE took the single atomic claim; this worker atomically CONSUMES it

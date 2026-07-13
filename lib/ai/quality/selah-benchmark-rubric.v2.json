@@ -1,0 +1,246 @@
+{
+  "contract_version": "selah-benchmark-rubric-v2",
+  "artifact": "chapter_workup",
+  "stage": "benchmark_comparison",
+  "benchmark_set_id": "mark6-refined-plus-mark-study-references-2026-07",
+  "policy": {
+    "private_benchmark_wording_available_to_author": false,
+    "private_benchmark_wording_available_to_independent_reviewer": true,
+    "distinctive_benchmark_wording_may_be_used_in_revision_instructions": false,
+    "weighted_score_minimum": 85,
+    "calibration_status": "provisional_pending_owner_benchmark_scoring",
+    "minimum_rating_each_criterion": 3,
+    "exact_gate_rating": 4,
+    "exact_gate_criterion_ids": ["BMQ-06", "BMQ-12", "BMQ-13"],
+    "averaging_may_not_hide_a_weak_criterion": true,
+    "owner_approval_still_required": true
+  },
+  "rating_scale": {
+    "0": "Absent, contradicted, unsafe, or provenance-invalid; block.",
+    "1": "Major weakness; block.",
+    "2": "Below the publishable bar; targeted revision required.",
+    "3": "Responsible and publishable, but not consistently benchmark-level.",
+    "4": "Comparable to Mark 6, Selah's only refined app-quality benchmark."
+  },
+  "evidence_policy": {
+    "allowed_prefixes": [
+      "workup:/",
+      "manifest:/",
+      "structural-report:/",
+      "source-overlap-report:/",
+      "freshness-report:/",
+      "render-report:/",
+      "guidance:/"
+    ],
+    "required_path_groups_by_criterion": {
+      "BMQ-01": [["workup:/"]],
+      "BMQ-02": [["workup:/"]],
+      "BMQ-03": [["workup:/"]],
+      "BMQ-04": [["workup:/"]],
+      "BMQ-05": [["workup:/"]],
+      "BMQ-06": [["workup:/"]],
+      "BMQ-07": [["workup:/"]],
+      "BMQ-08": [["workup:/"]],
+      "BMQ-09": [["workup:/application"], ["workup:/prayer"]],
+      "BMQ-10": [
+        ["workup:/verseByVerse"],
+        ["workup:/whatPeopleAsk"],
+        ["workup:/timeline", "workup:/maps"],
+        ["workup:/goDeeper", "workup:/sections"]
+      ],
+      "BMQ-11": [["workup:/generatedImages"], ["workup:/sceneChecks"]],
+      "BMQ-12": [["manifest:/source"], ["workup:/bibleText"]],
+      "BMQ-13": [["freshness-report:/"], ["workup:/"]]
+    }
+  },
+  "remediation_policy": {
+    "allowed_domains_by_criterion": {
+      "BMQ-01": ["workup"],
+      "BMQ-02": ["workup", "regenerate_clean"],
+      "BMQ-03": ["workup"],
+      "BMQ-04": ["workup"],
+      "BMQ-05": ["workup"],
+      "BMQ-06": ["workup", "regenerate_clean"],
+      "BMQ-07": ["workup", "regenerate_clean"],
+      "BMQ-08": ["workup", "regenerate_clean"],
+      "BMQ-09": ["workup"],
+      "BMQ-10": ["workup"],
+      "BMQ-11": ["workup"],
+      "BMQ-12": ["manifest", "regenerate_clean"],
+      "BMQ-13": ["workup", "review_process", "regenerate_clean"]
+    }
+  },
+  "criteria": [
+    {
+      "id": "BMQ-01",
+      "key": "chapter_coverage",
+      "title": "Complete, proportionate chapter coverage",
+      "weight": 12,
+      "question": "Does the draft meaningfully teach every major movement without reducing the chapter to one favorite idea?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "Every major movement receives substantive treatment.",
+        "The controlling theme connects the chapter without flattening its tensions.",
+        "Attention is proportionate to the text rather than driven by an easy illustration.",
+        "Where it helps understanding, the workup briefly shows how the chapter receives and advances the surrounding flow of its book."
+      ]
+    },
+    {
+      "id": "BMQ-02",
+      "key": "textual_grounding",
+      "title": "Textual grounding and local accuracy",
+      "weight": 11,
+      "question": "Are the chapter's claims grounded in the passage, with parallel accounts and later tradition labeled rather than imported?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "Direct claims can be traced to the chapter or an explicitly named supporting passage.",
+        "Parallel-Gospel details, textual variants, and traditions are identified as such.",
+        "No invented motives, dialogue, chronology, or camera-level details are presented as fact."
+      ]
+    },
+    {
+      "id": "BMQ-03",
+      "key": "interpretive_honesty",
+      "title": "Interpretive honesty",
+      "weight": 8,
+      "question": "Does the draft consistently distinguish text, strong inference, interpretation, tradition, and what remains unknown?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "Confidence matches the available evidence.",
+        "Debated questions stay open without turning the chapter into a hedge-filled lecture.",
+        "The reader can tell what Scripture says and what Selah is helping them consider."
+      ]
+    },
+    {
+      "id": "BMQ-04",
+      "key": "theological_depth",
+      "title": "Jesus-centered theological depth",
+      "weight": 11,
+      "question": "Does the draft reveal what the chapter shows about God, Jesus, people, and the kingdom without forcing typology or skipping the first meaning?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "The Jesus connection grows from the chapter and the wider canon.",
+        "The theology is specific enough to teach, not merely inspirational.",
+        "Tensions in the passage are held together rather than resolved with a slogan."
+      ]
+    },
+    {
+      "id": "BMQ-05",
+      "key": "explanatory_value",
+      "title": "Explanatory and discovery value",
+      "weight": 9,
+      "question": "Does the workup help a thoughtful reader see, understand, or connect something they were likely to miss?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "Unfamiliar concepts receive plain-language explanation or responsible modern comparison.",
+        "Historical or literary context changes how the passage is understood.",
+        "The draft contains genuine discovery rather than trivia added for decoration."
+      ]
+    },
+    {
+      "id": "BMQ-06",
+      "key": "selah_voice",
+      "title": "Selah voice and memorability",
+      "weight": 12,
+      "question": "Does it sound like a wise friend standing under Scripture with the reader—warm, natural, perceptive, and memorable rather than generic or academic?",
+      "minimum_evidence_paths": 3,
+      "indicators": [
+        "The cadence varies naturally and avoids repetitive assistant-like transitions.",
+        "Memorable lines clarify the text instead of performing cleverness.",
+        "Correction uses humble solidarity where fitting and never preaches down at the reader."
+      ]
+    },
+    {
+      "id": "BMQ-07",
+      "key": "historical_cultural_integrity",
+      "title": "Historical, geographic, and Jewish-context integrity",
+      "weight": 7,
+      "question": "Where relevant, are people, places, groups, customs, dates, and maps represented with responsible specificity and visible uncertainty?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "Historical details teach the passage and do not masquerade as textual facts.",
+        "Jewish people and groups are described specifically without caricature or collective blame.",
+        "Locations, routes, dates, and reconstructions are labeled at the confidence the evidence supports."
+      ]
+    },
+    {
+      "id": "BMQ-08",
+      "key": "pastoral_safety",
+      "title": "Pastoral, medical, and human dignity",
+      "weight": 8,
+      "question": "Is the chapter emotionally wise and safe, especially around suffering, abuse, disability, illness, prayer, faith, forgiveness, and unanswered questions?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "Application never blames sufferers, displaces appropriate care, or promises an outcome the text does not promise.",
+        "Disability and illness are treated with dignity rather than as spectacle or moral shorthand.",
+        "Forgiveness, sacrifice, submission, and cross-bearing never erase truth, accountability, boundaries, or safety.",
+        "Oppression, power, servitude, violence, warfare, judgment, and sacrifice are named honestly without sanitizing harm or exploiting it for spectacle."
+      ]
+    },
+    {
+      "id": "BMQ-09",
+      "key": "application_and_prayer",
+      "title": "Chapter-shaped application and prayer",
+      "weight": 9,
+      "question": "Do the application and prayer arise from this chapter, meet real life honestly, and redirect the reader toward God's kingdom?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "The application is specific and actionable without becoming moralism.",
+        "The prayer sounds natural and reverent, not like a summary with 'Lord' added.",
+        "Neither section relies on guarantees, shame, manipulation, or generic language reusable for any chapter."
+      ]
+    },
+    {
+      "id": "BMQ-10",
+      "key": "supporting_modules",
+      "title": "Supporting-module usefulness and economy",
+      "weight": 4,
+      "question": "Do passage flow, FAQs, timeline, maps, and Quick/Deep layers reinforce the chapter accurately while doing distinct jobs?",
+      "minimum_evidence_paths": 4,
+      "indicators": [
+        "FAQs answer questions a real reader is likely to ask.",
+        "Maps and timeline elements teach scale, sequence, or setting with uncertainty intact.",
+        "Quick and Deep layers add different value instead of paraphrasing one another or inflating page length."
+      ]
+    },
+    {
+      "id": "BMQ-11",
+      "key": "visual_truthfulness",
+      "title": "Visual-direction truthfulness (copy stage)",
+      "weight": 4,
+      "question": "Do proposed Scene Checks and image directions identify strong chapter moments while preserving textual, historical, and human truth?",
+      "minimum_evidence_paths": 3,
+      "indicators": [
+        "The proposed concepts are distinct and chapter-shaped rather than generic filler; this copy-stage rating does not claim that the final three-or-five image plan or rendered assets are complete.",
+        "People remain dignified and visuals do not smuggle unsupported age, status, motive, emotion, disability, location, or merged-scene claims.",
+        "Text-explicit radiance, fire, cloud, healing, or other supernatural effects are shown with restraint—neither inflated into fantasy nor erased by a blanket no-glow rule."
+      ]
+    },
+    {
+      "id": "BMQ-12",
+      "key": "source_selection_and_handling_integrity",
+      "title": "Source selection and handling integrity",
+      "weight": 2,
+      "question": "Is the draft traceable to the owner-selected authoring source and exact use/handling policy while keeping ESV text and server-owned provenance out of generated copy?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "The generation manifest binds the owner decision, Crossway/ESV identity, edition, endpoint, request options, ordered passage digests, bundle digest, prompt, Brain, guidance, and exemplar.",
+        "Generated output, logs, reports, and manifests do not store ESV passage text or claim a special Crossway AI license.",
+        "The primary chapter and adjacent Book Flow context remain role-distinct and source identity remains available to the reviewer."
+      ]
+    },
+    {
+      "id": "BMQ-13",
+      "key": "fresh_authorship",
+      "title": "Fresh authorship",
+      "weight": 3,
+      "question": "Is this an original Selah treatment that learns the benchmark's standards without copying or disguising its distinctive wording?",
+      "minimum_evidence_paths": 2,
+      "indicators": [
+        "Private benchmark prose was not available to the authoring model.",
+        "The independent comparison finds no copied titles, memorable lines, prayers, or disguised paraphrases.",
+        "Any revision instruction describes the weakness and desired quality without supplying benchmark wording to imitate."
+      ]
+    }
+  ]
+}

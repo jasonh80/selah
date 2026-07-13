@@ -20,9 +20,13 @@ export interface ChapterImage {
 export interface Character {
   name: string;
   role: string;
+  estimatedAge?: string;
+  description?: string;
+  imageUrl?: string;
 }
 
 export interface ChapterMap {
+  title?: string;
   caption: string;
   src: string;
   alt: string;
@@ -48,6 +52,22 @@ export interface Verse {
   number: number;
   text: string;
   redLetter?: boolean;
+}
+
+export interface VerseFlowItem {
+  startVerse?: number;
+  endVerse?: number;
+  rangeLabel: string;
+  title: string;
+  explanation: string;
+  jesusConnection?: string;
+  application?: string;
+}
+
+export interface ChapterTopic {
+  title: string;
+  reason: string;
+  priority: number;
 }
 
 // --- Dashboard-specific shapes (drive the iOS-style hero) ---
@@ -128,7 +148,9 @@ export interface ChapterWorkup {
 
   estimatedDate: string;
   estimatedLocation: string;
+  modernLocationNote?: string;
   jesusConnectionShort: string;
+  primaryCharacters?: string[];
 
   images: ChapterImage[];
   metaChips: MetaChip[];
@@ -140,6 +162,7 @@ export interface ChapterWorkup {
   quickSummary: string;
   summary: string;
   context: string;
+  whatHappens?: string;
   modernReadersMiss: string;
   jesusConnection: string;
   application: string;
@@ -149,7 +172,10 @@ export interface ChapterWorkup {
   modernMap: ChapterMap;
   historicMap: ChapterMap;
   timeline: TimelineEvent[];
+  timelineLabel?: string;
   keyItems: KeyItem[];
+  verseByVerse?: VerseFlowItem[];
+  chapterSpecificTopics?: ChapterTopic[];
 
   versions: string[];
   defaultVersion: string;

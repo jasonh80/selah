@@ -517,11 +517,12 @@ const integration = async () => {
 // generator that returns the schema-valid Exodus 27 fixture.
 // =====================================================================
 const ADMIN = process.env.DEV_ADMIN_TOKEN!;
+const GENERIC_SLUG = "exodus-27";
 const TEST_SETTINGS: GenerationSettings = {
   id: "global",
   text_generation_enabled: true,
   image_generation_enabled: true,
-  allowed_slugs: ["mark-8"],
+  allowed_slugs: [GENERIC_SLUG, "mark-8"],
   selected_text_model: "offline-test-model",
   selected_image_model: "offline-test-image-model",
   daily_budget_limit_usd: null,
@@ -577,7 +578,7 @@ const realRouteAndWorkers = async () => {
   try {
     // R1. Route auth: no/bad admin token → 401; nothing claimed, nothing triggered.
     {
-      const res = await adminPost(adminReq({ action: "generate", slug: "mark-8" }, "wrong-token"));
+      const res = await adminPost(adminReq({ action: "generate", slug: GENERIC_SLUG }, "wrong-token"));
       ok(res.status === 401, "R1 bad admin token → 401");
       ok(store.rows.size === 0 && lastTrigger === null, "R1 unauthorized request claimed/triggered nothing");
     }
@@ -591,33 +592,41 @@ const realRouteAndWorkers = async () => {
       ok(store.rows.get("mark-6")!.status === "draft" && lastTrigger === null, "R2 protected row untouched, no trigger");
     }
 
+    // R2b. Mark sprint slugs remain blocked until their protected runner is connected.
+    {
+      const res = await adminPost(adminReq({ action: "generate", slug: "mark-8" }));
+      ok(res.status === 403, "R2b Mark sprint slug requires protected runner");
+      ok(!store.rows.has("mark-8") && lastTrigger === null, "R2b protected Mark sprint made no claim and no trigger");
+      ok(audit.some((a) => a.action === "refused:generate" && a.slug === "mark-8"), "R2b refusal durably audited");
+    }
+
     // R3. Kill switch OFF through the REAL route: refused before any claim.
     {
       __setGenerationTestOverrides({ settings: { ...TEST_SETTINGS, text_generation_enabled: false }, captureAudit: audit });
-      const res = await adminPost(adminReq({ action: "generate", slug: "mark-8" }));
+      const res = await adminPost(adminReq({ action: "generate", slug: GENERIC_SLUG }));
       ok(res.status === 403, "R3 text kill switch OFF → 403");
-      ok(!store.rows.has("mark-8") && lastTrigger === null, "R3 no claim, no trigger with switch OFF");
+      ok(!store.rows.has(GENERIC_SLUG) && lastTrigger === null, "R3 no claim, no trigger with switch OFF");
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
     // R4. FULL PIPELINE: real route claims + triggers; real worker authenticates,
     // consumes, generates (fixture), completes a draft.
     {
-      const res = await adminPost(adminReq({ action: "generate", slug: "mark-8" }));
+      const res = await adminPost(adminReq({ action: "generate", slug: GENERIC_SLUG }));
       ok(res.status === 200, "R4 route accepted generate");
       ok(lastTrigger !== null, "R4 route sent an authenticated trigger");
       const { slug, job, token } = lastTrigger!.body;
-      ok(slug === "mark-8" && !!job && !!token, "R4 trigger carries slug + job + signed token");
-      ok(store.rows.get("mark-8")!.workup_json[TEXT_JOB_STATE_KEY] === "queued", "R4 claim is queued until the worker consumes");
+      ok(slug === GENERIC_SLUG && !!job && !!token, "R4 trigger carries slug + job + signed token");
+      ok(store.rows.get(GENERIC_SLUG)!.workup_json[TEXT_JOB_STATE_KEY] === "queued", "R4 claim is queued until the worker consumes");
 
       const wres = await textWorker(workerReq("generate-chapter-background", { slug, job, token }));
       ok(wres.status === 200, `R4 real worker completed (HTTP ${wres.status})`);
-      ok(store.rows.get("mark-8")!.status === "draft", "R4 worker saved a draft via the real pipeline");
+      ok(store.rows.get(GENERIC_SLUG)!.status === "draft", "R4 worker saved a draft via the real pipeline");
 
       // Replay the SAME delivery (valid token, already-consumed job): refused, draft untouched.
       const replay = await textWorker(workerReq("generate-chapter-background", { slug, job, token }));
       ok(replay.status === 500 || replay.status === 409, `R4 duplicate delivery refused (HTTP ${replay.status})`);
-      ok(store.rows.get("mark-8")!.status === "draft", "R4 duplicate delivery changed nothing");
+      ok(store.rows.get(GENERIC_SLUG)!.status === "draft", "R4 duplicate delivery changed nothing");
       ok(audit.some((a) => a.action === "generate_text_conflict" || String(a.message ?? "").includes("claim not consumed")), "R4 duplicate delivery durably audited");
     }
 
@@ -641,14 +650,14 @@ const realRouteAndWorkers = async () => {
 
     // R6. Trigger failure through the REAL route: job failed + truthful response.
     {
-      store.rows.delete("mark-8");
+      store.rows.delete(GENERIC_SLUG);
       triggerResult = { ok: false, error: "connect ECONNREFUSED" };
-      const res = await adminPost(adminReq({ action: "generate", slug: "mark-8" }));
+      const res = await adminPost(adminReq({ action: "generate", slug: GENERIC_SLUG }));
       ok(res.status === 502, "R6 trigger failure → 502");
-      ok(store.rows.get("mark-8")!.status === "failed", "R6 job marked failed, not stranded");
+      ok(store.rows.get(GENERIC_SLUG)!.status === "failed", "R6 job marked failed, not stranded");
       const bodyJson = (await res.json()) as { error?: string };
       ok(/job marked failed/.test(bodyJson.error ?? ""), "R6 response states the true cleanup outcome");
-      store.rows.delete("mark-8");
+      store.rows.delete(GENERIC_SLUG);
     }
 
     // R6b. Trigger failure AND cleanup write failure: response admits stranding.
@@ -665,13 +674,13 @@ const realRouteAndWorkers = async () => {
         }
         return origUpdate(slug, p, next);
       };
-      const res = await adminPost(adminReq({ action: "generate", slug: "mark-8" }));
+      const res = await adminPost(adminReq({ action: "generate", slug: GENERIC_SLUG }));
       store.update = origUpdate;
       ok(res.status === 500, "R6b cleanup write failure → 500");
       const bodyJson = (await res.json()) as { error?: string };
       ok(/CLEANUP WRITE FAILED|still be marked generating/i.test(bodyJson.error ?? ""), "R6b response admits the row may be stranded");
-      ok(store.rows.get("mark-8")!.status === "generating", "R6b row genuinely stranded — response told the truth");
-      store.rows.delete("mark-8");
+      ok(store.rows.get(GENERIC_SLUG)!.status === "generating", "R6b row genuinely stranded — response told the truth");
+      store.rows.delete(GENERIC_SLUG);
       triggerResult = { ok: true, status: 202 };
     }
   } finally {

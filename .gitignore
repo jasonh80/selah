@@ -5,6 +5,7 @@
 .DS_Store
 *.pem
 .env*.local
+/esv.json
 .vercel
 next-env.d.ts
 _archive_v1_2026-06-13/

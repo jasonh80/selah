@@ -45,7 +45,7 @@ type Example = {
   active: boolean;
 };
 
-type Phase = "idle" | "generating" | "ready" | "error";
+type Phase = "idle" | "checking" | "generating" | "ready" | "error";
 type Verdict = "" | "yes" | "needs_work";
 type Scope = "chapter" | "future" | "both";
 type StepState = "done" | "current" | "todo";
@@ -67,9 +67,10 @@ export default function SelahStudioPage() {
   const [loginMsg, setLoginMsg] = useState("");
 
   const [book, setBook] = useState("Mark");
-  const [chapter, setChapter] = useState(6);
+  const [chapter, setChapter] = useState(8);
   const [phase, setPhase] = useState<Phase>("idle");
   const [genMsg, setGenMsg] = useState("");
+  const [statusProblem, setStatusProblem] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
   const [previewed, setPreviewed] = useState(false);
@@ -78,8 +79,12 @@ export default function SelahStudioPage() {
   const [scope, setScope] = useState<Scope>("chapter");
   const [tags, setTags] = useState<string[]>([]);
   const [noteSaved, setNoteSaved] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [reviewMsg, setReviewMsg] = useState("");
 
   const [published, setPublished] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishMsg, setPublishMsg] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
   const [rules, setRules] = useState<Rule[] | null>(null);
@@ -102,8 +107,15 @@ export default function SelahStudioPage() {
     setLoginMsg("");
     const j = await api("GET");
     setBusy(false);
-    if (j.ok) setSettings(j.settings);
-    else setLoginMsg(j.error || "That key didn't work — try again.");
+    if (j.ok) {
+      setSettings(j.settings);
+      const target = slugFor(book, chapter) ?? "";
+      activeSlug.current = target;
+      if (target) {
+        setPhase("checking");
+        void loadChapterStatus(target);
+      }
+    } else setLoginMsg(j.error || "That key didn't work — try again.");
   }
 
   // Reset the review/publish state when the chapter changes or a fresh draft begins.
@@ -114,32 +126,107 @@ export default function SelahStudioPage() {
     setScope("chapter");
     setTags([]);
     setNoteSaved(false);
+    setShowFeedback(false);
+    setReviewMsg("");
     setPublished(false);
+    setPublishMsg("");
   }
 
   function onPickChapter(nextBook: string, nextChapter: number) {
     setBook(nextBook);
     setChapter(nextChapter);
-    setPhase("idle");
+    setPhase("checking");
     setGenMsg("");
+    setStatusProblem(false);
     setConfirming(false);
     resetReview();
+    const target = slugFor(nextBook, nextChapter) ?? "";
+    activeSlug.current = target;
+    if (target) void loadChapterStatus(target);
+  }
+
+  async function loadChapterStatus(target: string) {
+    setPhase("checking");
+    setStatusProblem(false);
+    setGenMsg("");
+
+    let j: Record<string, unknown>;
+    try {
+      j = await api("POST", { action: "status", slug: target });
+    } catch {
+      if (activeSlug.current !== target) return;
+      setPhase("error");
+      setStatusProblem(true);
+      setGenMsg("Studio could not check this chapter. Check your connection and try again.");
+      return;
+    }
+    if (activeSlug.current !== target) return;
+    if (!j.ok) {
+      setPhase("error");
+      setStatusProblem(true);
+      setGenMsg("Studio could not check this chapter. Try again before creating a draft.");
+      return;
+    }
+
+    const status = j.status as string | null;
+    setStatusProblem(false);
+    if (status === "reviewed") {
+      setPhase("ready");
+      setPublished(true);
+      setGenMsg("");
+    } else if (status === "draft" || status === "ready") {
+      setPhase("ready");
+      setPublished(false);
+      setGenMsg("");
+    } else if (status === "generating") {
+      setPhase("generating");
+      setPublished(false);
+      setGenMsg("");
+      void pollStatus(target);
+    } else if (status === "failed") {
+      setPhase("error");
+      setPublished(false);
+      setGenMsg("The last draft did not finish. You can try again when generation is ready.");
+    } else {
+      setPhase("idle");
+      setPublished(false);
+      setGenMsg("");
+    }
   }
 
   async function pollStatus(target: string, attempt = 0) {
     if (activeSlug.current !== target) return;
     if (attempt > 48) {
       setPhase("error");
-      setGenMsg("This is taking longer than expected. Check Recent activity in Advanced Settings.");
+      setStatusProblem(true);
+      setGenMsg("This is taking longer than expected. Check Recent activity in Settings & history.");
       return;
     }
-    const j = await api("POST", { action: "status", slug: target });
+    let j: Record<string, unknown>;
+    try {
+      j = await api("POST", { action: "status", slug: target });
+    } catch {
+      if (activeSlug.current !== target) return;
+      setPhase("error");
+      setStatusProblem(true);
+      setGenMsg("Studio lost its connection while checking the draft. Try checking again.");
+      return;
+    }
+    if (activeSlug.current !== target) return;
+    if (!j.ok) {
+      setPhase("error");
+      setStatusProblem(true);
+      setGenMsg("Studio could not check the draft. Try checking again.");
+      return;
+    }
     const st = j.status as string | null;
     if (st === "draft" || st === "ready" || st === "reviewed") {
       setPhase("ready");
+      setPublished(st === "reviewed");
       setGenMsg("");
     } else if (st === "failed") {
       setPhase("error");
+      setStatusProblem(false);
       setGenMsg("Something went wrong while writing the draft. Check Recent activity.");
     } else {
       setTimeout(() => pollStatus(target, attempt + 1), 5000);
@@ -147,7 +234,7 @@ export default function SelahStudioPage() {
   }
 
   function onGenerateClick() {
-    if (!slug || phase === "generating") return;
+    if (!slug || phase === "checking" || phase === "generating" || statusProblem || published) return;
     if (settings?.require_confirm) {
       setConfirming(true);
       return;
@@ -156,18 +243,29 @@ export default function SelahStudioPage() {
   }
 
   async function doGenerate() {
+    const target = slug;
     setConfirming(false);
     setPhase("generating");
     setGenMsg("");
+    setStatusProblem(false);
     resetReview();
-    activeSlug.current = slug;
-    const j = await api("POST", { action: "generate", slug, confirm: true });
-    if (!j.ok) {
+    activeSlug.current = target;
+    let j: Record<string, unknown>;
+    try {
+      j = await api("POST", { action: "generate", slug: target, confirm: true });
+    } catch {
+      if (activeSlug.current !== target) return;
       setPhase("error");
-      setGenMsg(j.error || "Couldn't start the draft.");
+      setGenMsg("Studio could not start the draft. Check your connection and try again.");
       return;
     }
-    void pollStatus(slug);
+    if (activeSlug.current !== target) return;
+    if (!j.ok) {
+      setPhase("error");
+      setGenMsg(typeof j.error === "string" ? j.error : "Couldn't start the draft.");
+      return;
+    }
+    void pollStatus(target);
   }
 
   function previewDraft() {
@@ -182,12 +280,21 @@ export default function SelahStudioPage() {
 
   async function saveNote() {
     if (!verdict) return;
+    const target = slug;
     setBusy(true);
-    const j = await api("POST", { action: "feedback", slug, verdict, note, scope, tags });
-    setBusy(false);
-    setNoteSaved(Boolean(j.ok));
-    // A future/both note may have created a global rule — refresh the panel if open.
-    if (j.ok && scope !== "chapter" && rules !== null) void loadRules();
+    setReviewMsg("");
+    try {
+      const j = await api("POST", { action: "feedback", slug: target, verdict, note, scope, tags });
+      if (activeSlug.current !== target) return;
+      setNoteSaved(Boolean(j.ok));
+      if (!j.ok) setReviewMsg("Studio could not save that feedback. Try again.");
+      // A future/both note may have created a global rule — refresh the panel if open.
+      if (j.ok && scope !== "chapter" && rules !== null) void loadRules();
+    } catch {
+      if (activeSlug.current === target) setReviewMsg("Studio could not save that feedback. Try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function loadRules() {
@@ -221,16 +328,33 @@ export default function SelahStudioPage() {
   }
 
   async function publishFinal() {
+    const target = slug;
     setBusy(true);
-    // Capture the positive review alongside the publish (if not already saved).
-    if (verdict && !noteSaved) {
-      await api("POST", { action: "feedback", slug, verdict, note, scope, tags });
-      setNoteSaved(true);
+    setPublishing(true);
+    setPublishMsg("");
+    try {
+      // Capture the positive review alongside the publish (if not already saved).
+      if (verdict && !noteSaved) {
+        const feedback = await api("POST", { action: "feedback", slug: target, verdict, note, scope, tags });
+        if (activeSlug.current !== target) return;
+        if (!feedback.ok) {
+          setPublishMsg("Studio could not save your approval, so nothing was published. Try again.");
+          return;
+        }
+        setNoteSaved(true);
+      }
+      const j = await api("POST", { action: "publish", slug: target });
+      if (activeSlug.current !== target) {
+        return;
+      }
+      setPublished(Boolean(j.ok));
+      if (!j.ok) setPublishMsg(j.error || "Publish failed.");
+    } catch {
+      if (activeSlug.current === target) setPublishMsg("Studio lost its connection. Nothing was confirmed as published.");
+    } finally {
+      setBusy(false);
+      setPublishing(false);
     }
-    const j = await api("POST", { action: "publish", slug });
-    setBusy(false);
-    setPublished(Boolean(j.ok));
-    if (!j.ok) setGenMsg(j.error || "Publish failed.");
   }
 
   async function saveSettings() {
@@ -272,7 +396,7 @@ export default function SelahStudioPage() {
           placeholder="Studio key"
           className={`${field} mt-5`}
         />
-        <button onClick={connect} disabled={busy || !token} className={`${primary} mt-3`}>
+        <button type="button" onClick={connect} disabled={busy || !token} className={`${primary} mt-3`}>
           {busy ? "…" : "Enter Studio"}
         </button>
         {loginMsg && <p className="mt-3 text-[13px] text-jesus-red">{loginMsg}</p>}
@@ -285,10 +409,10 @@ export default function SelahStudioPage() {
   const draftReady = phase === "ready";
   const canPublish = draftReady && previewed && verdict === "yes" && !published;
 
-  const step1: StepState = phase === "idle" ? "current" : "done";
+  const step1: StepState = phase === "idle" && !published ? "current" : "done";
   const step2: StepState =
-    phase === "idle" ? "todo" : phase === "ready" ? "done" : "current";
-  const step3: StepState = previewed ? "done" : draftReady ? "current" : "todo";
+    published ? "done" : phase === "idle" ? "todo" : phase === "ready" ? "done" : "current";
+  const step3: StepState = published || previewed ? "done" : draftReady ? "current" : "todo";
   const step4: StepState = published ? "done" : verdict === "yes" && previewed ? "current" : "todo";
 
   return (
@@ -297,7 +421,7 @@ export default function SelahStudioPage() {
         <p className="text-eyebrow">SELAH STUDIO</p>
         <h1 className="mt-1 text-title text-primary">Launch a Chapter</h1>
         <p className="mt-1 text-[14px] text-secondary">
-          Generate a draft, preview it, and publish when it feels like Selah.
+          Choose a chapter, review one fresh draft, then decide when it goes live.
         </p>
       </header>
 
@@ -306,7 +430,7 @@ export default function SelahStudioPage() {
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-[12px] text-secondary">Book</label>
-            <select className={`${field} mt-1`} value={book} onChange={(e) => onPickChapter(e.target.value, 1)}>
+            <select disabled={busy} className={`${field} mt-1`} value={book} onChange={(e) => onPickChapter(e.target.value, 1)}>
               {BIBLE_BOOKS.map((b) => (
                 <option key={b.name} value={b.name}>{b.name}</option>
               ))}
@@ -314,7 +438,7 @@ export default function SelahStudioPage() {
           </div>
           <div>
             <label className="block text-[12px] text-secondary">Chapter</label>
-            <select className={`${field} mt-1`} value={chapter} onChange={(e) => onPickChapter(book, Number(e.target.value))}>
+            <select disabled={busy} className={`${field} mt-1`} value={chapter} onChange={(e) => onPickChapter(book, Number(e.target.value))}>
               {Array.from({ length: chapterCount(book) }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
@@ -328,111 +452,154 @@ export default function SelahStudioPage() {
 
       {/* Step 2 — Generate Draft */}
       <Step n={2} title="Generate Draft" state={step2}>
-        {!confirming ? (
-          <button onClick={onGenerateClick} disabled={phase === "generating" || textOff} className={primary}>
-            {phase === "generating" ? "Generating…" : draftReady ? "Generate Again" : "Generate Draft"}
+        {statusProblem ? (
+          <button type="button" onClick={() => void loadChapterStatus(slug)} className={ghost}>
+            Check chapter again
+          </button>
+        ) : !confirming ? (
+          <button type="button" onClick={onGenerateClick} disabled={phase === "checking" || phase === "generating" || textOff || published} className={primary}>
+            {published
+              ? "Already Published"
+              : phase === "checking"
+                ? "Checking…"
+                : phase === "generating"
+                  ? "Generating…"
+                  : draftReady
+                    ? "Generate Again"
+                    : "Generate Draft"}
           </button>
         ) : (
           <div className="rounded-lg border bg-card-soft p-3">
             <p className="text-[13px] text-primary">
-              Write a fresh draft of <span className="font-semibold">{book} {chapter}</span>? This uses a little credit.
+              Create one fresh private draft of <span className="font-semibold">{book} {chapter}</span>? It will not publish, and it uses a small amount of credit.
             </p>
             <div className="mt-2.5 flex gap-2">
-              <button onClick={() => void doGenerate()} className={primary}>Yes, generate</button>
-              <button onClick={() => setConfirming(false)} className={ghost}>Cancel</button>
+              <button type="button" onClick={() => void doGenerate()} className={primary}>Create draft</button>
+              <button type="button" onClick={() => setConfirming(false)} className={ghost}>Cancel</button>
             </div>
           </div>
         )}
 
         {textOff && (
           <p className="mt-2.5 text-[13px] text-secondary">
-            Text generation is paused. Turn it on in <span className="text-primary">Advanced Settings</span> below to begin.
+            Draft creation is paused. Turn it on in <span className="text-primary">Settings &amp; history</span> below to begin.
           </p>
         )}
         {phase === "generating" && (
-          <p className="mt-2.5 flex items-center gap-2 text-[13px] text-secondary">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-accent-strong" />
-            Writing the draft — about a minute. You can wait here.
-          </p>
+          <DraftWaitCard reference={`${book} ${chapter}`} />
         )}
-        {draftReady && <p className="mt-2.5 text-[13px] font-medium text-accent-strong">✓ Preview Ready</p>}
-        {phase === "error" && genMsg && <p className="mt-2.5 text-[13px] text-jesus-red">{genMsg}</p>}
+        {draftReady && !published && <p className="mt-2.5 text-[13px] font-medium text-accent-strong">✓ Draft ready to review</p>}
+        {published && <p className="mt-2.5 text-[13px] font-medium text-accent-strong">✓ This chapter is already live</p>}
+        {phase === "error" && genMsg && <p role="alert" className="mt-2.5 text-[13px] text-jesus-red">{genMsg}</p>}
       </Step>
 
       {/* Step 3 — Preview Draft + Selah Brain review */}
       <Step n={3} title="Preview Draft" state={step3}>
-        <div className="flex flex-wrap items-center gap-3">
-          <button onClick={previewDraft} disabled={!draftReady} className={ghost}>
-            Preview Draft ↗
-          </button>
-          <a
-            href={`/dev/compare/${slug}?token=${encodeURIComponent(token)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[13px] text-secondary underline"
-          >
-            Compare versions ↗
+        {published ? (
+          <a href={`/chapter/${slug}`} target="_blank" rel="noreferrer" className="text-[13px] text-primary underline">
+            View live chapter ↗
           </a>
-        </div>
-        {draftReady && !previewed && (
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={previewDraft} disabled={!draftReady} className={ghost}>
+              Preview Draft ↗
+            </button>
+            {draftReady && (
+              <a
+                href={`/dev/compare/${slug}?token=${encodeURIComponent(token)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[13px] text-secondary underline"
+              >
+                Compare versions ↗
+              </a>
+            )}
+          </div>
+        )}
+        {draftReady && !published && !previewed && (
           <p className="mt-2.5 text-[13px] text-secondary">Open the preview, then tell Selah how it feels.</p>
         )}
 
-        {previewed && (
+        {previewed && !published && (
           <div className="mt-3 space-y-4 rounded-lg border bg-card-soft p-4">
             <div>
-              <p className="text-[14px] font-semibold text-primary">Does this feel like Selah?</p>
+              <p className="text-[13px] font-semibold text-primary">Before you choose Ready</p>
+              <ul className="mt-2 space-y-1 text-[12px] text-secondary">
+                <li>• Bible: Is it faithful to this chapter and honest about what we do not know?</li>
+                <li>• Jesus: Does it help people see and follow Him without forcing a connection?</li>
+                <li>• Voice: Is it warm, clear, and memorable like Mark 6—without copying it?</li>
+                <li>• Usefulness: Do the explanation, application, and prayer grow from the chapter?</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-primary">Is this ready to publish?</p>
               <div className="mt-2 flex gap-2">
-                <Seg active={verdict === "yes"} onClick={() => { setVerdict("yes"); setNoteSaved(false); }}>Yes</Seg>
-                <Seg active={verdict === "needs_work"} onClick={() => { setVerdict("needs_work"); setNoteSaved(false); }}>Needs work</Seg>
+                <Seg active={verdict === "yes"} onClick={() => { setVerdict("yes"); setNoteSaved(false); setShowFeedback(false); }}>Ready</Seg>
+                <Seg active={verdict === "needs_work"} onClick={() => { setVerdict("needs_work"); setNoteSaved(false); setShowFeedback(true); }}>Needs work</Seg>
               </div>
             </div>
 
             {verdict && (
               <>
-                <div>
-                  <label className="text-[13px] text-secondary">What should Selah learn from this? (optional)</label>
-                  <textarea
-                    value={note}
-                    onChange={(e) => { setNote(e.target.value); setNoteSaved(false); }}
-                    rows={3}
-                    placeholder="e.g. Keep the timeline confident — no &ldquo;approximate&rdquo; in the headline."
-                    className={`${field} mt-1`}
-                  />
-                </div>
-
-                <div>
-                  <p className="text-[13px] text-secondary">Apply this note to:</p>
-                  <div className="mt-1.5 flex flex-wrap gap-2">
-                    <Seg active={scope === "chapter"} onClick={() => { setScope("chapter"); setNoteSaved(false); }}>This chapter only</Seg>
-                    <Seg active={scope === "future"} onClick={() => { setScope("future"); setNoteSaved(false); }}>Future chapters too</Seg>
-                    <Seg active={scope === "both"} onClick={() => { setScope("both"); setNoteSaved(false); }}>Both</Seg>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-[13px] text-secondary">Quick tags (optional)</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {QUICK_TAGS.map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => toggleTag(t)}
-                        className={`rounded-full border px-2.5 py-1 text-[12px] transition ${
-                          tags.includes(t) ? "border-accent-strong bg-accent-strong/15 text-primary" : "bg-card text-secondary"
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button onClick={saveNote} disabled={busy} className={ghost}>
-                    {busy ? "Saving…" : "Save note"}
+                {!showFeedback && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFeedback(true)}
+                    className="text-[13px] text-secondary underline"
+                  >
+                    Add feedback for Selah Brain (optional)
                   </button>
-                  {noteSaved && <span className="text-[13px] text-accent-strong">Saved — Selah will remember this.</span>}
-                </div>
+                )}
+
+                {showFeedback && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[13px] text-secondary">What should Selah learn?</label>
+                      <textarea
+                        value={note}
+                        onChange={(e) => { setNote(e.target.value); setNoteSaved(false); }}
+                        rows={3}
+                        placeholder="Tell Selah what was strong or what needs to change."
+                        className={`${field} mt-1`}
+                      />
+                    </div>
+
+                    <div>
+                      <p className="text-[13px] text-secondary">Use this feedback for:</p>
+                      <div className="mt-1.5 flex flex-wrap gap-2">
+                        <Seg active={scope === "chapter"} onClick={() => { setScope("chapter"); setNoteSaved(false); }}>Only this chapter</Seg>
+                        <Seg active={scope === "future"} onClick={() => { setScope("future"); setNoteSaved(false); }}>Future chapters</Seg>
+                        <Seg active={scope === "both"} onClick={() => { setScope("both"); setNoteSaved(false); }}>Both</Seg>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[13px] text-secondary">Quick notes (optional)</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {QUICK_TAGS.map((t) => (
+                          <button
+                            type="button"
+                            key={t}
+                            onClick={() => toggleTag(t)}
+                            className={`rounded-full border px-2.5 py-1 text-[12px] transition ${
+                              tags.includes(t) ? "border-accent-strong bg-accent-strong/15 text-primary" : "bg-card text-secondary"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={saveNote} disabled={busy} className={ghost}>
+                        {busy ? "Saving…" : "Save feedback"}
+                      </button>
+                      {noteSaved && <span className="text-[13px] text-accent-strong">Saved</span>}
+                    </div>
+                    {reviewMsg && <p role="alert" className="text-[13px] text-jesus-red">{reviewMsg}</p>}
+                  </div>
+                )}
 
                 {verdict === "needs_work" && (
                   <p className="text-[13px] text-secondary">
@@ -447,9 +614,10 @@ export default function SelahStudioPage() {
 
       {/* Step 4 — Publish Final */}
       <Step n={4} title="Publish Final" state={step4}>
-        <button onClick={publishFinal} disabled={!canPublish || busy} className={primary}>
-          {busy && verdict === "yes" ? "Publishing…" : "Publish Final"}
+        <button type="button" onClick={publishFinal} disabled={!canPublish || busy} className={primary}>
+          {publishing ? "Publishing…" : "Publish Final"}
         </button>
+        {publishMsg && <p role="alert" className="mt-2.5 text-[13px] text-jesus-red">{publishMsg}</p>}
         {published ? (
           <p className="mt-2.5 text-[13px] font-medium text-accent-strong">
             ✓ Published — {book} {chapter} is live.{" "}
@@ -468,9 +636,12 @@ export default function SelahStudioPage() {
         )}
       </Step>
 
-      {/* Advanced Settings */}
+      {/* Settings and history stay out of the main launch flow. */}
       <div className="mt-2 rounded-lg border bg-card shadow-hair">
         <button
+          type="button"
+          aria-expanded={showAdvanced}
+          aria-controls="studio-settings-panel"
           onClick={() => {
             setShowAdvanced((v) => !v);
             if (!audit) void loadAudit();
@@ -479,55 +650,30 @@ export default function SelahStudioPage() {
           }}
           className="flex w-full items-center justify-between px-4 py-3 text-[14px] font-medium text-primary"
         >
-          Advanced Settings
+          Settings &amp; history
           <span className="text-secondary">{showAdvanced ? "⌃" : "⌄"}</span>
         </button>
         {showAdvanced && (
-          <div className="space-y-3 border-t px-4 py-4">
-            <Toggle label="Text Generation" checked={settings.text_generation_enabled} onChange={(v) => setS("text_generation_enabled", v)} />
+          <div id="studio-settings-panel" className="space-y-3 border-t px-4 py-4">
+            <Toggle label="Create text drafts" checked={settings.text_generation_enabled} onChange={(v) => setS("text_generation_enabled", v)} />
             <Toggle
-              label="Image Generation"
-              hint="Stays off until a text draft is approved"
+              label="Create chapter images"
+              hint="Keep off until the text is approved"
               checked={settings.image_generation_enabled}
               onChange={(v) => setS("image_generation_enabled", v)}
             />
-            <Toggle label="Require confirmation before generating" checked={settings.require_confirm} onChange={(v) => setS("require_confirm", v)} />
+            <Toggle label="Confirm before spending credit" checked={settings.require_confirm} onChange={(v) => setS("require_confirm", v)} />
+            <p className="text-[12px] text-secondary">
+              Chapter access and the approved AI setup are managed automatically.
+            </p>
 
-            <div>
-              <p className="text-eyebrow">Allowed chapters (managed automatically)</p>
-              <input
-                className={`${field} mt-1`}
-                value={settings.allowed_slugs.join(", ")}
-                onChange={(e) => setS("allowed_slugs", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-eyebrow">Text model</p>
-                <input className={`${field} mt-1`} value={settings.selected_text_model} onChange={(e) => setS("selected_text_model", e.target.value)} />
-              </div>
-              <div>
-                <p className="text-eyebrow">Image model</p>
-                <input className={`${field} mt-1`} value={settings.selected_image_model} onChange={(e) => setS("selected_image_model", e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <p className="text-eyebrow">Daily budget (USD · not yet enforced)</p>
-              <input
-                className={`${field} mt-1`}
-                type="number"
-                value={settings.daily_budget_limit_usd ?? ""}
-                onChange={(e) => setS("daily_budget_limit_usd", e.target.value === "" ? null : Number(e.target.value))}
-              />
-            </div>
-
-            <button onClick={saveSettings} disabled={busy} className={primary}>
+            <button type="button" onClick={saveSettings} disabled={busy} className={primary}>
               {busy ? "…" : "Save settings"}
             </button>
 
             {/* What Selah Has Learned — active global rules */}
-            <div className="pt-2">
-              <p className="text-eyebrow">What Selah Has Learned</p>
+            <details className="border-t pt-3">
+              <summary className="cursor-pointer text-[13px] font-medium text-primary">Selah Brain rules</summary>
               <div className="mt-1.5 space-y-1.5">
                 {rules === null ? (
                   <p className="text-[12px] text-secondary">Loading…</p>
@@ -548,6 +694,7 @@ export default function SelahStudioPage() {
                         </p>
                       </div>
                       <button
+                        type="button"
                         onClick={() => toggleRule(r.id, !r.active)}
                         className={`rounded-full border px-2.5 py-1 text-[11px] ${
                           r.active ? "border-accent-strong bg-accent-strong/15 text-primary" : "bg-card text-secondary"
@@ -556,6 +703,7 @@ export default function SelahStudioPage() {
                         {r.active ? "Active" : "Off"}
                       </button>
                       <button
+                        type="button"
                         onClick={() => removeRule(r.id)}
                         title="Remove rule"
                         className="rounded-full px-1.5 text-[14px] text-secondary hover:text-jesus-red"
@@ -566,11 +714,11 @@ export default function SelahStudioPage() {
                   ))
                 )}
               </div>
-            </div>
+            </details>
 
             {/* Approved Examples — voice exemplars retrieved by genre */}
-            <div className="pt-2">
-              <p className="text-eyebrow">Approved Examples</p>
+            <details className="border-t pt-3">
+              <summary className="cursor-pointer text-[13px] font-medium text-primary">Approved examples</summary>
               <div className="mt-1.5 space-y-1.5">
                 {examples === null ? (
                   <p className="text-[12px] text-secondary">Loading…</p>
@@ -584,20 +732,21 @@ export default function SelahStudioPage() {
                         <p className="text-[11px] text-secondary">{x.genre} · {x.example_type}</p>
                       </div>
                       <button
+                        type="button"
                         onClick={() => toggleExample(x.id, !x.active)}
                         className={`rounded-full border px-2.5 py-1 text-[11px] ${x.active ? "border-accent-strong bg-accent-strong/15 text-primary" : "bg-card text-secondary"}`}
                       >
                         {x.active ? "Active" : "Off"}
                       </button>
-                      <button onClick={() => removeExample(x.id)} title="Remove example" className="rounded-full px-1.5 text-[14px] text-secondary hover:text-jesus-red">×</button>
+                      <button type="button" onClick={() => removeExample(x.id)} title="Remove example" className="rounded-full px-1.5 text-[14px] text-secondary hover:text-jesus-red">×</button>
                     </div>
                   ))
                 )}
               </div>
-            </div>
+            </details>
 
-            <div className="pt-2">
-              <p className="text-eyebrow">Recent activity</p>
+            <details className="border-t pt-3">
+              <summary className="cursor-pointer text-[13px] font-medium text-primary">Recent activity</summary>
               <div className="mt-1.5 space-y-1">
                 {audit === null ? (
                   <p className="text-[12px] text-secondary">Loading…</p>
@@ -613,7 +762,7 @@ export default function SelahStudioPage() {
                   ))
                 )}
               </div>
-            </div>
+            </details>
             <p className="text-[11px] text-secondary">
               Last saved: {settings.updated_at ? settings.updated_at.slice(0, 16).replace("T", " ") : "—"}
             </p>
@@ -647,6 +796,7 @@ function Step({ n, title, state, children }: { n: number; title: string; state: 
 function Seg({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`rounded-full border px-4 py-1.5 text-[13px] transition ${
         active ? "border-transparent bg-accent-strong text-white" : "bg-card text-secondary"
@@ -666,5 +816,25 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
       </span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     </label>
+  );
+}
+
+function DraftWaitCard({ reference }: { reference: string }) {
+  return (
+    <div role="status" aria-live="polite" className="mt-3 rounded-lg border bg-card-soft p-4">
+      <div className="flex items-center gap-2">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-accent-strong" aria-hidden="true" />
+        <p className="text-[14px] font-semibold text-primary">Creating your private {reference} draft</p>
+      </div>
+      <p className="mt-2 text-[13px] text-secondary">
+        This usually takes 2–4 minutes while Selah studies the chapter, writes the work-up, and checks it for completeness.
+      </p>
+      <p className="mt-2 text-[13px] font-medium text-primary">
+        Nothing will publish automatically. Images come later, after you approve the text.
+      </p>
+      <p className="mt-2 text-[12px] text-secondary">
+        You may safely leave this page and return. Studio will find the draft when it is ready.
+      </p>
+    </div>
   );
 }

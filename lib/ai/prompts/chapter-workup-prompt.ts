@@ -1,11 +1,26 @@
 // Builds the prompt that asks the model for ONE shared global Selah chapter
 // workup. No API call here — this only assembles the instruction string.
 
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v3";
+
+export type GenerationSourceSectionRole =
+  | "context_before"
+  | "primary"
+  | "context_after";
+
+export interface ChapterWorkupGenerationSource {
+  label: string;
+  sections: Array<{
+    role: GenerationSourceSectionRole;
+    reference: string;
+    text: string;
+  }>;
+}
+
 export interface ChapterWorkupPromptInput {
   book: string;
   chapter: number;
   bibleVersion?: string;
-  bibleText?: string;
   // Active Selah Brain rules (apply to every chapter) and review notes specific
   // to THIS chapter. Both come from the dedicated Selah Brain tables.
   globalRules?: string[];
@@ -14,8 +29,51 @@ export interface ChapterWorkupPromptInput {
   examples?: { title: string; exampleType: string; content: string }[];
 }
 
-export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): string {
-  const { book, chapter, bibleVersion, bibleText, globalRules, chapterNotes, examples } = input;
+export type ProtectedChapterWorkupPromptInput = ChapterWorkupPromptInput & {
+  // This input is for the future protected composition root only. The ordinary
+  // generator deliberately has no source-bearing API.
+  generationSource: ChapterWorkupGenerationSource;
+};
+
+type InternalChapterWorkupPromptInput = ChapterWorkupPromptInput & {
+  generationSource?: ChapterWorkupGenerationSource;
+};
+
+function buildChapterWorkupPromptInternal(
+  input: InternalChapterWorkupPromptInput,
+): string {
+  const {
+    book,
+    chapter,
+    bibleVersion,
+    generationSource,
+    globalRules,
+    chapterNotes,
+    examples,
+  } = input;
+  if (generationSource) {
+    if (!generationSource.label.trim()) {
+      throw new Error("A server-owned generation source label is required");
+    }
+    const roles: GenerationSourceSectionRole[] = [
+      "context_before",
+      "primary",
+      "context_after",
+    ];
+    if (
+      generationSource.sections.length !== roles.length ||
+      generationSource.sections.some(
+        (section, index) =>
+          section.role !== roles[index] ||
+          !section.reference.trim() ||
+          !section.text.trim(),
+      )
+    ) {
+      throw new Error(
+        "Generation source must contain non-empty context-before, primary, and context-after sections in order",
+      );
+    }
+  }
   const slug = `${book.toLowerCase().replace(/\s+/g, "-")}-${chapter}`;
   const rulesBlock =
     globalRules && globalRules.length
@@ -35,6 +93,30 @@ export function buildChapterWorkupPrompt(input: ChapterWorkupPromptInput): strin
           .map((e) => `--- EXAMPLE: ${e.title} (${e.exampleType}) ---\n${e.content}\n--- END EXAMPLE ---`)
           .join("\n\n")}`
       : "";
+  const generationSourceBlock = generationSource
+    ? `\n\nSERVER-SUPPLIED GENERATION SOURCE (${generationSource.label.trim()})
+Use PRIMARY CHAPTER for this workup. CONTEXT BEFORE and CONTEXT AFTER may only
+ground surrounding-chapter Book Flow. Do not blend their events into the
+primary chapter. Do not quote or reproduce source wording in the output.
+Footnote callouts and bodies, when present, are translator/editorial notes—not
+verse text. They may inform an explicitly labeled textual note but must never be
+silently presented as the words of Scripture.
+The protected runner must bind source handling, API options, references, text
+digests, ordered bundle digest, and owner decision in the fail-closed generation
+manifest before sending this request, even when reader display also uses ESV.
+
+--- CONTEXT BEFORE (${generationSource.sections[0].reference.trim()}; BOOK FLOW ONLY) ---
+${generationSource.sections[0].text.trim()}
+--- END CONTEXT BEFORE ---
+
+--- PRIMARY CHAPTER (${generationSource.sections[1].reference.trim()}) ---
+${generationSource.sections[1].text.trim()}
+--- END PRIMARY CHAPTER ---
+
+--- CONTEXT AFTER (${generationSource.sections[2].reference.trim()}; BOOK FLOW ONLY) ---
+${generationSource.sections[2].text.trim()}
+--- END CONTEXT AFTER ---`
+    : "";
 
   return `You are the content engine for Selah, a daily Bible chapter app whose only
 goal is to help people grow closer to Jesus through Scripture.
@@ -63,7 +145,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "chapter": ${chapter},
   "slug": "${slug}",
   "title": "${book} ${chapter}",
-  "subtitle": "<short evocative subtitle>",
+  "subtitle": "<fresh, chapter-specific editorial title; do not copy example wording>",
   "status": "draft",
   "version": "1",
   "theme": "<one short line, e.g. 'Holy access to God'>",
@@ -96,8 +178,8 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     ]
   },
   "maps": {
-    "modern": { "title": "Modern Map", "description": "<what it shows today>", "uncertaintyNote": "<optional>" },
-    "historic": { "title": "Historic Map", "description": "<the biblical-world view>", "uncertaintyNote": "<optional>" }
+    "modern": { "title": "Modern Map", "description": "<what it shows today>", "uncertaintyNote": "<required scope/precision note>" },
+    "historic": { "title": "Historic Map", "description": "<the biblical-world view>", "uncertaintyNote": "<required scope/precision note>" }
   },
   "keyObjects": [
     { "title": "<object/place>", "description": "<short>" }
@@ -111,7 +193,10 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     { "type": "human", "title": "Human Moment", "description": "<a character/emotional moment: What did this feel like?>", "prompt": "<vivid prompt>", "alt": "<alt>", "caption": "<caption>", "status": "placeholder" }
   ],
   "verseByVerse": [
-    { "range": "<e.g. '1-6'>", "title": "<short>", "explanation": "<brief, no quoted verse text>" }
+    { "startVerse": 1, "endVerse": 6, "rangeLabel": "1–6", "title": "<short>", "explanation": "<brief, no quoted verse text>" }
+  ],
+  "whatPeopleAsk": [
+    { "question": "<a real question readers ask about THIS chapter>", "answer": "<warm, accurate, useful answer; no quoted verse text>" }
   ],
   "goDeeper": {
     "learnMore": [ { "title": "<short>", "description": "<short>" } ],
@@ -159,7 +244,9 @@ SCENE CHECKS (picture it accurately)
   people commonly imagine wrongly (wrong building, wrong clothing, wrong scale,
   English text on objects, a tidy scene that was really chaotic/dangerous, etc.).
   Do not force them. Tone: warm, visual, confident, historically grounded, lightly
-  witty when it fits — like a wise friend, not a textbook.
+  witty when it fits — like a wise friend, not a textbook. When supplied chapter
+  review notes identify real visual corrections, include at least one; otherwise
+  an empty array is better than a forced card.
 - "visualAccuracyNotes" are crisp, concrete corrections that will later be fed to
   image generation as guardrails. Be specific (materials, scale in feet, no English
   lettering, era-appropriate script, etc.).
@@ -201,12 +288,56 @@ SECTION DEPTH (this is the heart of Selah)
   imagination, verse-by-verse movement, and a warm, accurate Jesus connection.
 - Be specific, not generic. If a section could apply to almost any chapter, rewrite it.
 
+PASSAGE FLOW & QUESTIONS
+- "verseByVerse" is the machine-checkable chapter spine. Use one entry for every
+  natural scene or argument movement. Keep entries ordered and cover the whole
+  chapter from verse 1 through the final verse with no gaps or overlaps. Narrative
+  chapters commonly need 5-10 entries; do not compress a broad chapter into an
+  arbitrary 2-4 items. "startVerse" and "endVerse" are inclusive integers;
+  "rangeLabel" is display copy only.
+- "whatPeopleAsk" must contain 5-8 questions people genuinely ask about THIS
+  chapter. Answer the real concern beneath each question in Selah's warm,
+  plainspoken voice. Include difficult historical, theological, textual, or
+  pastoral questions when the chapter raises them. Never invent certainty,
+  promise an automatic outcome, blame suffering, or use an answer to bypass
+  safety, medical care, justice, or wise pastoral care.
+
 RULES
 - "generatedImages" MUST have exactly 3 entries in this order: establishing, detail, human, each with status "placeholder".
 - "primaryCharacters" is an array of strings; "keyObjects", "keyPeople", "sections", "chapterSpecificTopics" are arrays of OBJECTS.
-- Provide 2-4 items for timeline.items, keyObjects, keyPeople, verseByVerse, and each goDeeper group; 3-7 chapterSpecificTopics.
+- Provide 2-4 items for timeline.items and each goDeeper group; 2-6 keyObjects
+  and keyPeople; 3-7 chapterSpecificTopics; 5-8 whatPeopleAsk items. Passage-flow
+  length is determined by complete chapter coverage, not a fixed small count.
 - Mark the timeline item for THIS chapter with "active": true.
+- "bibleText.version" records the reader-display version only. Generation
+  provenance is server-owned and bound separately even when both use ESV.
 - Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${rulesBlock}${chapterBlock}${examplesBlock}${
-    bibleText ? `\n\nUse this chapter text as your source (do not quote it verbatim in output):\n"""\n${bibleText}\n"""` : ""
+    generationSourceBlock
   }`;
+}
+
+/** Build the ordinary source-free prompt used by the existing generator. */
+export function buildChapterWorkupPrompt(
+  input: ChapterWorkupPromptInput,
+): string {
+  return buildChapterWorkupPromptInternal({
+    book: input.book,
+    chapter: input.chapter,
+    bibleVersion: input.bibleVersion,
+    globalRules: input.globalRules,
+    chapterNotes: input.chapterNotes,
+    examples: input.examples,
+  });
+}
+
+/**
+ * Build a source-framed prompt for the future protected runner.
+ *
+ * This pure formatter does not authorize generation. The runner must first
+ * prove that this exact source bundle and final request are manifest-bound.
+ */
+export function buildProtectedChapterWorkupPrompt(
+  input: ProtectedChapterWorkupPromptInput,
+): string {
+  return buildChapterWorkupPromptInternal(input);
 }

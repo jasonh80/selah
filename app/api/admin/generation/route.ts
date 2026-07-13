@@ -5,7 +5,11 @@ import {
   logGenerationAudit,
   type GenerationSettings,
 } from "@/lib/server/generation-settings";
-import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
+import {
+  generationAllowed,
+  isProtectedMarkSprintGenerationIdentity,
+  parseSlug,
+} from "@/lib/server/generate-chapter-workup";
 import {
   getChapterStatus,
   getDraftWorkup,
@@ -292,6 +296,16 @@ export async function POST(req: Request) {
     const blocked = await guardOrRefuse(slug, "generate", "createGeneratingChapterWorkup");
     if (blocked) return blocked;
     const confirm = body.confirm === true || body.confirm === "yes";
+    // Refuse before the ordinary admin flow can add the slug to the persistent
+    // allowlist or claim a generating row. Mark 8–11 require the protected path.
+    if (isProtectedMarkSprintGenerationIdentity({ slug })) {
+      return refuse(
+        slug,
+        "generate",
+        "blocked — this chapter requires the protected Mark sprint runner",
+        403,
+      );
+    }
     const settings = await getGenerationSettings();
 
     if (settings.require_confirm && !confirm) {
