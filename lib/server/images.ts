@@ -59,16 +59,24 @@ export const IMAGE_ALLOWED_SLUGS = ["psalm-23", "mark-6", MARK_8_IMAGE_SLUG];
 // the settings kill switch and allowlist still apply. Never set in production.
 let imageConfigBypassForTesting = false;
 let imagePlansOverride: Record<string, ImagePlan[]> | null = null;
+let imageRunDeadlineMsOverride: number | null = null;
 let imageModelProbeOverride:
   | ((model: string) => Promise<{ ok: boolean; model: string; error?: string }>)
   | null = null;
 export function __setImageTestOverrides(overrides: {
   configBypass?: boolean;
   plans?: Record<string, ImagePlan[]> | null;
+  runDeadlineMs?: number;
   modelProbe?: (model: string) => Promise<{ ok: boolean; model: string; error?: string }>;
 } | null): void {
   imageConfigBypassForTesting = overrides?.configBypass ?? false;
   imagePlansOverride = overrides?.plans ?? null;
+  imageRunDeadlineMsOverride =
+    overrides?.runDeadlineMs !== undefined &&
+    Number.isFinite(overrides.runDeadlineMs) &&
+    overrides.runDeadlineMs > 0
+      ? overrides.runDeadlineMs
+      : null;
   imageModelProbeOverride = overrides?.modelProbe ?? null;
 }
 
@@ -86,6 +94,68 @@ export async function imageGenAllowed(slug: string): Promise<boolean> {
 }
 
 const BUCKET = "chapter-images";
+
+// Netlify gives the background worker 15 minutes. Mark 8 stops all image work
+// at 12 minutes, leaving a full three minutes for the existing cost, audit,
+// and terminal-state writes. Legacy plans are intentionally unchanged.
+export const MARK_8_IMAGE_RUN_DEADLINE_MS = 12 * 60 * 1000;
+export const MARK_8_IMAGE_RUN_CLEANUP_RESERVE_MS = 3 * 60 * 1000;
+
+class ImageRunDeadlineError extends Error {
+  constructor() {
+    super(
+      "Mark 8 image run reached its 12-minute safety deadline; stopping before the hosting limit",
+    );
+    this.name = "ImageRunDeadlineError";
+  }
+}
+
+interface ImageRunDeadline {
+  signal: AbortSignal;
+  run<T>(operation: () => Promise<T>): Promise<T>;
+  dispose(): void;
+}
+
+function createMark8ImageRunDeadline(): ImageRunDeadline {
+  const controller = new AbortController();
+  const durationMs = imageRunDeadlineMsOverride ?? MARK_8_IMAGE_RUN_DEADLINE_MS;
+  const timer = setTimeout(() => controller.abort(), durationMs);
+  timer.unref?.();
+
+  return {
+    signal: controller.signal,
+    run<T>(operation: () => Promise<T>): Promise<T> {
+      if (controller.signal.aborted) return Promise.reject(new ImageRunDeadlineError());
+      return new Promise<T>((resolve, reject) => {
+        let settled = false;
+        const finish = (callback: () => void) => {
+          if (settled) return;
+          settled = true;
+          controller.signal.removeEventListener("abort", onAbort);
+          callback();
+        };
+        const onAbort = () => finish(() => reject(new ImageRunDeadlineError()));
+        controller.signal.addEventListener("abort", onAbort, { once: true });
+        Promise.resolve()
+          .then(operation)
+          .then(
+            (value) => finish(() => resolve(value)),
+            (error) => finish(() => reject(error)),
+          );
+      });
+    },
+    dispose(): void {
+      clearTimeout(timer);
+    },
+  };
+}
+
+function withinImageRunDeadline<T>(
+  deadline: ImageRunDeadline | undefined,
+  operation: () => Promise<T>,
+): Promise<T> {
+  return deadline ? deadline.run(operation) : operation();
+}
 
 const STYLE =
   " Historical documentary realism, earthy and restrained. Ancient Judean terrain, believable shepherding world, natural light, cinematic but not theatrical, reverent not staged. No halos, no glowing figures or angels, no fantasy effects, no modern objects, no European fantasy Bible-art look, no clean costumes, no text or lettering of any kind.";
@@ -229,7 +299,11 @@ async function ensureBucket(db: NonNullable<ReturnType<typeof getSupabaseAdmin>>
 
 // One image → PNG bytes. Handles gpt-image models (b64) and dall-e (url/b64).
 // Uses EXACTLY the given model — no fallback; unknown models fail loudly.
-async function generateImageBytes(model: string, plan: ImagePlan): Promise<Buffer> {
+async function generateImageBytes(
+  model: string,
+  plan: ImagePlan,
+  signal?: AbortSignal,
+): Promise<Buffer> {
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
   const isDalle = /dall-e/i.test(model);
@@ -242,13 +316,16 @@ async function generateImageBytes(model: string, plan: ImagePlan): Promise<Buffe
   if (model === MARK_8_IMAGE_MODEL) params.quality = "high";
   if (isDalle) params.response_format = "b64_json";
 
-  const res = (await client.images.generate(params as never)) as {
+  const res = (await client.images.generate(
+    params as never,
+    signal ? { signal, maxRetries: 0 } : undefined,
+  )) as {
     data?: { b64_json?: string; url?: string }[];
   };
   const item = res.data?.[0];
   if (item?.b64_json) return Buffer.from(item.b64_json, "base64");
   if (item?.url) {
-    const r = await fetch(item.url);
+    const r = await fetch(item.url, signal ? { signal } : undefined);
     if (!r.ok) throw new Error(`image fetch ${r.status}`);
     return Buffer.from(await r.arrayBuffer());
   }
@@ -298,6 +375,20 @@ export async function generateAndStoreChapterImages(
   jobId: string,
   binding?: ImageJobBinding,
 ): Promise<ImageGenResult> {
+  const deadline = slug === MARK_8_IMAGE_SLUG ? createMark8ImageRunDeadline() : undefined;
+  try {
+    return await generateAndStoreChapterImagesWithinDeadline(slug, jobId, binding, deadline);
+  } finally {
+    deadline?.dispose();
+  }
+}
+
+async function generateAndStoreChapterImagesWithinDeadline(
+  slug: string,
+  jobId: string,
+  binding: ImageJobBinding | undefined,
+  deadline: ImageRunDeadline | undefined,
+): Promise<ImageGenResult> {
   const isDynamicMark8 = slug === MARK_8_IMAGE_SLUG;
   const store = requireJobStore(slug, "generateAndStoreChapterImages");
   let model = binding?.model ?? CHAPTER_IMAGE_MODEL;
@@ -310,7 +401,7 @@ export async function generateAndStoreChapterImages(
   // queued claim is released if a pre-spend check fails. If atomic consume
   // loses to a duplicate worker, queued-only release cannot cancel the winner.
   try {
-    if (!(await imageGenAllowed(slug))) {
+    if (!(await withinImageRunDeadline(deadline, () => imageGenAllowed(slug)))) {
       throw new Error("image generation not allowed for this slug");
     }
     model = isDynamicMark8 ? MARK_8_IMAGE_MODEL : await activeImageModel();
@@ -323,12 +414,15 @@ export async function generateAndStoreChapterImages(
     db = imageDepsOverride?.db ?? getSupabaseAdmin() ?? undefined;
     if (!db) throw new Error("Supabase not configured");
 
+    // Do not race the atomic queued → running write against the timer: an
+    // ambiguous database completion could otherwise strand the claim. The
+    // next read/check observes an expired deadline before any paid work.
     workup = await consumeImageClaim(store, slug, jobId, binding);
     consumed = true;
 
     // Re-read the kill switch/allowlist and selected model after consume,
     // immediately before the storage/model envelope begins.
-    if (!(await imageGenAllowed(slug))) {
+    if (!(await withinImageRunDeadline(deadline, () => imageGenAllowed(slug)))) {
       throw new Error("image generation was disabled before spend");
     }
     const recheckedModel = isDynamicMark8 ? MARK_8_IMAGE_MODEL : await activeImageModel();
@@ -380,25 +474,39 @@ export async function generateAndStoreChapterImages(
   // upload failed, (b) durably audits, and (c) releases the claim for retry.
   const stored: { kind: ImageKind; url: string; plan: ImagePlan }[] = [];
   let generatedCount = 0;
+  let startedCount = 0;
   try {
-    await ensureBucket(exactDb);
+    await withinImageRunDeadline(deadline, () => ensureBucket(exactDb));
     for (const plan of plans) {
-      const bytes = await generate(model, plan);
+      if (isDynamicMark8) startedCount += 1;
+      const bytes = await withinImageRunDeadline(deadline, () =>
+        generate(model, plan, deadline?.signal),
+      );
       generatedCount += 1; // model spend happened even if the upload below fails
-      const url = await uploadImage(exactDb, `${slug}/${jobId}/${fileFor(plan.kind)}`, bytes);
+      const url = await withinImageRunDeadline(deadline, () =>
+        uploadImage(exactDb, `${slug}/${jobId}/${fileFor(plan.kind)}`, bytes),
+      );
       stored.push({ kind: plan.kind, url, plan });
     }
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 200);
-    if (isDynamicMark8 && generatedCount > 0) {
+    const deadlineExceeded = e instanceof ImageRunDeadlineError;
+    // A request aborted at the deadline may still be billed even though no
+    // image response arrived. Record that one in-flight request as POSSIBLE
+    // spend, but keep `generated` truthful and never call it a completed image.
+    const possibleSpendCount = deadlineExceeded
+      ? Math.max(generatedCount, startedCount)
+      : generatedCount;
+    const billingUncertain = possibleSpendCount > generatedCount;
+    if (isDynamicMark8 && possibleSpendCount > 0) {
       let costRecorded = false;
       try {
         await recordCostEventStrict({
           requestType: "chapter_image_generation",
           provider: "openai",
           model,
-          imageCount: generatedCount,
-          estimatedCostUsd: generatedCount * MARK_8_IMAGE_ESTIMATED_COST_USD,
+          imageCount: possibleSpendCount,
+          estimatedCostUsd: possibleSpendCount * MARK_8_IMAGE_ESTIMATED_COST_USD,
           imageQuality: "high",
           metadata: {
             slug,
@@ -407,6 +515,10 @@ export async function generateAndStoreChapterImages(
             failed: true,
             error: msg,
             generated: generatedCount,
+            requestsStarted: startedCount,
+            possibleSpendCount,
+            billingUncertain,
+            deadlineExceeded,
             uploaded: stored.length,
             completedKinds: stored.map((x) => x.kind),
           },
@@ -420,8 +532,12 @@ export async function generateAndStoreChapterImages(
         slug,
         jobId,
         costRecorded ? "failed" : "blocked",
-        generatedCount,
-        costRecorded ? "image_run_failed" : "cost_record_failed",
+        possibleSpendCount,
+        costRecorded
+          ? deadlineExceeded
+            ? "image_run_deadline"
+            : "image_run_failed"
+          : "cost_record_failed",
         binding,
       );
       await logGenerationAudit({
@@ -430,7 +546,9 @@ export async function generateAndStoreChapterImages(
         model,
         status: "failed",
         message:
-          `generated ${generatedCount}/${plans.length}, uploaded ${stored.length}: ${msg}; ` +
+          `${billingUncertain
+            ? `deadline after ${generatedCount} completed image(s); ${possibleSpendCount} request(s) may be billed`
+            : `generated ${generatedCount}/${plans.length}, uploaded ${stored.length}`}: ${msg}; ` +
           `${costRecorded ? "spend recorded" : "COST NOT RECORDED"}; ` +
           `${terminal ? "job locked" : "job lock write failed — manual inspection required"}; ` +
           `orphaned dir: ${slug}/${jobId}/`,
@@ -440,7 +558,9 @@ export async function generateAndStoreChapterImages(
         slug,
         model,
         error: costRecorded
-          ? `image run failed after ${generatedCount}/${plans.length} images; spend recorded and retry requires owner confirmation`
+          ? billingUncertain
+            ? `image run stopped at its safety deadline after ${generatedCount}/${plans.length} completed images; one in-flight request may be billed and retry requires owner confirmation`
+            : `image run failed after ${generatedCount}/${plans.length} images; spend recorded and retry requires owner confirmation`
           : "image run blocked after spend because its cost could not be recorded",
       };
     }
