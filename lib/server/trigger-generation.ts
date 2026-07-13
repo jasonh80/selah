@@ -7,7 +7,7 @@
 // token bound to (purpose, slug, jobId) and, for an approved text run, its
 // manifest digest. Workers verify the token before any work; a bare or
 // replayed-after-expiry URL does nothing.
-import { signJobToken, type JobPurpose } from "./generation-jobs";
+import { signJobToken, type ImageJobBinding, type JobPurpose } from "./generation-jobs";
 
 export interface TriggerResult {
   ok: boolean;
@@ -17,7 +17,14 @@ export interface TriggerResult {
 
 interface TriggerRequest {
   url: string;
-  body: { slug: string; job: string; token: string; approvedManifestDigest?: string };
+  body: {
+    slug: string;
+    job: string;
+    token: string;
+    approvedManifestDigest?: string;
+    imagePlanDigest?: string;
+    imageModel?: string;
+  };
 }
 
 async function post(reqSpec: TriggerRequest): Promise<TriggerResult> {
@@ -57,6 +64,7 @@ async function trigger(
   host: string,
   jobId: string,
   approvedManifestDigest?: string,
+  imageBinding?: ImageJobBinding,
 ): Promise<TriggerResult> {
   let token: string;
   try {
@@ -71,6 +79,12 @@ async function trigger(
       job: jobId,
       token,
       ...(approvedManifestDigest === undefined ? {} : { approvedManifestDigest }),
+      ...(imageBinding === undefined
+        ? {}
+        : {
+            imagePlanDigest: imageBinding.planDigest,
+            imageModel: imageBinding.model,
+          }),
     },
   };
   return triggerOverride ? triggerOverride(req) : post(req);
@@ -85,6 +99,11 @@ export async function triggerBackgroundGeneration(
   return trigger("text", "generate-chapter-background", slug, host, jobId, approvedManifestDigest);
 }
 
-export async function triggerBackgroundImageGeneration(slug: string, host: string, jobId: string): Promise<TriggerResult> {
-  return trigger("image", "generate-images-background", slug, host, jobId);
+export async function triggerBackgroundImageGeneration(
+  slug: string,
+  host: string,
+  jobId: string,
+  binding?: ImageJobBinding,
+): Promise<TriggerResult> {
+  return trigger("image", "generate-images-background", slug, host, jobId, undefined, binding);
 }

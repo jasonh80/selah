@@ -21,12 +21,22 @@ import {
   ChapterMutationError,
   type RowLookup,
 } from "./protected-chapters";
+import {
+  assertMark8ImagesArePlaceholders,
+  deriveMark8ImagePlan,
+  MARK_8_IMAGE_MODEL,
+  MARK_8_IMAGE_SLUG,
+} from "./mark8-image-plan";
 
 export const TEXT_JOB_KEY = "generationJobId";
 export const TEXT_JOB_STATE_KEY = "generationJobState";
 export const TEXT_JOB_MANIFEST_DIGEST_KEY = "generationApprovedManifestDigest";
 export const IMAGE_JOB_KEY = "imageJobId";
 export const IMAGE_JOB_STATE_KEY = "imageJobState";
+export const IMAGE_JOB_PLAN_DIGEST_KEY = "imageJobPlanDigest";
+export const IMAGE_JOB_MODEL_KEY = "imageJobModel";
+export const IMAGE_JOB_SPENT_COUNT_KEY = "imageJobSpentCount";
+export const IMAGE_JOB_ERROR_CODE_KEY = "imageJobErrorCode";
 
 const LOWERCASE_SHA256 = /^[0-9a-f]{64}$/;
 
@@ -48,6 +58,11 @@ export interface JobStorePort {
   insert(slug: string, payload: Record<string, unknown>): Promise<"ok" | "duplicate" | { error: string }>;
   /** Conditional UPDATE honoring ALL predicates; returns changed-row count. */
   update(slug: string, predicates: JobPredicates, next: Record<string, unknown>): Promise<number | { error: string }>;
+}
+
+export interface ImageJobBinding {
+  planDigest: string;
+  model: string;
 }
 
 function toLookup(row: JobRow | null | { error: string }): RowLookup {
@@ -537,44 +552,150 @@ function isProtectedFailure(e: unknown): boolean {
 
 // ---------------- image jobs (single-use; duplicates cannot double-spend) ----------------
 
+function validatedImageBinding(
+  slug: string,
+  workup: ChapterWorkup,
+  binding: ImageJobBinding | undefined,
+  action: string,
+): ImageJobBinding | undefined {
+  if (slug !== MARK_8_IMAGE_SLUG) {
+    if (binding === undefined) return undefined;
+    if (!LOWERCASE_SHA256.test(binding.planDigest) || binding.model.trim() === "") {
+      throw new ChapterMutationError("REFUSED", action, slug, "image-job binding is malformed");
+    }
+    return { planDigest: binding.planDigest, model: binding.model };
+  }
+  if (!binding) {
+    throw new ChapterMutationError("REFUSED", action, slug, "Mark 8 requires a bound image plan and model");
+  }
+  if (!LOWERCASE_SHA256.test(binding.planDigest)) {
+    throw new ChapterMutationError("REFUSED", action, slug, "Mark 8 image-plan digest must be a lowercase SHA-256 digest");
+  }
+  if (binding.model !== MARK_8_IMAGE_MODEL) {
+    throw new ChapterMutationError("REFUSED", action, slug, `Mark 8 requires ${MARK_8_IMAGE_MODEL} exactly`);
+  }
+  let derived;
+  try {
+    assertMark8ImagesArePlaceholders(workup);
+    derived = deriveMark8ImagePlan(workup);
+  } catch (error) {
+    throw new ChapterMutationError("REFUSED", action, slug, String((error as Error).message));
+  }
+  if (derived.digest !== binding.planDigest) {
+    throw new ChapterMutationError("CONFLICT", action, slug, "stored Mark 8 image plan no longer matches this claim");
+  }
+  return { planDigest: derived.digest, model: MARK_8_IMAGE_MODEL };
+}
+
+function imageBindingPredicates(
+  row: JobRow,
+  slug: string,
+  binding: ImageJobBinding | undefined,
+  action: string,
+): { key: string; equals: string }[] {
+  const expected = validatedImageBinding(
+    slug,
+    row.workupJson as unknown as ChapterWorkup,
+    binding,
+    action,
+  );
+  const storedDigest = row.workupJson[IMAGE_JOB_PLAN_DIGEST_KEY];
+  const storedModel = row.workupJson[IMAGE_JOB_MODEL_KEY];
+  if (expected === undefined) {
+    if (storedDigest !== undefined || storedModel !== undefined) {
+      throw new ChapterMutationError("CONFLICT", action, slug, "unexpected image-job binding on a legacy claim");
+    }
+    return [];
+  }
+  if (storedDigest !== expected.planDigest || storedModel !== expected.model) {
+    throw new ChapterMutationError("CONFLICT", action, slug, "image plan or model does not match this claim");
+  }
+  return [
+    { key: IMAGE_JOB_PLAN_DIGEST_KEY, equals: expected.planDigest },
+    { key: IMAGE_JOB_MODEL_KEY, equals: expected.model },
+  ];
+}
+
 /**
  * Atomic single-use IMAGE claim on a draft row (route-side). Refuses while
  * another image claim is active (no double spend). Stamps state "queued"; the
  * worker consumes it. Error paths must release via releaseImageJob.
  */
-export async function claimImageJob(store: JobStorePort, slug: string): Promise<{ jobId: string; workup: ChapterWorkup }> {
+export async function claimImageJob(
+  store: JobStorePort,
+  slug: string,
+  binding?: ImageJobBinding,
+): Promise<{ jobId: string; workup: ChapterWorkup; binding?: ImageJobBinding }> {
   const row = await store.read(slug);
   const decision = decideMutation("updateChapterWorkupJson", slug, toLookup(row));
   if (!decision.allowed) throw new ChapterMutationError("REFUSED", "claimImageJob", slug, decision.reason);
   const json = (row && !("error" in row) && row.workupJson) || {};
-  if (typeof json[IMAGE_JOB_KEY] === "string" && json[IMAGE_JOB_KEY]) {
+  const previousJobId = typeof json[IMAGE_JOB_KEY] === "string" ? json[IMAGE_JOB_KEY] : "";
+  const previousState = typeof json[IMAGE_JOB_STATE_KEY] === "string" ? json[IMAGE_JOB_STATE_KEY] : "";
+  const ownerConfirmedRetry =
+    slug === MARK_8_IMAGE_SLUG && previousJobId !== "" && previousState === "failed";
+  if (previousJobId && !ownerConfirmedRetry) {
     throw new ChapterMutationError("CONFLICT", "claimImageJob", slug, "an image job is already active for this chapter");
   }
+  const exactBinding = validatedImageBinding(
+    slug,
+    json as unknown as ChapterWorkup,
+    binding,
+    "claimImageJob",
+  );
   const jobId = newJobId();
+  const claimedJson = { ...json };
+  delete claimedJson[IMAGE_JOB_SPENT_COUNT_KEY];
+  delete claimedJson[IMAGE_JOB_ERROR_CODE_KEY];
   const changed = await store.update(
     slug,
     {
       status: decision.expected!.status,
       updatedAt: decision.expected!.updatedAt,
-      json: [{ key: IMAGE_JOB_KEY, equals: null }], // key must still be absent at write time
+      json: ownerConfirmedRetry
+        ? [
+            { key: IMAGE_JOB_KEY, equals: previousJobId },
+            { key: IMAGE_JOB_STATE_KEY, equals: "failed" },
+          ]
+        : [{ key: IMAGE_JOB_KEY, equals: null }], // key must still be absent at write time
     },
     {
-      workup_json: { ...json, [IMAGE_JOB_KEY]: jobId, [IMAGE_JOB_STATE_KEY]: "queued" },
+      workup_json: {
+        ...claimedJson,
+        [IMAGE_JOB_KEY]: jobId,
+        [IMAGE_JOB_STATE_KEY]: "queued",
+        ...(exactBinding
+          ? {
+              [IMAGE_JOB_PLAN_DIGEST_KEY]: exactBinding.planDigest,
+              [IMAGE_JOB_MODEL_KEY]: exactBinding.model,
+            }
+          : {}),
+      },
       updated_at: new Date().toISOString(),
     },
   );
   if (typeof changed === "object") throw new ChapterMutationError("WRITE_FAILED", "claimImageJob", slug, changed.error);
   if (changed !== 1) throw new ChapterMutationError("CONFLICT", "claimImageJob", slug, "another image claim won the race");
-  return { jobId, workup: { ...(json as unknown as ChapterWorkup) } };
+  return {
+    jobId,
+    workup: { ...(json as unknown as ChapterWorkup) },
+    ...(exactBinding ? { binding: exactBinding } : {}),
+  };
 }
 
 /** Worker-side atomic consumption of an image claim ("queued" → "running"). */
-export async function consumeImageClaim(store: JobStorePort, slug: string, jobId: string): Promise<ChapterWorkup> {
+export async function consumeImageClaim(
+  store: JobStorePort,
+  slug: string,
+  jobId: string,
+  binding?: ImageJobBinding,
+): Promise<ChapterWorkup> {
   if (!jobId) throw new ChapterMutationError("REFUSED", "consumeImageClaim", slug, "missing job id");
   const row = await readRowForTerminalWrite(store, slug, "consumeImageClaim");
   if (row.status !== "draft" || row.workupJson?.[IMAGE_JOB_KEY] !== jobId) {
     throw new ChapterMutationError("CONFLICT", "consumeImageClaim", slug, "image claim is not owned by this worker");
   }
+  const bindingPredicates = imageBindingPredicates(row, slug, binding, "consumeImageClaim");
   const changed = await store.update(
     slug,
     {
@@ -583,6 +704,7 @@ export async function consumeImageClaim(store: JobStorePort, slug: string, jobId
       json: [
         { key: IMAGE_JOB_KEY, equals: jobId },
         { key: IMAGE_JOB_STATE_KEY, equals: "queued" },
+        ...bindingPredicates,
       ],
     },
     {
@@ -608,6 +730,10 @@ export async function completeImageJob(
   const json = { ...(finalWorkup as unknown as Record<string, unknown>) };
   delete json[IMAGE_JOB_KEY];
   delete json[IMAGE_JOB_STATE_KEY];
+  delete json[IMAGE_JOB_PLAN_DIGEST_KEY];
+  delete json[IMAGE_JOB_MODEL_KEY];
+  delete json[IMAGE_JOB_SPENT_COUNT_KEY];
+  delete json[IMAGE_JOB_ERROR_CODE_KEY];
   const changed = await store.update(
     slug,
     {
@@ -631,7 +757,12 @@ export async function completeImageJob(
  * trigger failure releases a "queued" claim, a worker failure a "running"
  * one). Never throws; false = claim not released (superseded or write failed).
  */
-export async function releaseImageJob(store: JobStorePort, slug: string, jobId: string): Promise<boolean> {
+export async function releaseImageJob(
+  store: JobStorePort,
+  slug: string,
+  jobId: string,
+  expectedState?: "queued" | "running",
+): Promise<boolean> {
   let row: JobRow;
   try {
     row = await readRowForTerminalWrite(store, slug, "releaseImageJob");
@@ -640,13 +771,87 @@ export async function releaseImageJob(store: JobStorePort, slug: string, jobId: 
     return false;
   }
   if (row.workupJson?.[IMAGE_JOB_KEY] !== jobId) return false;
+  if (expectedState !== undefined && row.workupJson?.[IMAGE_JOB_STATE_KEY] !== expectedState) return false;
   const json = { ...row.workupJson };
   delete json[IMAGE_JOB_KEY];
   delete json[IMAGE_JOB_STATE_KEY];
+  delete json[IMAGE_JOB_PLAN_DIGEST_KEY];
+  delete json[IMAGE_JOB_MODEL_KEY];
+  delete json[IMAGE_JOB_SPENT_COUNT_KEY];
+  delete json[IMAGE_JOB_ERROR_CODE_KEY];
   const changed = await store.update(
     slug,
-    { status: "draft", updatedAt: row.updatedAt, json: [{ key: IMAGE_JOB_KEY, equals: jobId }] },
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_JOB_KEY, equals: jobId },
+        ...(expectedState === undefined
+          ? []
+          : [{ key: IMAGE_JOB_STATE_KEY, equals: expectedState }]),
+      ],
+    },
     { workup_json: json, updated_at: new Date().toISOString() },
+  );
+  return typeof changed === "number" && changed === 1;
+}
+
+/**
+ * Paid work that cannot complete remains locked. `failed` means the spend was
+ * durably recorded; `blocked` means even the cost record failed. Both prevent
+ * an automatic second paid run from hiding or duplicating the first spend.
+ */
+export async function markImageJobTerminalFailure(
+  store: JobStorePort,
+  slug: string,
+  jobId: string,
+  state: "failed" | "blocked",
+  spentCount: number,
+  errorCode: string,
+  binding?: ImageJobBinding,
+): Promise<boolean> {
+  let row: JobRow;
+  try {
+    row = await readRowForTerminalWrite(store, slug, "markImageJobTerminalFailure");
+  } catch (error) {
+    console.error(`[selah] markImageJobTerminalFailure(${slug}): ${(error as Error).message}`);
+    return false;
+  }
+  if (row.workupJson?.[IMAGE_JOB_KEY] !== jobId || row.workupJson?.[IMAGE_JOB_STATE_KEY] !== "running") {
+    return false;
+  }
+  let bindingPredicates: { key: string; equals: string }[];
+  try {
+    bindingPredicates = imageBindingPredicates(
+      row,
+      slug,
+      binding,
+      "markImageJobTerminalFailure",
+    );
+  } catch (error) {
+    console.error(`[selah] markImageJobTerminalFailure(${slug}): ${(error as Error).message}`);
+    return false;
+  }
+  const changed = await store.update(
+    slug,
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_JOB_KEY, equals: jobId },
+        { key: IMAGE_JOB_STATE_KEY, equals: "running" },
+        ...bindingPredicates,
+      ],
+    },
+    {
+      workup_json: {
+        ...row.workupJson,
+        [IMAGE_JOB_STATE_KEY]: state,
+        [IMAGE_JOB_SPENT_COUNT_KEY]: Math.max(0, Math.floor(spentCount)),
+        [IMAGE_JOB_ERROR_CODE_KEY]: errorCode.slice(0, 80),
+      },
+      updated_at: new Date().toISOString(),
+    },
   );
   return typeof changed === "number" && changed === 1;
 }

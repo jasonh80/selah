@@ -272,6 +272,11 @@ import {
   TEXT_JOB_STATE_KEY,
   TEXT_JOB_MANIFEST_DIGEST_KEY,
   IMAGE_JOB_KEY,
+  IMAGE_JOB_STATE_KEY,
+  IMAGE_JOB_PLAN_DIGEST_KEY,
+  IMAGE_JOB_MODEL_KEY,
+  IMAGE_JOB_SPENT_COUNT_KEY,
+  IMAGE_JOB_ERROR_CODE_KEY,
 } from "../lib/server/generation-jobs";
 import { isChapterMutationError, __setRowLookupForTesting } from "../lib/server/protected-chapters";
 import {
@@ -284,12 +289,22 @@ import {
   getGenerationSettings,
   type GenerationSettings,
 } from "../lib/server/generation-settings";
-import { __setCostCaptureForTesting, type CostEventInput } from "../lib/server/cost-events-repository";
+import {
+  __setCostCaptureForTesting,
+  __setCostWriteFailureForTesting,
+  type CostEventInput,
+} from "../lib/server/cost-events-repository";
 import {
   __setGenerationConfigBypassForTesting,
   __setTextGeneratorForTesting,
 } from "../lib/server/generate-chapter-workup";
 import { __setImageTestOverrides, __setImageDepsForTesting, generateAndStoreChapterImages } from "../lib/server/images";
+import {
+  deriveMark8ImagePlan,
+  isStoredMark8ImageUrl,
+  mark8FinalReviewDigest,
+  MARK_8_IMAGE_MODEL,
+} from "../lib/server/mark8-image-plan";
 import { POST as adminPost } from "../app/api/admin/generation/route";
 import textWorker, {
   __setMark8PermissionCheckerForTesting,
@@ -344,6 +359,50 @@ class FakeJobStore implements JobStorePort {
 
 const META = { book: "Mark", chapter: 8, title: "Mark 8" };
 const WORKUP = { slug: "mark-8", title: "Mark 8" } as unknown as ChapterWorkup;
+const MARK8_IMAGE_WORKUP = {
+  slug: "mark-8",
+  title: "Mark 8",
+  heroKind: "peter-confession",
+  images: [
+    {
+      kind: "bread-in-the-boat",
+      index: 1,
+      label: "Bread in the Boat",
+      description: "The disciples sit with one loaf while missing what Jesus has shown them.",
+      prompt: "A historically grounded first-century Galilean fishing boat with the disciples and one loaf.",
+      caption: "One loaf was in the boat, but their understanding was still forming.",
+      src: "/img/placeholder/establishing.svg",
+      alt: "The disciples in a fishing boat with one loaf between them.",
+      status: "placeholder",
+    },
+    {
+      kind: "peter-confession",
+      index: 2,
+      label: "You Are the Christ",
+      description: "Peter names Jesus as the Christ near Caesarea Philippi.",
+      prompt: "Peter answering Jesus near Caesarea Philippi with the disciples gathered close.",
+      caption: "Peter sees truly, but he still has more to learn about the way of the Messiah.",
+      src: "/img/placeholder/detail.svg",
+      alt: "Peter answering Jesus as the disciples listen near Caesarea Philippi.",
+      status: "placeholder",
+    },
+    {
+      kind: "take-up-the-cross",
+      index: 3,
+      label: "Take Up Your Cross",
+      description: "Jesus calls the crowd and disciples to costly, faithful following.",
+      prompt: "Jesus teaching an ordinary crowd and His disciples on a rugged northern road.",
+      caption: "Following Jesus means receiving His way, not reshaping it around ours.",
+      src: "/img/placeholder/human.svg",
+      alt: "Jesus teaching His disciples and a crowd on a rugged road.",
+      status: "placeholder",
+    },
+  ],
+} as unknown as ChapterWorkup;
+const MARK8_IMAGE_BINDING = {
+  planDigest: deriveMark8ImagePlan(MARK8_IMAGE_WORKUP).digest,
+  model: MARK_8_IMAGE_MODEL,
+};
 const MANIFEST_DIGEST_A = "a".repeat(64);
 const MANIFEST_DIGEST_B = "b".repeat(64);
 
@@ -725,15 +784,28 @@ const integration = async () => {
   // I5. Image single-use claim + consume: duplicates cannot double-spend.
   {
     const store = new FakeJobStore();
-    store.seed("mark-8", "draft", { title: "Mark 8", images: [] });
-    const { jobId } = await claimImageJob(store, "mark-8");
-    await expectCode(() => claimImageJob(store, "mark-8"), "CONFLICT", "I5 second image request cannot claim (no double spend)");
-    await consumeImageClaim(store, "mark-8", jobId);
-    await expectCode(() => consumeImageClaim(store, "mark-8", jobId), "CONFLICT", "I5 duplicate image delivery cannot consume twice");
+    store.seed("mark-8", "draft", structuredClone(MARK8_IMAGE_WORKUP) as unknown as Record<string, unknown>);
+    const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+    ok(
+      store.rows.get("mark-8")!.workup_json[IMAGE_JOB_PLAN_DIGEST_KEY] === MARK8_IMAGE_BINDING.planDigest &&
+        store.rows.get("mark-8")!.workup_json[IMAGE_JOB_MODEL_KEY] === MARK_8_IMAGE_MODEL,
+      "I5 Mark 8 claim binds the exact ordered plan and gpt-image-2",
+    );
+    await expectCode(
+      () => claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING),
+      "CONFLICT",
+      "I5 second image request cannot claim (no double spend)",
+    );
+    await consumeImageClaim(store, "mark-8", jobId, MARK8_IMAGE_BINDING);
+    await expectCode(
+      () => consumeImageClaim(store, "mark-8", jobId, MARK8_IMAGE_BINDING),
+      "CONFLICT",
+      "I5 duplicate image delivery cannot consume twice",
+    );
     ok(await releaseImageJob(store, "mark-8", jobId), "I5 failed run releases claim");
-    const second = await claimImageJob(store, "mark-8");
+    const second = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
     ok(second.jobId !== jobId, "I5 retry gets a fresh job id");
-    await consumeImageClaim(store, "mark-8", second.jobId);
+    await consumeImageClaim(store, "mark-8", second.jobId, MARK8_IMAGE_BINDING);
     await completeImageJob(store, "mark-8", second.jobId, { title: "Mark 8", images: [{}] } as unknown as ChapterWorkup);
     ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "I5 completion clears the claim");
   }
@@ -741,17 +813,17 @@ const integration = async () => {
   // I6. Stale image worker: superseded run cannot apply; bytes stay orphaned.
   {
     const store = new FakeJobStore();
-    store.seed("mark-8", "draft", { title: "Mark 8", images: [] });
-    const first = await claimImageJob(store, "mark-8");
+    store.seed("mark-8", "draft", structuredClone(MARK8_IMAGE_WORKUP) as unknown as Record<string, unknown>);
+    const first = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
     ok(await releaseImageJob(store, "mark-8", first.jobId), "I6 first run released");
-    const second = await claimImageJob(store, "mark-8");
+    const second = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
     await expectCode(
       () => completeImageJob(store, "mark-8", first.jobId, { title: "stale" } as unknown as ChapterWorkup),
       "CONFLICT",
       "I6 stale image worker cannot apply (orphaned files stay isolated)",
     );
     ok((store.rows.get("mark-8")!.workup_json as { title?: string }).title === "Mark 8", "I6 draft untouched by stale run");
-    await consumeImageClaim(store, "mark-8", second.jobId);
+    await consumeImageClaim(store, "mark-8", second.jobId, MARK8_IMAGE_BINDING);
     await completeImageJob(store, "mark-8", second.jobId, { title: "Mark 8", images: [{}] } as unknown as ChapterWorkup);
   }
 
@@ -1422,34 +1494,96 @@ function fakeDb(): FakeDb {
         state.uploads.push(path);
         return { error: null };
       },
-      getPublicUrl: (path: string) => ({ data: { publicUrl: `https://fake.storage/${path}` } }),
+      getPublicUrl: (path: string) => ({
+        data: { publicUrl: `https://fake.storage/storage/v1/object/public/chapter-images/${path}` },
+      }),
     }),
   };
   return state;
 }
-const TEST_PLAN = [
-  { kind: "establishing" as const, prompt: "p1", alt: "a1", caption: "c1" },
-  { kind: "detail" as const, prompt: "p2", alt: "a2", caption: "c2" },
-];
-
 const realImagePipeline = async () => {
   const audit: Array<Record<string, unknown>> = [];
   const costs: CostEventInput[] = [];
   const store = new FakeJobStore();
   const db = fakeDb();
+  let imageTrigger: {
+    body: {
+      slug: string;
+      job: string;
+      token: string;
+      imagePlanDigest?: string;
+      imageModel?: string;
+    };
+  } | null = null;
 
   __setJobStoreForTesting(store);
   __setRowLookupForTesting(storeLookup(store));
   __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
   __setCostCaptureForTesting(costs);
-  __setImageTestOverrides({ configBypass: true, plans: { "mark-8": TEST_PLAN } });
+  __setImageTestOverrides({
+    configBypass: true,
+    modelProbe: async (model) => ({ ok: true, model }),
+  });
+  __setTriggerTransportForTesting(async (request) => {
+    imageTrigger = request;
+    return { ok: true, status: 202 };
+  });
   __setImageDepsForTesting({
     db: { storage: db.storage } as never,
     generateBytes: async () => Buffer.from("fake-png"),
   });
 
   try {
-    const workupJson = { title: "Mark 8", images: [{ kind: "establishing", index: 1, label: "x", src: "", alt: "", status: "pending" }] };
+    const workupJson = structuredClone(MARK8_IMAGE_WORKUP) as unknown as Record<string, unknown>;
+
+    // M0. REAL Studio admin route: exact draft plan + project-standard model
+    // are bound before its authenticated background dispatch.
+    {
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      const response = await adminPost(adminReq({
+        action: "generate_images",
+        slug: "mark-8",
+        model: "gpt-image-1",
+      }));
+      const body = await response.json() as Record<string, unknown>;
+      ok(response.status === 200 && body.triggered === true, "M0 Studio route claims and dispatches Mark 8 images");
+      const trigger = imageTrigger as unknown as { body: Record<string, unknown> };
+      ok(
+        trigger.body.imagePlanDigest === MARK8_IMAGE_BINDING.planDigest &&
+          trigger.body.imageModel === MARK_8_IMAGE_MODEL,
+        "M0 dispatch carries the exact stored plan digest and gpt-image-2 binding",
+      );
+      const row = store.rows.get("mark-8")!;
+      ok(
+        row.workup_json[IMAGE_JOB_PLAN_DIGEST_KEY] === MARK8_IMAGE_BINDING.planDigest &&
+          row.workup_json[IMAGE_JOB_MODEL_KEY] === MARK_8_IMAGE_MODEL,
+        "M0 atomic claim persists the same plan/model binding",
+      );
+      const statusResponse = await adminPost(adminReq({ action: "images_status", slug: "mark-8" }));
+      const status = await statusResponse.json() as Record<string, unknown>;
+      ok(
+        status.state === "queued" && status.model === MARK_8_IMAGE_MODEL && status.done === false &&
+          status.estimatedCostUsd === 0.495,
+        "M0 Studio status truthfully reports queued exact-model work",
+      );
+      ok(
+        await releaseImageJob(store, "mark-8", String(body.jobId), "queued"),
+        "M0 unspent route claim releases cleanly",
+      );
+      store.rows.delete("mark-8");
+      imageTrigger = null;
+
+      const invalidPlan = structuredClone(workupJson);
+      invalidPlan.images = (invalidPlan.images as unknown[]).slice(0, 2);
+      store.seed("mark-8", "draft", invalidPlan);
+      const invalidStatus = await adminPost(adminReq({ action: "images_status", slug: "mark-8" }));
+      const invalidBody = await invalidStatus.json() as Record<string, unknown>;
+      ok(
+        invalidStatus.status === 409 && invalidBody.ok === false && !("estimatedCostUsd" in invalidBody),
+        "M0 invalid plan blocks Studio instead of showing a false $0 estimate",
+      );
+      store.rows.delete("mark-8");
+    }
 
     // M1. Worker method/auth (real handler).
     {
@@ -1464,18 +1598,124 @@ const realImagePipeline = async () => {
     // M2. Happy path through the REAL worker: claim (as the route does) → consume → generate → upload → complete.
     {
       store.seed("mark-8", "draft", structuredClone(workupJson));
-      const { jobId } = await claimImageJob(store, "mark-8");
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
       const token = signJobToken("image", "mark-8", jobId).token;
-      const res = await imagesWorker(workerReq("generate-images-background", { slug: "mark-8", job: jobId, token }));
+      const res = await imagesWorker(workerReq("generate-images-background", {
+        slug: "mark-8",
+        job: jobId,
+        token,
+        imagePlanDigest: MARK8_IMAGE_BINDING.planDigest,
+        imageModel: MARK8_IMAGE_BINDING.model,
+      }));
       ok(res.status === 200, `M2 real image worker succeeded (HTTP ${res.status})`);
-      ok(db.uploads.length === 2 && db.uploads.every((p) => p.includes(`mark-8/${jobId}/`)), "M2 uploads go to the immutable job directory");
+      ok(db.uploads.length === 3 && db.uploads.every((p) => p.includes(`mark-8/${jobId}/`)), "M2 uploads go to the immutable job directory");
       ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "M2 completion cleared the claim");
-      ok(costs.some((c) => c.imageCount === 2 && !(c.metadata as { failed?: boolean })?.failed), "M2 success spend recorded");
+      ok(
+        costs.some((c) => c.imageCount === 3 && c.estimatedCostUsd === 0.495 && c.imageQuality === "high" && !(c.metadata as { failed?: boolean })?.failed),
+        "M2 success spend records gpt-image-2 high-quality estimate",
+      );
+      const finalWorkup = store.rows.get("mark-8")!.workup_json as unknown as ChapterWorkup;
+      ok(
+        finalWorkup.images.map((image) => image.kind).join(",") ===
+          MARK8_IMAGE_WORKUP.images.map((image) => image.kind).join(","),
+        "M2 exact planned image order replaces placeholders (no append)",
+      );
+      ok(finalWorkup.heroKind === MARK8_IMAGE_WORKUP.heroKind, "M2 exact heroKind is preserved");
+      ok(finalWorkup.images.every(isStoredMark8ImageUrl), "M2 final image URLs use the exact public Mark 8 job/kind paths");
+      const reviewDigest = mark8FinalReviewDigest(finalWorkup);
+      ok(reviewDigest !== null, "M2 complete final workup gets a review digest");
+      ok(
+        mark8FinalReviewDigest({ ...finalWorkup, title: "Changed after review" }) !== reviewDigest,
+        "M2 review digest binds non-image render content too",
+      );
+      ok(
+        mark8FinalReviewDigest({
+          ...finalWorkup,
+          [IMAGE_JOB_KEY]: "transient",
+          [IMAGE_JOB_STATE_KEY]: "queued",
+          [IMAGE_JOB_PLAN_DIGEST_KEY]: MARK8_IMAGE_BINDING.planDigest,
+          [IMAGE_JOB_MODEL_KEY]: MARK_8_IMAGE_MODEL,
+        } as ChapterWorkup) === reviewDigest,
+        "M2 transient image-job keys do not change the final review digest",
+      );
+      const statusResponse = await adminPost(adminReq({ action: "images_status", slug: "mark-8" }));
+      const statusBody = await statusResponse.json() as Record<string, unknown>;
+      ok(
+        statusResponse.status === 200 && statusBody.done === true && statusBody.state === "idle" &&
+          statusBody.reviewDigest === reviewDigest,
+        "M2 Studio status exposes the exact complete-workup review digest",
+      );
+      const statusItems = statusBody.images as Array<Record<string, unknown>>;
+      ok(
+        statusItems.length === 3 && statusItems.every((item) => typeof item.description === "string" && !("prompt" in item) && !("src" in item)),
+        "M2 Studio status is useful but exposes no prompts or storage URLs",
+      );
       // Duplicate delivery of the same run: refused, no double spend.
       db.uploads.length = 0;
-      const replay = await imagesWorker(workerReq("generate-images-background", { slug: "mark-8", job: jobId, token }));
+      const replay = await imagesWorker(workerReq("generate-images-background", {
+        slug: "mark-8",
+        job: jobId,
+        token,
+        imagePlanDigest: MARK8_IMAGE_BINDING.planDigest,
+        imageModel: MARK8_IMAGE_BINDING.model,
+      }));
       ok(replay.status === 500, "M2 duplicate image delivery refused");
       ok(db.uploads.length === 0, "M2 duplicate delivery spent nothing");
+      store.rows.delete("mark-8");
+    }
+
+    // M3b. Worker-time switches and thrown control reads release queued work;
+    // no valid pre-spend refusal can leave Mark 8 stranded or spend anything.
+    {
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      db.uploads.length = 0;
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, image_generation_enabled: false },
+        captureAudit: audit,
+      });
+      const result = await generateAndStoreChapterImages("mark-8", jobId, MARK8_IMAGE_BINDING);
+      ok(!result.ok && store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "M3b disabled switch releases queued claim");
+      ok(db.uploads.length === 0, "M3b disabled switch spends nothing");
+      store.rows.delete("mark-8");
+
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      const throwingSettings = { ...TEST_SETTINGS };
+      Object.defineProperty(throwingSettings, "image_generation_enabled", {
+        enumerable: true,
+        get() { throw new Error("settings read boom"); },
+      });
+      const thrownJob = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      __setGenerationTestOverrides({ settings: throwingSettings, captureAudit: audit });
+      const thrown = await generateAndStoreChapterImages("mark-8", thrownJob.jobId, MARK8_IMAGE_BINDING);
+      ok(!thrown.ok && /settings read boom/.test(thrown.error ?? ""), "M3b thrown control check surfaces");
+      ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "M3b thrown control check releases queued claim");
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+      store.rows.delete("mark-8");
+    }
+
+    // M3c. Worker re-verifies both exact claim bindings before spend.
+    {
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      db.uploads.length = 0;
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      const wrongModel = await generateAndStoreChapterImages("mark-8", jobId, {
+        ...MARK8_IMAGE_BINDING,
+        model: "gpt-image-1",
+      });
+      ok(!wrongModel.ok && /gpt-image-2/.test(wrongModel.error ?? ""), "M3c wrong worker model binding refused");
+      ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined && db.uploads.length === 0, "M3c wrong model releases queued claim with zero spend");
+      store.rows.delete("mark-8");
+
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      const changedPlanJob = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      const changedRow = store.rows.get("mark-8")!;
+      const changedImages = structuredClone((changedRow.workup_json as unknown as ChapterWorkup).images);
+      changedImages[0].caption += " changed";
+      changedRow.workup_json = { ...changedRow.workup_json, images: changedImages };
+      const changed = await generateAndStoreChapterImages("mark-8", changedPlanJob.jobId, MARK8_IMAGE_BINDING);
+      ok(!changed.ok && /no longer matches|changed|digest/i.test(changed.error ?? ""), "M3c changed stored plan refused");
+      ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined && db.uploads.length === 0, "M3c changed plan releases queued claim with zero spend");
       store.rows.delete("mark-8");
     }
 
@@ -1483,9 +1723,9 @@ const realImagePipeline = async () => {
     {
       store.seed("mark-8", "draft", structuredClone(workupJson));
       costs.length = 0;
-      const { jobId } = await claimImageJob(store, "mark-8");
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
       db.buckets.failCreate = true;
-      const result = await generateAndStoreChapterImages("mark-8", jobId);
+      const result = await generateAndStoreChapterImages("mark-8", jobId, MARK8_IMAGE_BINDING);
       db.buckets.failCreate = false;
       ok(!result.ok && /bucket boom|createBucket/.test(result.error ?? ""), "M3 bucket failure surfaces");
       ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "M3 claim released after bucket failure");
@@ -1500,14 +1740,18 @@ const realImagePipeline = async () => {
       costs.length = 0;
       db.uploads.length = 0;
       db.failUploadAfter = 1; // first upload ok, second fails (after 2nd generation)
-      const { jobId } = await claimImageJob(store, "mark-8");
-      const result = await generateAndStoreChapterImages("mark-8", jobId);
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      const result = await generateAndStoreChapterImages("mark-8", jobId, MARK8_IMAGE_BINDING);
       db.failUploadAfter = -1;
       ok(!result.ok, "M4 upload failure fails the run");
       const spend = costs.find((c) => (c.metadata as { failed?: boolean })?.failed);
       ok(!!spend && spend.imageCount === 2, "M4 BOTH generated images counted as spend (uploaded only 1)");
       ok((spend!.metadata as { uploaded?: number }).uploaded === 1, "M4 spend metadata separates generated vs uploaded");
-      ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "M4 claim released for retry");
+      ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_STATE_KEY] === "failed", "M4 paid failure is terminal, not auto-retried");
+      ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_SPENT_COUNT_KEY] === 2, "M4 terminal state exposes exact spend count");
+      const retry = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      ok(retry.jobId !== jobId && store.rows.get("mark-8")!.workup_json[IMAGE_JOB_STATE_KEY] === "queued", "M4 explicit owner retry replaces only failed state");
+      ok(await releaseImageJob(store, "mark-8", retry.jobId, "queued"), "M4 retry claim can be safely released before spend");
       store.rows.delete("mark-8");
     }
 
@@ -1515,7 +1759,7 @@ const realImagePipeline = async () => {
     {
       store.seed("mark-8", "draft", structuredClone(workupJson));
       costs.length = 0;
-      const { jobId } = await claimImageJob(store, "mark-8");
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
       // Sabotage the terminal write: another actor replaces the claim mid-run.
       const row = store.rows.get("mark-8")!;
       const origUpdate = store.update.bind(store);
@@ -1528,20 +1772,75 @@ const realImagePipeline = async () => {
         }
         return origUpdate(slug, p, next);
       };
-      const result = await generateAndStoreChapterImages("mark-8", jobId);
+      const result = await generateAndStoreChapterImages("mark-8", jobId, MARK8_IMAGE_BINDING);
       store.update = origUpdate;
       ok(!result.ok && /not applied|CONFLICT/i.test(result.error ?? ""), "M5 superseded run cannot apply");
-      const spend = costs.find((c) => (c.metadata as { conflict?: boolean })?.conflict);
-      ok(!!spend && spend.imageCount === 2, "M5 conflicted spend recorded as a cost event");
+      const spend = costs.find((c) => (c.metadata as { planDigest?: string })?.planDigest === MARK8_IMAGE_BINDING.planDigest);
+      ok(!!spend && spend.imageCount === 3, "M5 conflicted spend was strictly recorded before terminal apply");
       ok(audit.some((a) => a.action === "image_run_conflict"), "M5 conflict durably audited");
+      store.rows.delete("mark-8");
+    }
+
+    // M6. Spend whose strict cost row fails is BLOCKED and cannot retry.
+    {
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      db.uploads.length = 0;
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      __setCostCaptureForTesting(null);
+      __setCostWriteFailureForTesting("insert_failed");
+      const result = await generateAndStoreChapterImages("mark-8", jobId, MARK8_IMAGE_BINDING);
+      __setCostWriteFailureForTesting(null);
+      __setCostCaptureForTesting(costs);
+      const row = store.rows.get("mark-8")!;
+      ok(!result.ok && /blocked/.test(result.error ?? ""), "M6 unrecorded spend returns blocked");
+      ok(row.workup_json[IMAGE_JOB_STATE_KEY] === "blocked", "M6 unrecorded spend is visibly blocked, not running");
+      ok(row.workup_json[IMAGE_JOB_SPENT_COUNT_KEY] === 3, "M6 blocked state preserves exact spend count");
+      ok(row.workup_json[IMAGE_JOB_ERROR_CODE_KEY] === "cost_record_failed", "M6 blocked state carries safe error code");
+      await expectCode(
+        () => claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING),
+        "CONFLICT",
+        "M6 blocked spend cannot automatically retry",
+      );
+      const statusResponse = await adminPost(adminReq({ action: "images_status", slug: "mark-8" }));
+      const statusBody = await statusResponse.json() as Record<string, unknown>;
+      ok(statusBody.state === "blocked" && statusBody.spentCount === 3 && statusBody.done === false, "M6 Studio sees terminal blocked state and spend count");
+      store.rows.delete("mark-8");
+    }
+
+    // M7. A completion write conflict that still belongs to this exact job is
+    // terminal `failed`, never an endless running poll.
+    {
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      costs.length = 0;
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      const originalUpdate = store.update.bind(store);
+      let failCompletionOnce = true;
+      store.update = async (slug, predicates, next) => {
+        const isCompletion = (predicates.json ?? []).some(
+          (check) => check.key === IMAGE_JOB_STATE_KEY && check.equals === "running",
+        ) && "workup_json" in next && !(IMAGE_JOB_STATE_KEY in (next.workup_json as Record<string, unknown>));
+        if (isCompletion && failCompletionOnce) {
+          failCompletionOnce = false;
+          return 0;
+        }
+        return originalUpdate(slug, predicates, next);
+      };
+      const result = await generateAndStoreChapterImages("mark-8", jobId, MARK8_IMAGE_BINDING);
+      store.update = originalUpdate;
+      ok(!result.ok, "M7 completion conflict fails the run");
+      ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_STATE_KEY] === "failed", "M7 owned completion conflict becomes terminal failed");
+      ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_SPENT_COUNT_KEY] === 3, "M7 completion conflict exposes spent count");
+      store.rows.delete("mark-8");
     }
   } finally {
     __setJobStoreForTesting(null);
     __setRowLookupForTesting(null);
     __setGenerationTestOverrides(null);
     __setCostCaptureForTesting(null);
+    __setCostWriteFailureForTesting(null);
     __setImageTestOverrides(null);
     __setImageDepsForTesting(null);
+    __setTriggerTransportForTesting(null);
   }
 };
 

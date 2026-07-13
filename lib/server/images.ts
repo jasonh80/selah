@@ -4,22 +4,33 @@
 import type { ChapterWorkup, ImageKind } from "@/lib/types";
 import { getOpenAI, isOpenAIConfigured } from "./openai";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
-import { isChapterMutationError } from "./protected-chapters";
-import { recordCostEvent } from "./cost-events-repository";
+import { ChapterMutationError, isChapterMutationError } from "./protected-chapters";
+import { recordCostEvent, recordCostEventStrict } from "./cost-events-repository";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import {
   consumeImageClaim,
   completeImageJob,
+  markImageJobTerminalFailure,
   releaseImageJob,
   requireJobStore,
+  type ImageJobBinding,
+  type JobStorePort,
 } from "./generation-jobs";
+import {
+  assertMark8ImagesArePlaceholders,
+  deriveMark8ImagePlan,
+  MARK_8_IMAGE_ESTIMATED_COST_USD,
+  MARK_8_IMAGE_MODEL,
+  MARK_8_IMAGE_SLUG,
+  type Mark8ImagePlanItem,
+} from "./mark8-image-plan";
 
 // Fallback default only — the ACTIVE model comes from Supabase settings
 // (selected_image_model, Studio-controlled). Never silently falls back: the
 // selected model is used exactly; if the API rejects it, the run fails loudly.
 export const CHAPTER_IMAGE_MODEL = process.env.CHAPTER_IMAGE_MODEL || "gpt-image-1";
 
-async function activeImageModel(): Promise<string> {
+export async function activeImageModel(): Promise<string> {
   const s = await getGenerationSettings();
   return s.selected_image_model || CHAPTER_IMAGE_MODEL;
 }
@@ -28,6 +39,7 @@ async function activeImageModel(): Promise<string> {
 // admin console to confirm access BEFORE any generation with a new model.
 export async function checkImageModel(model?: string): Promise<{ ok: boolean; model: string; error?: string }> {
   const m = model || (await activeImageModel());
+  if (imageModelProbeOverride) return imageModelProbeOverride(m);
   const client = getOpenAI();
   if (!client) return { ok: false, model: m, error: "OpenAI not configured" };
   try {
@@ -38,21 +50,26 @@ export async function checkImageModel(model?: string): Promise<{ ok: boolean; mo
   }
 }
 
-// Slugs that have a hand-authored IMAGE_PLAN. (Generated chapters' image prompts
-// will come from their workup later; for now image gen needs a plan here.)
-export const IMAGE_ALLOWED_SLUGS = ["psalm-23", "mark-6"];
+// Slugs with a supported paid-image path. Psalm 23 and Mark 6 keep their
+// hand-authored static plans; Mark 8 derives its plan from the stored draft.
+export const IMAGE_ALLOWED_SLUGS = ["psalm-23", "mark-6", MARK_8_IMAGE_SLUG];
 
 // TEST SEAM (offline safety gate only): skip env-configured checks and supply
 // a synthetic plan so the verify script can drive the REAL image pipeline —
 // the settings kill switch and allowlist still apply. Never set in production.
 let imageConfigBypassForTesting = false;
 let imagePlansOverride: Record<string, ImagePlan[]> | null = null;
+let imageModelProbeOverride:
+  | ((model: string) => Promise<{ ok: boolean; model: string; error?: string }>)
+  | null = null;
 export function __setImageTestOverrides(overrides: {
   configBypass?: boolean;
   plans?: Record<string, ImagePlan[]> | null;
+  modelProbe?: (model: string) => Promise<{ ok: boolean; model: string; error?: string }>;
 } | null): void {
   imageConfigBypassForTesting = overrides?.configBypass ?? false;
   imagePlansOverride = overrides?.plans ?? null;
+  imageModelProbeOverride = overrides?.modelProbe ?? null;
 }
 
 function plansFor(slug: string): ImagePlan[] | undefined {
@@ -63,7 +80,7 @@ function plansFor(slug: string): ImagePlan[] | undefined {
 // defaults OFF). Fail-CLOSED. Still requires an IMAGE_PLAN for the slug.
 export async function imageGenAllowed(slug: string): Promise<boolean> {
   if (!imageConfigBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
-  if (!plansFor(slug)) return false;
+  if (slug !== MARK_8_IMAGE_SLUG && !plansFor(slug)) return false;
   const s = await getGenerationSettings();
   return s.image_generation_enabled && s.allowed_slugs.includes(slug);
 }
@@ -79,6 +96,42 @@ interface ImagePlan {
   alt: string;
   caption: string;
   wide?: boolean; // landscape output (hero-suited); default portrait
+}
+
+function dynamicMark8Plans(workup: ChapterWorkup): readonly Mark8ImagePlanItem[] {
+  return deriveMark8ImagePlan(workup).images;
+}
+
+/** Read-only route preflight; claimImageJob re-derives before its atomic write. */
+export async function prepareImageJobBinding(
+  store: JobStorePort,
+  slug: string,
+): Promise<ImageJobBinding | undefined> {
+  if (slug !== MARK_8_IMAGE_SLUG) return undefined;
+  // Mark 8 deliberately uses the project-standard model directly. The Studio
+  // model setting remains a legacy-plan control and cannot downgrade this run.
+  const model = MARK_8_IMAGE_MODEL;
+  const row = await store.read(slug);
+  if (!row || "error" in row) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "prepareImageJobBinding",
+      slug,
+      "stored Mark 8 draft is unreadable",
+    );
+  }
+  try {
+    const workup = row.workupJson as unknown as ChapterWorkup;
+    assertMark8ImagesArePlaceholders(workup);
+    return { planDigest: deriveMark8ImagePlan(workup).digest, model };
+  } catch (error) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "prepareImageJobBinding",
+      slug,
+      String((error as Error).message),
+    );
+  }
 }
 
 // Final prompts (user-provided) + style suffix, keyed by slug.
@@ -186,6 +239,7 @@ async function generateImageBytes(model: string, plan: ImagePlan): Promise<Buffe
     size: imageSize(model, plan),
     n: 1,
   };
+  if (model === MARK_8_IMAGE_MODEL) params.quality = "high";
   if (isDalle) params.response_format = "b64_json";
 
   const res = (await client.images.generate(params as never)) as {
@@ -239,41 +293,81 @@ export function __setImageDepsForTesting(deps: Partial<ImageRuntimeDeps> | null)
  * worker-side flow atomically CONSUMES it (queued → running) before any
  * spend. Allowlisted + flag-gated. Does NOT generate or modify chapter text.
  */
-export async function generateAndStoreChapterImages(slug: string, jobId: string): Promise<ImageGenResult> {
-  const model = await activeImageModel();
-  if (!(await imageGenAllowed(slug))) {
-    return { ok: false, slug, model, error: "image generation not allowed for this slug" };
-  }
-  const db = imageDepsOverride?.db ?? getSupabaseAdmin();
-  if (!db) return { ok: false, slug, model, error: "Supabase not configured" };
-
-  // ATOMIC CONSUMPTION of the route's single-use claim: queued → running,
-  // pinned to this exact job id and the row revision. A duplicated delivery
-  // loses here with zero rows changed — BEFORE any model spend. Protected
-  // slugs and null revisions are refused inside the helper.
+export async function generateAndStoreChapterImages(
+  slug: string,
+  jobId: string,
+  binding?: ImageJobBinding,
+): Promise<ImageGenResult> {
+  const isDynamicMark8 = slug === MARK_8_IMAGE_SLUG;
   const store = requireJobStore(slug, "generateAndStoreChapterImages");
-  let workup: ChapterWorkup;
+  let model = binding?.model ?? CHAPTER_IMAGE_MODEL;
+  let workup: ChapterWorkup | undefined;
+  let plans: readonly ImagePlan[] = [];
+  let db: NonNullable<ReturnType<typeof getSupabaseAdmin>> | undefined;
+  let consumed = false;
+
+  // Every control and plan/model check happens before paid work. A valid
+  // queued claim is released if a pre-spend check fails. If atomic consume
+  // loses to a duplicate worker, queued-only release cannot cancel the winner.
   try {
-    workup = await consumeImageClaim(store, slug, jobId);
-  } catch (e) {
-    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
-    console.error(`[selah] image claim consumption failed for ${slug}: ${msg}`);
-    await logGenerationAudit({ action: "image_run_refused", slug, model, status: "failed", message: `${msg} (no spend occurred)`.slice(0, 300) });
-    return { ok: false, slug, model, error: msg };
-  }
-  if (!Array.isArray(workup.images)) {
-    const released = await releaseImageJob(store, slug, jobId);
+    if (!(await imageGenAllowed(slug))) {
+      throw new Error("image generation not allowed for this slug");
+    }
+    model = isDynamicMark8 ? MARK_8_IMAGE_MODEL : await activeImageModel();
+    if (isDynamicMark8) {
+      if (!binding) throw new Error("Mark 8 image job is missing its exact binding");
+      if (model !== MARK_8_IMAGE_MODEL || binding.model !== MARK_8_IMAGE_MODEL) {
+        throw new Error(`Mark 8 requires ${MARK_8_IMAGE_MODEL} exactly`);
+      }
+    }
+    db = imageDepsOverride?.db ?? getSupabaseAdmin() ?? undefined;
+    if (!db) throw new Error("Supabase not configured");
+
+    workup = await consumeImageClaim(store, slug, jobId, binding);
+    consumed = true;
+
+    // Re-read the kill switch/allowlist and selected model after consume,
+    // immediately before the storage/model envelope begins.
+    if (!(await imageGenAllowed(slug))) {
+      throw new Error("image generation was disabled before spend");
+    }
+    const recheckedModel = isDynamicMark8 ? MARK_8_IMAGE_MODEL : await activeImageModel();
+    if (recheckedModel !== model) throw new Error("selected image model changed before spend");
+
+    if (isDynamicMark8) {
+      const derived = deriveMark8ImagePlan(workup);
+      if (derived.digest !== binding!.planDigest || model !== binding!.model) {
+        throw new Error("stored Mark 8 image plan or model changed before spend");
+      }
+      plans = dynamicMark8Plans(workup);
+    } else {
+      const staticPlans = plansFor(slug);
+      if (!staticPlans) throw new Error("approved static image plan is missing");
+      plans = staticPlans;
+    }
+  } catch (error) {
+    const msg = isChapterMutationError(error)
+      ? `${error.code}: ${error.message}`
+      : String((error as Error).message);
+    const released = await releaseImageJob(
+      store,
+      slug,
+      jobId,
+      consumed ? "running" : "queued",
+    );
+    console.error(`[selah] image pre-spend refusal for ${slug}: ${msg}`);
     await logGenerationAudit({
       action: "image_run_refused",
       slug,
       model,
       status: "failed",
-      message: `stored row has no renderable workup${released ? "" : " (claim NOT released — manual cleanup needed)"}`,
+      message: `${msg} (no spend occurred; ${released ? "claim released" : "claim not released or owned by another worker"})`.slice(0, 300),
     });
-    return { ok: false, slug, model, error: "no stored chapter workup for slug" };
+    return { ok: false, slug, model, error: msg };
   }
 
-  const plans = plansFor(slug)!; // imageGenAllowed already required a plan
+  const exactWorkup = workup!;
+  const exactDb = db!;
   const generate = imageDepsOverride?.generateBytes ?? generateImageBytes;
 
   // Generate + upload each image (sequential — kinder to rate limits).
@@ -287,15 +381,69 @@ export async function generateAndStoreChapterImages(slug: string, jobId: string)
   const stored: { kind: ImageKind; url: string; plan: ImagePlan }[] = [];
   let generatedCount = 0;
   try {
-    await ensureBucket(db);
+    await ensureBucket(exactDb);
     for (const plan of plans) {
       const bytes = await generate(model, plan);
       generatedCount += 1; // model spend happened even if the upload below fails
-      const url = await uploadImage(db, `${slug}/${jobId}/${fileFor(plan.kind)}`, bytes);
+      const url = await uploadImage(exactDb, `${slug}/${jobId}/${fileFor(plan.kind)}`, bytes);
       stored.push({ kind: plan.kind, url, plan });
     }
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 200);
+    if (isDynamicMark8 && generatedCount > 0) {
+      let costRecorded = false;
+      try {
+        await recordCostEventStrict({
+          requestType: "chapter_image_generation",
+          provider: "openai",
+          model,
+          imageCount: generatedCount,
+          estimatedCostUsd: generatedCount * MARK_8_IMAGE_ESTIMATED_COST_USD,
+          imageQuality: "high",
+          metadata: {
+            slug,
+            jobId,
+            planDigest: binding!.planDigest,
+            failed: true,
+            error: msg,
+            generated: generatedCount,
+            uploaded: stored.length,
+            completedKinds: stored.map((x) => x.kind),
+          },
+        });
+        costRecorded = true;
+      } catch {
+        // A paid run without a durable cost row must stay locked and visible.
+      }
+      const terminal = await markImageJobTerminalFailure(
+        store,
+        slug,
+        jobId,
+        costRecorded ? "failed" : "blocked",
+        generatedCount,
+        costRecorded ? "image_run_failed" : "cost_record_failed",
+        binding,
+      );
+      await logGenerationAudit({
+        action: costRecorded ? "image_run_failed" : "image_run_blocked",
+        slug,
+        model,
+        status: "failed",
+        message:
+          `generated ${generatedCount}/${plans.length}, uploaded ${stored.length}: ${msg}; ` +
+          `${costRecorded ? "spend recorded" : "COST NOT RECORDED"}; ` +
+          `${terminal ? "job locked" : "job lock write failed — manual inspection required"}; ` +
+          `orphaned dir: ${slug}/${jobId}/`,
+      });
+      return {
+        ok: false,
+        slug,
+        model,
+        error: costRecorded
+          ? `image run failed after ${generatedCount}/${plans.length} images; spend recorded and retry requires owner confirmation`
+          : "image run blocked after spend because its cost could not be recorded",
+      };
+    }
     if (generatedCount > 0) {
       await recordCostEvent({
         requestType: "chapter_image_generation",
@@ -314,7 +462,7 @@ export async function generateAndStoreChapterImages(slug: string, jobId: string)
         },
       });
     }
-    const released = await releaseImageJob(store, slug, jobId);
+    const released = await releaseImageJob(store, slug, jobId, "running");
     await logGenerationAudit({
       action: "image_run_failed",
       slug,
@@ -327,54 +475,117 @@ export async function generateAndStoreChapterImages(slug: string, jobId: string)
     return { ok: false, slug, model, error: `image run failed after ${generatedCount}/${plans.length} images: ${msg}` };
   }
 
-  // Wire stored images into workup_json.images: replace matching kinds, APPEND
-  // new kinds (supports 3- or 5-image chapter-driven plans; earlier images with
-  // other kinds are left in place, never overwritten here).
-  const updatedImages = workup.images.map((img) => {
-    const hit = stored.find((s) => s.kind === img.kind);
-    if (!hit) return img;
-    return {
-      ...img,
-      src: hit.url,
-      status: "complete" as const,
-      prompt: hit.plan.prompt,
-      alt: hit.plan.alt,
-      caption: hit.plan.caption,
-    };
-  });
-  const existingKinds = new Set(workup.images.map((i) => i.kind));
-  let nextIndex = workup.images.length;
-  for (const s of stored) {
-    if (existingKinds.has(s.kind)) continue;
-    nextIndex += 1;
-    updatedImages.push({
-      kind: s.kind,
-      index: nextIndex,
-      label: s.plan.caption,
-      prompt: s.plan.prompt,
-      caption: s.plan.caption,
-      src: s.url,
-      alt: s.plan.alt,
-      status: "complete" as const,
-    });
+  // Mark 8 replaces its exact stored placeholder array in exact order. Legacy
+  // static plans keep their existing replace/append behavior unchanged.
+  const updatedImages = isDynamicMark8
+    ? exactWorkup.images.map((image, index) => ({
+        ...image,
+        src: stored[index].url,
+        status: "complete" as const,
+        prompt: stored[index].plan.prompt,
+        alt: stored[index].plan.alt,
+        caption: stored[index].plan.caption,
+      }))
+    : exactWorkup.images.map((img) => {
+        const hit = stored.find((s) => s.kind === img.kind);
+        if (!hit) return img;
+        return {
+          ...img,
+          src: hit.url,
+          status: "complete" as const,
+          prompt: hit.plan.prompt,
+          alt: hit.plan.alt,
+          caption: hit.plan.caption,
+        };
+      });
+  if (!isDynamicMark8) {
+    const existingKinds = new Set(exactWorkup.images.map((i) => i.kind));
+    let nextIndex = exactWorkup.images.length;
+    for (const s of stored) {
+      if (existingKinds.has(s.kind)) continue;
+      nextIndex += 1;
+      updatedImages.push({
+        kind: s.kind,
+        index: nextIndex,
+        label: s.plan.caption,
+        prompt: s.plan.prompt,
+        caption: s.plan.caption,
+        src: s.url,
+        alt: s.plan.alt,
+        status: "complete" as const,
+      });
+    }
+  }
+
+  // Mark 8 never claims success unless the paid spend has a durable cost row.
+  if (isDynamicMark8) {
+    try {
+      await recordCostEventStrict({
+        requestType: "chapter_image_generation",
+        provider: "openai",
+        model,
+        imageCount: generatedCount,
+        estimatedCostUsd: generatedCount * MARK_8_IMAGE_ESTIMATED_COST_USD,
+        imageQuality: "high",
+        metadata: {
+          slug,
+          jobId,
+          planDigest: binding!.planDigest,
+          imageTypes: plans.map((plan) => plan.kind),
+        },
+      });
+    } catch {
+      const terminal = await markImageJobTerminalFailure(
+        store,
+        slug,
+        jobId,
+        "blocked",
+        generatedCount,
+        "cost_record_failed",
+        binding,
+      );
+      await logGenerationAudit({
+        action: "image_run_blocked",
+        slug,
+        model,
+        status: "failed",
+        message:
+          `all ${generatedCount} images generated but COST NOT RECORDED; ` +
+          `${terminal ? "job locked" : "job lock write failed — manual inspection required"}; ` +
+          `orphaned dir: ${slug}/${jobId}/`,
+      });
+      return { ok: false, slug, model, error: "image run blocked because its cost could not be recorded" };
+    }
   }
   try {
     // Terminal write pinned to THIS job id: a superseded/stale run is a typed
     // CONFLICT and the uploaded bytes stay isolated in the job directory.
-    await completeImageJob(store, slug, jobId, { ...workup, images: updatedImages });
+    await completeImageJob(store, slug, jobId, { ...exactWorkup, images: updatedImages });
   } catch (e) {
     const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
     console.error(`[selah] image run for ${slug} not applied — ${msg}`);
-    // The spend already happened even though the result can't be applied —
-    // record it as a real cost event, not just an audit line.
-    await recordCostEvent({
-      requestType: "chapter_image_generation",
-      provider: "openai",
-      model,
-      imageCount: generatedCount,
-      estimatedCostUsd: generatedCount * 0.04,
-      metadata: { slug, jobId, conflict: true, error: msg, generated: generatedCount, uploaded: stored.length },
-    });
+    // Mark 8's spend was strictly recorded before this terminal write. Legacy
+    // behavior records its conflicted spend here as before.
+    if (!isDynamicMark8) {
+      await recordCostEvent({
+        requestType: "chapter_image_generation",
+        provider: "openai",
+        model,
+        imageCount: generatedCount,
+        estimatedCostUsd: generatedCount * 0.04,
+        metadata: { slug, jobId, conflict: true, error: msg, generated: generatedCount, uploaded: stored.length },
+      });
+    } else {
+      await markImageJobTerminalFailure(
+        store,
+        slug,
+        jobId,
+        "failed",
+        generatedCount,
+        "completion_conflict",
+        binding,
+      );
+    }
     await logGenerationAudit({
       action: "image_run_conflict",
       slug,
@@ -392,15 +603,17 @@ export async function generateAndStoreChapterImages(slug: string, jobId: string)
     message: `stored ${stored.length} images under ${slug}/${jobId}/`,
   });
 
-  // Cost event (estimate scales with image count; APIs don't return per-call USD).
-  await recordCostEvent({
-    requestType: "chapter_image_generation",
-    provider: "openai",
-    model,
-    imageCount: generatedCount,
-    estimatedCostUsd: generatedCount * 0.04,
-    metadata: { slug, jobId, imageTypes: plans.map((p) => p.kind) },
-  });
+  // Legacy plans retain their original best-effort post-success cost event.
+  if (!isDynamicMark8) {
+    await recordCostEvent({
+      requestType: "chapter_image_generation",
+      provider: "openai",
+      model,
+      imageCount: generatedCount,
+      estimatedCostUsd: generatedCount * 0.04,
+      metadata: { slug, jobId, imageTypes: plans.map((p) => p.kind) },
+    });
+  }
 
   return { ok: true, slug, model, images: stored.map((s) => ({ kind: s.kind, url: s.url })) };
 }

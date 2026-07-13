@@ -22,9 +22,24 @@ import {
   failGenerationJob,
   releaseImageJob,
   requireJobStore,
+  IMAGE_JOB_ERROR_CODE_KEY,
+  IMAGE_JOB_KEY,
+  IMAGE_JOB_MODEL_KEY,
+  IMAGE_JOB_SPENT_COUNT_KEY,
+  IMAGE_JOB_STATE_KEY,
 } from "@/lib/server/generation-jobs";
 import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
-import { imageGenAllowed, checkImageModel } from "@/lib/server/images";
+import {
+  imageGenAllowed,
+  checkImageModel,
+  prepareImageJobBinding,
+} from "@/lib/server/images";
+import {
+  deriveMark8ImagePlan,
+  mark8FinalReviewDigest,
+  MARK_8_IMAGE_ESTIMATED_COST_USD,
+  MARK_8_IMAGE_SLUG,
+} from "@/lib/server/mark8-image-plan";
 import {
   chapterMutationDecision,
   isChapterMutationError,
@@ -271,21 +286,40 @@ export async function POST(req: Request) {
         403,
       );
     }
-    const probe = await checkImageModel(typeof body.model === "string" ? body.model : undefined);
+    let store: ReturnType<typeof requireJobStore>;
+    try {
+      store = requireJobStore(slug, "generate_images");
+    } catch (error) {
+      return mapMutationError(slug, "generate_images", error);
+    }
+    let binding: Awaited<ReturnType<typeof prepareImageJobBinding>>;
+    try {
+      binding = await prepareImageJobBinding(store, slug);
+    } catch (error) {
+      return mapMutationError(slug, "generate_images", error);
+    }
+    const probe = await checkImageModel(
+      binding?.model ?? (typeof body.model === "string" ? body.model : undefined),
+    );
     if (!probe.ok) {
       return refuse(slug, "generate_images", `image model "${probe.model}" unavailable: ${probe.error}`, 502);
     }
     let imageJobId: string;
     try {
-      const claim = await claimImageJob(requireJobStore(slug, "generate_images"), slug);
+      const claim = await claimImageJob(store, slug, binding);
       imageJobId = claim.jobId;
     } catch (e) {
       return mapMutationError(slug, "generate_images", e);
     }
     await logGenerationAudit({ action: "generate_images", slug, status: "started", message: `job ${imageJobId}` });
-    const triggered = await triggerBackgroundImageGeneration(slug, new URL(req.url).host, imageJobId);
+    const triggered = await triggerBackgroundImageGeneration(
+      slug,
+      new URL(req.url).host,
+      imageJobId,
+      binding,
+    );
     if (!triggered.ok) {
-      const released = await releaseImageJob(requireJobStore(slug, "generate_images"), slug, imageJobId);
+      const released = await releaseImageJob(store, slug, imageJobId, "queued");
       return refuse(
         slug,
         "generate_images",
@@ -298,16 +332,83 @@ export async function POST(req: Request) {
   }
   if (action === "images_status") {
     const slug = String(body.slug ?? "");
-    const row = await getDraftWorkup(slug);
-    const imgs = row?.workup.images ?? [];
-    const stored = imgs.filter((i) => /^https?:\/\//.test(i.src));
+    let row;
+    try {
+      row = await requireJobStore(slug, "images_status").read(slug);
+    } catch {
+      return NextResponse.json({ ok: false, error: "image status unavailable" }, { status: 500 });
+    }
+    if (!row || "error" in row) {
+      return NextResponse.json(
+        { ok: false, error: row && "error" in row ? "image status unavailable" : "draft not found" },
+        { status: row ? 500 : 404 },
+      );
+    }
+    const workup = row.workupJson as unknown as ChapterWorkup;
+    const imgs = Array.isArray(workup.images) ? workup.images : [];
+    const stored = imgs.filter((image) => image.status === "complete" && /^https:\/\//u.test(image.src));
+    const rawState = row.workupJson[IMAGE_JOB_STATE_KEY];
+    const hasActiveJob = typeof row.workupJson[IMAGE_JOB_KEY] === "string";
+    const state = hasActiveJob && ["queued", "running", "failed", "blocked"].includes(String(rawState))
+      ? String(rawState)
+      : "idle";
+    const spentCountValue = Number(row.workupJson[IMAGE_JOB_SPENT_COUNT_KEY]);
+    const spentCount = Number.isSafeInteger(spentCountValue) && spentCountValue >= 0
+      ? Math.min(spentCountValue, imgs.length)
+      : 0;
+    const reviewDigest = slug === MARK_8_IMAGE_SLUG
+      ? mark8FinalReviewDigest(workup)
+      : null;
+    let estimatedCostUsd: number | undefined;
+    if (slug === MARK_8_IMAGE_SLUG) {
+      try {
+        const exactCount = deriveMark8ImagePlan(workup).images.length;
+        estimatedCostUsd = Math.round(exactCount * MARK_8_IMAGE_ESTIMATED_COST_USD * 1000) / 1000;
+      } catch {
+        return NextResponse.json(
+          { ok: false, error: "Mark 8 image plan is not ready." },
+          { status: 409 },
+        );
+      }
+    }
+    const done = slug === MARK_8_IMAGE_SLUG
+      ? reviewDigest !== null
+      : imgs.length > 0 && stored.length === imgs.length;
     return NextResponse.json({
       ok: true,
       slug,
       total: imgs.length,
       stored: stored.length,
-      done: imgs.length > 0 && stored.length === imgs.length,
-      urls: stored.map((i) => ({ kind: i.kind, src: i.src })),
+      done,
+      state,
+      spentCount,
+      ...(estimatedCostUsd === undefined ? {} : { estimatedCostUsd }),
+      heroKind: workup.heroKind ?? null,
+      ...(hasActiveJob && typeof row.workupJson[IMAGE_JOB_MODEL_KEY] === "string"
+        ? { model: row.workupJson[IMAGE_JOB_MODEL_KEY] }
+        : {}),
+      ...(state === "blocked"
+        ? { errorCode: "cost_record_failed" }
+        : state === "failed"
+          ? {
+              errorCode:
+                row.workupJson[IMAGE_JOB_ERROR_CODE_KEY] === "completion_conflict"
+                  ? "completion_conflict"
+                  : "image_run_failed",
+            }
+          : {}),
+      images: imgs.map((image) => ({
+        kind: image.kind,
+        label: image.label,
+        description: image.description ?? "",
+        status:
+          (state === "queued" || state === "running") && image.status !== "complete"
+            ? "generating"
+            : ["placeholder", "generating", "complete", "failed"].includes(String(image.status))
+              ? image.status
+              : "placeholder",
+      })),
+      ...(reviewDigest === null ? {} : { reviewDigest }),
     });
   }
 
