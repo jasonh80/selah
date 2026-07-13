@@ -33,20 +33,28 @@ export type MarkSprintDraftPipelineErrorCode =
 export class MarkSprintDraftPipelineError extends Error {
   readonly code: MarkSprintDraftPipelineErrorCode;
   readonly blockerCodes: readonly string[];
+  readonly tokenUsage: Readonly<MarkSprintDraftTokenUsage> | null;
 
   constructor(
     code: MarkSprintDraftPipelineErrorCode,
     blockerCodes: readonly string[] = [],
+    tokenUsage: MarkSprintDraftTokenUsage | null = null,
   ) {
     super(`Protected Mark draft stopped: ${code}`);
     this.name = "MarkSprintDraftPipelineError";
     this.code = code;
     this.blockerCodes = Object.freeze([...new Set(blockerCodes)].sort());
+    this.tokenUsage = tokenUsage ? Object.freeze({ ...tokenUsage }) : null;
   }
 }
 
 export interface MarkSprintModelExecutionResult {
   rawDraftJson: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface MarkSprintDraftTokenUsage {
   inputTokens: number;
   outputTokens: number;
 }
@@ -72,10 +80,7 @@ export interface ProtectedMarkSprintDraftResult {
   rawDraftDigest: string;
   canonicalDraftDigest: string;
   overlapReportDigest: string;
-  tokenUsage: {
-    inputTokens: number;
-    outputTokens: number;
-  };
+  tokenUsage: Readonly<MarkSprintDraftTokenUsage>;
   overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability;
   quality: {
     machineVerdict: "pass";
@@ -98,6 +103,18 @@ function deepFreeze<T>(value: T): T {
 
 function validTokenCount(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function safeTokenUsage(
+  execution: MarkSprintModelExecutionResult,
+): MarkSprintDraftTokenUsage | null {
+  return validTokenCount(execution.inputTokens) &&
+    validTokenCount(execution.outputTokens)
+    ? {
+        inputTokens: execution.inputTokens,
+        outputTokens: execution.outputTokens,
+      }
+    : null;
 }
 
 /**
@@ -126,32 +143,50 @@ export async function runProtectedMarkSprintDraft(
   } catch {
     throw new MarkSprintDraftPipelineError("MODEL_EXECUTION_FAILED");
   }
+  const tokenUsage = execution ? safeTokenUsage(execution) : null;
   if (
     !execution ||
     typeof execution.rawDraftJson !== "string" ||
     !execution.rawDraftJson.trim() ||
-    !validTokenCount(execution.inputTokens) ||
-    !validTokenCount(execution.outputTokens)
+    tokenUsage === null
   ) {
-    throw new MarkSprintDraftPipelineError("MODEL_RESPONSE_INVALID");
+    throw new MarkSprintDraftPipelineError(
+      "MODEL_RESPONSE_INVALID",
+      [],
+      tokenUsage,
+    );
   }
 
   let generated;
   try {
     generated = parseChapterWorkupJson(execution.rawDraftJson);
   } catch {
-    throw new MarkSprintDraftPipelineError("MODEL_RESPONSE_INVALID");
+    throw new MarkSprintDraftPipelineError(
+      "MODEL_RESPONSE_INVALID",
+      [],
+      tokenUsage,
+    );
   }
 
-  const overlapReport = evaluateGenerationManifestV3Overlap(
-    input.preflight,
-    preparation,
-    execution.rawDraftJson,
-  );
+  let overlapReport: ReturnType<typeof evaluateGenerationManifestV3Overlap>;
+  try {
+    overlapReport = evaluateGenerationManifestV3Overlap(
+      input.preflight,
+      preparation,
+      execution.rawDraftJson,
+    );
+  } catch {
+    throw new MarkSprintDraftPipelineError(
+      "SOURCE_OVERLAP_BLOCKED",
+      [],
+      tokenUsage,
+    );
+  }
   if (overlapReport.verdict !== "pass") {
     throw new MarkSprintDraftPipelineError(
       "SOURCE_OVERLAP_BLOCKED",
       overlapReport.findings.map((finding) => finding.code),
+      tokenUsage,
     );
   }
   let overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability;
@@ -170,7 +205,11 @@ export async function runProtectedMarkSprintDraft(
       execution.rawDraftJson,
     );
   } catch {
-    throw new MarkSprintDraftPipelineError("SOURCE_OVERLAP_BLOCKED");
+    throw new MarkSprintDraftPipelineError(
+      "SOURCE_OVERLAP_BLOCKED",
+      [],
+      tokenUsage,
+    );
   }
 
   const quality = evaluateMarkSprintDraft(generated, input.sourceBundle.slug);
@@ -178,6 +217,7 @@ export async function runProtectedMarkSprintDraft(
     throw new MarkSprintDraftPipelineError(
       "MARK_QUALITY_BLOCKED",
       quality.blockers.map((finding) => finding.code),
+      tokenUsage,
     );
   }
 
@@ -189,10 +229,7 @@ export async function runProtectedMarkSprintDraft(
     rawDraftDigest: overlapReport.rawDraftDigest,
     canonicalDraftDigest: overlapReport.canonicalDraftDigest,
     overlapReportDigest: overlapReport.reportDigest,
-    tokenUsage: {
-      inputTokens: execution.inputTokens,
-      outputTokens: execution.outputTokens,
-    },
+    tokenUsage,
     overlapAcceptance,
     quality: {
       machineVerdict: "pass" as const,

@@ -78,7 +78,7 @@ async function main(): Promise<void> {
   }
 
   const invalidSchema = executor('{"slug":"mark-8"}');
-  await expectPipelineError(
+  const schemaError = await expectPipelineError(
     runProtectedMarkSprintDraft({
       sourceBundle,
       modelRequest,
@@ -88,6 +88,11 @@ async function main(): Promise<void> {
     "MODEL_RESPONSE_INVALID",
   );
   assert.equal(invalidSchema.calls(), 1);
+  assert.deepEqual(schemaError.tokenUsage, {
+    inputTokens: 321,
+    outputTokens: 654,
+  });
+  assert.ok(Object.isFrozen(schemaError.tokenUsage));
 
   const copiedSource = passingDraft("mark-8");
   copiedSource.summary = `${SOURCE_PHRASE}. ${copiedSource.summary}`;
@@ -103,6 +108,10 @@ async function main(): Promise<void> {
   );
   assert.equal(overlap.calls(), 1);
   assert.ok(overlapError.blockerCodes.length > 0);
+  assert.deepEqual(overlapError.tokenUsage, {
+    inputTokens: 321,
+    outputTokens: 654,
+  });
 
   const wrongChapter = passingDraft("mark-8");
   wrongChapter.slug = "mark-9";
@@ -120,6 +129,10 @@ async function main(): Promise<void> {
   assert.ok(
     qualityError.blockerCodes.includes("STR-002 OUTPUT_IDENTITY_MISMATCH"),
   );
+  assert.deepEqual(qualityError.tokenUsage, {
+    inputTokens: 321,
+    outputTokens: 654,
+  });
 
   const happyJson = JSON.stringify(passingDraft("mark-8"));
   const happy = executor(happyJson);
@@ -183,6 +196,7 @@ async function main(): Promise<void> {
     "MODEL_EXECUTION_FAILED",
   );
   assert.equal(failedCalls, 1);
+  assert.equal(executionError.tokenUsage, null);
   assert.ok(!String(executionError).includes(SOURCE_PHRASE));
   assert.ok(!JSON.stringify(executionError).includes(PRIVATE_RULE));
 
