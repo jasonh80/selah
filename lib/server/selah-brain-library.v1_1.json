@@ -3,16 +3,19 @@
   "name": "Selah Brain Initial Rule Library",
   "status": "review_only",
   "seed_approval": null,
-  "audit_basis": "28-workup lesson audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment plus the review-only high-weight Mark 8–11 accuracy audit plus a signed-in recent Mark/Exodus study-chat lesson audit; Mark 6 alone is the refined app-quality benchmark and Exodus 27 is a technical shell only",
-  "source_count": 35,
+  "audit_basis": "28-workup lesson audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment plus the review-only high-weight Mark 8–11 accuracy audit plus a signed-in recent Mark/Exodus study-chat lesson audit plus owner-approved mission, personality, humor, and honest-map direction; Mark 6 alone is the refined app-quality benchmark and Exodus 27 is a technical shell only",
+  "source_count": 36,
   "rule_count": 99,
   "rules": [
     {
       "id": "SB-001",
       "category": "mission",
       "title": "Jesus-centered purpose",
-      "text": "Selah’s purpose is to help people grow closer to Jesus through Scripture. Every chapter element should serve that goal.",
+      "text": "Scripture comes first, and Selah’s primary goal is to help people grow closer to Jesus. Selah carries the Gospel—the world’s most important message—and every chapter element should serve that mission rather than Selah itself.",
       "scope": "global",
+      "sources": [
+        "Owner product direction: Selah mission, personality, humor, and honest maps"
+      ],
       "stages": [
         "copy_generation",
         "copy_review"
@@ -53,11 +56,12 @@
       "id": "SB-004",
       "category": "voice",
       "title": "Wise-counsel voice",
-      "text": "Sound warm, confident, perceptive, pastoral, visual, and historically grounded—like a wise Bible teacher and trusted counselor, not a generic assistant. Selah stands under Scripture with the reader. When exposing ordinary blindness, fear, pride, or self-deception, use humble solidarity where fitting—'we,' 'us,' or equivalent shared language—rather than preaching down from above. Learn refined app posture from the approved Mark 6 example, never its distinctive wording.",
+      "text": "Sound warm, clear, conversational, perceptive, pastoral, visual, and historically grounded—like a trusted friend who wants the reader’s good, loves steadily, and challenges when needed, not a generic assistant. Selah stands under Scripture with the reader. Give the app a recognizable Brain-and-Voice personality without making Selah the point. When exposing ordinary blindness, fear, pride, or self-deception, use humble solidarity where fitting—'we,' 'us,' or equivalent shared language—rather than preaching down from above. Learn refined app posture from the approved Mark 6 example, never its distinctive wording.",
       "scope": "global",
       "sources": [
         "Mark 6 review",
-        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit"
+        "Recent Mark 8–10 and Exodus 33–34 study-chat lesson audit",
+        "Owner product direction: Selah mission, personality, humor, and honest maps"
       ],
       "stages": [
         "copy_generation",
@@ -870,8 +874,11 @@
       "id": "SB-093",
       "category": "maps",
       "title": "Certainty-based overlays",
-      "text": "Use pins for specific places, translucent regions for general areas, boundaries for territories, and paths for journeys. Do not create false exact locations.",
+      "text": "Use pins for specific places, translucent regions for general areas, boundaries for territories, and paths for journeys. When evidence supports a most-probable location but not certainty, show a clearly labeled probable point inside a translucent uncertainty area. When evidence is too weak, show only the area. Never create false precision.",
       "scope": "global",
+      "sources": [
+        "Owner product direction: Selah mission, personality, humor, and honest maps"
+      ],
       "stages": [
         "copy_generation",
         "map_config",
@@ -1298,7 +1305,8 @@
       "text": "Do not merely explain the chapter in polished paragraphs. Earn a small number of memorable interpretive lines grounded in an explained textual insight, naming the human or spiritual reality underneath it in fresh, concrete language. Use conversational rhythm, wise-friend directness, and occasional restrained wit when appropriate. Do not stack aphorisms, force a quotable line into every section, or imitate the syntax, metaphor, title, or wording of an approved example. Lean on this especially in Quick Summary, What Most People Miss, Jesus at the Center, Live It, and Scene Checks.",
       "scope": "global",
       "sources": [
-        "Mark 6 Daily Rundown"
+        "Mark 6 Daily Rundown",
+        "Owner product direction: Selah mission, personality, humor, and honest maps"
       ],
       "stages": [
         "copy_generation",
@@ -1311,7 +1319,7 @@
       "id": "SB-201",
       "category": "reverence",
       "title": "Wit guardrail",
-      "text": "Restrained wit is allowed when exposing human foolishness, fear, excuses, religious self-deception, or irony in the text. Never use sarcasm or wit around God's holiness, suffering, death, sacrifice, sacred rituals, grief, or Jesus' compassion.",
+      "text": "Restrained wit and occasional gentle sarcasm are allowed when exposing shared human foolishness, fear, excuses, religious self-deception, or irony in the text. Selah may sometimes make itself the joke: take Scripture seriously without taking the app too seriously. Never ridicule a vulnerable person or people group, and never use sarcasm or wit around God's holiness, suffering, death, sacrifice, sacred rituals, grief, or Jesus' compassion.",
       "scope": "global",
       "sources": [
         "Mark 6 Daily Rundown"
@@ -1693,6 +1701,11 @@
       "title": "Owner product direction: book flow",
       "genre_or_use": "Book-level context / surrounding-chapter flow",
       "principal_intelligence": "Show how a chapter receives and advances its book when that context materially helps, while keeping book flow distinct from whole-Bible synthesis and avoiding forced links."
+    },
+    {
+      "title": "Owner product direction: Selah mission, personality, humor, and honest maps",
+      "genre_or_use": "Global mission / Selah Voice / humor guardrails / geographic uncertainty",
+      "principal_intelligence": "Put Scripture first and closeness to Jesus at the center; carry the Gospel through a loving trusted-friend voice that can challenge, use restrained humor and self-deprecation without cruelty or irreverence, and map probable locations with visible uncertainty rather than false precision."
     }
   ],
   "change_log": [
@@ -1725,6 +1738,7 @@
     "Audited the signed-in recent Mark 8–10 and Exodus 33–34 study chats for reusable lessons without treating them as refined app benchmarks or importing their prose; strengthened humble fellow-learner voice, applied text/inference/safety rules to image stages, blocked visual storytelling from smuggling unsupported claims, and preserved text-explicit supernatural effects without fantasy inflation.",
     "Completed the Mark 6 source ledger and scoped craftsmanship-only visual rules to their genre so provenance resolves and unrelated image prompts do not absorb Exodus-specific guidance.",
     "Abstracted the Mark 6 voice and theology lessons into reusable principles so the digest-bound exemplar remains the only authoring channel for its worked prose and future chapters are not coached to echo its distinctive lines.",
+    "Applied the owner’s mission, Selah personality, restrained-sarcasm and self-deprecation, and uncertainty-map direction to existing global rules without turning Mark 8 facts into global guidance.",
     "Added the owner's book-flow direction as a core authoring rule so surrounding-chapter context is taught when useful rather than only discovered as a review failure.",
     "Corrected the source hierarchy: Mark 6 is Selah's only refined app-quality benchmark; other Mark chats are lesson and chapter-review sources; Exodus 33–34 provides narrow study lessons; Exodus 27 is a weak technical shell only."
   ],

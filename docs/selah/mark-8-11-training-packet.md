@@ -98,9 +98,10 @@ Clearly**.
    suffering-seeking, and never tells someone to remain with an abuser.
 9. Map only responsible regions: probable eastern/Decapolis context,
    unidentified Dalmanutha, debated Bethsaida, and the villages around Caesarea
-   Philippi. Use uncertainty regions rather than false pins or a verified route.
-   Images remain people-first and must not merge separate moments or import
-   parallel-Gospel details.
+   Philippi. Where evidence supports a most-probable location, show a labeled
+   probable point inside a translucent uncertainty area; where it does not,
+   show only the area. Never imply a verified route. Images remain people-first
+   and must not merge separate moments or import parallel-Gospel details.
 10. Image candidates should distinguish the chapter's movements rather than
    repeat a feeding tableau: the seven baskets after the crowd has eaten can
    carry the evidence-and-memory theme; a restrained subjective partial-sight

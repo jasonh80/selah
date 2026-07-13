@@ -287,7 +287,7 @@ assert.equal(
   "stale approval must not authorize changed Brain content",
 );
 assert.equal(library.rule_count, 99, "unexpected candidate rule count");
-assert.equal(library.source_count, 35, "unexpected candidate source count");
+assert.equal(library.source_count, 36, "unexpected candidate source count");
 assert.match(
   library.audit_basis,
   /Mark 6 alone is the refined app-quality benchmark/i,
