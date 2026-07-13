@@ -361,8 +361,6 @@ for (const slug of MARK_SPRINT_SLUGS) {
   assert.equal(policy.readyForGeneration, false, `${slug} must remain blocked today`);
   const codes = policy.blockers.map((blocker) => blocker.code);
   for (const code of [
-    "guidance_not_approved",
-    "brain_artifact_not_approved",
     "brain_live_match_missing",
     "source_not_connected",
     "source_passage_digests_missing",
@@ -374,7 +372,15 @@ for (const slug of MARK_SPRINT_SLUGS) {
   ]) {
     assert.ok(codes.includes(code as never), `${slug} missing current-state blocker ${code}`);
   }
+  assert.ok(
+    !codes.includes("brain_artifact_not_approved"),
+    `${slug} lost the exact v1.9 Brain approval`,
+  );
   if (slug === "mark-8") {
+    assert.ok(
+      !codes.includes("guidance_not_approved"),
+      "the exact Mark 8 projection approval should satisfy only Mark 8 guidance",
+    );
     assert.ok(!codes.includes("chapter_note_row_ids_missing"));
     assert.deepEqual(
       policy.requirements.chapterNotes.map((note) => note.expectedStoredRowId),
@@ -382,6 +388,10 @@ for (const slug of MARK_SPRINT_SLUGS) {
       "Mark 8 policy must bind the ten deterministic setup rows",
     );
   } else {
+    assert.ok(
+      codes.includes("guidance_not_approved"),
+      `${slug} must remain blocked by its review-only guidance`,
+    );
     assert.ok(
       codes.includes("chapter_note_row_ids_missing"),
       `${slug} must remain blocked without deterministic note rows`,

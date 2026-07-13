@@ -243,18 +243,12 @@ async function main(): Promise<void> {
   assert.match(exact.manifestDigest ?? "", /^[a-f0-9]{64}$/u);
   assert.deepEqual(
     exact.manifestFindings.map((finding) => finding.code),
-    [
-      "BRAIN_NOT_APPROVED",
-      "GUIDANCE_NOT_APPROVED",
-      "MANIFEST_APPROVAL_MISSING",
-    ],
+    ["MANIFEST_APPROVAL_MISSING"],
     "exact live evidence must leave approval findings only",
   );
   assert.deepEqual(
     exact.approvalBlockers.map((blocker) => blocker.code),
     [
-      "BRAIN_ARTIFACT_APPROVAL_MISSING",
-      "GUIDANCE_APPROVAL_MISSING",
       "SOURCE_RUNTIME_APPROVAL_MISSING",
       "MANIFEST_APPROVAL_MISSING",
       "OWNER_RUN_AUTHORIZATION_MISSING",
@@ -287,16 +281,12 @@ async function main(): Promise<void> {
   assert.equal(confirmed.prepared, null);
   assert.deepEqual(
     confirmed.preview.manifestFindings.map((finding) => finding.code),
-    ["BRAIN_NOT_APPROVED", "GUIDANCE_NOT_APPROVED"],
-    "exact manifest + owner confirmation must still respect review-only artifacts",
+    [],
+    "exact manifest + owner confirmation must preserve the approved artifacts",
   );
   assert.deepEqual(
     confirmed.preview.approvalBlockers.map((blocker) => blocker.code),
-    [
-      "BRAIN_ARTIFACT_APPROVAL_MISSING",
-      "GUIDANCE_APPROVAL_MISSING",
-      "SOURCE_RUNTIME_APPROVAL_MISSING",
-    ],
+    ["SOURCE_RUNTIME_APPROVAL_MISSING"],
   );
   assert.deepEqual(Object.keys(confirmed), ["preview"]);
   assert.equal(JSON.stringify(confirmed).includes("prepared"), false);

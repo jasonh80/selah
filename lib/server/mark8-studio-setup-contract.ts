@@ -116,9 +116,18 @@ export interface Mark8StudioSetupApproval {
   readonly receipt_digest: string;
 }
 
-// Intentionally null until the owner approves the exact Mark 8 projection and
-// its ten notes.
-export const MARK_8_STUDIO_SETUP_APPROVAL: Mark8StudioSetupApproval | null = null;
+// Exact owner approval after Claude's independent read-only review. These
+// literal digests must be updated by a new review if any bound input changes.
+export const MARK_8_STUDIO_SETUP_APPROVAL: Mark8StudioSetupApproval | null = {
+  scope: "private_studio_mark8_guidance_and_notes",
+  slug: "mark-8",
+  approved_by: "Jason Hales (owner)",
+  approved_at: "2026-07-13T15:29:54Z",
+  evidence: "Owner approved the ten Mark 8 notes and global Selah refinements; Claude independently approved commit 7a6c76c with only the owner-accepted v1.9 version bump.",
+  guidance_digest: "b9db44382d5a08e212cca71b23e31f34707d211d3131e7e3586de2a9dad39c1a",
+  notes_digest: "d583be7098836531ebc9d71bf53d1239d47c65376a400fab06421d3fb93dcfcd",
+  receipt_digest: "2f997af024cfc13f07549a5d1f827b82d759db1d6d45b8dc90d38ac7f84b487f",
+};
 
 export function mark8StudioSetupApprovalMatches(
   approval: Mark8StudioSetupApproval | null,

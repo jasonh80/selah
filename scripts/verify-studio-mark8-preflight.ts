@@ -25,6 +25,7 @@ import {
   type Mark8StudioSetupApproval,
 } from "../lib/server/mark8-studio-setup-contract";
 import {
+  __setMark8StudioSetupStoreForTesting,
   reconcileMark8StudioSetup,
   type Mark8ChapterNoteRow,
   type Mark8StudioSetupStore,
@@ -254,11 +255,10 @@ async function main(): Promise<void> {
   assert.match(MARK_8_SOURCE_PREPARATION_MESSAGE, /chose to proceed with that uncertainty/u);
   assert.match(MARK_8_SOURCE_PREPARATION_MESSAGE, /Nothing is sent to the writing AI, saved, or published yet/u);
 
-  // The new setup remains inert at this head: Brain uses its own existing
-  // approval and the separate receipt binds the exact Mark 8 guidance and ten
-  // notes.
-  assert.equal(MARK_8_STUDIO_SETUP_APPROVAL, null);
-  assert.equal(librarySeedApproved(), false);
+  // The exact Brain and Mark 8 receipts are approved in code, but this offline
+  // gate never performs the owner-triggered live setup.
+  assert.equal(mark8StudioSetupApprovalMatches(MARK_8_STUDIO_SETUP_APPROVAL), true);
+  assert.equal(librarySeedApproved(), true);
   assert.equal(mark8StudioSetupApprovalMatches(null), false);
   assert.equal(mark8StudioSetupApprovalMatches(validMark8GuidanceApproval), true);
   assert.equal(mark8ScopedSetupApprovalApplies("mark-8", validMark8GuidanceApproval), true);
@@ -295,8 +295,13 @@ async function main(): Promise<void> {
     "the exact Mark 8 projection receipt satisfies only Mark 8 guidance",
   );
   assert.ok(
-    guidanceApprovedPolicy.blockers.some((blocker) => blocker.code === "brain_artifact_not_approved"),
-    "a valid Mark 8 guidance receipt must not bypass the unapproved Brain",
+    !guidanceApprovedPolicy.blockers.some((blocker) => blocker.code === "brain_artifact_not_approved"),
+    "the separately approved Brain should satisfy its own artifact gate",
+  );
+  assert.equal(
+    librarySeedApproved("review_only", null),
+    false,
+    "Mark 8 guidance approval still cannot approve an unapproved Brain",
   );
   const mark9Policy = buildMarkSprintManifestPolicy("mark-9", {
     mark8GuidanceApproval: validMark8GuidanceApproval,
@@ -433,6 +438,18 @@ async function main(): Promise<void> {
   const route = await import("../app/api/admin/generation/route");
   const setupAudit: Array<Record<string, unknown>> = [];
   generationSettings.__setGenerationTestOverrides({ captureAudit: setupAudit });
+  __setMark8StudioSetupStoreForTesting(
+    new FakeSetupStore(
+      canonicalRuleRows(),
+      MARK_8_SETUP_NOTES.map((note) => ({
+        id: note.rowId,
+        slug: MARK_8_SETUP_SLUG,
+        tags: [...note.tags],
+        note: note.text,
+        scope: "chapter",
+      })),
+    ),
+  );
   const unauthorizedSetup = await route.POST(
     adminRequest(
       { action: "mark8_setup_status", slug: "mark-8" },
@@ -441,12 +458,12 @@ async function main(): Promise<void> {
   );
   assert.equal(unauthorizedSetup.status, 401);
 
-  const lockedSetup = await route.POST(
+  const readySetup = await route.POST(
     adminRequest({ action: "mark8_setup_status", slug: "mark-8" }),
   );
-  assert.equal(lockedSetup.status, 200);
-  assert.deepEqual(decideMark8StudioSetup(await lockedSetup.json()), {
-    kind: "locked",
+  assert.equal(readySetup.status, 200);
+  assert.deepEqual(decideMark8StudioSetup(await readySetup.json()), {
+    kind: "ready",
   });
   const wrongSetupSlug = await route.POST(
     adminRequest({ action: "mark8_setup_status", slug: "mark-9" }),
@@ -460,13 +477,14 @@ async function main(): Promise<void> {
     }),
   );
   assert.equal(unconfirmedSetup.status, 400);
-  const bodyCannotApproveSetup = await route.POST(
+  const bodyCannotChangeSetup = await route.POST(
     adminRequest({
       ...buildMark8StudioSetupRequest(setupDecision),
       approval: validMark8GuidanceApproval,
+      setupDigest: "0".repeat(64),
     }),
   );
-  assert.equal(bodyCannotApproveSetup.status, 403);
+  assert.equal(bodyCannotChangeSetup.status, 409);
   assert.deepEqual(
     setupAudit.map(({ action, slug, status, message }) => ({
       action,
@@ -491,7 +509,7 @@ async function main(): Promise<void> {
         action: "mark8_setup",
         slug: "mark-8",
         status: "failed",
-        message: "refused:UNAPPROVED",
+        message: "refused:DIGEST_MISMATCH",
       },
     ],
   );
@@ -568,6 +586,7 @@ async function main(): Promise<void> {
     assert.equal(unavailableBody.error, MARK_8_PREFLIGHT_ERROR);
     assert.doesNotMatch(JSON.stringify(unavailableBody), /PRIVATE/u);
   } finally {
+    __setMark8StudioSetupStoreForTesting(null);
     loader.__setMark8PreviewLoaderForTesting(null);
     generationSettings.__setGenerationTestOverrides(null);
   }

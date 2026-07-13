@@ -288,7 +288,17 @@ function createSupabaseMark8StudioSetupStore(
   };
 }
 
+// TEST SEAM (offline route verification only). Production uses the server-only
+// Supabase adapter below.
+let mark8StudioSetupStoreForTesting: Mark8StudioSetupStore | null = null;
+export function __setMark8StudioSetupStoreForTesting(
+  store: Mark8StudioSetupStore | null,
+): void {
+  mark8StudioSetupStoreForTesting = store;
+}
+
 function productionStore(): Mark8StudioSetupStore {
+  if (mark8StudioSetupStoreForTesting) return mark8StudioSetupStoreForTesting;
   const db = getSupabaseAdmin();
   if (!db) {
     throw new Mark8StudioSetupError("STORE_FAILED", "Mark 8 setup is unavailable.");
