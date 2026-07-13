@@ -22,6 +22,13 @@ import {
   type NoteDigestIdentity,
 } from "./generation-manifest";
 import type { MarkSprintSlug } from "./mark-sprint-manifest-policy";
+import {
+  LIBRARY_CONTENT_DIGEST,
+  LIBRARY_MANIFEST_DIGEST,
+  LIBRARY_VERSION,
+  libraryContentDigestMatchesSnapshot,
+  libraryManifestDigestMatchesSnapshot,
+} from "./selah-brain-library";
 
 if (typeof window !== "undefined") {
   throw new Error("Generation manifest v3 is server-only");
@@ -54,7 +61,8 @@ export interface GenerationManifestV3Requirements {
   promptRevision: string;
   brain: {
     libraryVersion: string;
-    libraryDigest: string;
+    approvalContentDigest: string;
+    manifestArtifactDigest: string;
     rules: DigestIdentity[];
   };
   guidance: {
@@ -79,9 +87,6 @@ export interface GenerationManifestV3PreparationInput {
   model: GenerationManifestV3Requirements["model"];
   brain: {
     libraryVersion: string;
-    // The future composition root supplies the exact digestable live-library
-    // snapshot. Its digest is derived here; callers never supply the result.
-    artifact: unknown;
     approved: boolean;
     liveMatched: boolean;
     rules: Array<{ id: string; text: string }>;
@@ -122,7 +127,8 @@ interface DerivedMaterialEvidence {
   promptRevision: string;
   brain: {
     libraryVersion: string;
-    libraryDigest: string;
+    approvalContentDigest: string;
+    manifestArtifactDigest: string;
     approved: boolean;
     liveMatched: boolean;
     rules: DigestIdentity[];
@@ -316,7 +322,6 @@ function assertPreparationInput(
   ]);
   assertExactRecord(input.brain, "preparation.brain", [
     "libraryVersion",
-    "artifact",
     "approved",
     "liveMatched",
     "rules",
@@ -367,7 +372,13 @@ function assertPreparationInput(
   ) {
     throw new Error("preparation model controls are invalid");
   }
-  nonempty(input.brain.libraryVersion, "preparation.brain.libraryVersion");
+  if (
+    input.brain.libraryVersion !== LIBRARY_VERSION ||
+    !libraryContentDigestMatchesSnapshot() ||
+    !libraryManifestDigestMatchesSnapshot()
+  ) {
+    throw new Error("preparation Brain library does not match the version-controlled artifact");
+  }
   if (!input.brain.rules.length || duplicateIds(input.brain.rules)) {
     throw new Error("preparation Brain rules must be non-empty and unique");
   }
@@ -394,9 +405,10 @@ function assertPreparationInput(
   ] as const) {
     nonempty(value, path);
   }
-  // Canonicalization here proves the complete artifact snapshots are bounded
-  // to JSON semantics before any prompt or manifest is composed.
-  canonicalJson(input.brain.artifact);
+  // Canonicalization here proves the guidance snapshot is bounded to JSON
+  // semantics before any prompt or manifest is composed. The Brain digest is
+  // derived by its own library module because that artifact has a separately
+  // reviewed digest contract.
   canonicalJson(input.guidance.artifact);
 }
 
@@ -446,7 +458,8 @@ export function prepareGenerationModelRequestV3(
     promptRevision: CHAPTER_WORKUP_PROMPT_REVISION,
     brain: {
       libraryVersion: input.brain.libraryVersion,
-      libraryDigest: sha256Canonical(input.brain.artifact),
+      approvalContentDigest: LIBRARY_CONTENT_DIGEST,
+      manifestArtifactDigest: LIBRARY_MANIFEST_DIGEST,
       approved: input.brain.approved,
       liveMatched: input.brain.liveMatched,
       rules: input.brain.rules.map((rule) => ({
@@ -519,7 +532,8 @@ function rejectUnknownRequirements(
   ]);
   check("requirements.brain", requirements.brain, [
     "libraryVersion",
-    "libraryDigest",
+    "approvalContentDigest",
+    "manifestArtifactDigest",
     "rules",
   ]);
   if (Array.isArray(requirements.brain?.rules)) {
@@ -708,9 +722,15 @@ export function evaluateGenerationManifestV3(
     evidence.brain.libraryVersion,
   );
   sameDigest(
-    "brain.libraryDigest",
-    requirements.brain.libraryDigest,
-    evidence.brain.libraryDigest,
+    "brain.approvalContentDigest",
+    requirements.brain.approvalContentDigest,
+    evidence.brain.approvalContentDigest,
+    add,
+  );
+  sameDigest(
+    "brain.manifestArtifactDigest",
+    requirements.brain.manifestArtifactDigest,
+    evidence.brain.manifestArtifactDigest,
     add,
   );
   if (evidence.brain.approved !== true) {

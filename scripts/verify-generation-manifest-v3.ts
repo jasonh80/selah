@@ -31,6 +31,11 @@ import {
   sha256Text,
 } from "../lib/server/generation-manifest";
 import { CHAPTER_WORKUP_PROMPT_REVISION } from "../lib/ai/prompts/chapter-workup-prompt";
+import {
+  LIBRARY_CONTENT_DIGEST,
+  LIBRARY_MANIFEST_DIGEST,
+  LIBRARY_VERSION,
+} from "../lib/server/selah-brain-library";
 
 const SYNTHETIC_KEY = "PRIVATE V3 SYNTHETIC API KEY";
 const SOURCE_PHRASE =
@@ -38,7 +43,6 @@ const SOURCE_PHRASE =
 const PRIVATE_RULE = "PRIVATE V3 RULE keep the synthetic test fail closed";
 const PRIVATE_NOTE = "PRIVATE V3 NOTE a chapter-specific synthetic constraint";
 const PRIVATE_EXAMPLE = "PRIVATE V3 EXAMPLE wise warm synthetic voice";
-const PRIVATE_BRAIN_ARTIFACT = "PRIVATE V3 BRAIN ARTIFACT";
 const PRIVATE_GUIDANCE_ARTIFACT = "PRIVATE V3 GUIDANCE ARTIFACT";
 const V2_GOLDEN_DIGEST =
   "b5918e7a779be7f8b5890f7c89594451e9cd2fb5a83d859c2d3ed8fc3d1c36f3";
@@ -132,11 +136,7 @@ function fixtureInput(
       maxCompletionTokens: 12_000,
     },
     brain: {
-      libraryVersion: "synthetic-v1",
-      artifact: {
-        label: PRIVATE_BRAIN_ARTIFACT,
-        rules: ["rule-a", "rule-b"],
-      },
+      libraryVersion: LIBRARY_VERSION,
       approved: true,
       liveMatched: true,
       rules: [
@@ -183,7 +183,8 @@ function requirementsFrom(
     promptRevision: CHAPTER_WORKUP_PROMPT_REVISION,
     brain: {
       libraryVersion: input.brain.libraryVersion,
-      libraryDigest: sha256Canonical(input.brain.artifact),
+      approvalContentDigest: LIBRARY_CONTENT_DIGEST,
+      manifestArtifactDigest: LIBRARY_MANIFEST_DIGEST,
       rules: input.brain.rules.map((rule) => ({
         id: rule.id,
         digest: sha256Text(rule.text),
@@ -284,6 +285,15 @@ async function main(): Promise<void> {
     GENERATION_MODEL_API_SURFACE_V3,
   );
   assert.equal(green.manifest.modelRequest.store, false);
+  assert.equal(green.manifest.brain.libraryVersion, LIBRARY_VERSION);
+  assert.equal(
+    green.manifest.brain.approvalContentDigest,
+    LIBRARY_CONTENT_DIGEST,
+  );
+  assert.equal(
+    green.manifest.brain.manifestArtifactDigest,
+    LIBRARY_MANIFEST_DIGEST,
+  );
   assert.equal(
     green.manifest.modelRequest.retentionStatement,
     "store_false_requested_provider_retention_policy_still_applies",
@@ -304,7 +314,6 @@ async function main(): Promise<void> {
     PRIVATE_RULE,
     PRIVATE_NOTE,
     PRIVATE_EXAMPLE,
-    PRIVATE_BRAIN_ARTIFACT,
     PRIVATE_GUIDANCE_ARTIFACT,
     requestA.messages[0].content,
   ]) {
@@ -531,7 +540,12 @@ async function main(): Promise<void> {
   expectRequirementBlocked("token cap", (r) => { r.model.maxCompletionTokens--; }, "IDENTITY_MISMATCH");
   expectRequirementBlocked("prompt revision", (r) => { r.promptRevision = "other"; }, "IDENTITY_MISMATCH");
   expectRequirementBlocked("Brain version", (r) => { r.brain.libraryVersion = "other"; }, "IDENTITY_MISMATCH");
-  expectRequirementBlocked("Brain digest", (r) => { r.brain.libraryDigest = "0".repeat(64); }, "DIGEST_MISMATCH");
+  expectRequirementBlocked("Brain approval digest", (r) => {
+    r.brain.approvalContentDigest = "0".repeat(64);
+  }, "DIGEST_MISMATCH");
+  expectRequirementBlocked("Brain manifest digest", (r) => {
+    r.brain.manifestArtifactDigest = "0".repeat(64);
+  }, "DIGEST_MISMATCH");
   expectRequirementBlocked("rule id", (r) => { r.brain.rules[0].id = "other"; }, "IDENTITY_MISMATCH");
   expectRequirementBlocked("rule digest", (r) => { r.brain.rules[0].digest = "1".repeat(64); }, "DIGEST_MISMATCH");
   expectRequirementBlocked("rule order", (r) => { r.brain.rules.reverse(); }, "IDENTITY_MISMATCH");
@@ -575,9 +589,12 @@ async function main(): Promise<void> {
     assert.equal(result.ready, false, `${label} unexpectedly passed`);
     assert.ok(result.findings.some((finding) => finding.code === code), label);
   }
-  expectPreparedBlocked("derived Brain artifact", (i) => {
-    i.brain.artifact = { changed: true };
-  }, "DIGEST_MISMATCH");
+  mutationCases++;
+  assert.throws(
+    () => preparedWith((i) => { i.brain.libraryVersion = "other-library"; }),
+    /version-controlled artifact/u,
+    "a different Brain library must be refused before request preparation",
+  );
   expectPreparedBlocked("derived rule text", (i) => {
     i.brain.rules[0].text += " changed";
   }, "DIGEST_MISMATCH");

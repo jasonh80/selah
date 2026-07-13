@@ -3,6 +3,7 @@
 // truth for the seed; live toggles/edits then happen in the DB.
 import { createHash } from "node:crypto";
 import library from "./selah-brain-library.v1_1.json";
+import { sha256Canonical } from "./generation-manifest";
 
 export interface SeedRule {
   readonly id: string;
@@ -56,14 +57,18 @@ function deepFreeze<T>(value: T): T {
 // approval digest and all seed planning now read the same immutable snapshot.
 const lib = deepFreeze(structuredClone(library)) as unknown as CanonicalLibrary;
 
-function contentDigestFor(snapshot: CanonicalLibrary): string {
+function approvalExcludedArtifact(snapshot: CanonicalLibrary) {
   const {
     status: _status,
     seed_approval: _seedApproval,
     ...digestableLibrary
   } = snapshot;
+  return digestableLibrary;
+}
+
+function contentDigestFor(snapshot: CanonicalLibrary): string {
   return createHash("sha256")
-    .update(JSON.stringify(digestableLibrary))
+    .update(JSON.stringify(approvalExcludedArtifact(snapshot)))
     .digest("hex");
 }
 
@@ -81,6 +86,23 @@ export const MAX_CONTEXTUAL_BY_STAGE =
 // stable, so this digest is deterministic in Studio, verification, and Netlify.
 export const LIBRARY_CONTENT_DIGEST = contentDigestFor(lib);
 
+// The seed approval keeps its historical ordered-JSON digest above. Generation
+// manifests use a separate canonical digest of the exact same approval-excluded
+// artifact. Naming both prevents either encoding from being mistaken for the
+// other while binding them to one immutable snapshot.
+export const LIBRARY_MANIFEST_ARTIFACT = deepFreeze(
+  structuredClone(approvalExcludedArtifact(lib)),
+);
+export const LIBRARY_MANIFEST_DIGEST = sha256Canonical(
+  LIBRARY_MANIFEST_ARTIFACT,
+);
+
 export function libraryContentDigestMatchesSnapshot(): boolean {
   return contentDigestFor(lib) === LIBRARY_CONTENT_DIGEST;
+}
+
+export function libraryManifestDigestMatchesSnapshot(): boolean {
+  return (
+    sha256Canonical(approvalExcludedArtifact(lib)) === LIBRARY_MANIFEST_DIGEST
+  );
 }
