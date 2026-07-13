@@ -59,6 +59,9 @@ class FakeJobStore implements JobStorePort {
   updateCalls = 0;
   consumeFailure: "conflict" | "write_failed" | null = null;
   cleanupFailure: "conflict" | "write_failed" | null = null;
+  rejectNextRead = false;
+  rejectConsumeUpdate = false;
+  rejectCleanupUpdate = false;
 
   constructor(events: string[]) {
     this.events = events;
@@ -77,6 +80,10 @@ class FakeJobStore implements JobStorePort {
   }
 
   async read(slug: string): Promise<JobRow | null | { error: string }> {
+    if (this.rejectNextRead) {
+      this.rejectNextRead = false;
+      throw new Error("PRIVATE rejected read detail");
+    }
     const row = this.rows.get(slug);
     return row
       ? {
@@ -119,6 +126,10 @@ class FakeJobStore implements JobStorePort {
       next.workup_json !== null &&
       (next.workup_json as Record<string, unknown>)[TEXT_JOB_STATE_KEY] ===
         "running";
+    if (isConsume && this.rejectConsumeUpdate) {
+      this.rejectConsumeUpdate = false;
+      throw new Error("PRIVATE rejected consume update detail");
+    }
     if (isConsume && this.consumeFailure) {
       const failure = this.consumeFailure;
       this.consumeFailure = null;
@@ -132,6 +143,10 @@ class FakeJobStore implements JobStorePort {
       return failure === "conflict"
         ? 0
         : { error: "simulated cleanup write failure" };
+    }
+    if (next.status === "failed" && this.rejectCleanupUpdate) {
+      this.rejectCleanupUpdate = false;
+      throw new Error("PRIVATE rejected cleanup update detail");
     }
     if (isConsume) {
       this.events.push("consume");
@@ -365,6 +380,33 @@ async function main(): Promise<void> {
     assert.equal(h.modelCalls(), 0);
     assert.equal(h.costs.length, 0);
     assert.equal(h.snapshots.length, 0);
+  }
+
+  // Rejected storage promises are cleanup-required, never duplicate conflicts.
+  for (const [kind, expectedStatus] of [
+    ["consume_read", "failed"],
+    ["consume_update", "failed"],
+    ["cleanup_update", "write_failed"],
+  ] as const) {
+    const h = harness("happy");
+    if (kind === "consume_read") h.store.rejectNextRead = true;
+    if (kind === "consume_update") h.store.rejectConsumeUpdate = true;
+    if (kind === "cleanup_update") {
+      h.store.consumeFailure = "write_failed";
+      h.store.rejectCleanupUpdate = true;
+    }
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "CLAIM_CONSUME_WRITE_FAILED");
+    assert.equal(result.status, expectedStatus);
+    assert.deepEqual(h.events, [], `${kind} reached key/source/model work`);
+    assert.equal(h.modelCalls(), 0);
+    assert.equal(h.costs.length, 0);
+    assert.equal(h.snapshots.length, 0);
+    assert.equal(
+      h.store.rows.get(SLUG)?.status,
+      expectedStatus === "failed" ? "failed" : "generating",
+    );
   }
 
   // Every post-consumption failure is terminal, never a draft or snapshot.

@@ -230,13 +230,19 @@ async function failConsumedJob(
   input: RunProtectedMarkDraftJobInput,
   code: ProtectedMarkDraftJobFailureCode,
 ): Promise<ProtectedMarkDraftJobResult> {
-  const cleanup = await failGenerationJob(
-    ports.store,
-    input.slug,
-    input.jobId,
-    `protected_mark_draft:${code}`,
-    input.approvedManifestDigest,
-  );
+  let cleanup: FailJobOutcome;
+  try {
+    cleanup = await failGenerationJob(
+      ports.store,
+      input.slug,
+      input.jobId,
+      `protected_mark_draft:${code}`,
+      input.approvedManifestDigest,
+    );
+  } catch {
+    // Defensive backstop: cleanup I/O must never reject the orchestrator.
+    cleanup = "write_failed";
+  }
   await auditFailure(
     ports,
     input.slug,
@@ -325,28 +331,32 @@ export async function runProtectedMarkDraftJob(
       input.approvedManifestDigest,
     );
   } catch (error) {
-    if (isChapterMutationError(error) && error.code === "WRITE_FAILED") {
-      // The consume write may not have happened. Close only this exact job;
-      // failGenerationJob re-asserts slug, job id, and manifest digest.
-      return await failConsumedJob(
+    if (isChapterMutationError(error) && error.code === "CONFLICT") {
+      // A duplicate/superseded delivery may be the rightful owner. Never let
+      // this losing delivery clean up the shared row.
+      await auditFailure(
         ports,
-        input,
-        "CLAIM_CONSUME_WRITE_FAILED",
+        input.slug,
+        "CLAIM_NOT_CONSUMED",
+        input.approvedManifestDigest,
       );
+      return Object.freeze({
+        ok: false,
+        slug: input.slug,
+        status: "conflict",
+        code: "CLAIM_NOT_CONSUMED",
+        manifestDigest: input.approvedManifestDigest,
+      });
     }
-    await auditFailure(
+    // WRITE_FAILED, REFUSED, and raw rejected read/update promises are not
+    // proof of another owner. Attempt exact job+digest cleanup fail-closed.
+    return await failConsumedJob(
       ports,
-      input.slug,
-      "CLAIM_NOT_CONSUMED",
-      input.approvedManifestDigest,
+      input,
+      isChapterMutationError(error) && error.code === "REFUSED"
+        ? "CLAIM_NOT_CONSUMED"
+        : "CLAIM_CONSUME_WRITE_FAILED",
     );
-    return Object.freeze({
-      ok: false,
-      slug: input.slug,
-      status: "conflict",
-      code: "CLAIM_NOT_CONSUMED",
-      manifestDigest: input.approvedManifestDigest,
-    });
   }
 
   let apiKey: string;

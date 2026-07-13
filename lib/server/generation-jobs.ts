@@ -487,7 +487,9 @@ export async function failGenerationJob(
     row = await readRowForTerminalWrite(store, slug, "failGenerationJob");
   } catch (e) {
     const conflictLike = isProtectedFailure(e);
-    console.error(`[selah] failGenerationJob(${slug}): ${(e as Error).message}`);
+    console.error(
+      `[selah] failGenerationJob(${slug}): cleanup read ${conflictLike ? "refused" : "failed"}`,
+    );
     return conflictLike ? "conflict" : "write_failed";
   }
   if (row.status !== "generating" || row.workupJson?.[TEXT_JOB_KEY] !== jobId) return "conflict";
@@ -503,15 +505,23 @@ export async function failGenerationJob(
     console.error(`[selah] failGenerationJob(${slug}): ${(e as Error).message}`);
     return "conflict";
   }
-  const changed = await store.update(
-    slug,
-    {
-      status: "generating",
-      updatedAt: row.updatedAt,
-      json: [{ key: TEXT_JOB_KEY, equals: jobId }, ...manifestPredicates],
-    },
-    { status: "failed", generation_error: message.slice(0, 300), updated_at: new Date().toISOString() },
-  );
+  let changed: number | { error: string };
+  try {
+    changed = await store.update(
+      slug,
+      {
+        status: "generating",
+        updatedAt: row.updatedAt,
+        json: [{ key: TEXT_JOB_KEY, equals: jobId }, ...manifestPredicates],
+      },
+      { status: "failed", generation_error: message.slice(0, 300), updated_at: new Date().toISOString() },
+    );
+  } catch {
+    console.error(
+      `[selah] failGenerationJob(${slug}): cleanup update rejected — row may be stranded generating`,
+    );
+    return "write_failed";
+  }
   if (typeof changed === "object") {
     console.error(`[selah] failGenerationJob(${slug}): write failed — row may be stranded generating: ${changed.error}`);
     return "write_failed";
