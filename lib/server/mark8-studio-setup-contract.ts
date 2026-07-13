@@ -122,11 +122,11 @@ export const MARK_8_STUDIO_SETUP_APPROVAL: Mark8StudioSetupApproval | null = {
   scope: "private_studio_mark8_guidance_and_notes",
   slug: "mark-8",
   approved_by: "Jason Hales (owner)",
-  approved_at: "2026-07-13T15:29:54Z",
-  evidence: "Owner approved the ten Mark 8 notes and global Selah refinements; Claude independently approved commit 7a6c76c with only the owner-accepted v1.9 version bump.",
-  guidance_digest: "b9db44382d5a08e212cca71b23e31f34707d211d3131e7e3586de2a9dad39c1a",
+  approved_at: "2026-07-13T19:36:35Z",
+  evidence: "Owner approved the exact Mark 8 guidance and explicitly directed Selah to use the official ESV API for prompt-time analysis despite the recorded permission uncertainty; this receipt records the source connection with no other guidance change.",
+  guidance_digest: "3088b4a34f247c9f75b8f9587d8ecff95c48dbbe79eb94d7b8479b57451ab43b",
   notes_digest: "d583be7098836531ebc9d71bf53d1239d47c65376a400fab06421d3fb93dcfcd",
-  receipt_digest: "2f997af024cfc13f07549a5d1f827b82d759db1d6d45b8dc90d38ac7f84b487f",
+  receipt_digest: "e5502031cfe9386c842fdd3661cb614ec55e7ff1c83cdc3a14615e5ed002ac6c",
 };
 
 export function mark8StudioSetupApprovalMatches(

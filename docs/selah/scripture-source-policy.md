@@ -125,20 +125,20 @@ adds an exact ignore rule. The historical commit remains in public Git history.
 Do not rewrite published history without a separate owner decision and a clear
 legal/operational need.
 
-## Still blocked
+## Connected pilot, still owner-gated
 
-The source translation is selected, but the source is not connected. Generation
-remains blocked until the protected runner, exact API options, returned passage
-validation, source-overlap review, owner-bound manifest, Studio safety flow,
-Brain approval/live proof, voice exemplar identity, and per-run authorization
-all pass. Both generation switches remain off.
+The official ESV API source is connected only to the protected Mark 8 pilot.
+Exact API options, returned-passage validation, the owner-bound manifest,
+Brain/live evidence, the voice exemplar, and the single-use job must pass before
+a model call. Source-overlap and draft-quality gates must then pass before the
+private draft can be saved. Studio still requires the owner to confirm the exact
+prepared manifest, and both generation switches stay off except during that
+approved run.
 
-The current assembler, overlap scanner, and Manifest v3 composition are offline
-and synthetic-tested only. No application route imports the assembler. The
-ordinary Studio path refuses Mark 8–11 before it can alter the persistent
-allowlist or claim a chapter row. Actual retrieval still requires a future
-owner-issued, expiring, one-use fetch capability; a separate one-use capability
-must guard model dispatch and another must guard draft persistence.
+The assembler, overlap scanner, and Manifest v3 composition are wired only to
+the authenticated Mark 8 background worker and remain synthetic-tested until
+the first owner-approved private draft. Mark 9–11 cannot use this path yet and
+cannot fall through to ordinary generation.
 
 The existing reader also needs a separate attribution review before Selah
 expands its ESV use. It currently supplies a shortened hard-coded notice as

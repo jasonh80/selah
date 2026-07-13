@@ -18,6 +18,7 @@ import {
   type ConsumedTextJobCapability,
   type FailJobOutcome,
   type JobStorePort,
+  type TextJobFailureState,
 } from "./generation-jobs";
 import { logGenerationAudit } from "./generation-settings";
 import type { GenerationModelRequestV3 } from "./generation-manifest-v3";
@@ -299,6 +300,7 @@ async function failConsumedJob(
   ports: ProtectedMarkDraftJobPorts,
   input: RunProtectedMarkDraftJobInput,
   code: ProtectedMarkDraftJobFailureCode,
+  expectedState: TextJobFailureState = "running",
 ): Promise<ProtectedMarkDraftJobResult> {
   let cleanup: FailJobOutcome;
   try {
@@ -307,7 +309,10 @@ async function failConsumedJob(
       input.slug,
       input.jobId,
       `protected_mark_draft:${code}`,
-      input.approvedManifestDigest,
+      {
+        expectedState,
+        approvedManifestDigest: input.approvedManifestDigest,
+      },
     );
   } catch {
     // Defensive backstop: cleanup I/O must never reject the orchestrator.
@@ -428,6 +433,7 @@ export async function runProtectedMarkDraftJob(
       isChapterMutationError(error) && error.code === "REFUSED"
         ? "CLAIM_NOT_CONSUMED"
         : "CLAIM_CONSUME_WRITE_FAILED",
+      "queued",
     );
   }
 

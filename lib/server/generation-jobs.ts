@@ -561,20 +561,27 @@ export async function completeGenerationJob(
 }
 
 export type FailJobOutcome = "marked_failed" | "conflict" | "write_failed";
+export type TextJobFailureState = "queued" | "running";
+export interface FailGenerationJobOptions {
+  expectedState: TextJobFailureState;
+  approvedManifestDigest?: string;
+}
 
 /**
- * Terminal FAILURE. Pinned to this job id in either state (a route-side
- * trigger failure happens while still "queued"; a worker failure while
- * "running"). Never throws — but the caller MUST inspect the outcome:
- * "conflict" means a newer run owns the row (safe to leave); "write_failed"
- * means the row may be STRANDED as generating and the response must say so.
+ * Terminal FAILURE. Pinned to this job id and the one lifecycle state the
+ * caller actually owns. Route/pre-run cleanup may fail only "queued"; a worker
+ * that successfully consumed the claim may fail only "running". Never throws
+ * — but the caller MUST inspect the outcome:
+ * "conflict" means the claim is in another lifecycle state, finished, or
+ * superseded (safe to leave); "write_failed" means the row may be STRANDED as
+ * generating and the response must say so.
  */
 export async function failGenerationJob(
   store: JobStorePort,
   slug: string,
   jobId: string,
   message: string,
-  approvedManifestDigest?: string,
+  options: FailGenerationJobOptions,
 ): Promise<FailJobOutcome> {
   let row: JobRow;
   try {
@@ -586,12 +593,16 @@ export async function failGenerationJob(
     );
     return conflictLike ? "conflict" : "write_failed";
   }
-  if (row.status !== "generating" || row.workupJson?.[TEXT_JOB_KEY] !== jobId) return "conflict";
+  if (
+    row.status !== "generating" ||
+    row.workupJson?.[TEXT_JOB_KEY] !== jobId ||
+    row.workupJson?.[TEXT_JOB_STATE_KEY] !== options.expectedState
+  ) return "conflict";
   let manifestPredicates: { key: string; equals: string }[];
   try {
     manifestPredicates = manifestBindingPredicates(
       row,
-      approvedManifestDigest,
+      options.approvedManifestDigest,
       "failGenerationJob",
       slug,
     );
@@ -606,7 +617,11 @@ export async function failGenerationJob(
       {
         status: "generating",
         updatedAt: row.updatedAt,
-        json: [{ key: TEXT_JOB_KEY, equals: jobId }, ...manifestPredicates],
+        json: [
+          { key: TEXT_JOB_KEY, equals: jobId },
+          { key: TEXT_JOB_STATE_KEY, equals: options.expectedState },
+          ...manifestPredicates,
+        ],
       },
       { status: "failed", generation_error: message.slice(0, 300), updated_at: new Date().toISOString() },
     );

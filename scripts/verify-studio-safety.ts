@@ -538,15 +538,23 @@ const integration = async () => {
       approvedManifestDigest: MANIFEST_DIGEST_A,
     });
     ok(
-      (await failGenerationJob(store, "mark-8", jobA, "trigger failed")) === "conflict",
+      (await failGenerationJob(store, "mark-8", jobA, "trigger failed", {
+        expectedState: "queued",
+      })) === "conflict",
       "I1e bound failure refuses an omitted digest",
     );
     ok(
-      (await failGenerationJob(store, "mark-8", jobA, "trigger failed", MANIFEST_DIGEST_B)) === "conflict",
+      (await failGenerationJob(store, "mark-8", jobA, "trigger failed", {
+        expectedState: "queued",
+        approvedManifestDigest: MANIFEST_DIGEST_B,
+      })) === "conflict",
       "I1e bound failure refuses a mismatched digest",
     );
     ok(
-      (await failGenerationJob(store, "mark-8", jobA, "trigger failed", MANIFEST_DIGEST_A)) === "marked_failed",
+      (await failGenerationJob(store, "mark-8", jobA, "trigger failed", {
+        expectedState: "queued",
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      })) === "marked_failed",
       "I1e bound failure accepts the exact digest",
     );
 
@@ -580,7 +588,10 @@ const integration = async () => {
       ...META,
       approvedManifestDigest: MANIFEST_DIGEST_A,
     });
-    await failGenerationJob(store, "mark-8", boundJob, "retry", MANIFEST_DIGEST_A);
+    await failGenerationJob(store, "mark-8", boundJob, "retry", {
+      expectedState: "queued",
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
     const genericJob = await claimGenerationJob(store, "mark-8", META);
     ok(
       store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === undefined,
@@ -649,7 +660,10 @@ const integration = async () => {
       return originalUpdate(slug, predicates, next);
     };
     ok(
-      (await failGenerationJob(store, "mark-8", jobId, "boom", MANIFEST_DIGEST_A)) === "conflict",
+      (await failGenerationJob(store, "mark-8", jobId, "boom", {
+        expectedState: "queued",
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      })) === "conflict",
       "I1g failure refuses a digest swap during its terminal write",
     );
     ok(store.rows.get("mark-8")!.status === "generating", "I1g conflicted failure cannot change job status");
@@ -770,12 +784,12 @@ const integration = async () => {
   {
     const store = new FakeJobStore();
     const jobA = await claimGenerationJob(store, "mark-8", META);
-    ok((await failGenerationJob(store, "mark-8", jobA, "trigger failed")) === "marked_failed", "I3 failed trigger marks job A failed");
+    ok((await failGenerationJob(store, "mark-8", jobA, "trigger failed", { expectedState: "queued" })) === "marked_failed", "I3 failed trigger marks job A failed");
     ok(store.rows.get("mark-8")!.status === "failed", "I3 not stranded as generating");
     const jobB = await claimGenerationJob(store, "mark-8", META); // retry claims B
     await expectCode(() => consumeGenerationClaim(store, "mark-8", jobA), "CONFLICT", "I3 zombie A cannot consume");
     await expectCode(() => completeGenerationJob(store, "mark-8", jobA, { workup: WORKUP }), "CONFLICT", "I3 zombie A cannot overwrite B");
-    ok((await failGenerationJob(store, "mark-8", jobA, "zombie")) === "conflict", "I3 zombie A cannot fail B (conflict, not stranded)");
+    ok((await failGenerationJob(store, "mark-8", jobA, "zombie", { expectedState: "queued" })) === "conflict", "I3 zombie A cannot fail B (conflict, not stranded)");
     ok(store.rows.get("mark-8")!.workup_json[TEXT_JOB_KEY] === jobB, "I3 B's claim intact");
     await consumeGenerationClaim(store, "mark-8", jobB);
     await completeGenerationJob(store, "mark-8", jobB, { workup: WORKUP });
@@ -787,9 +801,49 @@ const integration = async () => {
     const store = new FakeJobStore();
     const jobId = await claimGenerationJob(store, "mark-8", META);
     store.failNextUpdate = true;
-    ok((await failGenerationJob(store, "mark-8", jobId, "boom")) === "write_failed", "I3b cleanup write failure → write_failed (row may be stranded)");
+    ok((await failGenerationJob(store, "mark-8", jobId, "boom", { expectedState: "queued" })) === "write_failed", "I3b cleanup write failure → write_failed (row may be stranded)");
     ok(store.rows.get("mark-8")!.status === "generating", "I3b row genuinely still generating — outcome told the truth");
-    ok((await failGenerationJob(store, "mark-8", jobId, "boom")) === "marked_failed", "I3b retry cleanup succeeds");
+    ok((await failGenerationJob(store, "mark-8", jobId, "boom", { expectedState: "queued" })) === "marked_failed", "I3b retry cleanup succeeds");
+  }
+
+  // I3c. Cleanup authority is state-bound: route/pre-run cleanup cannot kill a
+  // worker-owned run, and worker cleanup cannot claim an unconsumed queue item.
+  {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", META);
+    ok(
+      (await failGenerationJob(store, "mark-8", jobId, "worker too early", {
+        expectedState: "running",
+      })) === "conflict",
+      "I3c running cleanup cannot fail a queued job",
+    );
+    ok(store.rows.get("mark-8")!.workup_json[TEXT_JOB_STATE_KEY] === "queued", "I3c queued claim remains intact");
+    await consumeGenerationClaim(store, "mark-8", jobId);
+    ok(
+      (await failGenerationJob(store, "mark-8", jobId, "lost trigger response", {
+        expectedState: "queued",
+      })) === "conflict",
+      "I3c delayed route cleanup cannot fail a consumed job",
+    );
+    ok(store.rows.get("mark-8")!.workup_json[TEXT_JOB_STATE_KEY] === "running", "I3c running worker remains intact");
+    await completeGenerationJob(store, "mark-8", jobId, { workup: WORKUP });
+    ok(store.rows.get("mark-8")!.status === "draft", "I3c worker still completes after delayed route cleanup");
+  }
+  {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", META);
+    const originalUpdate = store.update.bind(store);
+    store.update = async (slug, predicates, next) => {
+      store.rows.get(slug)!.workup_json[TEXT_JOB_STATE_KEY] = "running";
+      return originalUpdate(slug, predicates, next);
+    };
+    ok(
+      (await failGenerationJob(store, "mark-8", jobId, "raced cleanup", {
+        expectedState: "queued",
+      })) === "conflict",
+      "I3c queued-to-running race is a zero-row conflict",
+    );
+    ok(store.rows.get("mark-8")!.status === "generating", "I3c raced cleanup leaves the running job untouched");
   }
 
   // I4. Job ids are collision-resistant UUIDs, not timestamps.
@@ -933,7 +987,7 @@ const integration = async () => {
     store.seed("mark-6", "generating", { [TEXT_JOB_KEY]: jid, [TEXT_JOB_STATE_KEY]: "queued" });
     await expectCode(() => consumeGenerationClaim(store, "mark-6", jid), "REFUSED", "I8 protected slug cannot be consumed");
     await expectCode(() => completeGenerationJob(store, "mark-6", jid, { workup: WORKUP }), "REFUSED", "I8 protected slug cannot be completed");
-    ok((await failGenerationJob(store, "mark-6", jid, "x")) !== "marked_failed", "I8 protected slug cannot be failed");
+    ok((await failGenerationJob(store, "mark-6", jid, "x", { expectedState: "queued" })) !== "marked_failed", "I8 protected slug cannot be failed");
     ok(store.rows.get("mark-6")!.status === "generating", "I8 protected row untouched by terminal helpers");
     store.seed("psalm-23", "draft", { [IMAGE_JOB_KEY]: jid, imageJobState: "queued", title: "P23" });
     await expectCode(() => consumeImageClaim(store, "psalm-23", jid), "REFUSED", "I8 protected slug cannot consume image claim");
@@ -1268,6 +1322,42 @@ const realRouteAndWorkers = async () => {
       store.rows.delete("mark-8");
     }
 
+    // R3d. A duplicate delivery that sees the switch OFF cannot use queued
+    // cleanup to cancel the first delivery after it already consumed the job.
+    {
+      lastTrigger = null;
+      const queued = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(queued.status === 200 && lastTrigger !== null, "R3d queued Mark 8 for duplicate-delivery race");
+      const body = { ...lastTrigger!.body };
+      await consumeGenerationClaim(store, "mark-8", body.job, MANIFEST_DIGEST_A);
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, text_generation_enabled: false },
+        captureAudit: audit,
+      });
+      const duplicate = await textWorker(workerReq("generate-chapter-background", body));
+      ok(duplicate.status === 409, "R3d duplicate OFF delivery cannot clean up a running job");
+      ok(
+        store.rows.get("mark-8")!.status === "generating" &&
+          store.rows.get("mark-8")!.workup_json[TEXT_JOB_STATE_KEY] === "running",
+        "R3d first delivery remains running",
+      );
+      await completeGenerationJob(
+        store,
+        "mark-8",
+        body.job,
+        { workup: WORKUP, version: "offline-race-proof", bibleVersion: "ESV" },
+        MANIFEST_DIGEST_A,
+      );
+      ok(store.rows.get("mark-8")!.status === "draft", "R3d first delivery can still save its private draft");
+      store.rows.delete("mark-8");
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+    }
+
     // R4. FULL PIPELINE: real route claims + triggers; real worker authenticates,
     // consumes, generates (fixture), completes a draft.
     {
@@ -1496,8 +1586,8 @@ const realRouteAndWorkers = async () => {
       ok(protectedRunnerCalls === protectedBefore, "R5d Mark 9–11 never reached the Mark 8 runner");
     }
 
-    // R5e. An unexpected protected-runner throw cannot strand Studio in
-    // generating, whether it happens before or after claim consumption.
+    // R5e. An outer catch may clean only a queued claim. Once a runner consumed
+    // it, the outer layer has no ownership proof and must leave it untouched.
     {
       store.rows.delete("mark-8");
       lastTrigger = null;
@@ -1531,8 +1621,19 @@ const realRouteAndWorkers = async () => {
         "generate-chapter-background",
         { ...lastTrigger!.body },
       ));
-      ok(afterResponse.status === 500, "R5e throw after consume reports worker failure");
-      ok(store.rows.get("mark-8")!.status === "failed", "R5e throw after consume cleaned the running job");
+      ok(afterResponse.status === 409, "R5e throw after consume reports a non-destructive conflict");
+      ok(
+        store.rows.get("mark-8")!.status === "generating" &&
+          store.rows.get("mark-8")!.workup_json[TEXT_JOB_STATE_KEY] === "running",
+        "R5e outer catch left the running job untouched without ownership proof",
+      );
+      ok(
+        (await failGenerationJob(store, "mark-8", String(lastTrigger!.body.job), "owned runner cleanup", {
+          expectedState: "running",
+          approvedManifestDigest: MANIFEST_DIGEST_B,
+        })) === "marked_failed",
+        "R5e a runner with running-state authority can clean up its own job",
+      );
       protectedRunnerMode = "complete";
       store.rows.delete("mark-8");
     }
@@ -1549,7 +1650,50 @@ const realRouteAndWorkers = async () => {
       store.rows.delete(GENERIC_SLUG);
     }
 
-    // R6b. Trigger failure AND cleanup write failure: response admits stranding.
+    // R6b. If the worker accepted and consumed a trigger but the route lost the
+    // response, route-side queued cleanup cannot terminate the paid run.
+    {
+      store.rows.delete("mark-8");
+      lastTrigger = null;
+      __setTriggerTransportForTesting(async (req) => {
+        lastTrigger = req;
+        await consumeGenerationClaim(
+          store,
+          req.body.slug,
+          req.body.job,
+          req.body.approvedManifestDigest,
+        );
+        return { ok: false, error: "accepted response lost" };
+      });
+      const response = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(response.status === 502, "R6b lost trigger response reports failure to Studio");
+      ok(lastTrigger !== null, "R6b worker received the trigger before its response was lost");
+      ok(
+        store.rows.get("mark-8")!.status === "generating" &&
+          store.rows.get("mark-8")!.workup_json[TEXT_JOB_STATE_KEY] === "running",
+        "R6b route cleanup left the consumed job running",
+      );
+      await completeGenerationJob(
+        store,
+        "mark-8",
+        lastTrigger!.body.job,
+        { workup: WORKUP, version: "offline-lost-response", bibleVersion: "ESV" },
+        MANIFEST_DIGEST_A,
+      );
+      ok(store.rows.get("mark-8")!.status === "draft", "R6b accepted worker can still save the private draft");
+      store.rows.delete("mark-8");
+      __setTriggerTransportForTesting(async (req) => {
+        lastTrigger = req;
+        return triggerResult;
+      });
+    }
+
+    // R6c. Trigger failure AND cleanup write failure: response admits stranding.
     {
       triggerResult = { ok: false, error: "connect ECONNREFUSED" };
       // The claim is an INSERT (row deleted above), so the FIRST update is the
@@ -1565,15 +1709,15 @@ const realRouteAndWorkers = async () => {
       };
       const res = await adminPost(adminReq({ action: "generate", slug: GENERIC_SLUG }));
       store.update = origUpdate;
-      ok(res.status === 500, "R6b cleanup write failure → 500");
+      ok(res.status === 500, "R6c cleanup write failure → 500");
       const bodyJson = (await res.json()) as { error?: string };
-      ok(/CLEANUP WRITE FAILED|still be marked generating/i.test(bodyJson.error ?? ""), "R6b response admits the row may be stranded");
-      ok(store.rows.get(GENERIC_SLUG)!.status === "generating", "R6b row genuinely stranded — response told the truth");
+      ok(/CLEANUP WRITE FAILED|still be marked generating/i.test(bodyJson.error ?? ""), "R6c response admits the row may be stranded");
+      ok(store.rows.get(GENERIC_SLUG)!.status === "generating", "R6c row genuinely stranded — response told the truth");
       store.rows.delete(GENERIC_SLUG);
       triggerResult = { ok: true, status: 202 };
     }
 
-    // R6c. Mark 8 trigger cleanup must present the same manifest digest that
+    // R6d. Mark 8 trigger cleanup must present the same manifest digest that
     // was bound to the claim; omitting it would conflict and strand the row.
     {
       store.rows.delete("mark-8");
@@ -1589,11 +1733,11 @@ const realRouteAndWorkers = async () => {
         confirm: true,
         approvedManifestDigest: MANIFEST_DIGEST_A,
       }));
-      ok(response.status === 502, "R6c Mark 8 trigger failure → 502");
-      ok(store.rows.get("mark-8")!.status === "failed", "R6c exact digest cleanup marked the protected job failed");
+      ok(response.status === 502, "R6d Mark 8 trigger failure → 502");
+      ok(store.rows.get("mark-8")!.status === "failed", "R6d exact digest cleanup marked the protected job failed");
       ok(
         store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === MANIFEST_DIGEST_A,
-        "R6c cleanup stayed pinned to the original manifest digest",
+        "R6d cleanup stayed pinned to the original manifest digest",
       );
       store.rows.delete("mark-8");
       triggerResult = { ok: true, status: 202 };

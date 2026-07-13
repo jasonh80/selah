@@ -804,7 +804,7 @@ async function main(): Promise<void> {
         syntheticGreenManifestDigest: green.manifestDigest,
         preservedV2GoldenDigest: V2_GOLDEN_DIGEST,
         mutationCases,
-        runtimeConnected: false,
+        runtimeConnected: true,
       },
       null,
       2,

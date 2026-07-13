@@ -66,13 +66,16 @@ async function cleanupProtectedMark8Claim(
       slug,
       jobId,
       reason,
-      approvedManifestDigest,
+      {
+        expectedState: "queued",
+        approvedManifestDigest,
+      },
     );
     const cleanupNote =
       cleanup === "marked_failed"
         ? "job marked failed"
         : cleanup === "conflict"
-          ? "job was already completed or superseded; nothing was overwritten"
+          ? "job already started, completed, or was superseded; nothing was overwritten"
           : "cleanup write failed; the job may still be marked generating";
     const status =
       cleanup === "write_failed"

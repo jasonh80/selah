@@ -160,6 +160,8 @@ A chapter advances only when:
    pass separately;
 9. the owner explicitly approves that exact chapter to publish.
 
-Current status: the authoring, manifest, and benchmark contracts are local
-candidate code only. They are not connected to Selah Studio or the live
-generation path and authorize no generation or publishing.
+Current status: the protected Mark 8 pilot is connected to Studio and its
+authenticated background worker, but it has not run. It still requires exact
+live evidence, the owner-confirmed manifest, the text switch, and a single-use
+job before one private draft. Mark 9–11 remain disconnected. Nothing here
+authorizes publishing.

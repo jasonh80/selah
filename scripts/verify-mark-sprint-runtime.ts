@@ -248,11 +248,7 @@ async function main(): Promise<void> {
   );
   assert.deepEqual(
     exact.approvalBlockers.map((blocker) => blocker.code),
-    [
-      "SOURCE_RUNTIME_APPROVAL_MISSING",
-      "MANIFEST_APPROVAL_MISSING",
-      "OWNER_RUN_AUTHORIZATION_MISSING",
-    ],
+    ["MANIFEST_APPROVAL_MISSING", "OWNER_RUN_AUTHORIZATION_MISSING"],
   );
   assert.ok(Object.isFrozen(exact));
   const serialized = JSON.stringify(exact);
@@ -277,20 +273,23 @@ async function main(): Promise<void> {
   });
   assert.equal(sourceFetchCount, 3);
   assert.equal(confirmed.preview.evidenceReady, true);
-  assert.equal(confirmed.preview.readyForGeneration, false);
-  assert.equal(confirmed.prepared, null);
+  assert.equal(confirmed.preview.readyForGeneration, true);
+  assert.notEqual(confirmed.prepared, null);
   assert.deepEqual(
     confirmed.preview.manifestFindings.map((finding) => finding.code),
     [],
     "exact manifest + owner confirmation must preserve the approved artifacts",
   );
-  assert.deepEqual(
-    confirmed.preview.approvalBlockers.map((blocker) => blocker.code),
-    ["SOURCE_RUNTIME_APPROVAL_MISSING"],
-  );
+  assert.deepEqual(confirmed.preview.approvalBlockers, []);
   assert.deepEqual(Object.keys(confirmed), ["preview"]);
   assert.equal(JSON.stringify(confirmed).includes("prepared"), false);
   assert.equal(JSON.stringify(confirmed).includes(SOURCE_PHRASE), false);
+  assert.doesNotThrow(() =>
+    withMarkSprintRuntimeApprovedPreparation(confirmed.prepared!, (preparation) => {
+      assert.equal(preparation.manifestResult.manifestDigest, exact.manifestDigest);
+      assert.equal(preparation.sourceBundle.bundleDigest, exact.sourceBundleDigest);
+    }),
+  );
 
   const unconfirmed = await prepareMarkSprintRuntime({
     slug: SLUG,

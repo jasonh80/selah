@@ -362,7 +362,6 @@ for (const slug of MARK_SPRINT_SLUGS) {
   const codes = policy.blockers.map((blocker) => blocker.code);
   for (const code of [
     "brain_live_match_missing",
-    "source_not_connected",
     "source_passage_digests_missing",
     "source_digest_missing",
     "model_request_digest_missing",
@@ -430,7 +429,7 @@ for (const slug of MARK_SPRINT_SLUGS) {
   assert.equal(policy.requirements.source.version, "ESV Text Edition: 2025");
   assert.equal(policy.requirements.source.commercialUseAllowed, false);
   assert.equal(policy.requirements.source.ownerSelectionStatus, "approved");
-  assert.equal(policy.requirements.source.runtimeConnectionStatus, "not_connected");
+  assert.equal(policy.requirements.source.runtimeConnectionStatus, "connected");
   assert.equal(
     policy.requirements.source.expectedRequestOptionsDigest,
     MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST,

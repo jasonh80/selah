@@ -32,7 +32,7 @@
     "published_terms_ai_analysis_status": "not_explicit_owner_accepts_uncertainty",
     "commercial_use_allowed": false,
     "owner_selection_status": "approved",
-    "runtime_connection_status": "not_connected",
+    "runtime_connection_status": "connected",
     "source_text_included": false,
     "reader_display_version": "ESV",
     "reader_and_generation_sources_are_distinct": false,

@@ -1,8 +1,8 @@
-# Generation Manifest v2 and protected v3 candidate
+# Generation Manifest v2 and protected v3
 
-> Offline, review-only groundwork. This does not read or write Supabase, alter
-> Studio, allowlist a slug, create a draft row, dispatch a job, call a model, or
-> authorize generation.
+> V2 is offline historical groundwork. V3 is connected only to the protected
+> Mark 8 pilot. A green manifest is evidence, never permission to generate or
+> publish.
 
 V2 is preserved unchanged as historical evidence. V3 is a separate contract;
 it does not reinterpret or auto-upgrade a v2 approval. V3 binds the exact safe
@@ -12,7 +12,7 @@ bundle digest) plus the one exact, deeply frozen OpenAI Chat Completions request
 The request explicitly sets `store: false`; this is a provider-side storage
 opt-out request, not a claim of zero retention.
 
-Before a future Mark 8–11 authoring run can spend money or mutate a chapter, a
+Before a protected authoring run can spend money or mutate a chapter, a
 server-owned preflight must bind the exact:
 
 - chapter identity and reader-display version;
@@ -42,14 +42,14 @@ not claim byte-for-byte file identity.
 
 ## Current result
 
-The version-controlled Mark policy must remain blocked. Brain v1.9 is approved
-for a future owner-triggered seed, but the Mark guidance packet remains
-review-only and the live Brain match has not been proved. The
-owner selected ESV on 2026-07-12. A protected assembler, fixed request-option
-digest, source-overlap gate, and v3 request/manifest composition candidate now
-exist only as synthetic-tested offline code. No real passage digest, stored
-example identity, live Brain/note snapshot, owner-approved per-run manifest,
-one-use fetch/run/persistence authorization, or connected Studio worker exists.
+Brain v1.9 and the exact Mark 8 guidance projection are owner-approved. The
+owner selected the official ESV API on 2026-07-12 and directed the protected
+source contract to proceed under the recorded permission uncertainty. The
+assembler, fixed request options, overlap gate, exact request, v3 manifest,
+Studio confirmation, single-use job, authenticated worker, and conditional
+private-draft save are connected for Mark 8 only. The first real run has not
+occurred; it must still prove the exact live Brain, notes, exemplar, returned
+ESV bundle, and owner-confirmed per-run manifest. Mark 9–11 remain blocked.
 
 The source decision is documented in `scripture-source-policy.md`. The manifest
 records the published-terms ambiguity honestly and never contains ESV text or
@@ -68,21 +68,16 @@ missing, duplicated, reordered, inactive, ambiguous, or unapproved material.
 The normal `npm run build` preflight runs this verifier after the Brain and
 authoring-contract checks.
 
-## Future integration boundary
+## Runtime boundary
 
-Only after the protected Studio safety work lands, the authenticated route may
-prepare live materials and call this preflight. That call belongs after access
-checks but before allowlist mutation, chapter-row mutation, job creation,
-dispatch, or cost. A worker must receive an immutable private snapshot, verify
-the same approved manifest digest, and dispatch the exact request object whose
-canonical digest was approved. It must use that snapshot rather than re-reading
-mutable rules, notes, examples, source, model, or settings.
+The authenticated route prepares the read-only preview before any allowlist
+mutation, chapter-row mutation, job creation, dispatch, or cost. After the owner
+confirms the exact digest, the worker rebuilds and verifies that same manifest,
+then dispatches the exact frozen request object whose digest was approved.
 
-The current verifier mirrors the runtime request field names and controls, but
-that is only a fixture. Before wiring, one server-only request builder must
-produce the immutable object used both for hashing and for the SDK call; the
-worker must recompute its digest immediately before dispatch. Separately
-constructing a “manifest request” and a “runtime request” is not acceptable.
+One server-only request builder produces the immutable object used both for
+hashing and for the SDK call. The worker recomputes its evidence before dispatch;
+a separate “manifest request” and “runtime request” are not allowed.
 
 V3 readiness, preflight, and passing-overlap capabilities are process-local,
 non-transferable evidence. They are deliberately reusable for exact verification
@@ -90,7 +85,7 @@ and do not authorize a fetch, model call, database write, or publication. Runtim
 must add separately authenticated, expiring, slug/scope/revision-bound nonces and
 atomically consume them once at the corresponding external boundary.
 
-Run authorization, expiry, one-use tokens, concurrency locking, runtime draft
-QA, freshness comparison, and publish approval are intentionally separate
-future controls. A green offline manifest is necessary; it is never sufficient
-to publish a chapter.
+Run authorization, signed one-use jobs, concurrency locking, runtime draft QA,
+and conditional persistence are implemented for Mark 8. Editorial review,
+completion work, image review, and owner publish approval remain separate. A
+green manifest is necessary; it is never sufficient to publish a chapter.

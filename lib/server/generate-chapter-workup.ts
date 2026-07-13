@@ -289,7 +289,10 @@ export async function generateAndStoreChapter(
     // an old worker. The outcome is reported truthfully: "conflict" = a newer
     // run owns the row (left untouched); "write_failed" = the row may be
     // STRANDED as generating and the audit says so.
-    const outcome = await failGenerationJob(store, slug, jobId, msg, approvedManifestDigest);
+    const outcome = await failGenerationJob(store, slug, jobId, msg, {
+      expectedState: "running",
+      approvedManifestDigest,
+    });
     const kind = isChapterMutationError(e) && e.code === "CONFLICT" ? "generate_text_conflict" : "generate_text";
     const cleanupNote =
       outcome === "marked_failed"

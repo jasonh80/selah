@@ -89,12 +89,18 @@ export async function GET(request: Request) {
   if (!triggered.ok) {
     // Report the cleanup outcome truthfully — never claim "marked failed"
     // when the cleanup write itself failed and the row may be stranded.
-    const cleanup = await failGenerationJob(requireJobStore(slug, "regenerate"), slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+    const cleanup = await failGenerationJob(
+      requireJobStore(slug, "regenerate"),
+      slug,
+      jobId,
+      `trigger failed: ${triggered.error ?? triggered.status}`,
+      { expectedState: "queued" },
+    );
     const cleanupNote =
       cleanup === "marked_failed"
         ? "job marked failed"
         : cleanup === "conflict"
-          ? "a newer run owns this chapter; nothing was overwritten"
+          ? "the job already started or was superseded; nothing was overwritten"
           : "CLEANUP WRITE FAILED — the row may still be marked generating";
     await logGenerationAudit({
       action: "refused:regenerate",

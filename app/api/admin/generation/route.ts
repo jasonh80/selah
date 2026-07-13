@@ -723,13 +723,16 @@ export async function POST(req: Request) {
           slug,
           jobId,
           `trigger failed: ${triggered.error ?? triggered.status}`,
-          approvedManifestDigest,
+          {
+            expectedState: "queued",
+            approvedManifestDigest,
+          },
         );
         const cleanupNote =
           cleanup === "marked_failed"
             ? "job marked failed"
             : cleanup === "conflict"
-              ? "a newer run owns this chapter; nothing was overwritten"
+              ? "the job already started or was superseded; nothing was overwritten"
               : "CLEANUP WRITE FAILED — the row may still be marked generating";
         return refuse(
           slug,
@@ -796,12 +799,18 @@ export async function POST(req: Request) {
       // fail the claimed job (pinned to this job id) and report the CLEANUP
       // OUTCOME truthfully — a failed cleanup write means the row may still
       // say "generating", and the response must never claim otherwise.
-      const cleanup = await failGenerationJob(requireJobStore(slug, "generate"), slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+      const cleanup = await failGenerationJob(
+        requireJobStore(slug, "generate"),
+        slug,
+        jobId,
+        `trigger failed: ${triggered.error ?? triggered.status}`,
+        { expectedState: "queued" },
+      );
       const cleanupNote =
         cleanup === "marked_failed"
           ? "job marked failed"
           : cleanup === "conflict"
-            ? "a newer run owns this chapter; nothing was overwritten"
+            ? "the job already started or was superseded; nothing was overwritten"
             : "CLEANUP WRITE FAILED — the row may still be marked generating";
       return refuse(
         slug,

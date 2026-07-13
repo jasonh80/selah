@@ -96,12 +96,14 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 - No auth, no personalization, no payments, no live "Ask Selah" tool,
   no Street View ("Standing There" shows a roadmap placeholder by design).
 - Budget limit field in settings is stored but **not enforced**.
-- Generation currently treats missing Brain rules, chapter notes, examples, and
-  source text as soft failures. **Do not generate Mark 8–11** until their Studio
-  manifest fails closed before any mutation or model call.
-- The review-only Mark 8–11 guidance packet is versioned in
-  `lib/server/mark-sprint-guidance.v1.json`; it is not loaded into Supabase or
-  connected to generation. The owner selected the official ESV API as the
+- Ordinary generation still treats some missing context as soft failures. The
+  protected Mark 8 pilot now fails closed on exact Brain rules, chapter notes,
+  exemplar, source evidence, manifest approval, and per-run owner authorization.
+  Mark 9–11 remain disconnected and blocked.
+- The Mark 8–11 guidance packet is versioned in
+  `lib/server/mark-sprint-guidance.v1.json`. Its exact Mark 8 projection and ten
+  notes are owner-approved for private Studio setup; Mark 9–11 remain
+  review-only. The owner selected the official ESV API as the
   prompt-time analysis source on 2026-07-12; OEB is not used. The published
   terms do not explicitly address third-party model analysis, and the owner's
   decision accepts that uncertainty for this noncommercial ministry use without
@@ -109,23 +111,25 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   primary ESV chapter plus one adjacent ESV chapter on each side, each and the
   ordered bundle digest-bound without storing text in the repo, manifest, logs,
   or workup. See `docs/selah/scripture-source-policy.md`.
-- Generation Manifest v2 remains frozen historical groundwork. A separate
-  offline v3 candidate now binds the richer protected ESV response evidence,
+- Generation Manifest v2 remains frozen historical groundwork. Manifest v3 now
+  binds the richer protected ESV response evidence for the Mark 8 pilot,
   exact frozen OpenAI Chat Completions request (`store: false`), Brain rules,
   chapter notes, exemplar, source-overlap result, and owner-approved manifest
   digest without persisting private text. V3 capabilities are process-local
-  evidence, not run authorization. It is not wired to Studio or a worker; see
-  `docs/selah/generation-manifest.md`.
-- The protected ESV source assembler and overlap gate are synthetic-tested only.
+  evidence, not run authorization; the authenticated worker also requires the
+  exact owner-confirmed manifest and a single-use job. It is not connected for
+  Mark 9–11; see `docs/selah/generation-manifest.md`.
+- The protected ESV source assembler and overlap gate are synthetic-tested and
+  connected only to the authenticated Mark 8 worker.
   They validate the ESV's omitted disputed verse numbers in these Mark windows,
   reject partial/oversized/mismatched responses, retain cancellation through
   body reads, keep source text non-enumerable, and block copied wording hidden
-  within or across JSON fields. Ordinary Mark 8–11 generation now refuses before
-  allowlist or chapter-row mutation. No runtime path imports the assembler.
-- A local `mark-sprint-copy-review-v1.0` authoring contract now verifies the
+  within or across JSON fields. Ordinary Mark 8–11 generation refuses before it
+  can bypass the protected path; Mark 9–11 remain blocked.
+- The `mark-sprint-copy-review-v1.0` authoring contract verifies the
   Mark 8–11 structural floor (full passage movements, FAQ, content modules,
-  placeholder image shape, and no embedded verse array). It is not wired to
-  Studio and does not prove provenance, freshness, semantic accuracy, rendered
+  placeholder image shape, and no embedded verse array). It runs inside the
+  protected Mark 8 draft pipeline but does not prove semantic accuracy, rendered
   map/image completion, or owner approval. Those remain fail-closed manifest,
   source-aware comparison, completion, and human-review gates.
 - A local `selah-benchmark-rubric-v2` candidate now turns the refined Mark 6

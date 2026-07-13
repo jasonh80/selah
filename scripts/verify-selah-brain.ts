@@ -722,8 +722,8 @@ assert.equal(guidance.owner_source_decision.oeb_allowed, false);
 assert.equal(guidance.source_requirement.owner_selection_status, "approved");
 assert.equal(
   guidance.source_requirement.runtime_connection_status,
-  "not_connected",
-  "owner selection must not be mistaken for runtime connection",
+  "connected",
+  "the owner-approved ESV contract must stay connected to the protected runner",
 );
 assert.equal(
   guidance.source_requirement.source_text_included,
