@@ -30,7 +30,7 @@ function prose(label: string, detail: string): string {
   return `${label} is synthetic validation copy, not publishable chapter content. ${detail} It exists only to prove that the strict authoring contract preserves substantive, distinct fields and fails safely when required evidence disappears.`;
 }
 
-function passingDraft(slug: string): GeneratedChapterWorkup {
+export function passingDraft(slug: string): GeneratedChapterWorkup {
   const expected = getMarkSprintChapterContract(slug);
   assert.ok(expected, `missing contract for ${slug}`);
   const chapter = expected.chapter;
@@ -303,6 +303,8 @@ function passingDraft(slug: string): GeneratedChapterWorkup {
 function hasCode(report: ReturnType<typeof evaluateMarkSprintDraft>, code: string) {
   return report.blockers.some((finding) => finding.code === code);
 }
+
+export function verifyMarkAuthoringContract(): void {
 
 for (const slug of ["mark-8", "mark-9", "mark-10", "mark-11"]) {
   const parsed = parseChapterWorkupJson(JSON.stringify(passingDraft(slug)));
@@ -858,3 +860,11 @@ console.log(
     2,
   ),
 );
+}
+
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  verifyMarkAuthoringContract();
+}

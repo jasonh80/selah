@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   GENERATION_MANIFEST_V3,
   GENERATION_MODEL_API_SURFACE_V3,
@@ -37,13 +39,13 @@ import {
   LIBRARY_VERSION,
 } from "../lib/server/selah-brain-library";
 
-const SYNTHETIC_KEY = "PRIVATE V3 SYNTHETIC API KEY";
-const SOURCE_PHRASE =
+export const SYNTHETIC_KEY = "PRIVATE V3 SYNTHETIC API KEY";
+export const SOURCE_PHRASE =
   "PRIVATE V3 SOURCE cedar amber lantern mercy river witness never serialize";
-const PRIVATE_RULE = "PRIVATE V3 RULE keep the synthetic test fail closed";
-const PRIVATE_NOTE = "PRIVATE V3 NOTE a chapter-specific synthetic constraint";
-const PRIVATE_EXAMPLE = "PRIVATE V3 EXAMPLE wise warm synthetic voice";
-const PRIVATE_GUIDANCE_ARTIFACT = "PRIVATE V3 GUIDANCE ARTIFACT";
+export const PRIVATE_RULE = "PRIVATE V3 RULE keep the synthetic test fail closed";
+export const PRIVATE_NOTE = "PRIVATE V3 NOTE a chapter-specific synthetic constraint";
+export const PRIVATE_EXAMPLE = "PRIVATE V3 EXAMPLE wise warm synthetic voice";
+export const PRIVATE_GUIDANCE_ARTIFACT = "PRIVATE V3 GUIDANCE ARTIFACT";
 const V2_GOLDEN_DIGEST =
   "b5918e7a779be7f8b5890f7c89594451e9cd2fb5a83d859c2d3ed8fc3d1c36f3";
 
@@ -61,7 +63,7 @@ function syntheticText(reference: string, variant: string): string {
     .map((verse) =>
       verse === 1
         ? `[1] ${SOURCE_PHRASE} chapter ${chapter} variant ${variant}.`
-        : `[${verse}] synthetic complete chapter content carries enough distinct words for validation chapter ${chapter} verse ${verse} variant ${variant}.`,
+        : `[${verse}] zareth quorin vexal nembor ulith pavren dorval kelith sovar tunem chapter ${chapter} verse ${verse} variant ${variant}.`,
     )
     .join("\n\n");
 }
@@ -106,7 +108,7 @@ function syntheticFetcher(variant: string, metadata = "base") {
   };
 }
 
-async function bundle(
+export async function bundle(
   slug: "mark-8" | "mark-9",
   variant: string,
   metadata = "base",
@@ -118,7 +120,7 @@ async function bundle(
   });
 }
 
-function fixtureInput(
+export function fixtureInput(
   sourceBundle: MarkSprintEsvSourceBundle,
 ): GenerationManifestV3PreparationInput {
   const chapter = Number(sourceBundle.slug.split("-")[1]) as 8 | 9 | 10 | 11;
@@ -171,7 +173,7 @@ function fixtureInput(
   };
 }
 
-function requirementsFrom(
+export function requirementsFrom(
   input: GenerationManifestV3PreparationInput,
   approvedManifestDigest: string | null = null,
 ): GenerationManifestV3Requirements {
@@ -810,4 +812,9 @@ async function main(): Promise<void> {
   );
 }
 
-void main();
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  void main();
+}
