@@ -13,9 +13,9 @@ import {
 import { studioPreviewUrl } from "@/lib/studio-preview";
 
 // Selah Studio — a calm, guided publishing flow (not a developer console).
-// Choose Chapter → Generate Draft → Preview Draft → Publish Final. All technical
-// controls live behind Advanced Settings. Nothing sensitive is in the page; the
-// Supabase service-role key stays server-side behind the token-gated API.
+// Choose Chapter → Generate Draft → Preview Text → Create & Review Images →
+// Publish Final. All technical controls stay out of the guided flow. Nothing
+// sensitive is in the page; service credentials remain server-side.
 type GenSettings = {
   text_generation_enabled: boolean;
   image_generation_enabled: boolean;
@@ -58,6 +58,27 @@ type Phase = "idle" | "checking" | "generating" | "ready" | "error";
 type Verdict = "" | "yes" | "needs_work";
 type Scope = "chapter" | "future" | "both";
 type StepState = "done" | "current" | "todo";
+type ImagePhase = "idle" | "checking" | "confirming" | "queued" | "running" | "ready" | "error";
+
+type StudioImage = {
+  kind: string;
+  label: string;
+  description: string;
+  status: string;
+};
+
+type StudioImageStatus = {
+  total: number;
+  stored: number;
+  done: boolean;
+  state: "idle" | "queued" | "running" | "blocked" | "failed";
+  heroKind: string | null;
+  model: string | null;
+  images: StudioImage[];
+  reviewDigest: string | null;
+  spentCount: number;
+  estimatedCostUsd: number;
+};
 
 const QUICK_TAGS = [
   "Too academic",
@@ -94,6 +115,12 @@ export default function SelahStudioPage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [reviewMsg, setReviewMsg] = useState("");
 
+  const [imagePhase, setImagePhase] = useState<ImagePhase>("idle");
+  const [imageStatus, setImageStatus] = useState<StudioImageStatus | null>(null);
+  const [imageMsg, setImageMsg] = useState("");
+  const [imagesPreviewed, setImagesPreviewed] = useState(false);
+  const [approvedReviewDigest, setApprovedReviewDigest] = useState<string | null>(null);
+
   const [published, setPublished] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState("");
@@ -104,6 +131,8 @@ export default function SelahStudioPage() {
 
   const activeSlug = useRef("");
   const mark8PreflightRequest = useRef(0);
+  const imageStatusRequest = useRef(0);
+  const currentImageReviewDigest = useRef("");
   const slug = slugFor(book, chapter) ?? "";
 
   async function api(method: "GET" | "POST", body?: unknown) {
@@ -131,7 +160,18 @@ export default function SelahStudioPage() {
     } else setLoginMsg(j.error || "That key didn't work — try again.");
   }
 
-  // Reset the review/publish state when the chapter changes or a fresh draft begins.
+  function resetImageReview() {
+    imageStatusRequest.current++;
+    currentImageReviewDigest.current = "";
+    setImagePhase("idle");
+    setImageStatus(null);
+    setImageMsg("");
+    setImagesPreviewed(false);
+    setApprovedReviewDigest(null);
+  }
+
+  // Reset the review, image, and publish state when the chapter changes or a
+  // fresh draft begins. An approval must never carry into a different draft.
   function resetReview() {
     setPreviewed(false);
     setVerdict("");
@@ -141,6 +181,7 @@ export default function SelahStudioPage() {
     setNoteSaved(false);
     setShowFeedback(false);
     setReviewMsg("");
+    resetImageReview();
     setPublished(false);
     setPublishMsg("");
   }
@@ -195,6 +236,7 @@ export default function SelahStudioPage() {
       setPhase("ready");
       setPublished(false);
       setGenMsg("");
+      if (target === MARK_8_STUDIO_SLUG) void loadImagesStatus(target);
     } else if (status === "generating") {
       setPhase("generating");
       setPublished(false);
@@ -241,6 +283,7 @@ export default function SelahStudioPage() {
       setPhase("ready");
       setPublished(st === "reviewed");
       setGenMsg("");
+      if (st !== "reviewed" && target === MARK_8_STUDIO_SLUG) void loadImagesStatus(target);
     } else if (st === "failed") {
       setPhase("error");
       setStatusProblem(false);
@@ -341,12 +384,17 @@ export default function SelahStudioPage() {
     const target = slug;
     const previewUrl = studioPreviewUrl(target);
     if (!previewUrl) return;
+    const reviewingImages = imagePhase === "ready" && Boolean(imageStatus?.reviewDigest);
 
     // Open synchronously so browsers do not block the tab while Studio waits
     // for the authenticated cookie response.
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
-      setReviewMsg("Allow pop-ups for Selah, then try Preview Draft again.");
+      if (reviewingImages) {
+        setImageMsg("Allow pop-ups for Selah, then try the image preview again.");
+      } else {
+        setReviewMsg("Allow pop-ups for Selah, then try Preview Draft again.");
+      }
       return;
     }
     previewWindow.opener = null;
@@ -355,11 +403,175 @@ export default function SelahStudioPage() {
       if (!response.ok) throw new Error("preview access refused");
       previewWindow.location.href = previewUrl;
       setPreviewed(true);
+      if (reviewingImages) {
+        setImagesPreviewed(true);
+        setApprovedReviewDigest(null);
+        setImageMsg("");
+      }
       setReviewMsg("");
     } catch {
       previewWindow.close();
-      setReviewMsg("Studio could not open the preview. Try again.");
+      if (reviewingImages) {
+        setImageMsg("Studio could not open the image preview. Try again.");
+      } else {
+        setReviewMsg("Studio could not open the preview. Try again.");
+      }
     }
+  }
+
+  function applyImageStatus(next: StudioImageStatus) {
+    const nextDigest = next.reviewDigest ?? "";
+    if (currentImageReviewDigest.current !== nextDigest) {
+      currentImageReviewDigest.current = nextDigest;
+      setImagesPreviewed(false);
+      setApprovedReviewDigest(null);
+    }
+    setImageStatus(next);
+  }
+
+  async function loadImagesStatus(target: string) {
+    if (target !== MARK_8_STUDIO_SLUG) return;
+    const requestId = ++imageStatusRequest.current;
+    setImagePhase("checking");
+    setImageMsg("");
+    await checkImagesStatus(target, requestId, 0, false);
+  }
+
+  async function checkImagesStatus(
+    target: string,
+    requestId: number,
+    attempt: number,
+    expectWork: boolean,
+  ) {
+    if (activeSlug.current !== target || imageStatusRequest.current !== requestId) return;
+    if (attempt > 150) {
+      setImagePhase("error");
+      setImageMsg("The images are taking longer than expected. They may still be working—check again in a moment.");
+      return;
+    }
+
+    let response: Record<string, unknown>;
+    try {
+      response = await api("POST", { action: "images_status", slug: target });
+    } catch {
+      if (activeSlug.current !== target || imageStatusRequest.current !== requestId) return;
+      setImagePhase("error");
+      setImageMsg("Studio lost track of the images. They may still be working—check again.");
+      return;
+    }
+    if (activeSlug.current !== target || imageStatusRequest.current !== requestId) return;
+
+    const next = readStudioImageStatus(response);
+    if (!next) {
+      setImagePhase("error");
+      setImageMsg("Studio could not check the images. Nothing was published. Try checking again.");
+      return;
+    }
+    applyImageStatus(next);
+
+    const exactPlan = next.total === 3 || next.total === 5;
+    const complete =
+      exactPlan &&
+      next.done &&
+      next.stored === next.total &&
+      Boolean(next.reviewDigest);
+    if (complete) {
+      setImagePhase("ready");
+      setImageMsg("");
+      return;
+    }
+
+    if (next.state === "blocked" || next.state === "failed") {
+      setImagePhase("error");
+      setImageMsg(
+        next.state === "blocked"
+          ? "The image run stopped after using image credit, but Studio could not safely finish its record. Studio needs attention before another image run. Nothing was published."
+          : next.spentCount > 0
+            ? `The images stopped before they finished. Image credit was used for ${next.spentCount} ${next.spentCount === 1 ? "image" : "images"}. Nothing was published.`
+            : "The images stopped before they finished. No image credit was used. Nothing was published.",
+      );
+      return;
+    }
+
+    if (next.state === "queued" || next.state === "running") {
+      setImagePhase(next.state);
+      setTimeout(() => {
+        void checkImagesStatus(target, requestId, attempt + 1, true);
+      }, 6000);
+      return;
+    }
+
+    if (expectWork) {
+      if (attempt < 3) {
+        setImagePhase("queued");
+        setTimeout(() => {
+          void checkImagesStatus(target, requestId, attempt + 1, true);
+        }, 4000);
+      } else {
+        setImagePhase("error");
+        setImageMsg("The image run stopped before it finished. Nothing was published. You can try again.");
+      }
+      return;
+    }
+
+    if (!exactPlan) {
+      setImagePhase("error");
+      setImageMsg("This draft does not have a complete 3- or 5-image plan yet. Create a fresh draft before making images.");
+      return;
+    }
+    setImagePhase("idle");
+    setImageMsg("");
+  }
+
+  function confirmImageCreation() {
+    if (slug !== MARK_8_STUDIO_SLUG || verdict !== "yes" || !previewed) return;
+    if (!imageStatus || (imageStatus.total !== 3 && imageStatus.total !== 5)) {
+      void loadImagesStatus(slug);
+      return;
+    }
+    setImagePhase("confirming");
+    setImageMsg("");
+  }
+
+  async function createImages() {
+    const target = slug;
+    if (
+      target !== MARK_8_STUDIO_SLUG ||
+      verdict !== "yes" ||
+      !previewed ||
+      !settings?.image_generation_enabled ||
+      !imageStatus ||
+      (imageStatus.total !== 3 && imageStatus.total !== 5)
+    ) return;
+
+    const requestId = ++imageStatusRequest.current;
+    currentImageReviewDigest.current = "";
+    setApprovedReviewDigest(null);
+    setImagesPreviewed(false);
+    setImagePhase("queued");
+    setImageMsg("");
+    try {
+      const response = await api("POST", { action: "generate_images", slug: target });
+      if (activeSlug.current !== target || imageStatusRequest.current !== requestId) return;
+      if (!response.ok) {
+        setImagePhase("error");
+        setImageMsg("Studio could not start the images. No images were approved or published. You can try again.");
+        return;
+      }
+      // A successful trigger only means the work was accepted. Studio waits
+      // for the stored image set and its exact review digest before saying ready.
+      await checkImagesStatus(target, requestId, 0, true);
+    } catch {
+      if (activeSlug.current === target && imageStatusRequest.current === requestId) {
+        setImagePhase("error");
+        setImageMsg("Studio could not start the images. Nothing was published. You can try again.");
+      }
+    }
+  }
+
+  function approveImages() {
+    if (!imagesPreviewed || imagePhase !== "ready" || !imageStatus?.reviewDigest) return;
+    setApprovedReviewDigest(imageStatus.reviewDigest);
   }
 
   function toggleTag(t: string) {
@@ -432,7 +644,11 @@ export default function SelahStudioPage() {
         }
         setNoteSaved(true);
       }
-      const j = await api("POST", { action: "publish", slug: target });
+      const j = await api("POST", {
+        action: "publish",
+        slug: target,
+        ...(target === MARK_8_STUDIO_SLUG ? { reviewDigest: approvedReviewDigest } : {}),
+      });
       if (activeSlug.current !== target) {
         return;
       }
@@ -495,14 +711,31 @@ export default function SelahStudioPage() {
 
   // ---------------- Step states ----------------
   const textOff = !settings.text_generation_enabled;
+  const isMark8 = slug === MARK_8_STUDIO_SLUG;
   const draftReady = phase === "ready";
-  const canPublish = draftReady && previewed && verdict === "yes" && !published;
+  const exactImagesReady =
+    imagePhase === "ready" &&
+    Boolean(imageStatus?.reviewDigest) &&
+    imageStatus?.stored === imageStatus?.total &&
+    (imageStatus?.total === 3 || imageStatus?.total === 5);
+  const imagesApproved =
+    exactImagesReady &&
+    imagesPreviewed &&
+    Boolean(approvedReviewDigest) &&
+    approvedReviewDigest === imageStatus?.reviewDigest;
+  const canPublish =
+    draftReady &&
+    previewed &&
+    verdict === "yes" &&
+    !published &&
+    (!isMark8 || imagesApproved);
 
   const step1: StepState = phase === "idle" && !published ? "current" : "done";
   const step2: StepState =
     published ? "done" : phase === "idle" ? "todo" : phase === "ready" ? "done" : "current";
   const step3: StepState = published || previewed ? "done" : draftReady ? "current" : "todo";
-  const step4: StepState = published ? "done" : verdict === "yes" && previewed ? "current" : "todo";
+  const step4: StepState = published || imagesApproved ? "done" : verdict === "yes" && previewed ? "current" : "todo";
+  const publishStep: StepState = published ? "done" : canPublish ? "current" : "todo";
 
   return (
     <div className="mx-auto max-w-xl space-y-3 px-4 py-12">
@@ -649,10 +882,40 @@ export default function SelahStudioPage() {
               </ul>
             </div>
             <div>
-              <p className="text-[14px] font-semibold text-primary">Is this ready to publish?</p>
+              <p className="text-[14px] font-semibold text-primary">
+                {isMark8 ? "Is the text ready?" : "Is this ready to publish?"}
+              </p>
               <div className="mt-2 flex gap-2">
-                <Seg active={verdict === "yes"} onClick={() => { setVerdict("yes"); setNoteSaved(false); setShowFeedback(false); }}>Ready</Seg>
-                <Seg active={verdict === "needs_work"} onClick={() => { setVerdict("needs_work"); setNoteSaved(false); setShowFeedback(true); }}>Needs work</Seg>
+                <Seg
+                  active={verdict === "yes"}
+                  onClick={() => {
+                    const newlyReady = verdict !== "yes";
+                    setVerdict("yes");
+                    setNoteSaved(false);
+                    setShowFeedback(false);
+                    if (isMark8 && newlyReady) {
+                      setImagesPreviewed(false);
+                      setApprovedReviewDigest(null);
+                      if (imagePhase !== "queued" && imagePhase !== "running") {
+                        void loadImagesStatus(slug);
+                      }
+                    }
+                  }}
+                >
+                  Ready
+                </Seg>
+                <Seg
+                  active={verdict === "needs_work"}
+                  onClick={() => {
+                    setVerdict("needs_work");
+                    setNoteSaved(false);
+                    setShowFeedback(true);
+                    setImagesPreviewed(false);
+                    setApprovedReviewDigest(null);
+                  }}
+                >
+                  Needs work
+                </Seg>
               </div>
             </div>
 
@@ -729,8 +992,103 @@ export default function SelahStudioPage() {
         )}
       </Step>
 
-      {/* Step 4 — Publish Final */}
-      <Step n={4} title="Publish Final" state={step4}>
+      {/* Mark 8 launch gate — images are a separate, owner-approved spend and review. */}
+      {isMark8 && (
+        <Step n={4} title="Create & Review Images" state={step4}>
+          {published ? (
+            <p className="text-[13px] font-medium text-accent-strong">✓ Images approved</p>
+          ) : verdict !== "yes" || !previewed ? (
+            <p className="text-[13px] text-secondary">Preview the draft and mark the text Ready first.</p>
+          ) : imagePhase === "checking" ? (
+            <p role="status" className="text-[13px] text-secondary">Checking the image plan…</p>
+          ) : imagePhase === "confirming" && imageStatus ? (
+            <div className="rounded-lg border bg-card-soft p-3">
+              <p className="text-[13px] text-primary">
+                Create these <span className="font-semibold">{imageStatus.total} images</span> for Mark 8?
+                Estimated image cost: <span className="font-semibold">about {formatUsd(imageStatus.estimatedCostUsd)}</span>.
+                This uses image credit and does not publish the chapter.
+              </p>
+              <div className="mt-2.5 flex gap-2">
+                <button type="button" onClick={() => void createImages()} className={primary}>
+                  Create {imageStatus.total} images
+                </button>
+                <button type="button" onClick={() => setImagePhase("idle")} className={ghost}>Cancel</button>
+              </div>
+            </div>
+          ) : imagePhase === "queued" || imagePhase === "running" ? (
+            <ImageWaitCard phase={imagePhase} />
+          ) : imagePhase === "ready" && exactImagesReady ? (
+            <div className="space-y-3">
+              {imageMsg && <p role="alert" className="text-[13px] text-jesus-red">{imageMsg}</p>}
+              <p className="text-[13px] font-medium text-accent-strong">
+                ✓ {imageStatus?.total} images are ready to review
+              </p>
+              {imageStatus?.images && imageStatus.images.length > 0 && (
+                <ul className="space-y-1 text-[12px] text-secondary">
+                  {imageStatus.images.map((image) => (
+                    <li key={image.kind}>
+                      {image.kind === imageStatus.heroKind ? "Featured: " : ""}{image.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!imagesPreviewed ? (
+                <>
+                  <button type="button" onClick={previewDraft} className={ghost}>Preview with images ↗</button>
+                  <p className="text-[12px] text-secondary">
+                    Look at the featured image and every scene before approving them.
+                  </p>
+                </>
+              ) : !imagesApproved ? (
+                <div>
+                  <button type="button" onClick={approveImages} className={primary}>Images look right</button>
+                  <p className="mt-2 text-[12px] text-secondary">This approval is only for the exact chapter you just previewed.</p>
+                </div>
+              ) : (
+                <p className="text-[13px] font-medium text-accent-strong">✓ Image review approved</p>
+              )}
+            </div>
+          ) : imagePhase === "error" ? (
+            <div>
+              <p role="alert" className="text-[13px] text-jesus-red">{imageMsg}</p>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <button type="button" onClick={() => void loadImagesStatus(slug)} className={ghost}>Check images again</button>
+                {settings.image_generation_enabled &&
+                  imageStatus &&
+                  imageStatus.state !== "blocked" &&
+                  !imageStatus.done &&
+                  !imageStatus.reviewDigest &&
+                  (imageStatus.total === 3 || imageStatus.total === 5) && (
+                  <button type="button" onClick={confirmImageCreation} className={ghost}>Try creating again</button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <button
+                type="button"
+                onClick={confirmImageCreation}
+                disabled={
+                  !settings.image_generation_enabled ||
+                  !imageStatus ||
+                  (imageStatus.total !== 3 && imageStatus.total !== 5)
+                }
+                className={primary}
+              >
+                {imageStatus ? `Create ${imageStatus.total} images` : "Check image plan"}
+              </button>
+              {!settings.image_generation_enabled && (
+                <p className="mt-2.5 text-[13px] text-secondary">
+                  Image creation is paused. Turn it on in <span className="text-primary">Settings &amp; history</span> when you are ready.
+                </p>
+              )}
+            </div>
+          )}
+        </Step>
+      )}
+
+      {/* Publish stays Step 4 for legacy chapters and becomes Step 5 for Mark 8. */}
+      <Step n={isMark8 ? 5 : 4} title="Publish Final" state={isMark8 ? publishStep : step4}>
         <button type="button" onClick={publishFinal} disabled={!canPublish || busy} className={primary}>
           {publishing ? "Publishing…" : "Publish Final"}
         </button>
@@ -748,7 +1106,13 @@ export default function SelahStudioPage() {
                 ? "Preview the draft first."
                 : verdict !== "yes"
                   ? "Confirm it feels like Selah above to unlock publishing."
-                  : "Ready to go live."}
+                  : isMark8 && !exactImagesReady
+                    ? "Create and review the images first."
+                    : isMark8 && !imagesPreviewed
+                      ? "Preview the finished chapter with its images."
+                      : isMark8 && !imagesApproved
+                        ? "Confirm the images look right to unlock publishing."
+                        : "Ready to go live."}
           </p>
         )}
       </Step>
@@ -954,4 +1318,102 @@ function DraftWaitCard({ reference }: { reference: string }) {
       </p>
     </div>
   );
+}
+
+function ImageWaitCard({
+  phase,
+}: {
+  phase: "queued" | "running";
+}) {
+  const title =
+    phase === "queued"
+      ? "Preparing the image run"
+      : "Creating the chapter images";
+  const detail =
+    phase === "queued"
+      ? "Selah is checking the approved scene plan before using image credit."
+      : "This can take several minutes. You can leave this page and come back.";
+
+  return (
+    <div role="status" aria-live="polite" className="rounded-lg border bg-card-soft p-4">
+      <div className="flex items-center gap-2">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-accent-strong" aria-hidden="true" />
+        <p className="text-[14px] font-semibold text-primary">{title}</p>
+      </div>
+      <p className="mt-2 text-[13px] text-secondary">{detail}</p>
+      <p className="mt-2 text-[13px] font-medium text-primary">
+        Nothing will publish automatically. You will review every image first.
+      </p>
+    </div>
+  );
+}
+
+function readStudioImageStatus(value: unknown): StudioImageStatus | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  if (row.ok !== true) return null;
+  if (!Number.isInteger(row.total) || !Number.isInteger(row.stored)) return null;
+  const total = row.total as number;
+  const stored = row.stored as number;
+  if (total < 0 || stored < 0 || stored > total) return null;
+  if (
+    row.state !== "idle" &&
+    row.state !== "queued" &&
+    row.state !== "running" &&
+    row.state !== "blocked" &&
+    row.state !== "failed"
+  ) return null;
+
+  const rawImages = Array.isArray(row.images)
+    ? row.images
+    : Array.isArray(row.items)
+      ? row.items
+      : [];
+  const images: StudioImage[] = [];
+  for (const value of rawImages) {
+    if (!value || typeof value !== "object") return null;
+    const image = value as Record<string, unknown>;
+    if (
+      typeof image.kind !== "string" ||
+      typeof image.label !== "string" ||
+      typeof image.description !== "string" ||
+      typeof image.status !== "string"
+    ) return null;
+    images.push({
+      kind: image.kind,
+      label: image.label,
+      description: image.description,
+      status: image.status,
+    });
+  }
+
+  const spentCount = row.spentCount === undefined ? 0 : row.spentCount;
+  if (!Number.isInteger(spentCount) || (spentCount as number) < 0 || (spentCount as number) > total) return null;
+  if (
+    typeof row.estimatedCostUsd !== "number" ||
+    !Number.isFinite(row.estimatedCostUsd) ||
+    row.estimatedCostUsd < 0
+  ) return null;
+
+  return {
+    total,
+    stored,
+    done: row.done === true,
+    state: row.state,
+    heroKind: typeof row.heroKind === "string" && row.heroKind ? row.heroKind : null,
+    model: typeof row.model === "string" && row.model ? row.model : null,
+    images,
+    reviewDigest: typeof row.reviewDigest === "string" && row.reviewDigest ? row.reviewDigest : null,
+    spentCount: spentCount as number,
+    estimatedCostUsd: row.estimatedCostUsd,
+  };
+}
+
+function formatUsd(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
