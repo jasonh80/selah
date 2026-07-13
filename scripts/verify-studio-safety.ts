@@ -269,6 +269,7 @@ import {
   __setJobStoreForTesting,
   TEXT_JOB_KEY,
   TEXT_JOB_STATE_KEY,
+  TEXT_JOB_MANIFEST_DIGEST_KEY,
   IMAGE_JOB_KEY,
 } from "../lib/server/generation-jobs";
 import { isChapterMutationError, __setRowLookupForTesting } from "../lib/server/protected-chapters";
@@ -334,6 +335,8 @@ class FakeJobStore implements JobStorePort {
 
 const META = { book: "Mark", chapter: 8, title: "Mark 8" };
 const WORKUP = { slug: "mark-8", title: "Mark 8" } as unknown as ChapterWorkup;
+const MANIFEST_DIGEST_A = "a".repeat(64);
+const MANIFEST_DIGEST_B = "b".repeat(64);
 
 async function expectCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
   try {
@@ -398,6 +401,183 @@ const integration = async () => {
     const store = new FakeJobStore();
     const jobId = await claimGenerationJob(store, "mark-8", META);
     await expectCode(() => completeGenerationJob(store, "mark-8", jobId, { workup: WORKUP }), "CONFLICT", "I1c unconsumed job cannot complete");
+  }
+
+  // I1d. An approved manifest is stored once and required at every worker step.
+  {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
+    ok(
+      store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === MANIFEST_DIGEST_A,
+      "I1d claim stores the approved manifest digest",
+    );
+    await expectCode(
+      () => consumeGenerationClaim(store, "mark-8", jobId),
+      "CONFLICT",
+      "I1d bound claim cannot be consumed with the digest omitted",
+    );
+    await expectCode(
+      () => consumeGenerationClaim(store, "mark-8", jobId, MANIFEST_DIGEST_B),
+      "CONFLICT",
+      "I1d bound claim cannot be consumed with a different digest",
+    );
+    await expectCode(
+      () => consumeGenerationClaim(store, "mark-8", jobId, MANIFEST_DIGEST_A.toUpperCase()),
+      "REFUSED",
+      "I1d uppercase digest is invalid",
+    );
+    await consumeGenerationClaim(store, "mark-8", jobId, MANIFEST_DIGEST_A);
+    await expectCode(
+      () => completeGenerationJob(store, "mark-8", jobId, { workup: WORKUP }),
+      "CONFLICT",
+      "I1d bound job cannot complete with the digest omitted",
+    );
+    await expectCode(
+      () => completeGenerationJob(store, "mark-8", jobId, { workup: WORKUP }, MANIFEST_DIGEST_B),
+      "CONFLICT",
+      "I1d bound job cannot complete with a different digest",
+    );
+    await completeGenerationJob(store, "mark-8", jobId, { workup: WORKUP }, MANIFEST_DIGEST_A);
+    ok(store.rows.get("mark-8")!.status === "draft", "I1d exact manifest-bound job completes");
+  }
+
+  // I1e. Terminal failure is digest-bound too, including retries/cross-run use.
+  {
+    const store = new FakeJobStore();
+    const jobA = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
+    ok(
+      (await failGenerationJob(store, "mark-8", jobA, "trigger failed")) === "conflict",
+      "I1e bound failure refuses an omitted digest",
+    );
+    ok(
+      (await failGenerationJob(store, "mark-8", jobA, "trigger failed", MANIFEST_DIGEST_B)) === "conflict",
+      "I1e bound failure refuses a mismatched digest",
+    );
+    ok(
+      (await failGenerationJob(store, "mark-8", jobA, "trigger failed", MANIFEST_DIGEST_A)) === "marked_failed",
+      "I1e bound failure accepts the exact digest",
+    );
+
+    const jobB = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      approvedManifestDigest: MANIFEST_DIGEST_B,
+    });
+    ok(
+      store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === MANIFEST_DIGEST_B,
+      "I1e retry replaces the old run's digest",
+    );
+    await expectCode(
+      () => consumeGenerationClaim(store, "mark-8", jobB, MANIFEST_DIGEST_A),
+      "CONFLICT",
+      "I1e run B cannot consume using run A's digest",
+    );
+    await expectCode(
+      () => consumeGenerationClaim(store, "mark-8", jobA, MANIFEST_DIGEST_A),
+      "CONFLICT",
+      "I1e run A cannot cross into run B",
+    );
+    await consumeGenerationClaim(store, "mark-8", jobB, MANIFEST_DIGEST_B);
+    await completeGenerationJob(store, "mark-8", jobB, { workup: WORKUP }, MANIFEST_DIGEST_B);
+    ok(store.rows.get("mark-8")!.status === "draft", "I1e run B completes with its own digest");
+  }
+
+  // I1f. Generic jobs retain their original API and do not inherit a prior binding.
+  {
+    const store = new FakeJobStore();
+    const boundJob = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
+    await failGenerationJob(store, "mark-8", boundJob, "retry", MANIFEST_DIGEST_A);
+    const genericJob = await claimGenerationJob(store, "mark-8", META);
+    ok(
+      store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === undefined,
+      "I1f generic retry clears the prior run's manifest binding",
+    );
+    await expectCode(
+      () => consumeGenerationClaim(store, "mark-8", genericJob, MANIFEST_DIGEST_A),
+      "CONFLICT",
+      "I1f generic claim cannot be upgraded with a digest after claim",
+    );
+    await consumeGenerationClaim(store, "mark-8", genericJob);
+    await completeGenerationJob(store, "mark-8", genericJob, { workup: WORKUP });
+    ok(store.rows.get("mark-8")!.status === "draft", "I1f generic lifecycle remains unchanged");
+  }
+
+  // I1g. Digest predicates close consume and terminal read/write races.
+  {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
+    const originalUpdate = store.update.bind(store);
+    store.update = async (slug, predicates, next) => {
+      if ((predicates.json ?? []).some((p) => p.key === TEXT_JOB_STATE_KEY && p.equals === "queued")) {
+        store.rows.get(slug)!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] = MANIFEST_DIGEST_B;
+      }
+      return originalUpdate(slug, predicates, next);
+    };
+    await expectCode(
+      () => consumeGenerationClaim(store, "mark-8", jobId, MANIFEST_DIGEST_A),
+      "CONFLICT",
+      "I1g consume refuses a digest swap during its write",
+    );
+  }
+  {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
+    await consumeGenerationClaim(store, "mark-8", jobId, MANIFEST_DIGEST_A);
+    const originalUpdate = store.update.bind(store);
+    store.update = async (slug, predicates, next) => {
+      if ((predicates.json ?? []).some((p) => p.key === TEXT_JOB_STATE_KEY && p.equals === "running")) {
+        store.rows.get(slug)!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] = MANIFEST_DIGEST_B;
+      }
+      return originalUpdate(slug, predicates, next);
+    };
+    await expectCode(
+      () => completeGenerationJob(store, "mark-8", jobId, { workup: WORKUP }, MANIFEST_DIGEST_A),
+      "CONFLICT",
+      "I1g completion refuses a digest swap during its write",
+    );
+    ok(store.rows.get("mark-8")!.status === "generating", "I1g failed terminal assertion leaves the draft unapplied");
+  }
+  {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
+    const originalUpdate = store.update.bind(store);
+    store.update = async (slug, predicates, next) => {
+      store.rows.get(slug)!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] = MANIFEST_DIGEST_B;
+      return originalUpdate(slug, predicates, next);
+    };
+    ok(
+      (await failGenerationJob(store, "mark-8", jobId, "boom", MANIFEST_DIGEST_A)) === "conflict",
+      "I1g failure refuses a digest swap during its terminal write",
+    );
+    ok(store.rows.get("mark-8")!.status === "generating", "I1g conflicted failure cannot change job status");
+  }
+
+  // I1h. Invalid digests never create a claim.
+  {
+    const store = new FakeJobStore();
+    await expectCode(
+      () => claimGenerationJob(store, "mark-8", { ...META, approvedManifestDigest: "abc" }),
+      "REFUSED",
+      "I1h malformed approved manifest digest refused",
+    );
+    ok(!store.rows.has("mark-8"), "I1h malformed digest causes no row mutation");
   }
 
   // I2. Duplicate request while a run is live: second claim refused.

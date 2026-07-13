@@ -24,8 +24,11 @@ import {
 
 export const TEXT_JOB_KEY = "generationJobId";
 export const TEXT_JOB_STATE_KEY = "generationJobState";
+export const TEXT_JOB_MANIFEST_DIGEST_KEY = "generationApprovedManifestDigest";
 export const IMAGE_JOB_KEY = "imageJobId";
 export const IMAGE_JOB_STATE_KEY = "imageJobState";
+
+const LOWERCASE_SHA256 = /^[0-9a-f]{64}$/;
 
 export interface JobRow {
   status: string;
@@ -142,9 +145,58 @@ export interface ClaimMeta {
   title: string;
   source?: string;
   bibleVersion?: string;
+  /** Optional owner-approved manifest bound to this one text job. */
+  approvedManifestDigest?: string;
 }
 
 // ---------------- text jobs ----------------
+
+function validateApprovedManifestDigest(
+  digest: string | undefined,
+  action: string,
+  slug: string,
+): string | undefined {
+  if (digest === undefined) return undefined;
+  if (!LOWERCASE_SHA256.test(digest)) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      action,
+      slug,
+      "approved manifest digest must be a lowercase SHA-256 digest",
+    );
+  }
+  return digest;
+}
+
+/**
+ * Require the caller's optional digest to exactly match the claim. A bound
+ * claim cannot be consumed or finished by omitting its digest, and a generic
+ * claim cannot be upgraded into a manifest-bound run after it was claimed.
+ * The returned predicate closes the read/write race for bound claims.
+ */
+function manifestBindingPredicates(
+  row: JobRow,
+  approvedManifestDigest: string | undefined,
+  action: string,
+  slug: string,
+): { key: string; equals: string }[] {
+  const expected = validateApprovedManifestDigest(approvedManifestDigest, action, slug);
+  const stored = row.workupJson?.[TEXT_JOB_MANIFEST_DIGEST_KEY];
+  const storedDigest = typeof stored === "string" ? stored : undefined;
+
+  if (storedDigest !== expected || (stored !== undefined && storedDigest === undefined)) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      action,
+      slug,
+      "approved manifest digest does not match this text-job claim",
+    );
+  }
+
+  return expected === undefined
+    ? []
+    : [{ key: TEXT_JOB_MANIFEST_DIGEST_KEY, equals: expected }];
+}
 
 /**
  * Atomic single claim for TEXT generation (route-side; the worker consumes,
@@ -157,6 +209,11 @@ export async function claimGenerationJob(
   slug: string,
   meta: ClaimMeta,
 ): Promise<string> {
+  const approvedManifestDigest = validateApprovedManifestDigest(
+    meta.approvedManifestDigest,
+    "claimGenerationJob",
+    slug,
+  );
   const row = await store.read(slug);
   const decision = decideMutation("createGeneratingChapterWorkup", slug, toLookup(row));
   if (!decision.allowed) throw new ChapterMutationError("REFUSED", "claimGenerationJob", slug, decision.reason);
@@ -180,7 +237,13 @@ export async function claimGenerationJob(
       subtitle: null,
       source: meta.source ?? "generated",
       bible_version: meta.bibleVersion ?? null,
-      workup_json: { [TEXT_JOB_KEY]: jobId, [TEXT_JOB_STATE_KEY]: "queued" },
+      workup_json: {
+        [TEXT_JOB_KEY]: jobId,
+        [TEXT_JOB_STATE_KEY]: "queued",
+        ...(approvedManifestDigest === undefined
+          ? {}
+          : { [TEXT_JOB_MANIFEST_DIGEST_KEY]: approvedManifestDigest }),
+      },
     });
     if (inserted === "duplicate") {
       throw new ChapterMutationError("CONFLICT", "claimGenerationJob", slug, "another claim won the insert race");
@@ -193,10 +256,22 @@ export async function claimGenerationJob(
 
   // Existing draft/failed row: preserve its content, stamp the claim.
   const existingJson = (row && !("error" in row) && row.workupJson) || {};
+  const claimedJson: Record<string, unknown> = {
+    ...existingJson,
+    [TEXT_JOB_KEY]: jobId,
+    [TEXT_JOB_STATE_KEY]: "queued",
+  };
+  // A retry is a new run. It may bind a new approved manifest or return to the
+  // unchanged generic lifecycle, but it must never inherit an older digest.
+  if (approvedManifestDigest === undefined) {
+    delete claimedJson[TEXT_JOB_MANIFEST_DIGEST_KEY];
+  } else {
+    claimedJson[TEXT_JOB_MANIFEST_DIGEST_KEY] = approvedManifestDigest;
+  }
   const changed = await store.update(
     slug,
     { status: decision.expected.status, updatedAt: decision.expected.updatedAt },
-    { ...base, workup_json: { ...existingJson, [TEXT_JOB_KEY]: jobId, [TEXT_JOB_STATE_KEY]: "queued" } },
+    { ...base, workup_json: claimedJson },
   );
   if (typeof changed === "object") throw new ChapterMutationError("WRITE_FAILED", "claimGenerationJob", slug, changed.error);
   if (changed !== 1) {
@@ -212,12 +287,23 @@ export async function claimGenerationJob(
  * holding the same valid token — loses here with zero rows changed, BEFORE
  * any paid model call. Protected slugs and null revisions are refused.
  */
-export async function consumeGenerationClaim(store: JobStorePort, slug: string, jobId: string): Promise<void> {
+export async function consumeGenerationClaim(
+  store: JobStorePort,
+  slug: string,
+  jobId: string,
+  approvedManifestDigest?: string,
+): Promise<void> {
   if (!jobId) throw new ChapterMutationError("REFUSED", "consumeGenerationClaim", slug, "missing job id");
   const row = await readRowForTerminalWrite(store, slug, "consumeGenerationClaim");
   if (row.status !== "generating" || row.workupJson?.[TEXT_JOB_KEY] !== jobId) {
     throw new ChapterMutationError("CONFLICT", "consumeGenerationClaim", slug, "claim is not owned by this worker");
   }
+  const manifestPredicates = manifestBindingPredicates(
+    row,
+    approvedManifestDigest,
+    "consumeGenerationClaim",
+    slug,
+  );
   const changed = await store.update(
     slug,
     {
@@ -226,6 +312,7 @@ export async function consumeGenerationClaim(store: JobStorePort, slug: string, 
       json: [
         { key: TEXT_JOB_KEY, equals: jobId },
         { key: TEXT_JOB_STATE_KEY, equals: "queued" },
+        ...manifestPredicates,
       ],
     },
     {
@@ -248,8 +335,15 @@ export async function completeGenerationJob(
   slug: string,
   jobId: string,
   result: { workup: ChapterWorkup; version?: string; bibleVersion?: string },
+  approvedManifestDigest?: string,
 ): Promise<void> {
   const row = await readRowForTerminalWrite(store, slug, "completeGenerationJob");
+  const manifestPredicates = manifestBindingPredicates(
+    row,
+    approvedManifestDigest,
+    "completeGenerationJob",
+    slug,
+  );
   const changed = await store.update(
     slug,
     {
@@ -258,6 +352,7 @@ export async function completeGenerationJob(
       json: [
         { key: TEXT_JOB_KEY, equals: jobId },
         { key: TEXT_JOB_STATE_KEY, equals: "running" },
+        ...manifestPredicates,
       ],
     },
     {
@@ -290,6 +385,7 @@ export async function failGenerationJob(
   slug: string,
   jobId: string,
   message: string,
+  approvedManifestDigest?: string,
 ): Promise<FailJobOutcome> {
   let row: JobRow;
   try {
@@ -300,9 +396,25 @@ export async function failGenerationJob(
     return conflictLike ? "conflict" : "write_failed";
   }
   if (row.status !== "generating" || row.workupJson?.[TEXT_JOB_KEY] !== jobId) return "conflict";
+  let manifestPredicates: { key: string; equals: string }[];
+  try {
+    manifestPredicates = manifestBindingPredicates(
+      row,
+      approvedManifestDigest,
+      "failGenerationJob",
+      slug,
+    );
+  } catch (e) {
+    console.error(`[selah] failGenerationJob(${slug}): ${(e as Error).message}`);
+    return "conflict";
+  }
   const changed = await store.update(
     slug,
-    { status: "generating", updatedAt: row.updatedAt, json: [{ key: TEXT_JOB_KEY, equals: jobId }] },
+    {
+      status: "generating",
+      updatedAt: row.updatedAt,
+      json: [{ key: TEXT_JOB_KEY, equals: jobId }, ...manifestPredicates],
+    },
     { status: "failed", generation_error: message.slice(0, 300), updated_at: new Date().toISOString() },
   );
   if (typeof changed === "object") {
