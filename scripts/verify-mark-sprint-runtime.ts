@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import guidanceArtifact from "../lib/server/mark-sprint-guidance.v1.json";
 import {
+  prepareMarkSprintRuntime,
   prepareMarkSprintRuntimePreview,
+  withMarkSprintRuntimeApprovedPreparation,
+  type MarkSprintRuntimeApprovedPreparation,
   type MarkSprintLiveBrainRuleRow,
   type MarkSprintLiveChapterNoteRow,
   type MarkSprintLiveVoiceExampleRow,
@@ -24,22 +27,22 @@ const EXAMPLE_CONTENT =
 const policy = buildMarkSprintManifestPolicy(SLUG);
 
 const brainRows: MarkSprintLiveBrainRuleRow[] = SEED_RULES.map((seed) => {
-    return {
-      id: `db-${seed.id}`,
-      rule_id: seed.id,
-      title: seed.title,
-      rule_text: seed.text,
-      category: seed.category,
-      scope: seed.scope,
-      genre: seed.genre ?? null,
-      priority: seed.priority,
-      stages: [...seed.stages],
-      source_titles: [...(seed.sources ?? [])],
-      version: LIBRARY_VERSION,
-      active: seed.active,
-      archived: false,
-    };
-  });
+  return {
+    id: `db-${seed.id}`,
+    rule_id: seed.id,
+    title: seed.title,
+    rule_text: seed.text,
+    category: seed.category,
+    scope: seed.scope,
+    genre: seed.genre ?? null,
+    priority: seed.priority,
+    stages: [...seed.stages],
+    source_titles: [...(seed.sources ?? [])],
+    version: LIBRARY_VERSION,
+    active: seed.active,
+    archived: false,
+  };
+});
 
 const guidanceNotes = guidanceArtifact.chapters[SLUG].notes;
 const noteRows: MarkSprintLiveChapterNoteRow[] = guidanceNotes.map((note) => ({
@@ -236,6 +239,70 @@ async function main(): Promise<void> {
     assert.ok(!serialized.includes(privateValue), `safe preview leaked ${privateValue}`);
   }
 
+  sourceFetchCount = 0;
+  const confirmed = await prepareMarkSprintRuntime({
+    slug: SLUG,
+    apiKey: API_KEY,
+    ports: ports(),
+    fetchImpl: syntheticFetch,
+    approvedManifestDigest: exact.manifestDigest,
+    ownerAuthorized: true,
+  });
+  assert.equal(sourceFetchCount, 3);
+  assert.equal(confirmed.preview.evidenceReady, true);
+  assert.equal(confirmed.preview.readyForGeneration, false);
+  assert.equal(confirmed.prepared, null);
+  assert.deepEqual(
+    confirmed.preview.manifestFindings.map((finding) => finding.code),
+    ["BRAIN_NOT_APPROVED", "GUIDANCE_NOT_APPROVED"],
+    "exact manifest + owner confirmation must still respect review-only artifacts",
+  );
+  assert.deepEqual(
+    confirmed.preview.approvalBlockers.map((blocker) => blocker.code),
+    [
+      "BRAIN_ARTIFACT_APPROVAL_MISSING",
+      "GUIDANCE_APPROVAL_MISSING",
+      "SOURCE_RUNTIME_APPROVAL_MISSING",
+    ],
+  );
+  assert.deepEqual(Object.keys(confirmed), ["preview"]);
+  assert.equal(JSON.stringify(confirmed).includes("prepared"), false);
+  assert.equal(JSON.stringify(confirmed).includes(SOURCE_PHRASE), false);
+
+  const unconfirmed = await prepareMarkSprintRuntime({
+    slug: SLUG,
+    apiKey: API_KEY,
+    ports: ports(),
+    fetchImpl: syntheticFetch,
+    approvedManifestDigest: exact.manifestDigest,
+    ownerAuthorized: false,
+  });
+  assert.equal(unconfirmed.prepared, null);
+  assert.ok(
+    unconfirmed.preview.approvalBlockers.some(
+      (blocker) => blocker.code === "OWNER_RUN_AUTHORIZATION_MISSING",
+    ),
+  );
+
+  sourceFetchCount = 0;
+  const confirmedMismatch = await prepareMarkSprintRuntime({
+    slug: SLUG,
+    apiKey: API_KEY,
+    ports: ports({ brain: brainRows.slice(1) }),
+    fetchImpl: syntheticFetch,
+    approvedManifestDigest: exact.manifestDigest,
+    ownerAuthorized: true,
+  });
+  assert.equal(confirmedMismatch.prepared, null);
+  assert.equal(confirmedMismatch.preview.evidenceReady, false);
+  assert.equal(sourceFetchCount, 0);
+  assert.throws(() =>
+    withMarkSprintRuntimeApprovedPreparation(
+      {} as MarkSprintRuntimeApprovedPreparation,
+      () => null,
+    ),
+  );
+
   const sourceFailure = await prepareMarkSprintRuntimePreview({
     slug: SLUG,
     apiKey: API_KEY,
@@ -254,7 +321,9 @@ async function main(): Promise<void> {
 
   const failureJson = JSON.stringify(await preview(ports({ fail: "notes" })));
   assert.ok(!failureJson.includes("private database detail"));
-  console.log("Mark sprint runtime verification passed (missing/mismatch/exact/source)." );
+  console.log(
+    "Mark sprint runtime verification passed (preview/confirmed/fail-closed).",
+  );
 }
 
 main().catch((error) => {

@@ -7,9 +7,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import guidanceArtifact from "./mark-sprint-guidance.v1.json";
 import {
+  assertGenerationManifestV3PreflightCapability,
+  createGenerationManifestV3PreflightCapability,
   evaluateGenerationManifestV3,
   prepareGenerationModelRequestV3,
+  type GenerationManifestV3PreflightCapability,
   type GenerationManifestV3Requirements,
+  type GenerationManifestV3Result,
+  type GenerationModelRequestV3,
 } from "./generation-manifest-v3";
 import {
   canonicalJson,
@@ -182,13 +187,44 @@ export interface MarkSprintRuntimePreview {
   manifestFindings: readonly ManifestFinding[];
 }
 
-export interface PrepareMarkSprintRuntimeInput {
+export interface PrepareMarkSprintRuntimePreviewInput {
   slug: string;
   apiKey: string;
   ports: MarkSprintRuntimeReadPorts;
   fetchImpl?: FetchLike;
   approvedManifestDigest?: string | null;
 }
+
+/**
+ * Trusted server input set only after the confirmed route authenticates and
+ * owns the single-use generation job. Never map a request-body boolean here.
+ */
+export interface PrepareMarkSprintRuntimeInput
+  extends PrepareMarkSprintRuntimePreviewInput {
+  ownerAuthorized: boolean;
+}
+
+export type MarkSprintRuntimeApprovedPreparation = object & {
+  readonly __markSprintRuntimeApproved: never;
+};
+
+export interface MarkSprintRuntimePreparationResult {
+  readonly preview: MarkSprintRuntimePreview;
+  // Non-enumerable. JSON serialization of this result contains preview only.
+  readonly prepared: MarkSprintRuntimeApprovedPreparation | null;
+}
+
+export interface MarkSprintRuntimeRunnerPreparation {
+  readonly sourceBundle: MarkSprintEsvSourceBundle;
+  readonly modelRequest: GenerationModelRequestV3;
+  readonly manifestResult: GenerationManifestV3Result;
+  readonly preflight: GenerationManifestV3PreflightCapability;
+}
+
+const APPROVED_RUNTIME_PREPARATIONS = new WeakMap<
+  MarkSprintRuntimeApprovedPreparation,
+  MarkSprintRuntimeRunnerPreparation
+>();
 
 interface GuidanceNote {
   id: string;
@@ -229,6 +265,7 @@ function evidenceBlocker(
 function approvalBlockers(
   policy: MarkSprintManifestPolicy,
   findings: readonly ManifestFinding[],
+  ownerAuthorized: boolean,
 ): MarkSprintRuntimeApprovalBlocker[] {
   const blockers: MarkSprintRuntimeApprovalBlocker[] = [];
   const add = (code: MarkSprintRuntimeApprovalBlockerCode, message: string) => {
@@ -274,7 +311,10 @@ function approvalBlockers(
       );
     }
   }
-  if (policyCodes.has("owner_authorization_missing")) {
+  if (
+    policyCodes.has("owner_authorization_missing") &&
+    ownerAuthorized !== true
+  ) {
     add(
       "OWNER_RUN_AUTHORIZATION_MISSING",
       "A later one-use owner authorization is still required.",
@@ -518,6 +558,7 @@ function blockedPreview(
   slug: MarkSprintSlug,
   policy: MarkSprintManifestPolicy,
   evidenceBlockers: MarkSprintRuntimeEvidenceBlocker[],
+  ownerAuthorized: boolean,
 ): MarkSprintRuntimePreview {
   return deepFreeze({
     slug,
@@ -526,18 +567,51 @@ function blockedPreview(
     sourceBundleDigest: null,
     manifestDigest: null,
     evidenceBlockers,
-    approvalBlockers: approvalBlockers(policy, []),
+    approvalBlockers: approvalBlockers(policy, [], ownerAuthorized),
     manifestFindings: [],
   });
 }
 
+function runtimePreparationResult(
+  preview: MarkSprintRuntimePreview,
+  prepared: MarkSprintRuntimeApprovedPreparation | null,
+): MarkSprintRuntimePreparationResult {
+  const result = { preview } as MarkSprintRuntimePreparationResult;
+  Object.defineProperty(result, "prepared", {
+    value: prepared,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+  return Object.freeze(result);
+}
+
 /**
- * Prepare a safe v3 preview from exact live evidence. The frozen model request
- * and private ESV bundle remain local to this call and are never returned.
+ * Give the trusted runner temporary access to exact private preparation.
+ * Forged, cloned, preview-only, and blocked objects fail closed.
  */
-export async function prepareMarkSprintRuntimePreview(
+export function withMarkSprintRuntimeApprovedPreparation<T>(
+  prepared: MarkSprintRuntimeApprovedPreparation,
+  use: (preparation: MarkSprintRuntimeRunnerPreparation) => T,
+): T {
+  const binding = APPROVED_RUNTIME_PREPARATIONS.get(prepared);
+  if (!binding) {
+    throw new Error("Mark sprint runtime preparation is not approved");
+  }
+  assertGenerationManifestV3PreflightCapability(binding.preflight, {
+    sourceBundle: binding.sourceBundle,
+    modelRequest: binding.modelRequest,
+  });
+  return use(binding);
+}
+
+/**
+ * Prepare a safe v3 result from exact live evidence. Private materials are
+ * retained only behind an opaque capability after every approval matches.
+ */
+export async function prepareMarkSprintRuntime(
   input: PrepareMarkSprintRuntimeInput,
-): Promise<MarkSprintRuntimePreview> {
+): Promise<MarkSprintRuntimePreparationResult> {
   if (!isMarkSprintSlug(input.slug)) {
     throw new Error("Mark sprint runtime only accepts Mark 8–11");
   }
@@ -545,7 +619,10 @@ export async function prepareMarkSprintRuntimePreview(
   const policy = buildMarkSprintManifestPolicy(slug);
   const versioned = staticEvidence(policy);
   if (versioned.blockers.length) {
-    return blockedPreview(slug, policy, versioned.blockers);
+    return runtimePreparationResult(
+      blockedPreview(slug, policy, versioned.blockers, input.ownerAuthorized),
+      null,
+    );
   }
 
   const identity: MarkSprintVoiceExampleIdentity = {
@@ -570,7 +647,12 @@ export async function prepareMarkSprintRuntimePreview(
         ]
       : [],
   );
-  if (readBlockers.length) return blockedPreview(slug, policy, readBlockers);
+  if (readBlockers.length) {
+    return runtimePreparationResult(
+      blockedPreview(slug, policy, readBlockers, input.ownerAuthorized),
+      null,
+    );
+  }
 
   const brain = validateLiveBrain(
     (reads[0] as PromiseFulfilledResult<readonly MarkSprintLiveBrainRuleRow[]>).value,
@@ -591,7 +673,10 @@ export async function prepareMarkSprintRuntimePreview(
     ...example.blockers,
   ];
   if (liveBlockers.length || !example.example) {
-    return blockedPreview(slug, policy, liveBlockers);
+    return runtimePreparationResult(
+      blockedPreview(slug, policy, liveBlockers, input.ownerAuthorized),
+      null,
+    );
   }
 
   let bundle: MarkSprintEsvSourceBundle;
@@ -602,13 +687,21 @@ export async function prepareMarkSprintRuntimePreview(
       fetchImpl: input.fetchImpl,
     });
   } catch {
-    return blockedPreview(slug, policy, [
-      evidenceBlocker(
-        "SOURCE_LOAD_FAILED",
-        "source",
-        "The protected ESV bundle could not be assembled.",
+    return runtimePreparationResult(
+      blockedPreview(
+        slug,
+        policy,
+        [
+          evidenceBlocker(
+            "SOURCE_LOAD_FAILED",
+            "source",
+            "The protected ESV bundle could not be assembled.",
+          ),
+        ],
+        input.ownerAuthorized,
       ),
-    ]);
+      null,
+    );
   }
 
   const chapter = Number(slug.split("-")[1]) as 8 | 9 | 10 | 11;
@@ -692,7 +785,11 @@ export async function prepareMarkSprintRuntimePreview(
     sourceBundle: bundle,
     modelRequest,
   });
-  const approvals = approvalBlockers(policy, manifestResult.findings);
+  const approvals = approvalBlockers(
+    policy,
+    manifestResult.findings,
+    input.ownerAuthorized,
+  );
   const nonApprovalManifestFindings = manifestResult.findings.filter(
     (finding) =>
       ![
@@ -709,15 +806,50 @@ export async function prepareMarkSprintRuntimePreview(
       "Prepared v3 evidence does not match its exact requirement.",
     ),
   );
-  return deepFreeze({
+  const readyForGeneration =
+    input.ownerAuthorized === true &&
+    evidenceBlockers.length === 0 &&
+    approvals.length === 0 &&
+    manifestResult.ready;
+  const preview = deepFreeze({
     slug,
     evidenceReady: evidenceBlockers.length === 0,
-    readyForGeneration:
-      evidenceBlockers.length === 0 && approvals.length === 0 && manifestResult.ready,
+    readyForGeneration,
     sourceBundleDigest: bundle.bundleDigest,
     manifestDigest: manifestResult.manifestDigest,
     evidenceBlockers,
     approvalBlockers: approvals,
     manifestFindings: manifestResult.findings.map((finding) => ({ ...finding })),
   });
+  let prepared: MarkSprintRuntimeApprovedPreparation | null = null;
+  if (readyForGeneration) {
+    const preflight = createGenerationManifestV3PreflightCapability(
+      manifestResult,
+      { sourceBundle: bundle, modelRequest },
+    );
+    prepared = Object.freeze(
+      Object.create(null),
+    ) as MarkSprintRuntimeApprovedPreparation;
+    APPROVED_RUNTIME_PREPARATIONS.set(
+      prepared,
+      Object.freeze({
+        sourceBundle: bundle,
+        modelRequest,
+        manifestResult,
+        preflight,
+      }),
+    );
+  }
+  return runtimePreparationResult(preview, prepared);
+}
+
+/** Normal preview can never satisfy trusted owner authorization. */
+export async function prepareMarkSprintRuntimePreview(
+  input: PrepareMarkSprintRuntimePreviewInput,
+): Promise<MarkSprintRuntimePreview> {
+  const result = await prepareMarkSprintRuntime({
+    ...input,
+    ownerAuthorized: false,
+  });
+  return result.preview;
 }
