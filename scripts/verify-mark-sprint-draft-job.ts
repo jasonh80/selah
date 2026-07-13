@@ -34,7 +34,13 @@ import type {
   MarkSprintRuntimePreparationResult,
   MarkSprintRuntimeRunnerPreparation,
 } from "../lib/server/mark-sprint-runtime";
-import type { CostEventInput } from "../lib/server/cost-events-repository";
+import {
+  __setCostCaptureForTesting,
+  __setCostWriteFailureForTesting,
+  recordCostEvent,
+  recordCostEventStrict,
+  type CostEventInput,
+} from "../lib/server/cost-events-repository";
 
 const SLUG = "mark-8" as const;
 const JOB_ID = "offline-mark-8-job";
@@ -50,6 +56,9 @@ class FakeJobStore implements JobStorePort {
   readonly rows = new Map<string, StoredRow>();
   readonly events: string[];
   private tick = 0;
+  updateCalls = 0;
+  consumeFailure: "conflict" | "write_failed" | null = null;
+  cleanupFailure: "conflict" | "write_failed" | null = null;
 
   constructor(events: string[]) {
     this.events = events;
@@ -87,6 +96,7 @@ class FakeJobStore implements JobStorePort {
     predicates: JobPredicates,
     next: Record<string, unknown>,
   ): Promise<number | { error: string }> {
+    this.updateCalls++;
     const row = this.rows.get(slug);
     if (!row || row.status !== predicates.status) return 0;
     if (
@@ -104,12 +114,26 @@ class FakeJobStore implements JobStorePort {
         return 0;
       }
     }
-    if (
+    const isConsume =
       typeof next.workup_json === "object" &&
       next.workup_json !== null &&
       (next.workup_json as Record<string, unknown>)[TEXT_JOB_STATE_KEY] ===
-        "running"
-    ) {
+        "running";
+    if (isConsume && this.consumeFailure) {
+      const failure = this.consumeFailure;
+      this.consumeFailure = null;
+      return failure === "conflict"
+        ? 0
+        : { error: "PRIVATE consume storage detail" };
+    }
+    if (next.status === "failed" && this.cleanupFailure) {
+      const failure = this.cleanupFailure;
+      this.cleanupFailure = null;
+      return failure === "conflict"
+        ? 0
+        : { error: "simulated cleanup write failure" };
+    }
+    if (isConsume) {
       this.events.push("consume");
     }
     if ("status" in next) row.status = String(next.status);
@@ -309,6 +333,40 @@ async function main(): Promise<void> {
     assert.equal(h.store.rows.get(SLUG)?.status, "generating");
   }
 
+  // Consume conflicts never clean up a job another delivery may own.
+  {
+    const h = harness("happy");
+    h.store.consumeFailure = "conflict";
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "CLAIM_NOT_CONSUMED");
+    assert.equal(result.status, "conflict");
+    assert.equal(h.store.updateCalls, 1, "conflict attempted forbidden cleanup");
+    assert.deepEqual(h.events, []);
+    assert.equal(h.modelCalls(), 0);
+    assert.equal(h.store.rows.get(SLUG)?.status, "generating");
+  }
+
+  // A consume storage failure attempts exact-job cleanup and reports its truth.
+  for (const [cleanupFailure, expectedStatus] of [
+    [null, "failed"],
+    ["conflict", "conflict"],
+    ["write_failed", "write_failed"],
+  ] as const) {
+    const h = harness("happy");
+    h.store.consumeFailure = "write_failed";
+    h.store.cleanupFailure = cleanupFailure;
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "CLAIM_CONSUME_WRITE_FAILED");
+    assert.equal(result.status, expectedStatus);
+    assert.equal(h.store.updateCalls, 2);
+    assert.deepEqual(h.events, []);
+    assert.equal(h.modelCalls(), 0);
+    assert.equal(h.costs.length, 0);
+    assert.equal(h.snapshots.length, 0);
+  }
+
   // Every post-consumption failure is terminal, never a draft or snapshot.
   for (const [mode, code, usageKnown] of [
     ["model", "MODEL_EXECUTION_FAILED", false],
@@ -381,6 +439,19 @@ async function main(): Promise<void> {
     }
   }
 
+  // A required cost write failure closes the job; it can never look successful.
+  {
+    const h = harness("happy");
+    h.ports.recordCost = async () => { throw new Error("PRIVATE COST ERROR"); };
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "COST_LOG_FAILED");
+    assert.equal(result.status, "failed");
+    assert.equal(h.modelCalls(), 1);
+    assert.equal(h.store.rows.get(SLUG)?.status, "failed");
+    assert.equal(h.snapshots.length, 0);
+  }
+
   // Audit outages never change the truthful chapter/job outcome.
   {
     const saved = harness("happy");
@@ -400,11 +471,13 @@ async function main(): Promise<void> {
   // Exact OpenAI adapter passes the genuine request object without cloning.
   {
     let received: unknown;
+    let receivedOptions: unknown;
     const executor = createExactOpenAiMarkSprintExecutor({
       chat: {
         completions: {
-          async create(request) {
+          async create(request, options) {
             received = request;
+            receivedOptions = options;
             return {
               choices: [{ message: { content: "{}" } }],
               usage: { prompt_tokens: 7, completion_tokens: 9 },
@@ -415,11 +488,41 @@ async function main(): Promise<void> {
     });
     const execution = await executor.executeExactRequest(modelRequest);
     assert.equal(received, modelRequest);
+    assert.equal(
+      (receivedOptions as { maxRetries?: number }).maxRetries,
+      0,
+      "one protected executor call must make one provider request",
+    );
     assert.deepEqual(execution, {
       rawDraftJson: "{}",
       inputTokens: 7,
       outputTokens: 9,
     });
+  }
+
+
+  // Strict cost persistence throws; existing general callers remain best-effort.
+  {
+    const costInput: CostEventInput = {
+      requestType: "chapter_workup_text",
+      provider: "openai",
+      model: "synthetic-model",
+      inputTokens: 1,
+      outputTokens: 1,
+    };
+    __setCostCaptureForTesting(null);
+    __setCostWriteFailureForTesting("unconfigured");
+    await assert.rejects(() => recordCostEventStrict(costInput));
+    await assert.doesNotReject(() => recordCostEvent(costInput));
+    __setCostWriteFailureForTesting("insert_failed");
+    await assert.rejects(() => recordCostEventStrict(costInput));
+    await assert.doesNotReject(() => recordCostEvent(costInput));
+    const captured: CostEventInput[] = [];
+    __setCostWriteFailureForTesting(null);
+    __setCostCaptureForTesting(captured);
+    await recordCostEventStrict(costInput);
+    assert.equal(captured.length, 1);
+    __setCostCaptureForTesting(null);
   }
 
   console.log(

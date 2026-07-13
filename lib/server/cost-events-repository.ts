@@ -50,18 +50,20 @@ export function __setCostCaptureForTesting(capture: CostEventInput[] | null): vo
   costCapture = capture;
 }
 
-export async function recordCostEvent(input: CostEventInput): Promise<void> {
-  if (costCapture) {
-    costCapture.push({ ...input });
-    return;
-  }
-  const db = getSupabaseAdmin();
-  if (!db) {
-    warnSupabaseMissing("recordCostEvent");
-    return;
-  }
+// Offline-only failure seam for proving the strict protected-worker adapter.
+let costWriteFailureForTesting: "unconfigured" | "insert_failed" | null = null;
+export function __setCostWriteFailureForTesting(
+  failure: "unconfigured" | "insert_failed" | null,
+): void {
+  costWriteFailureForTesting = failure;
+}
 
-  const { error } = await db.from(TABLE).insert({
+type CostWriteOutcome =
+  | { ok: true }
+  | { ok: false; kind: "unconfigured" | "insert_failed"; message?: string };
+
+function rowFor(input: CostEventInput): Record<string, unknown> {
+  return {
     chapter_workup_id: input.chapterWorkupId ?? null,
     user_id: input.userId ?? null,
     request_type: input.requestType,
@@ -76,9 +78,50 @@ export async function recordCostEvent(input: CostEventInput): Promise<void> {
     estimated_cost_usd: input.estimatedCostUsd ?? null,
     actual_cost_usd: input.actualCostUsd ?? null,
     metadata: input.metadata ?? null,
-  });
+  };
+}
 
-  if (error) console.error("[selah] recordCostEvent failed:", error.message);
+async function writeCostEvent(input: CostEventInput): Promise<CostWriteOutcome> {
+  if (costCapture) {
+    costCapture.push({ ...input });
+    return { ok: true };
+  }
+  if (costWriteFailureForTesting) {
+    return { ok: false, kind: costWriteFailureForTesting };
+  }
+  const db = getSupabaseAdmin();
+  if (!db) {
+    return { ok: false, kind: "unconfigured" };
+  }
+
+  const { error } = await db.from(TABLE).insert(rowFor(input));
+  return error
+    ? { ok: false, kind: "insert_failed", message: error.message }
+    : { ok: true };
+}
+
+/** Existing callers remain best-effort and never throw. */
+export async function recordCostEvent(input: CostEventInput): Promise<void> {
+  const outcome = await writeCostEvent(input);
+  if (outcome.ok) return;
+  if (outcome.kind === "unconfigured") {
+    warnSupabaseMissing("recordCostEvent");
+  } else {
+    console.error("[selah] recordCostEvent failed:", outcome.message ?? "write failed");
+  }
+}
+
+/** Protected paid work must prove its cost row was durably accepted. */
+export async function recordCostEventStrict(input: CostEventInput): Promise<void> {
+  const outcome = await writeCostEvent(input);
+  if (!outcome.ok) {
+    // Deliberately omit database/provider detail from the thrown error.
+    throw new Error(
+      outcome.kind === "unconfigured"
+        ? "cost event storage is not configured"
+        : "cost event write failed",
+    );
+  }
 }
 
 export async function listCostEventsForChapter(chapterWorkupId: string): Promise<CostEventRow[]> {

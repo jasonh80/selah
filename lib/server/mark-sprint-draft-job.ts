@@ -6,7 +6,10 @@
 // later owner-reviewed boundary.
 import { estimateChapterWorkupCost } from "@/lib/ai/costs";
 import type { ChapterWorkup } from "@/lib/types";
-import { recordCostEvent, type CostEventInput } from "./cost-events-repository";
+import {
+  recordCostEventStrict,
+  type CostEventInput,
+} from "./cost-events-repository";
 import {
   completeGenerationJob,
   consumeGenerationClaim,
@@ -37,6 +40,7 @@ import {
 } from "./mark-sprint-runtime";
 import { isMarkSprintSlug, type MarkSprintSlug } from "./mark-sprint-manifest-policy";
 import { getOpenAI } from "./openai";
+import { isChapterMutationError } from "./protected-chapters";
 import { getSupabaseAdmin } from "./supabase";
 import { snapshotVersion } from "./chapter-versions-repository";
 
@@ -49,6 +53,7 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 export type ProtectedMarkDraftJobFailureCode =
   | "INVALID_INPUT"
   | "CLAIM_NOT_CONSUMED"
+  | "CLAIM_CONSUME_WRITE_FAILED"
   | "ESV_KEY_MISSING"
   | "RUNTIME_STORAGE_MISSING"
   | "PREPARATION_FAILED"
@@ -123,7 +128,7 @@ interface OpenAIExactClient {
     completions: {
       create(
         body: unknown,
-        options: { signal: AbortSignal },
+        options: { signal: AbortSignal; maxRetries: 0 },
       ): Promise<{
         choices?: Array<{ message?: { content?: string | null } }>;
         usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -145,6 +150,9 @@ export function createExactOpenAiMarkSprintExecutor(
       try {
         const response = await client.chat.completions.create(request, {
           signal: controller.signal,
+          // The exact protected executor owns retries. One execution means one
+          // provider request; a transport retry would risk duplicate spend.
+          maxRetries: 0,
         });
         return {
           rawDraftJson: response.choices?.[0]?.message?.content ?? "",
@@ -316,7 +324,16 @@ export async function runProtectedMarkDraftJob(
       input.jobId,
       input.approvedManifestDigest,
     );
-  } catch {
+  } catch (error) {
+    if (isChapterMutationError(error) && error.code === "WRITE_FAILED") {
+      // The consume write may not have happened. Close only this exact job;
+      // failGenerationJob re-asserts slug, job id, and manifest digest.
+      return await failConsumedJob(
+        ports,
+        input,
+        "CLAIM_CONSUME_WRITE_FAILED",
+      );
+    }
     await auditFailure(
       ports,
       input.slug,
@@ -525,7 +542,7 @@ export async function runConfiguredProtectedMarkDraftJob(
       if (!client) throw new Error("OpenAI unavailable");
       return createExactOpenAiMarkSprintExecutor(client as unknown as OpenAIExactClient);
     },
-    recordCost: recordCostEvent,
+    recordCost: recordCostEventStrict,
     audit: logGenerationAudit,
     snapshot: snapshotVersion,
   };
