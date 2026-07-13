@@ -1,7 +1,7 @@
 // Builds the prompt that asks the model for ONE shared global Selah chapter
 // workup. No API call here — this only assembles the instruction string.
 
-export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v3";
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v4";
 
 export type GenerationSourceSectionRole =
   | "context_before"
@@ -187,10 +187,11 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "keyPeople": [
     { "name": "<name>", "role": "<role>", "description": "<short>" }
   ],
+  "heroKind": "<the type of the most interesting or impactful image below>",
   "generatedImages": [
-    { "type": "establishing", "title": "Establishing Shot", "description": "<the broad world: Where am I?>", "prompt": "<vivid, historically grounded image-generation prompt>", "alt": "<alt text>", "caption": "<caption>", "status": "placeholder" },
-    { "type": "detail", "title": "Detail Shot", "description": "<an object/ritual a modern reader may not understand: What am I looking at?>", "prompt": "<vivid prompt>", "alt": "<alt>", "caption": "<caption>", "status": "placeholder" },
-    { "type": "human", "title": "Human Moment", "description": "<a character/emotional moment: What did this feel like?>", "prompt": "<vivid prompt>", "alt": "<alt>", "caption": "<caption>", "status": "placeholder" }
+    { "type": "<chapter-specific-kebab-id>", "title": "<scene title>", "description": "<why this scene helps a reader understand this chapter>", "prompt": "<vivid, historically grounded image-generation prompt>", "alt": "<specific accessible alt text>", "caption": "<specific caption>", "status": "placeholder" },
+    { "type": "<different-chapter-specific-kebab-id>", "title": "<scene title>", "description": "<why this distinct scene matters>", "prompt": "<vivid, historically grounded prompt>", "alt": "<specific accessible alt text>", "caption": "<specific caption>", "status": "placeholder" },
+    { "type": "<third-chapter-specific-kebab-id>", "title": "<scene title>", "description": "<why this distinct scene matters>", "prompt": "<vivid, historically grounded prompt>", "alt": "<specific accessible alt text>", "caption": "<specific caption>", "status": "placeholder" }
   ],
   "verseByVerse": [
     { "startVerse": 1, "endVerse": 6, "rangeLabel": "1–6", "title": "<short>", "explanation": "<brief, no quoted verse text>" }
@@ -215,7 +216,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     { "id": "theology", "title": "Theology Principle", "type": "theology", "priority": 6, "isCore": true, "cardSummary": "<short>", "fullContent": "<the principle, started simple>" },
     { "id": "application", "title": "Live It", "type": "application", "priority": 7, "isCore": true, "cardSummary": "<short>", "fullContent": "<practical, invitational, no moralism>" },
     { "id": "prayer", "title": "Prayer", "type": "prayer", "priority": 8, "isCore": true, "cardSummary": "<short>", "fullContent": "<a fuller prayer>" },
-    { "id": "image-plan", "title": "Image Plan", "type": "image_plan", "priority": 20, "isCore": false, "cardSummary": "<short>", "fullContent": "<describe the 3 images: establishing, detail, human>" }
+    { "id": "image-plan", "title": "Image Plan", "type": "image_plan", "priority": 20, "isCore": false, "cardSummary": "<short>", "fullContent": "<describe why these 3 or 5 chapter-specific images reveal this chapter>" }
   ],
   "biblicalTimeline": {
     "era": "<one of: Creation/Adam & Eve, Patriarchs, Exodus & Wilderness, David/Kingdom, Exile, Life of Jesus, Early Church, Today>",
@@ -302,8 +303,19 @@ PASSAGE FLOW & QUESTIONS
   promise an automatic outcome, blame suffering, or use an answer to bypass
   safety, medical care, justice, or wise pastoral care.
 
+IMAGE PLAN
+- Choose exactly 3 images for a focused chapter or exactly 5 when the chapter's
+  narrative breadth genuinely needs five distinct moments. Selah chooses from
+  THIS chapter; do not fill generic establishing/detail/human buckets.
+- Every generatedImages.type is a unique, descriptive, lowercase kebab-case ID
+  (letters and numbers joined by single hyphens), such as a concise scene name.
+  Each image needs a chapter-specific title, description, historically grounded
+  prompt, useful alt text, caption, and status "placeholder". Do not include imageUrl.
+- Set heroKind to the exact type of the most interesting or impactful moment in
+  the chapter. Choose it for meaning and reader impact—not because it is the
+  first image or a conventional establishing shot.
+
 RULES
-- "generatedImages" MUST have exactly 3 entries in this order: establishing, detail, human, each with status "placeholder".
 - "primaryCharacters" is an array of strings; "keyObjects", "keyPeople", "sections", "chapterSpecificTopics" are arrays of OBJECTS.
 - Provide 2-4 items for timeline.items and each goDeeper group; 2-6 keyObjects
   and keyPeople; 3-7 chapterSpecificTopics; 5-8 whatPeopleAsk items. Passage-flow

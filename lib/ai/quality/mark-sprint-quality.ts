@@ -65,6 +65,13 @@ function isPlaceholder(value: string): boolean {
   );
 }
 
+const SAFE_IMAGE_KIND = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const LEGACY_GENERIC_IMAGE_KINDS = new Set([
+  "establishing",
+  "detail",
+  "human",
+]);
+
 function canonicalRangeLabel(startVerse: number, endVerse: number): string {
   return startVerse === endVerse
     ? String(startVerse)
@@ -659,10 +666,37 @@ export function evaluateMarkSprintDraft(
       });
     }
 
-    const expectedImageTypes = ["establishing", "detail", "human"] as const;
+    const imageKinds = workup.generatedImages.map((image) => image.type);
+    const imageKindSet = new Set(imageKinds);
+    if (
+      (imageKinds.length !== 3 && imageKinds.length !== 5) ||
+      imageKindSet.size !== imageKinds.length
+    ) {
+      add(
+        "STR-008 IMAGE_CONCEPT_CONTRACT_INVALID",
+        "A new Mark draft needs exactly 3 or 5 images with unique kinds.",
+        ["workup:/generatedImages"],
+        "3 or 5 unique image kinds",
+        imageKinds,
+      );
+    }
+    if (
+      !workup.heroKind ||
+      !SAFE_IMAGE_KIND.test(workup.heroKind) ||
+      !imageKindSet.has(workup.heroKind)
+    ) {
+      add(
+        "STR-008 IMAGE_CONCEPT_CONTRACT_INVALID",
+        "heroKind must name one chapter-selected image as the chapter's most meaningful visual moment.",
+        ["workup:/heroKind", "workup:/generatedImages"],
+        imageKinds,
+        workup.heroKind,
+      );
+    }
     workup.generatedImages.forEach((image, index) => {
       if (
-        image.type !== expectedImageTypes[index] ||
+        !SAFE_IMAGE_KIND.test(image.type) ||
+        LEGACY_GENERIC_IMAGE_KINDS.has(image.type) ||
         image.status !== "placeholder" ||
         image.imageUrl !== undefined ||
         image.title.trim().length < 4 ||
@@ -678,7 +712,7 @@ export function evaluateMarkSprintDraft(
       ) {
         add(
           "STR-008 IMAGE_CONCEPT_CONTRACT_INVALID",
-          "Pre-generation image concepts need the exact ordered type, substantive fields, no URL, and placeholder status.",
+          "Each new image needs a unique chapter-specific kebab ID, substantive fields, no URL, and placeholder status.",
           [`workup:/generatedImages/${index}`],
         );
       }

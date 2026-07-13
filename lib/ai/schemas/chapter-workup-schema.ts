@@ -11,8 +11,19 @@ import { z } from "zod";
  * lib/personalization/types.ts.
  */
 
+export const GeneratedImageKindSchema = z
+  .string()
+  .min(3)
+  .max(48)
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Image kind must be a lowercase kebab-case ID",
+  );
+
 export const GeneratedImageSchema = z.object({
-  type: z.enum(["establishing", "detail", "human"]),
+  // `type` is the stored image-kind ID. The field name stays unchanged so
+  // legacy establishing/detail/human workups remain readable.
+  type: GeneratedImageKindSchema,
   title: z.string(),
   description: z.string(),
   prompt: z.string(),
@@ -25,17 +36,21 @@ export type GeneratedImage = z.infer<typeof GeneratedImageSchema>;
 
 const GeneratedImagesSchema = z
   .array(GeneratedImageSchema)
-  .length(3, "Exactly 3 images: establishing, detail, human")
+  .refine((images) => images.length === 3 || images.length === 5, {
+    message: "Choose exactly 3 or 5 chapter-specific images",
+  })
   .superRefine((images, ctx) => {
-    const expected = ["establishing", "detail", "human"] as const;
-    const types = images.map((image) => image.type);
-    expected.forEach((type) => {
-      if (types.filter((candidate) => candidate === type).length !== 1) {
+    const firstIndexByType = new Map<string, number>();
+    images.forEach((image, index) => {
+      const firstIndex = firstIndexByType.get(image.type);
+      if (firstIndex !== undefined) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["type"],
-          message: `Images must contain exactly one ${type}`,
+          path: [index, "type"],
+          message: `Image kinds must be unique; ${image.type} also appears at index ${firstIndex}`,
         });
+      } else {
+        firstIndexByType.set(image.type, index);
       }
     });
   });
@@ -249,7 +264,8 @@ const CostSchema = z
   })
   .optional();
 
-export const GeneratedChapterWorkupSchema = z.object({
+export const GeneratedChapterWorkupSchema = z
+  .object({
   // identity + record
   book: z.string(),
   chapter: z.number().int().positive(),
@@ -285,6 +301,9 @@ export const GeneratedChapterWorkupSchema = z.object({
   maps: z.object({ modern: MapSchema, historic: MapSchema }),
   keyObjects: z.array(KeyObjectSchema),
   keyPeople: z.array(KeyPersonSchema),
+  // Optional only so workups created before chapter-selected heroes still
+  // parse. New Mark drafts must provide it through the quality gate.
+  heroKind: GeneratedImageKindSchema.optional(),
   generatedImages: GeneratedImagesSchema,
   verseByVerse: z.array(VerseByVerseSchema),
   // Optional only for legacy fixtures. The generation-only quality gate requires
@@ -303,7 +322,19 @@ export const GeneratedChapterWorkupSchema = z.object({
   // metadata placeholders
   bibleText: BibleTextSchema,
   cost: CostSchema,
-});
+  })
+  .superRefine((workup, ctx) => {
+    if (
+      workup.heroKind !== undefined &&
+      !workup.generatedImages.some((image) => image.type === workup.heroKind)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["heroKind"],
+        message: "heroKind must match one generatedImages type",
+      });
+    }
+  });
 
 export type GeneratedChapterWorkup = z.infer<typeof GeneratedChapterWorkupSchema>;
 

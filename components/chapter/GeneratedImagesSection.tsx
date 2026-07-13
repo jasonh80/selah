@@ -1,13 +1,12 @@
 import type { ChapterWorkup, ChapterImage } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
 import { getImageTitle } from "@/lib/content/chapter-content";
-import { heroImageFor } from "@/components/chapter/HeroImage";
+import { supportingImagesFor } from "@/components/chapter/HeroImage";
 
 export function GeneratedImagesSection({ data }: { data: ChapterWorkup }) {
-  // The hero already shows one image (establishing, or the first of a
-  // chapter-driven set) — this grid carries the remaining scenes (2 or 4).
-  const heroKind = heroImageFor(data)?.kind;
-  const rest = data.images.filter((i) => i.kind !== heroKind);
+  // The chapter-selected hero is shown above; this grid carries the remaining
+  // two or four scenes. Legacy chapters use their prior hero fallback.
+  const rest = supportingImagesFor(data);
   if (rest.length === 0) return null;
 
   return (

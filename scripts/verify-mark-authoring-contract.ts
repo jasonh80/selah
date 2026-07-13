@@ -12,6 +12,10 @@ import {
 } from "../lib/ai/schemas/chapter-workup-schema";
 import { generatedToRenderWorkup } from "../lib/ai/adapters/generated-to-workup";
 import {
+  heroImageFor,
+  supportingImagesFor,
+} from "../components/chapter/HeroImage";
+import {
   evaluateMarkSprintDraft,
   getMarkSprintChapterContract,
 } from "../lib/ai/quality/mark-sprint-quality";
@@ -44,6 +48,11 @@ export function passingDraft(slug: string): GeneratedChapterWorkup {
     "application",
     "prayer",
   ];
+  const imageKinds = [
+    `mark-${chapter}-opening-pressure`,
+    `mark-${chapter}-turning-point`,
+    `mark-${chapter}-human-response`,
+  ] as const;
 
   return {
     ...legacyFixture,
@@ -147,9 +156,10 @@ export function passingDraft(slug: string): GeneratedChapterWorkup {
         description: "A second preserved description.",
       },
     ],
+    heroKind: imageKinds[1],
     generatedImages: [
       {
-        type: "establishing",
+        type: imageKinds[0],
         title: "Synthetic establishing concept",
         description: prose(
           `${slug} establishing description`,
@@ -164,7 +174,7 @@ export function passingDraft(slug: string): GeneratedChapterWorkup {
         status: "placeholder",
       },
       {
-        type: "detail",
+        type: imageKinds[1],
         title: "Synthetic detail concept",
         description: prose(
           `${slug} detail description`,
@@ -179,7 +189,7 @@ export function passingDraft(slug: string): GeneratedChapterWorkup {
         status: "placeholder",
       },
       {
-        type: "human",
+        type: imageKinds[2],
         title: "Synthetic human concept",
         description: prose(
           `${slug} human description`,
@@ -458,13 +468,107 @@ const duplicateImageKinds = {
   ...base,
   generatedImages: base.generatedImages.map((image) => ({
     ...image,
-    type: "establishing" as const,
+    type: base.generatedImages[0].type,
   })),
 };
 assert.throws(
   () => parseChapterWorkupJson(JSON.stringify(duplicateImageKinds)),
-  /exactly one detail/,
+  /Image kinds must be unique/,
 );
+
+const unsafeImageKind = {
+  ...base,
+  generatedImages: [
+    { ...base.generatedImages[0], type: "Walking Water" },
+    ...base.generatedImages.slice(1),
+  ],
+};
+assert.throws(
+  () => parseChapterWorkupJson(JSON.stringify(unsafeImageKind)),
+  /lowercase kebab-case ID/,
+);
+
+const fourImagePlan = {
+  ...base,
+  generatedImages: [
+    ...base.generatedImages,
+    { ...base.generatedImages[0], type: "mark-8-fourth-scene" },
+  ],
+};
+assert.throws(
+  () => parseChapterWorkupJson(JSON.stringify(fourImagePlan)),
+  /exactly 3 or 5 chapter-specific images/,
+);
+
+const missingHeroKind = { ...base, heroKind: undefined };
+assert.ok(
+  hasCode(
+    evaluateMarkSprintDraft(
+      parseChapterWorkupJson(JSON.stringify(missingHeroKind)),
+      "mark-8",
+    ),
+    "STR-008 IMAGE_CONCEPT_CONTRACT_INVALID",
+  ),
+);
+
+const unmatchedHeroKind = { ...base, heroKind: "mark-8-missing-scene" };
+assert.throws(
+  () => parseChapterWorkupJson(JSON.stringify(unmatchedHeroKind)),
+  /heroKind must match one generatedImages type/,
+);
+
+const genericLegacyKinds = {
+  ...base,
+  heroKind: "detail",
+  generatedImages: base.generatedImages.map((image, index) => ({
+    ...image,
+    type: ["establishing", "detail", "human"][index],
+  })),
+};
+assert.ok(
+  hasCode(
+    evaluateMarkSprintDraft(
+      parseChapterWorkupJson(JSON.stringify(genericLegacyKinds)),
+      "mark-8",
+    ),
+    "STR-008 IMAGE_CONCEPT_CONTRACT_INVALID",
+  ),
+  "new Mark drafts cannot fall back to the generic legacy buckets",
+);
+
+const fiveImagePlan = {
+  ...base,
+  heroKind: "mark-8-chapter-climax",
+  generatedImages: [
+    ...base.generatedImages,
+    {
+      ...base.generatedImages[0],
+      type: "mark-8-crowd-response",
+      title: "Synthetic crowd response concept",
+    },
+    {
+      ...base.generatedImages[1],
+      type: "mark-8-chapter-climax",
+      title: "Synthetic chapter climax concept",
+    },
+  ],
+};
+const parsedFiveImagePlan = parseChapterWorkupJson(
+  JSON.stringify(fiveImagePlan),
+);
+assert.equal(
+  evaluateMarkSprintDraft(parsedFiveImagePlan, "mark-8").machineVerdict,
+  "pass",
+);
+const renderedFiveImagePlan = generatedToRenderWorkup(parsedFiveImagePlan);
+assert.equal(heroImageFor(renderedFiveImagePlan)?.kind, fiveImagePlan.heroKind);
+assert.deepEqual(
+  supportingImagesFor(renderedFiveImagePlan).map((image) => image.kind),
+  fiveImagePlan.generatedImages
+    .map((image) => image.type)
+    .filter((kind) => kind !== fiveImagePlan.heroKind),
+);
+assert.ok((renderedFiveImagePlan.images[0].description?.length ?? 0) > 30);
 
 const swappedImageOrder = {
   ...base,
@@ -477,14 +581,28 @@ const swappedImageOrder = {
 const parsedSwappedImages = parseChapterWorkupJson(
   JSON.stringify(swappedImageOrder),
 );
-assert.ok(
-  hasCode(
-    evaluateMarkSprintDraft(parsedSwappedImages, "mark-8"),
-    "STR-008 IMAGE_CONCEPT_CONTRACT_INVALID",
-  ),
+assert.equal(
+  evaluateMarkSprintDraft(parsedSwappedImages, "mark-8").machineVerdict,
+  "pass",
 );
 assert.deepEqual(
   generatedToRenderWorkup(parsedSwappedImages).images.map((image) => image.kind),
+  swappedImageOrder.generatedImages.map((image) => image.type),
+  "chapter-driven image order must survive the render adapter",
+);
+
+const swappedLegacyImages = {
+  ...legacyFixture,
+  generatedImages: [
+    legacyFixture.generatedImages[1],
+    legacyFixture.generatedImages[0],
+    legacyFixture.generatedImages[2],
+  ],
+};
+assert.deepEqual(
+  generatedToRenderWorkup(
+    parseChapterWorkupJson(JSON.stringify(swappedLegacyImages)),
+  ).images.map((image) => image.kind),
   ["establishing", "detail", "human"],
   "legacy unique image kinds may parse out of order, but the adapter normalizes them",
 );
@@ -695,6 +813,14 @@ assert.equal(
 );
 assert.equal(rendered.modernMap.title, base.maps.modern.title);
 assert.equal(rendered.characters[0]?.description, base.keyPeople[0]?.description);
+assert.equal(rendered.heroKind, base.heroKind);
+assert.equal(heroImageFor(rendered)?.kind, base.heroKind);
+assert.equal(supportingImagesFor(rendered).length, 2);
+assert.equal(
+  heroImageFor({ ...rendered, heroKind: undefined })?.kind,
+  rendered.images[0].kind,
+  "legacy custom-kind chapters keep their first-image hero behavior",
+);
 
 const mark8Notes = guidance.chapters["mark-8"].notes.map((note) => note.text);
 const prompt = buildProtectedChapterWorkupPrompt({
@@ -778,6 +904,11 @@ assert.throws(
 );
 assert.match(prompt, /"whatPeopleAsk"/);
 assert.match(prompt, /"startVerse"/);
+assert.match(prompt, /"heroKind"/);
+assert.match(prompt, /exactly 3 images[\s\S]*exactly 5/i);
+assert.match(prompt, /unique, descriptive, lowercase kebab-case ID/i);
+assert.match(prompt, /most interesting or impactful moment/i);
+assert.match(prompt, /not because it is the\s+first image or a conventional establishing shot/i);
 assert.match(prompt, /5-8 questions/);
 assert.match(prompt, /no gaps or overlaps/i);
 assert.match(prompt, /SERVER-SUPPLIED GENERATION SOURCE \(ESV Text Edition: 2025/);
@@ -838,6 +969,10 @@ console.log(
         "stored Scripture text",
         "duplicate section ID",
         "duplicate image kinds",
+        "unsafe image kind",
+        "invalid image count",
+        "missing or unmatched hero",
+        "generic image buckets in a new Mark draft",
         "partial/conflicting passage ranges",
         "empty dashboard data",
         "missing map uncertainty",
@@ -854,6 +989,8 @@ console.log(
         "chapter topics",
         "map titles",
         "person descriptions",
+        "chapter image order and descriptions",
+        "chapter-selected hero",
       ],
     },
     null,

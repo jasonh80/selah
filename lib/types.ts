@@ -8,8 +8,9 @@ export type ImageKind = "establishing" | "detail" | "human" | (string & {});
 
 export interface ChapterImage {
   kind: ImageKind;
-  index: number; // 1, 2, 3
+  index: number; // 1-3 or 1-5, in the chapter-selected plan order
   label: string; // "Establishing Shot" | "Detail Shot" | "Human Moment"
+  description?: string;
   prompt: string;
   caption: string;
   src: string;
@@ -152,6 +153,9 @@ export interface ChapterWorkup {
   jesusConnectionShort: string;
   primaryCharacters?: string[];
 
+  // New generated workups name the most meaningful visual moment explicitly.
+  // Optional keeps hand-authored and legacy chapters unchanged.
+  heroKind?: ImageKind;
   images: ChapterImage[];
   metaChips: MetaChip[];
   navCards: NavCard[];
