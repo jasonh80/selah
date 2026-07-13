@@ -44,6 +44,23 @@ if (typeof window !== "undefined") {
 
 export const MARK_SPRINT_MAX_COMPLETION_TOKENS = 12_000;
 
+const MARK_6_VOICE_EXAMPLE_TITLE = "Mark 6 Daily Rundown";
+const MARK_6_LEGACY_VOICE_EXAMPLE_TITLE =
+  "Mark 6 Daily Rundown Voice Example";
+
+function acceptedVoiceExampleTitles(
+  identity: MarkSprintVoiceExampleIdentity,
+): readonly string[] {
+  // The original Studio row predates the versioned Mark sprint contract and
+  // carries a longer display title. Accept only that exact legacy identity;
+  // two matching active rows still fail closed as ambiguous below.
+  return identity.title === MARK_6_VOICE_EXAMPLE_TITLE &&
+    identity.genre === "gospel narrative" &&
+    identity.exampleType === "voice"
+    ? [identity.title, MARK_6_LEGACY_VOICE_EXAMPLE_TITLE]
+    : [identity.title];
+}
+
 type FetchLike = (
   input: string | URL | Request,
   init?: RequestInit,
@@ -136,7 +153,7 @@ export function createSupabaseMarkSprintRuntimeReadPorts(
       const { data, error } = await db
         .from("selah_approved_examples")
         .select("id,title,genre,example_type,content,active")
-        .eq("title", identity.title)
+        .in("title", [...acceptedVoiceExampleTitles(identity)])
         .eq("genre", identity.genre)
         .eq("example_type", identity.exampleType)
         .eq("active", true);
@@ -564,11 +581,12 @@ function validateLiveExample(
     };
   }
   const row = rows.length === 1 ? rows[0] : null;
+  const acceptedTitles = acceptedVoiceExampleTitles(expected);
   if (
     !row ||
     typeof row.id !== "string" ||
     !row.id.trim() ||
-    row.title !== expected.title ||
+    !acceptedTitles.includes(row.title) ||
     row.genre !== expected.genre ||
     row.example_type !== expected.exampleType ||
     row.active !== true ||
