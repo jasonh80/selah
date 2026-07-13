@@ -185,6 +185,29 @@ export interface ClaimMeta {
 
 // ---------------- text jobs ----------------
 
+const consumedTextJobCapabilityBrand: unique symbol = Symbol("consumedTextJobCapability");
+
+/** Opaque proof minted only after the queued → running write succeeds. */
+export type ConsumedTextJobCapability = {
+  readonly [consumedTextJobCapabilityBrand]: true;
+};
+
+export interface ConsumedTextJobIdentity {
+  slug: string;
+  jobId: string;
+  approvedManifestDigest?: string;
+}
+
+const consumedTextJobCapabilities = new WeakMap<object, Readonly<ConsumedTextJobIdentity>>();
+
+function mintConsumedTextJobCapability(identity: ConsumedTextJobIdentity): ConsumedTextJobCapability {
+  // The object deliberately carries no data. Copying or serializing it loses
+  // the WeakMap identity and therefore cannot copy the authority.
+  const capability = Object.freeze(Object.create(null)) as ConsumedTextJobCapability;
+  consumedTextJobCapabilities.set(capability, Object.freeze({ ...identity }));
+  return capability;
+}
+
 function validateApprovedManifestDigest(
   digest: string | undefined,
   action: string,
@@ -230,6 +253,39 @@ function manifestBindingPredicates(
   return expected === undefined
     ? []
     : [{ key: TEXT_JOB_MANIFEST_DIGEST_KEY, equals: expected }];
+}
+
+/**
+ * One-time proof accessor for protected dispatch. It both verifies the exact
+ * job identity and consumes the capability, so forged, cloned, or replayed
+ * objects cannot authorize paid work.
+ */
+export function takeConsumedTextJobCapabilityForDispatch(
+  capability: unknown,
+  expected: ConsumedTextJobIdentity,
+): Readonly<ConsumedTextJobIdentity> {
+  const action = "takeConsumedTextJobCapabilityForDispatch";
+  const approvedManifestDigest = validateApprovedManifestDigest(
+    expected.approvedManifestDigest,
+    action,
+    expected.slug,
+  );
+  if (!capability || (typeof capability !== "object" && typeof capability !== "function")) {
+    throw new ChapterMutationError("REFUSED", action, expected.slug, "consumed text-job capability is missing or forged");
+  }
+  const identity = consumedTextJobCapabilities.get(capability);
+  if (!identity) {
+    throw new ChapterMutationError("REFUSED", action, expected.slug, "consumed text-job capability is missing, forged, cloned, or already used");
+  }
+  if (
+    identity.slug !== expected.slug ||
+    identity.jobId !== expected.jobId ||
+    identity.approvedManifestDigest !== approvedManifestDigest
+  ) {
+    throw new ChapterMutationError("CONFLICT", action, expected.slug, "consumed text-job capability belongs to a different job binding");
+  }
+  consumedTextJobCapabilities.delete(capability);
+  return identity;
 }
 
 /**
@@ -326,7 +382,7 @@ export async function consumeGenerationClaim(
   slug: string,
   jobId: string,
   approvedManifestDigest?: string,
-): Promise<void> {
+): Promise<ConsumedTextJobCapability> {
   if (!jobId) throw new ChapterMutationError("REFUSED", "consumeGenerationClaim", slug, "missing job id");
   const row = await readRowForTerminalWrite(store, slug, "consumeGenerationClaim");
   if (row.status !== "generating" || row.workupJson?.[TEXT_JOB_KEY] !== jobId) {
@@ -358,6 +414,11 @@ export async function consumeGenerationClaim(
   if (changed !== 1) {
     throw new ChapterMutationError("CONFLICT", "consumeGenerationClaim", slug, "claim already consumed or superseded — refusing duplicate delivery");
   }
+  return mintConsumedTextJobCapability({
+    slug,
+    jobId,
+    ...(approvedManifestDigest === undefined ? {} : { approvedManifestDigest }),
+  });
 }
 
 /**

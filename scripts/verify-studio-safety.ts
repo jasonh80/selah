@@ -258,6 +258,7 @@ import type { JobStorePort, JobRow, JobPredicates } from "../lib/server/generati
 import {
   claimGenerationJob,
   consumeGenerationClaim,
+  takeConsumedTextJobCapabilityForDispatch,
   completeGenerationJob,
   failGenerationJob,
   claimImageJob,
@@ -582,6 +583,99 @@ const integration = async () => {
       "I1h malformed approved manifest digest refused",
     );
     ok(!store.rows.has("mark-8"), "I1h malformed digest causes no row mutation");
+  }
+
+  // I1i. Only a successful atomic consume mints one-use dispatch authority.
+  {
+    const store = new FakeJobStore();
+    const jobId = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
+    let failedCapability: unknown;
+    try {
+      failedCapability = await consumeGenerationClaim(store, "mark-8", jobId, MANIFEST_DIGEST_B);
+    } catch {
+      // Expected: a mismatched consume returns no authority.
+    }
+    ok(failedCapability === undefined, "I1i mismatched consume returns no capability");
+
+    const capability = await consumeGenerationClaim(store, "mark-8", jobId, MANIFEST_DIGEST_A);
+    ok(Object.keys(capability).length === 0, "I1i capability exposes no serializable job data");
+    await expectCode(
+      async () => takeConsumedTextJobCapabilityForDispatch({}, {
+        slug: "mark-8",
+        jobId,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }),
+      "REFUSED",
+      "I1i forged capability refused",
+    );
+    const cloned = structuredClone(capability);
+    await expectCode(
+      async () => takeConsumedTextJobCapabilityForDispatch(cloned, {
+        slug: "mark-8",
+        jobId,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }),
+      "REFUSED",
+      "I1i cloned capability refused",
+    );
+    const serializedClone = JSON.parse(JSON.stringify(capability)) as unknown;
+    await expectCode(
+      async () => takeConsumedTextJobCapabilityForDispatch(serializedClone, {
+        slug: "mark-8",
+        jobId,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }),
+      "REFUSED",
+      "I1i serialized capability refused",
+    );
+    await expectCode(
+      async () => takeConsumedTextJobCapabilityForDispatch(capability, {
+        slug: "mark-9",
+        jobId,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }),
+      "CONFLICT",
+      "I1i capability cannot cross slugs",
+    );
+    await expectCode(
+      async () => takeConsumedTextJobCapabilityForDispatch(capability, {
+        slug: "mark-8",
+        jobId,
+        approvedManifestDigest: MANIFEST_DIGEST_B,
+      }),
+      "CONFLICT",
+      "I1i capability cannot cross manifest digests",
+    );
+    const identity = takeConsumedTextJobCapabilityForDispatch(capability, {
+      slug: "mark-8",
+      jobId,
+      approvedManifestDigest: MANIFEST_DIGEST_A,
+    });
+    ok(
+      identity.slug === "mark-8" &&
+      identity.jobId === jobId &&
+      identity.approvedManifestDigest === MANIFEST_DIGEST_A,
+      "I1i exact protected dispatch receives the bound identity",
+    );
+    await expectCode(
+      async () => takeConsumedTextJobCapabilityForDispatch(capability, {
+        slug: "mark-8",
+        jobId,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }),
+      "REFUSED",
+      "I1i consumed capability cannot be replayed",
+    );
+    let duplicateCapability: unknown;
+    try {
+      duplicateCapability = await consumeGenerationClaim(store, "mark-8", jobId, MANIFEST_DIGEST_A);
+    } catch {
+      // Expected: duplicate delivery returns no authority.
+    }
+    ok(duplicateCapability === undefined, "I1i duplicate consume returns no capability");
   }
 
   // I2. Duplicate request while a run is live: second claim refused.
