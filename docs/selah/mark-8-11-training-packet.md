@@ -15,7 +15,7 @@ The recent Mark chats are lesson sources and same-chapter review references,
 not refined app benchmarks or final chapter copy. Mark 6 alone sets the refined
 app-quality bar. Selah Brain should author a fresh workup for each chapter after:
 
-1. the v1.8 rule diff is independently reviewed and approved;
+1. the v1.9 rule diff is independently reviewed and approved;
 2. these chapter-only notes are owner-approved and added with `scope=chapter`;
 3. the retrieval manifest proves that the intended rules, notes, example, and
    owner-approved source bundle are present;

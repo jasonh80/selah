@@ -2,7 +2,7 @@
   "packet_id": "mark-8-11-2026-07-v5",
   "version": "1.4",
   "status": "review_only",
-  "library_version": "1.8",
+  "library_version": "1.9",
   "authoring_policy": {
     "fresh_authorship_required": true,
     "private_study_reference_wording_available_during_generation": false,

@@ -49,18 +49,18 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 ## Selah Brain (the quality system)
 
 - **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 is the last
-  verified live library). The version-controlled seed has a review-only v1.8
-  candidate with 99 rules. Its artifact status is fail-closed `review_only`, so
-  it cannot be seeded until a separately reviewed artifact is marked
-  `approved_for_seed` and records owner, timestamp, review evidence, version, and
-  an exact content digest. `npm run build` runs the Brain verifier first. Supabase
+  verified live library). The version-controlled v1.9 candidate has 99 rules
+  and exact owner approval following Claude's independent review. Its artifact
+  status is `approved_for_seed`, but it has not been seeded. The recorded
+  approval binds the owner, timestamp, review evidence, version, and exact
+  content digest. `npm run build` runs the Brain verifier first. Supabase
   remains the live source of truth: a merged JSON
   change is not active until the owner separately approves seeding and a
   post-seed manifest proves the live IDs, wording, stages, and provenance.
 - Layers: core (always-on) · contextual (max 12 for copy and 18 for image
   stages, selected by genre/stage) ·
   qa (review only) · governance (never in prose prompts).
-- The v1.8 candidate includes the recent-chat audit plus fresh-language
+- The v1.9 candidate includes the recent-chat audit plus fresh-language
   abstraction: it adds humble fellow-learner voice, prevents visual
   details from smuggling unsupported claims, and makes text/inference/safety
   rules eligible for image stages. It also teaches useful surrounding-chapter
@@ -146,7 +146,7 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 ## Next up
 
 - **Current release sprint: Mark 8–11**, with Tuesday 2026-07-14 as the stretch
-  target. Selah Brain should author fresh drafts after the safety PR, v1.8,
+  target. Selah Brain should author fresh drafts after the safety PR, v1.9,
   chapter guidance, owner-approved ESV source contract, exact Mark 6 voice
   exemplar, and fail-closed manifest are reviewed. Each generation and
   publication still requires explicit owner approval.

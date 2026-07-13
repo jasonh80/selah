@@ -223,7 +223,7 @@ for (const rule of library.rules) {
 }
 
 const byId = new Map(library.rules.map((rule) => [rule.id, rule]));
-assert.equal(library.version, "1.8", "unexpected candidate Brain version");
+assert.equal(library.version, "1.9", "unexpected candidate Brain version");
 assert.match(LIBRARY_CONTENT_DIGEST, /^[a-f0-9]{64}$/);
 assert.ok(
   libraryContentDigestMatchesSnapshot(),
@@ -668,7 +668,7 @@ assert.deepEqual(metadataUpdate.values.stages, [
   "image_review",
 ]);
 assert.deepEqual(metadataUpdate.values.source_titles, [recentAuditTitle]);
-assert.equal(metadataUpdate.values.version, "1.8");
+assert.equal(metadataUpdate.values.version, "1.9");
 
 assert.equal(guidance.status, "review_only", "guidance must not be active");
 assert.equal(guidance.packet_id, "mark-8-11-2026-07-v5");

@@ -1,8 +1,14 @@
 {
-  "version": "1.8",
+  "version": "1.9",
   "name": "Selah Brain Initial Rule Library",
-  "status": "review_only",
-  "seed_approval": null,
+  "status": "approved_for_seed",
+  "seed_approval": {
+    "approved_by": "Jason Hales (owner)",
+    "approved_at": "2026-07-13T15:29:54Z",
+    "evidence": "Owner approved commit 7a6c76c after Claude's independent read-only review; owner directed proceeding with Claude's sole suggested change, the v1.9 version bump.",
+    "library_version": "1.9",
+    "content_digest": "6fa9784d5839501488cbca9aadb2302f31b240b411af2278b308b8214648504d"
+  },
   "audit_basis": "28-workup lesson audit plus approved Exodus 31 amendment plus Mark 6 Daily Rundown cadence + plainspoken voice + teach-theology amendments plus chapter-driven image selection amendment plus the review-only high-weight Mark 8–11 accuracy audit plus a signed-in recent Mark/Exodus study-chat lesson audit plus owner-approved mission, personality, humor, and honest-map direction; Mark 6 alone is the refined app-quality benchmark and Exodus 27 is a technical shell only",
   "source_count": 36,
   "rule_count": 99,
@@ -1739,6 +1745,7 @@
     "Completed the Mark 6 source ledger and scoped craftsmanship-only visual rules to their genre so provenance resolves and unrelated image prompts do not absorb Exodus-specific guidance.",
     "Abstracted the Mark 6 voice and theology lessons into reusable principles so the digest-bound exemplar remains the only authoring channel for its worked prose and future chapters are not coached to echo its distinctive lines.",
     "Applied the owner’s mission, Selah personality, restrained-sarcasm and self-deprecation, and uncertainty-map direction to existing global rules without turning Mark 8 facts into global guidance.",
+    "Bumped the reviewed candidate to v1.9 so the owner-and-Claude-approved mission, voice, humor, and map refinements cannot be confused with the superseded v1.8 artifact.",
     "Added the owner's book-flow direction as a core authoring rule so surrounding-chapter context is taught when useful rather than only discovered as a review failure.",
     "Corrected the source hierarchy: Mark 6 is Selah's only refined app-quality benchmark; other Mark chats are lesson and chapter-review sources; Exodus 33–34 provides narrow study lessons; Exodus 27 is a weak technical shell only."
   ],
