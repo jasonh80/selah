@@ -5,7 +5,7 @@
   "description": "Selah \u2014 your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run verify:studio-safety && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:benchmark",
+    "prebuild": "npm run verify:studio-safety && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -16,6 +16,7 @@
     "verify:manifest-v3": "node --import tsx scripts/verify-generation-manifest-v3.ts",
     "verify:mark-runtime": "node --import tsx scripts/verify-mark-sprint-runtime.ts",
     "verify:mark-draft": "node --import tsx scripts/verify-mark-sprint-draft-pipeline.ts",
+    "verify:mark-worker": "node --import tsx scripts/verify-mark-sprint-draft-job.ts",
     "verify:benchmark": "node --import tsx scripts/verify-selah-benchmark-review.ts",
     "validate:workup": "node --import tsx scripts/validate-workup.ts",
     "check:workup": "npm run validate:workup",
