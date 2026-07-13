@@ -75,6 +75,7 @@ type StudioImageStatus = {
   state: "idle" | "queued" | "running" | "blocked" | "failed";
   heroKind: string | null;
   model: string | null;
+  planDigest: string;
   images: StudioImage[];
   reviewDigest: string | null;
   spentCount: number;
@@ -90,20 +91,25 @@ const QUICK_TAGS = [
   "Map missing",
   "Great — save as example",
 ];
+const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 
 export default function SelahStudioPage() {
   const [token, setToken] = useState("");
   const [settings, setSettings] = useState<GenSettings | null>(null);
   const [busy, setBusy] = useState(false);
   const [loginMsg, setLoginMsg] = useState("");
+  const [settingsMsg, setSettingsMsg] = useState("");
 
   const [book, setBook] = useState("Mark");
   const [chapter, setChapter] = useState(8);
   const [phase, setPhase] = useState<Phase>("idle");
   const [genMsg, setGenMsg] = useState("");
+  const [draftTakingLonger, setDraftTakingLonger] = useState(false);
   const [statusProblem, setStatusProblem] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmingMark8Source, setConfirmingMark8Source] = useState(false);
+  const [confirmingImageDiscard, setConfirmingImageDiscard] = useState(false);
+  const [approvedImageDiscard, setApprovedImageDiscard] = useState(false);
   const [preparingMark8, setPreparingMark8] = useState(false);
   const [mark8ManifestDigest, setMark8ManifestDigest] = useState<string | null>(null);
   const [mark8Blockers, setMark8Blockers] = useState<string[]>([]);
@@ -135,6 +141,7 @@ export default function SelahStudioPage() {
   const mark8PreflightRequest = useRef(0);
   const imageStatusRequest = useRef(0);
   const currentImageReviewDigest = useRef("");
+  const confirmedSettings = useRef<GenSettings | null>(null);
   const slug = slugFor(book, chapter) ?? "";
 
   async function api(method: "GET" | "POST", body?: unknown) {
@@ -149,17 +156,26 @@ export default function SelahStudioPage() {
   async function connect() {
     setBusy(true);
     setLoginMsg("");
-    const j = await api("GET");
-    setBusy(false);
-    if (j.ok) {
-      setSettings(j.settings);
-      const target = slugFor(book, chapter) ?? "";
-      activeSlug.current = target;
-      if (target) {
-        setPhase("checking");
-        void loadChapterStatus(target);
+    try {
+      const j = await api("GET");
+      if (j.ok) {
+        const next = j.settings as GenSettings;
+        confirmedSettings.current = next;
+        setSettings(next);
+        const target = slugFor(book, chapter) ?? "";
+        activeSlug.current = target;
+        if (target) {
+          setPhase("checking");
+          void loadChapterStatus(target);
+        }
+      } else {
+        setLoginMsg(j.error || "That key didn't work — try again.");
       }
-    } else setLoginMsg(j.error || "That key didn't work — try again.");
+    } catch {
+      setLoginMsg("Studio could not connect. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function resetImageReview() {
@@ -170,6 +186,8 @@ export default function SelahStudioPage() {
     setImageMsg("");
     setImagesPreviewed(false);
     setApprovedReviewDigest(null);
+    setConfirmingImageDiscard(false);
+    setApprovedImageDiscard(false);
   }
 
   // Reset the review, image, and publish state when the chapter changes or a
@@ -193,9 +211,12 @@ export default function SelahStudioPage() {
     setChapter(nextChapter);
     setPhase("checking");
     setGenMsg("");
+    setDraftTakingLonger(false);
     setStatusProblem(false);
     setConfirming(false);
     setConfirmingMark8Source(false);
+    setConfirmingImageDiscard(false);
+    setApprovedImageDiscard(false);
     setPreparingMark8(false);
     setMark8ManifestDigest(null);
     setMark8Blockers([]);
@@ -210,6 +231,7 @@ export default function SelahStudioPage() {
     setPhase("checking");
     setStatusProblem(false);
     setGenMsg("");
+    setDraftTakingLonger(false);
 
     let j: Record<string, unknown>;
     try {
@@ -248,7 +270,12 @@ export default function SelahStudioPage() {
     } else if (status === "failed") {
       setPhase("error");
       setPublished(false);
-      setGenMsg("The last draft did not finish. You can try again when generation is ready.");
+      setDraftTakingLonger(false);
+      setGenMsg(
+        typeof j.failureMessage === "string"
+          ? j.failureMessage
+          : "The last draft did not finish. Check readiness before trying again.",
+      );
     } else {
       setPhase("idle");
       setPublished(false);
@@ -258,12 +285,13 @@ export default function SelahStudioPage() {
 
   async function pollStatus(target: string, attempt = 0) {
     if (activeSlug.current !== target) return;
-    if (attempt > 48) {
+    if (attempt > 150) {
       setPhase("error");
       setStatusProblem(true);
-      setGenMsg("This is taking longer than expected. Check Recent activity in Settings & history.");
+      setGenMsg("This is taking longer than expected. It may still be working. You can safely return later or check again.");
       return;
     }
+    if (attempt === 48) setDraftTakingLonger(true);
     let j: Record<string, unknown>;
     try {
       j = await api("POST", { action: "status", slug: target });
@@ -286,25 +314,45 @@ export default function SelahStudioPage() {
       setPhase("ready");
       setPublished(st === "reviewed");
       setGenMsg("");
+      setDraftTakingLonger(false);
       if (st !== "reviewed" && target === MARK_8_STUDIO_SLUG) void loadImagesStatus(target);
     } else if (st === "failed") {
       setPhase("error");
       setStatusProblem(false);
-      setGenMsg("Something went wrong while writing the draft. Check Recent activity.");
+      const safeFailure = typeof j.failureMessage === "string" ? j.failureMessage : "Something went wrong while writing the draft.";
+      setGenMsg(safeFailure);
+      setDraftTakingLonger(false);
     } else {
       setTimeout(() => pollStatus(target, attempt + 1), 5000);
     }
   }
 
   function onGenerateClick() {
-    if (!slug || phase === "checking" || phase === "generating" || preparingMark8 || statusProblem || published) return;
+    const imageWorkLocked =
+      slug === MARK_8_STUDIO_SLUG &&
+      (imagePhase === "checking" || imagePhase === "queued" || imagePhase === "running" ||
+        imageStatus?.state === "failed" || imageStatus?.state === "blocked");
+    if (!slug || phase === "checking" || phase === "generating" || preparingMark8 || statusProblem || published || imageWorkLocked) return;
     if (slug === MARK_8_STUDIO_SLUG) {
+      if ((imageStatus?.stored ?? 0) > 0 && !approvedImageDiscard) {
+        setConfirming(false);
+        setConfirmingMark8Source(false);
+        setConfirmingImageDiscard(true);
+        return;
+      }
       setConfirming(false);
+      setConfirmingImageDiscard(false);
       setConfirmingMark8Source(true);
       return;
     }
-    if (!settings?.text_generation_enabled) return;
-    if (settings?.require_confirm) {
+    if (
+      settings?.text_generation_enabled !== true ||
+      confirmedSettings.current?.text_generation_enabled !== true
+    ) return;
+    if (
+      settings?.require_confirm !== false ||
+      confirmedSettings.current?.require_confirm !== false
+    ) {
       setConfirming(true);
       return;
     }
@@ -331,6 +379,7 @@ export default function SelahStudioPage() {
       if (activeSlug.current !== target || mark8PreflightRequest.current !== requestId) return;
       const decision = decideMark8StudioPreflight(response);
       if (decision.kind === "blocked") {
+        setApprovedImageDiscard(false);
         setMark8Blockers(decision.blockers);
         return;
       }
@@ -338,6 +387,7 @@ export default function SelahStudioPage() {
       setConfirming(true);
     } catch {
       if (activeSlug.current === target && mark8PreflightRequest.current === requestId) {
+        setApprovedImageDiscard(false);
         setMark8Blockers([MARK_8_PREFLIGHT_ERROR]);
       }
     } finally {
@@ -349,6 +399,7 @@ export default function SelahStudioPage() {
 
   async function doGenerate() {
     const target = slug;
+    const discardCompletedImages = target === MARK_8_STUDIO_SLUG && approvedImageDiscard;
     const approvedManifestDigest =
       target === MARK_8_STUDIO_SLUG ? mark8ManifestDigest : null;
     if (target === MARK_8_STUDIO_SLUG && !approvedManifestDigest) {
@@ -367,12 +418,13 @@ export default function SelahStudioPage() {
     try {
       j = await api(
         "POST",
-        buildStudioGenerateRequest(target, approvedManifestDigest),
+        buildStudioGenerateRequest(target, approvedManifestDigest, discardCompletedImages),
       );
     } catch {
       if (activeSlug.current !== target) return;
       setPhase("error");
-      setGenMsg("Studio could not start the draft. Check your connection and try again.");
+      setStatusProblem(true);
+      setGenMsg("Studio lost its connection while starting the draft. Check the chapter before trying again.");
       return;
     }
     if (activeSlug.current !== target) return;
@@ -390,6 +442,7 @@ export default function SelahStudioPage() {
     const previewUrl = studioPreviewUrl(target);
     if (!previewUrl) return;
     const reviewingImages = imagePhase === "ready" && Boolean(imageStatus?.reviewDigest);
+    let previewFailure = "";
 
     // Open synchronously so browsers do not block the tab while Studio waits
     // for the authenticated cookie response.
@@ -404,6 +457,24 @@ export default function SelahStudioPage() {
     }
     previewWindow.opener = null;
     try {
+      if (reviewingImages) {
+        const statusResponse = await api("POST", { action: "images_status", slug: target });
+        const fresh = readStudioImageStatus(statusResponse);
+        const freshComplete =
+          fresh &&
+          (fresh.total === 3 || fresh.total === 5) &&
+          fresh.done &&
+          fresh.stored === fresh.total &&
+          Boolean(fresh.reviewDigest);
+        if (!fresh || !freshComplete) {
+          if (fresh) applyImageStatus(fresh);
+          setImagePhase(fresh?.state === "queued" || fresh?.state === "running" ? fresh.state : "error");
+          previewFailure = "The images changed or are not ready yet. Check them again before previewing.";
+          throw new Error("fresh image review unavailable");
+        }
+        applyImageStatus(fresh);
+        setImagePhase("ready");
+      }
       const response = await api("POST", { action: "preview_access", slug: target });
       if (!response.ok) throw new Error("preview access refused");
       previewWindow.location.href = previewUrl;
@@ -417,7 +488,7 @@ export default function SelahStudioPage() {
     } catch {
       previewWindow.close();
       if (reviewingImages) {
-        setImageMsg("Studio could not open the image preview. Try again.");
+        setImageMsg(previewFailure || "Studio could not open the image preview. Try again.");
       } else {
         setReviewMsg("Studio could not open the preview. Try again.");
       }
@@ -544,8 +615,11 @@ export default function SelahStudioPage() {
       target !== MARK_8_STUDIO_SLUG ||
       verdict !== "yes" ||
       !previewed ||
-      !settings?.image_generation_enabled ||
+      settings?.image_generation_enabled !== true ||
+      confirmedSettings.current?.image_generation_enabled !== true ||
       !imageStatus ||
+      !imageStatus.planDigest ||
+      !imageStatus.model ||
       (imageStatus.total !== 3 && imageStatus.total !== 5)
     ) return;
 
@@ -556,11 +630,21 @@ export default function SelahStudioPage() {
     setImagePhase("queued");
     setImageMsg("");
     try {
-      const response = await api("POST", { action: "generate_images", slug: target });
+      const response = await api("POST", {
+        action: "generate_images",
+        slug: target,
+        approvedImagePlanDigest: imageStatus.planDigest,
+        approvedImageCount: imageStatus.total,
+        approvedImageModel: imageStatus.model,
+      });
       if (activeSlug.current !== target || imageStatusRequest.current !== requestId) return;
       if (!response.ok) {
         setImagePhase("error");
-        setImageMsg("Studio could not start the images. No images were approved or published. You can try again.");
+        setImageMsg(
+          typeof response.error === "string"
+            ? response.error
+            : "Studio could not start the images. No images were approved or published. You can try again.",
+        );
         return;
       }
       // A successful trigger only means the work was accepted. Studio waits
@@ -635,12 +719,15 @@ export default function SelahStudioPage() {
 
   async function publishFinal() {
     const target = slug;
+    const hasFeedback = note.trim().length > 0 || tags.length > 0;
     setBusy(true);
     setPublishing(true);
     setPublishMsg("");
     try {
-      // Capture the positive review alongside the publish (if not already saved).
-      if (verdict && !noteSaved) {
+      // Optional teaching notes stay outside the publish-critical path. A plain
+      // Ready choice is represented by the final review digest, not an empty
+      // chapter_review_notes insert.
+      if (hasFeedback && !noteSaved) {
         const feedback = await api("POST", { action: "feedback", slug: target, verdict, note, scope, tags });
         if (activeSlug.current !== target) return;
         if (!feedback.ok) {
@@ -658,9 +745,33 @@ export default function SelahStudioPage() {
         return;
       }
       setPublished(Boolean(j.ok));
-      if (!j.ok) setPublishMsg(j.error || "Publish failed.");
+      if (!j.ok) {
+        setPublishMsg(j.error || "Publish failed.");
+        if (target === MARK_8_STUDIO_SLUG) {
+          setImagesPreviewed(false);
+          setApprovedReviewDigest(null);
+          void loadImagesStatus(target);
+        }
+      }
     } catch {
-      if (activeSlug.current === target) setPublishMsg("Studio lost its connection. Nothing was confirmed as published.");
+      if (activeSlug.current === target) {
+        setPublishMsg("Studio lost its connection after the publish attempt. Checking what happened…");
+        try {
+          const status = await api("POST", { action: "status", slug: target });
+          if (activeSlug.current !== target) return;
+          if (status.ok && status.status === "reviewed") {
+            setPublished(true);
+            setPhase("ready");
+            setPublishMsg("");
+          } else {
+            setPublishMsg("Nothing was confirmed as published. Check the chapter before trying again.");
+          }
+        } catch {
+          if (activeSlug.current === target) {
+            setPublishMsg("Nothing was confirmed as published. Check the chapter before trying again.");
+          }
+        }
+      }
     } finally {
       setBusy(false);
       setPublishing(false);
@@ -670,9 +781,24 @@ export default function SelahStudioPage() {
   async function saveSettings() {
     if (!settings) return;
     setBusy(true);
-    const j = await api("POST", { action: "save", settings });
-    setBusy(false);
-    if (j.ok) setSettings(j.settings);
+    setSettingsMsg("");
+    try {
+      const j = await api("POST", { action: "save", settings });
+      if (j.ok) {
+        const next = j.settings as GenSettings;
+        confirmedSettings.current = next;
+        setSettings(next);
+        setSettingsMsg("Saved");
+      } else {
+        setSettings(confirmedSettings.current);
+        setSettingsMsg("Studio could not save those switches. Nothing changed—try again.");
+      }
+    } catch {
+      setSettings(confirmedSettings.current);
+      setSettingsMsg("Studio could not save those switches. Nothing changed—check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function loadAudit() {
@@ -681,6 +807,7 @@ export default function SelahStudioPage() {
   }
 
   function setS<K extends keyof GenSettings>(k: K, v: GenSettings[K]) {
+    setSettingsMsg("");
     setSettings((s) => (s ? { ...s, [k]: v } : s));
   }
 
@@ -715,7 +842,14 @@ export default function SelahStudioPage() {
   }
 
   // ---------------- Step states ----------------
-  const textOff = !settings.text_generation_enabled;
+  // Spending controls follow the last server-confirmed save. Editing a switch
+  // locally must never make Studio look ready before the save actually lands.
+  const textOff =
+    settings.text_generation_enabled !== true ||
+    confirmedSettings.current?.text_generation_enabled !== true;
+  const imagesOff =
+    settings.image_generation_enabled !== true ||
+    confirmedSettings.current?.image_generation_enabled !== true;
   const isMark8 = slug === MARK_8_STUDIO_SLUG;
   const draftReady = phase === "ready";
   const exactImagesReady =
@@ -723,6 +857,10 @@ export default function SelahStudioPage() {
     Boolean(imageStatus?.reviewDigest) &&
     imageStatus?.stored === imageStatus?.total &&
     (imageStatus?.total === 3 || imageStatus?.total === 5);
+  const mark8ImageWorkLocked =
+    isMark8 &&
+    (imagePhase === "checking" || imagePhase === "queued" || imagePhase === "running" ||
+      imageStatus?.state === "failed" || imageStatus?.state === "blocked");
   const imagesApproved =
     exactImagesReady &&
     imagesPreviewed &&
@@ -783,6 +921,29 @@ export default function SelahStudioPage() {
           <button type="button" onClick={() => void loadChapterStatus(slug)} className={ghost}>
             Check chapter again
           </button>
+        ) : confirmingImageDiscard ? (
+          <div className="rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] text-primary">
+              Creating a new Mark 8 draft will remove the current {imageStatus?.stored ?? 0} finished images.
+              Their image credit cannot be recovered. Continue?
+            </p>
+            <div className="mt-2.5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingImageDiscard(false);
+                  setApprovedImageDiscard(true);
+                  setConfirmingMark8Source(true);
+                }}
+                className={primary}
+              >
+                Continue
+              </button>
+              <button type="button" onClick={() => setConfirmingImageDiscard(false)} className={ghost}>
+                Keep current draft
+              </button>
+            </div>
+          </div>
         ) : confirmingMark8Source ? (
           <div className="rounded-lg border bg-card-soft p-3">
             <p className="text-[13px] text-primary">{MARK_8_SOURCE_PREPARATION_MESSAGE}</p>
@@ -796,7 +957,10 @@ export default function SelahStudioPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setConfirmingMark8Source(false)}
+                onClick={() => {
+                  setConfirmingMark8Source(false);
+                  setApprovedImageDiscard(false);
+                }}
                 className={ghost}
               >
                 Cancel
@@ -809,7 +973,7 @@ export default function SelahStudioPage() {
             onClick={onGenerateClick}
             disabled={isStudioGenerateEntryDisabled({
               slug,
-              chapterBusy: phase === "checking" || phase === "generating",
+              chapterBusy: phase === "checking" || phase === "generating" || mark8ImageWorkLocked,
               preflightBusy: preparingMark8,
               textGenerationEnabled: !textOff,
               published,
@@ -818,6 +982,8 @@ export default function SelahStudioPage() {
           >
             {published
               ? "Already Published"
+              : mark8ImageWorkLocked
+                ? "Finish Current Images"
               : phase === "checking"
                 ? "Checking…"
                 : preparingMark8
@@ -845,7 +1011,10 @@ export default function SelahStudioPage() {
                 type="button"
                 onClick={() => {
                   setConfirming(false);
-                  if (slug === MARK_8_STUDIO_SLUG) setMark8ManifestDigest(null);
+                  if (slug === MARK_8_STUDIO_SLUG) {
+                    setMark8ManifestDigest(null);
+                    setApprovedImageDiscard(false);
+                  }
                 }}
                 className={ghost}
               >
@@ -866,11 +1035,16 @@ export default function SelahStudioPage() {
 
         {textOff && (
           <p className="mt-2.5 text-[13px] text-secondary">
-            Draft creation is paused. Turn it on in <span className="text-primary">Settings &amp; history</span> below to begin.
+            Draft creation is paused. Turn it on and save in <span className="text-primary">Settings &amp; history</span> below to begin.
           </p>
         )}
         {phase === "generating" && (
-          <DraftWaitCard reference={`${book} ${chapter}`} />
+          <DraftWaitCard reference={`${book} ${chapter}`} takingLonger={draftTakingLonger} />
+        )}
+        {mark8ImageWorkLocked && phase !== "generating" && (
+          <p className="mt-2.5 text-[13px] text-secondary">
+            Finish or safely resolve the current image step before creating a new text draft.
+          </p>
         )}
         {draftReady && !published && <p className="mt-2.5 text-[13px] font-medium text-accent-strong">✓ Draft ready to review</p>}
         {published && <p className="mt-2.5 text-[13px] font-medium text-accent-strong">✓ This chapter is already live</p>}
@@ -1080,7 +1254,7 @@ export default function SelahStudioPage() {
               <p role="alert" className="text-[13px] text-jesus-red">{imageMsg}</p>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 <button type="button" onClick={() => void loadImagesStatus(slug)} className={ghost}>Check images again</button>
-                {settings.image_generation_enabled &&
+                {!imagesOff &&
                   imageStatus &&
                   imageStatus.state !== "blocked" &&
                   !imageStatus.done &&
@@ -1096,7 +1270,7 @@ export default function SelahStudioPage() {
                 type="button"
                 onClick={confirmImageCreation}
                 disabled={
-                  !settings.image_generation_enabled ||
+                  imagesOff ||
                   !imageStatus ||
                   (imageStatus.total !== 3 && imageStatus.total !== 5)
                 }
@@ -1104,9 +1278,9 @@ export default function SelahStudioPage() {
               >
                 {imageStatus ? `Create ${imageStatus.total} images` : "Check image plan"}
               </button>
-              {!settings.image_generation_enabled && (
+              {imagesOff && (
                 <p className="mt-2.5 text-[13px] text-secondary">
-                  Image creation is paused. Turn it on in <span className="text-primary">Settings &amp; history</span> when you are ready.
+                  Image creation is paused. Turn it on and save in <span className="text-primary">Settings &amp; history</span> when you are ready.
                 </p>
               )}
             </div>
@@ -1178,6 +1352,14 @@ export default function SelahStudioPage() {
             <button type="button" onClick={saveSettings} disabled={busy} className={primary}>
               {busy ? "…" : "Save settings"}
             </button>
+            {settingsMsg && (
+              <p
+                role={settingsMsg === "Saved" ? "status" : "alert"}
+                className={`text-[12px] ${settingsMsg === "Saved" ? "text-accent-strong" : "text-jesus-red"}`}
+              >
+                {settingsMsg}
+              </p>
+            )}
 
             {/* What Selah Has Learned — active global rules */}
             <details className="border-t pt-3">
@@ -1327,15 +1509,19 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
   );
 }
 
-function DraftWaitCard({ reference }: { reference: string }) {
+function DraftWaitCard({ reference, takingLonger }: { reference: string; takingLonger: boolean }) {
   return (
     <div role="status" aria-live="polite" className="mt-3 rounded-lg border bg-card-soft p-4">
       <div className="flex items-center gap-2">
         <span className="h-2 w-2 animate-pulse rounded-full bg-accent-strong" aria-hidden="true" />
-        <p className="text-[14px] font-semibold text-primary">Creating your private {reference} draft</p>
+        <p className="text-[14px] font-semibold text-primary">
+          {takingLonger ? `Still creating your private ${reference} draft` : `Creating your private ${reference} draft`}
+        </p>
       </div>
       <p className="mt-2 text-[13px] text-secondary">
-        This usually takes 2–4 minutes while Selah studies the chapter, writes the work-up, and checks it for completeness.
+        {takingLonger
+          ? "This chapter is taking longer, but Studio is still checking it. A full Mark 8 draft can take up to about 10 minutes."
+          : "This usually takes 2–4 minutes while Selah studies the chapter, writes the work-up, and checks it for completeness."}
       </p>
       <p className="mt-2 text-[13px] font-medium text-primary">
         Nothing will publish automatically. Images come later, after you approve the text.
@@ -1421,6 +1607,8 @@ function readStudioImageStatus(value: unknown): StudioImageStatus | null {
     !Number.isFinite(row.estimatedCostUsd) ||
     row.estimatedCostUsd < 0
   ) return null;
+  if (typeof row.planDigest !== "string" || !LOWERCASE_SHA256.test(row.planDigest)) return null;
+  if (typeof row.model !== "string" || row.model.trim() === "") return null;
 
   return {
     total,
@@ -1428,7 +1616,8 @@ function readStudioImageStatus(value: unknown): StudioImageStatus | null {
     done: row.done === true,
     state: row.state,
     heroKind: typeof row.heroKind === "string" && row.heroKind ? row.heroKind : null,
-    model: typeof row.model === "string" && row.model ? row.model : null,
+    model: row.model,
+    planDigest: row.planDigest,
     images,
     reviewDigest: typeof row.reviewDigest === "string" && row.reviewDigest ? row.reviewDigest : null,
     spentCount: spentCount as number,

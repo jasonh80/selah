@@ -173,10 +173,14 @@ function dynamicMark8Plans(workup: ChapterWorkup): readonly Mark8ImagePlanItem[]
 }
 
 /** Read-only route preflight; claimImageJob re-derives before its atomic write. */
+export interface PreparedImageJobBinding extends ImageJobBinding {
+  imageCount: number;
+}
+
 export async function prepareImageJobBinding(
   store: JobStorePort,
   slug: string,
-): Promise<ImageJobBinding | undefined> {
+): Promise<PreparedImageJobBinding | undefined> {
   if (slug !== MARK_8_IMAGE_SLUG) return undefined;
   // Mark 8 deliberately uses the project-standard model directly. The Studio
   // model setting remains a legacy-plan control and cannot downgrade this run.
@@ -193,7 +197,8 @@ export async function prepareImageJobBinding(
   try {
     const workup = row.workupJson as unknown as ChapterWorkup;
     assertMark8ImagesArePlaceholders(workup);
-    return { planDigest: deriveMark8ImagePlan(workup).digest, model };
+    const plan = deriveMark8ImagePlan(workup);
+    return { planDigest: plan.digest, model, imageCount: plan.images.length };
   } catch (error) {
     throw new ChapterMutationError(
       "REFUSED",

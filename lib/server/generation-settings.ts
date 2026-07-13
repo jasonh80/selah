@@ -36,12 +36,15 @@ const FALLBACK: GenerationSettings = {
 // durable audit trail in memory. Never set in production code paths.
 let settingsOverride: GenerationSettings | null = null;
 let auditCapture: Array<Record<string, unknown>> | null = null;
+let auditFailureForTesting = false;
 export function __setGenerationTestOverrides(overrides: {
   settings?: GenerationSettings | null;
   captureAudit?: Array<Record<string, unknown>> | null;
+  auditFailure?: boolean;
 } | null): void {
   settingsOverride = overrides?.settings ?? null;
   auditCapture = overrides?.captureAudit ?? null;
+  auditFailureForTesting = overrides?.auditFailure ?? false;
 }
 
 export async function getGenerationSettings(): Promise<GenerationSettings> {
@@ -105,6 +108,7 @@ export async function logGenerationAudit(entry: {
   status: "started" | "succeeded" | "failed";
   message?: string;
 }): Promise<void> {
+  if (auditFailureForTesting) throw new Error("simulated generation audit outage");
   if (auditCapture) {
     auditCapture.push({ ...entry });
     return;

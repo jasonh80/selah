@@ -43,6 +43,73 @@ const LEGACY_PUBLIC_READY_EXCEPTIONS: readonly string[] = ["psalm-23"];
 
 export type WorkupStatus = "draft" | "generating" | "ready" | "failed" | "reviewed";
 
+export type StudioTextCreditStatus = "none" | "possible" | "used";
+export interface StudioChapterStatus {
+  status: string | null;
+  failureMessage?: string;
+  textCredit?: StudioTextCreditStatus;
+}
+
+const PRE_MODEL_FAILURES = new Set([
+  "INVALID_INPUT",
+  "CLAIM_NOT_CONSUMED",
+  "CLAIM_CONSUME_WRITE_FAILED",
+  "ESV_KEY_MISSING",
+  "RUNTIME_STORAGE_MISSING",
+  "PREPARATION_FAILED",
+  "PREPARATION_REFUSED",
+  "MANIFEST_DIGEST_MISMATCH",
+  "PREFLIGHT_INVALID",
+  "RUN_AUTHORIZATION_INVALID",
+]);
+
+/** Convert only allowlisted protected-run codes into safe owner guidance. */
+export function safeProtectedMarkFailure(
+  generationError: unknown,
+): Omit<StudioChapterStatus, "status"> | null {
+  if (typeof generationError !== "string") return null;
+  const match = /^protected_mark_draft:([A-Z_]+)$/u.exec(generationError);
+  if (!match) return null;
+  const code = match[1];
+  if (PRE_MODEL_FAILURES.has(code)) {
+    return {
+      failureMessage: "Studio stopped before the writing AI began. No text credit was used. Check readiness before trying again.",
+      textCredit: "none",
+    };
+  }
+  const failures: Record<string, Omit<StudioChapterStatus, "status">> = {
+    MODEL_EXECUTION_FAILED: {
+      failureMessage: "The writing AI did not finish. Some text credit may have been used. Check the setup before trying again.",
+      textCredit: "possible",
+    },
+    MODEL_RESPONSE_INVALID: {
+      failureMessage: "The AI returned a draft Studio could not safely use. Text credit was used. Review the setup before trying again.",
+      textCredit: "used",
+    },
+    SOURCE_OVERLAP_BLOCKED: {
+      failureMessage: "Studio stopped the draft because it copied too much Bible wording. Text credit was used. Adjust the instructions before trying again.",
+      textCredit: "used",
+    },
+    MARK_QUALITY_BLOCKED: {
+      failureMessage: "The draft finished but did not meet Selah's quality bar. Text credit was used. Review what failed before trying again.",
+      textCredit: "used",
+    },
+    RESULT_DIGEST_MISMATCH: {
+      failureMessage: "Studio could not verify the finished draft. Text credit was used. Do not retry until the saved plan is checked.",
+      textCredit: "used",
+    },
+    COST_LOG_FAILED: {
+      failureMessage: "The draft ran, but Studio could not safely record its cost. Text credit was used. Do not retry until this is checked.",
+      textCredit: "used",
+    },
+    DRAFT_COMPLETION_FAILED: {
+      failureMessage: "The draft finished, but Studio could not safely save it. Text credit was used. Check the saved chapter before trying again.",
+      textCredit: "used",
+    },
+  };
+  return failures[code] ?? null;
+}
+
 const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 const MARK_8_IMAGE_JOB_KEYS = [
   IMAGE_JOB_KEY,
@@ -261,6 +328,27 @@ export async function getChapterStatus(slug: string): Promise<string | null> {
     .maybeSingle();
   if (error) return null;
   return (data?.status as string | undefined) ?? null;
+}
+
+/** Status plus a small, allowlisted failure explanation for Selah Studio. */
+export async function getStudioChapterStatus(slug: string): Promise<StudioChapterStatus> {
+  const db = getSupabaseAdmin();
+  if (!db) {
+    warnSupabaseMissing("getStudioChapterStatus");
+    return { status: null };
+  }
+  const { data, error } = await db
+    .from(TABLE)
+    .select("status,generation_error")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) return { status: null };
+  const status = (data?.status as string | undefined) ?? null;
+  const safeFailure =
+    slug === MARK_8_IMAGE_SLUG && status === "failed"
+      ? safeProtectedMarkFailure(data?.generation_error)
+      : null;
+  return { status, ...(safeFailure ?? {}) };
 }
 
 

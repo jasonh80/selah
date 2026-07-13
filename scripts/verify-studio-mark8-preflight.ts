@@ -118,6 +118,13 @@ async function main(): Promise<void> {
     confirm: true,
     approvedManifestDigest: MANIFEST_DIGEST,
   });
+  assert.deepEqual(buildStudioGenerateRequest("mark-8", MANIFEST_DIGEST, true), {
+    action: "generate",
+    slug: "mark-8",
+    confirm: true,
+    approvedManifestDigest: MANIFEST_DIGEST,
+    confirmDiscardCompletedImages: true,
+  });
   assert.deepEqual(buildStudioGenerateRequest("exodus-27", null), {
     action: "generate",
     slug: "exodus-27",

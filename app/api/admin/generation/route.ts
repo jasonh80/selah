@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/generate-chapter-workup";
 import {
   getChapterStatus,
+  getStudioChapterStatus,
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
 import {
@@ -26,6 +27,7 @@ import {
   IMAGE_JOB_MODEL_KEY,
   IMAGE_JOB_SPENT_COUNT_KEY,
   IMAGE_JOB_STATE_KEY,
+  ALLOW_DISCARD_COMPLETED_IMAGES,
 } from "@/lib/server/generation-jobs";
 import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
 import {
@@ -37,6 +39,7 @@ import {
   deriveMark8ImagePlan,
   mark8FinalReviewDigest,
   MARK_8_IMAGE_ESTIMATED_COST_USD,
+  MARK_8_IMAGE_MODEL,
   MARK_8_IMAGE_SLUG,
 } from "@/lib/server/mark8-image-plan";
 import {
@@ -180,7 +183,13 @@ export async function POST(req: Request) {
         reviewDigest:
           typeof body.reviewDigest === "string" ? body.reviewDigest : undefined,
       });
-      await logGenerationAudit({ action: "publish", slug, status: "succeeded" });
+      try {
+        await logGenerationAudit({ action: "publish", slug, status: "succeeded" });
+      } catch {
+        // The publish write is authoritative. An audit outage must never make
+        // Studio report failure after the chapter is already live.
+        console.error(`[selah] publish audit failed after ${slug} was published`);
+      }
       return NextResponse.json({ ok: true, slug, status });
     } catch (e) {
       if (isChapterMutationError(e)) {
@@ -194,7 +203,7 @@ export async function POST(req: Request) {
   // ---- poll a chapter's status (for the Generate Draft progress UI) ----
   if (action === "status") {
     const slug = String(body.slug ?? "");
-    return NextResponse.json({ ok: true, slug, status: await getChapterStatus(slug) });
+    return NextResponse.json({ ok: true, slug, ...(await getStudioChapterStatus(slug)) });
   }
 
   // ---- Selah Brain review (does this feel like Selah?) ----
@@ -302,6 +311,20 @@ export async function POST(req: Request) {
     } catch (error) {
       return mapMutationError(slug, "generate_images", error);
     }
+    if (
+      slug === MARK_8_IMAGE_SLUG &&
+      (!binding ||
+        body.approvedImagePlanDigest !== binding.planDigest ||
+        body.approvedImageModel !== binding.model ||
+        body.approvedImageCount !== binding.imageCount)
+    ) {
+      return refuse(
+        slug,
+        "generate_images",
+        "The Mark 8 image plan changed after you reviewed its count and cost. Check the plan again before spending credit.",
+        409,
+      );
+    }
     const probe = await checkImageModel(
       binding?.model ?? (typeof body.model === "string" ? body.model : undefined),
     );
@@ -364,9 +387,11 @@ export async function POST(req: Request) {
       ? mark8FinalReviewDigest(workup)
       : null;
     let estimatedCostUsd: number | undefined;
+    let mark8Plan: ReturnType<typeof deriveMark8ImagePlan> | null = null;
     if (slug === MARK_8_IMAGE_SLUG) {
       try {
-        const exactCount = deriveMark8ImagePlan(workup).images.length;
+        mark8Plan = deriveMark8ImagePlan(workup);
+        const exactCount = mark8Plan.images.length;
         estimatedCostUsd = Math.round(exactCount * MARK_8_IMAGE_ESTIMATED_COST_USD * 1000) / 1000;
       } catch {
         return NextResponse.json(
@@ -387,8 +412,11 @@ export async function POST(req: Request) {
       state,
       spentCount,
       ...(estimatedCostUsd === undefined ? {} : { estimatedCostUsd }),
+      ...(mark8Plan === null ? {} : { planDigest: mark8Plan.digest }),
       heroKind: workup.heroKind ?? null,
-      ...(hasActiveJob && typeof row.workupJson[IMAGE_JOB_MODEL_KEY] === "string"
+      ...(mark8Plan !== null
+        ? { model: MARK_8_IMAGE_MODEL }
+        : hasActiveJob && typeof row.workupJson[IMAGE_JOB_MODEL_KEY] === "string"
         ? { model: row.workupJson[IMAGE_JOB_MODEL_KEY] }
         : {}),
       ...(state === "blocked"
@@ -537,6 +565,9 @@ export async function POST(req: Request) {
             title: `${parsed.book} ${parsed.chapter}`,
             source: "generated",
             approvedManifestDigest,
+            ...(body.confirmDiscardCompletedImages === true
+              ? { allowDiscardCompletedImages: ALLOW_DISCARD_COMPLETED_IMAGES }
+              : {}),
           },
         );
       } catch (e) {

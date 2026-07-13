@@ -198,6 +198,7 @@ export function decideMark8StudioPreflight(
 export function buildStudioGenerateRequest(
   slug: string,
   approvedManifestDigest: string | null,
+  confirmDiscardCompletedImages = false,
 ): Record<string, unknown> {
   if (slug === MARK_8_STUDIO_SLUG) {
     if (!approvedManifestDigest || !SHA256.test(approvedManifestDigest)) {
@@ -208,6 +209,7 @@ export function buildStudioGenerateRequest(
       slug,
       confirm: true,
       approvedManifestDigest,
+      ...(confirmDiscardCompletedImages ? { confirmDiscardCompletedImages: true } : {}),
     };
   }
   return { action: "generate", slug, confirm: true };

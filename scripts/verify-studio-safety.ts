@@ -277,6 +277,7 @@ import {
   IMAGE_JOB_MODEL_KEY,
   IMAGE_JOB_SPENT_COUNT_KEY,
   IMAGE_JOB_ERROR_CODE_KEY,
+  ALLOW_DISCARD_COMPLETED_IMAGES,
 } from "../lib/server/generation-jobs";
 import { isChapterMutationError, __setRowLookupForTesting } from "../lib/server/protected-chapters";
 import {
@@ -306,6 +307,7 @@ import {
   MARK_8_IMAGE_MODEL,
 } from "../lib/server/mark8-image-plan";
 import {
+  safeProtectedMarkFailure,
   validateMark8PublishCandidate,
 } from "../lib/server/chapter-workups-repository";
 import { POST as adminPost } from "../app/api/admin/generation/route";
@@ -795,6 +797,66 @@ const integration = async () => {
     const store = new FakeJobStore();
     const a = await claimGenerationJob(store, "mark-8", META);
     ok(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a), "I4 job id is a UUID");
+  }
+
+  // I4b. Text regeneration cannot silently orphan or discard paid images.
+  {
+    const store = new FakeJobStore();
+    store.seed("mark-8", "draft", {
+      ...(structuredClone(MARK8_IMAGE_WORKUP) as unknown as Record<string, unknown>),
+      [IMAGE_JOB_KEY]: "44444444-4444-4444-8444-444444444444",
+      [IMAGE_JOB_STATE_KEY]: "running",
+    });
+    await expectCode(
+      () => claimGenerationJob(store, "mark-8", META),
+      "REFUSED",
+      "I4b active paid image work blocks text regeneration",
+    );
+    ok(store.rows.get("mark-8")!.status === "draft", "I4b active image row stays untouched");
+
+    const withCompletedImage = structuredClone(MARK8_IMAGE_WORKUP);
+    withCompletedImage.images[0] = {
+      ...withCompletedImage.images[0],
+      status: "complete",
+      src: "https://offline-selah.supabase.co/storage/v1/object/public/chapter-images/mark-8/44444444-4444-4444-8444-444444444444/feeding-four-thousand.png",
+    };
+    store.seed(
+      "mark-8",
+      "draft",
+      withCompletedImage as unknown as Record<string, unknown>,
+    );
+    await expectCode(
+      () => claimGenerationJob(store, "mark-8", META),
+      "REFUSED",
+      "I4b completed paid images require trusted discard approval",
+    );
+    const approvedJob = await claimGenerationJob(store, "mark-8", {
+      ...META,
+      allowDiscardCompletedImages: ALLOW_DISCARD_COMPLETED_IMAGES,
+    });
+    ok(
+      store.rows.get("mark-8")!.status === "generating" && Boolean(approvedJob),
+      "I4b exact server-only discard approval permits one replacement draft",
+    );
+  }
+
+  // I4c. Failed Mark 8 runs expose only useful, allowlisted owner guidance.
+  {
+    const preModel = safeProtectedMarkFailure("protected_mark_draft:PREPARATION_REFUSED");
+    ok(
+      preModel?.textCredit === "none" && preModel.failureMessage?.includes("No text credit"),
+      "I4c pre-model failure truthfully reports no text spend",
+    );
+    const quality = safeProtectedMarkFailure("protected_mark_draft:MARK_QUALITY_BLOCKED");
+    ok(
+      quality?.textCredit === "used" && quality.failureMessage?.includes("quality bar"),
+      "I4c quality failure reports used text credit and a useful next step",
+    );
+    ok(
+      safeProtectedMarkFailure("private database error") === null &&
+        safeProtectedMarkFailure("protected_mark_draft:UNKNOWN_PRIVATE_CODE") === null,
+      "I4c unknown or private errors are never exposed",
+    );
   }
 
   // I5. Image single-use claim + consume: duplicates cannot double-spend.
@@ -1556,10 +1618,19 @@ const realImagePipeline = async () => {
     // are bound before its authenticated background dispatch.
     {
       store.seed("mark-8", "draft", structuredClone(workupJson));
+      const unconfirmed = await adminPost(adminReq({
+        action: "generate_images",
+        slug: "mark-8",
+      }));
+      ok(unconfirmed.status === 409, "M0 Studio refuses image spend without the exact owner-confirmed plan");
+      ok(store.rows.get("mark-8")!.status === "draft" && imageTrigger === null, "M0 unconfirmed image request claims nothing and triggers nothing");
+
       const response = await adminPost(adminReq({
         action: "generate_images",
         slug: "mark-8",
-        model: "gpt-image-1",
+        approvedImagePlanDigest: MARK8_IMAGE_BINDING.planDigest,
+        approvedImageCount: 3,
+        approvedImageModel: MARK_8_IMAGE_MODEL,
       }));
       const body = await response.json() as Record<string, unknown>;
       ok(response.status === 200 && body.triggered === true, "M0 Studio route claims and dispatches Mark 8 images");
@@ -1579,7 +1650,7 @@ const realImagePipeline = async () => {
       const status = await statusResponse.json() as Record<string, unknown>;
       ok(
         status.state === "queued" && status.model === MARK_8_IMAGE_MODEL && status.done === false &&
-          status.estimatedCostUsd === 0.495,
+          status.planDigest === MARK8_IMAGE_BINDING.planDigest && status.estimatedCostUsd === 0.495,
         "M0 Studio status truthfully reports queued exact-model work",
       );
       ok(
@@ -1849,6 +1920,51 @@ const realImagePipeline = async () => {
       store.rows.delete("mark-8");
     }
 
+    // M8. The Mark 8 worker stops before Netlify's hard limit and preserves a
+    // truthful possible-spend record for an aborted in-flight model request.
+    {
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      costs.length = 0;
+      __setImageTestOverrides({
+        configBypass: true,
+        runDeadlineMs: 30,
+        modelProbe: async (model) => ({ ok: true, model }),
+      });
+      __setImageDepsForTesting({
+        db: { storage: db.storage } as never,
+        generateBytes: async () => new Promise<Buffer>((resolve) => {
+          setTimeout(() => resolve(Buffer.from("late-fake-png")), 200);
+        }),
+      });
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      const result = await generateAndStoreChapterImages("mark-8", jobId, MARK8_IMAGE_BINDING);
+      const row = store.rows.get("mark-8")!;
+      const deadlineCost = costs.find(
+        (cost) => (cost.metadata as { deadlineExceeded?: boolean })?.deadlineExceeded === true,
+      );
+      ok(!result.ok && /safety deadline/u.test(result.error ?? ""), "M8 image run exits through the safe deadline path");
+      ok(
+        row.workup_json[IMAGE_JOB_STATE_KEY] === "failed" &&
+          row.workup_json[IMAGE_JOB_SPENT_COUNT_KEY] === 1,
+        "M8 possible in-flight spend becomes visible terminal state, never endless running",
+      );
+      ok(
+        deadlineCost?.imageCount === 1 &&
+          (deadlineCost.metadata as { generated?: number; billingUncertain?: boolean }).generated === 0 &&
+          (deadlineCost.metadata as { billingUncertain?: boolean }).billingUncertain === true,
+        "M8 possible billing is recorded without calling an unfinished image complete",
+      );
+      __setImageTestOverrides({
+        configBypass: true,
+        modelProbe: async (model) => ({ ok: true, model }),
+      });
+      __setImageDepsForTesting({
+        db: { storage: db.storage } as never,
+        generateBytes: async () => Buffer.from("fake-png"),
+      });
+      store.rows.delete("mark-8");
+    }
+
     // N. Final publishing is bound to the exact, owner-reviewed Mark 8 workup.
     // The same row revision that passes this check must win the conditional
     // publish write; browser claims, stale reviews, and foreign image origins
@@ -1957,12 +2073,18 @@ const realImagePipeline = async () => {
         ok(missing.status === 403, "N2 real admin route refuses Mark 8 without final owner review");
         ok(store.rows.get("mark-8")!.status === "draft", "N2 refused publish leaves Mark 8 private");
 
+        __setGenerationTestOverrides({
+          settings: TEST_SETTINGS,
+          captureAudit: audit,
+          auditFailure: true,
+        });
         const exact = await adminPost(adminReq({
           action: "publish",
           slug: "mark-8",
           reviewDigest: digest,
         }));
-        ok(exact.status === 200, "N2 real admin route accepts exact owner-reviewed Mark 8");
+        __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+        ok(exact.status === 200, "N2 real admin route accepts exact owner-reviewed Mark 8 even if the later audit is unavailable");
         ok(store.rows.get("mark-8")!.status === "reviewed", "N2 exact publish promotes Mark 8 once");
 
         store.seed(
