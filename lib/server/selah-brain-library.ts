@@ -5,47 +5,72 @@ import { createHash } from "node:crypto";
 import library from "./selah-brain-library.v1_1.json";
 
 export interface SeedRule {
-  id: string;
-  category: string;
-  title: string;
-  text: string;
-  scope: string; // global | genre
-  genre?: string;
-  stages: string[]; // copy_generation | copy_review | image_prompt | image_review | map_config | governance
-  active: boolean;
-  priority: string; // core | contextual | qa | governance
-  sources?: string[];
+  readonly id: string;
+  readonly category: string;
+  readonly title: string;
+  readonly text: string;
+  readonly scope: string; // global | genre
+  readonly genre?: string;
+  readonly stages: readonly string[]; // copy_generation | copy_review | image_prompt | image_review | map_config | governance
+  readonly active: boolean;
+  readonly priority: string; // core | contextual | qa | governance
+  readonly sources?: readonly string[];
 }
 
 export interface SeedApproval {
-  approved_by: string;
-  approved_at: string;
-  evidence: string;
-  library_version: string;
-  content_digest: string;
+  readonly approved_by: string;
+  readonly approved_at: string;
+  readonly evidence: string;
+  readonly library_version: string;
+  readonly content_digest: string;
 }
 
 interface InjectionPolicy {
-  always_on_rule_ids: string[];
-  max_contextual_rules_per_generation: number;
-  max_contextual_rules_by_stage?: Record<string, number>;
-  quality_gate_rule_ids: string[];
-  governance_rule_ids_not_injected_into_copy_prompt: string[];
+  readonly always_on_rule_ids: readonly string[];
+  readonly max_contextual_rules_per_generation: number;
+  readonly max_contextual_rules_by_stage?: Readonly<Record<string, number>>;
+  readonly quality_gate_rule_ids: readonly string[];
+  readonly governance_rule_ids_not_injected_into_copy_prompt: readonly string[];
 }
 
-const lib = library as unknown as {
-  version: string;
-  status: string;
-  seed_approval: SeedApproval | null;
-  rule_count: number;
-  rules: SeedRule[];
-  injection_policy: InjectionPolicy;
-};
+interface CanonicalLibrary {
+  readonly version: string;
+  readonly status: string;
+  readonly seed_approval: SeedApproval | null;
+  readonly rule_count: number;
+  readonly rules: readonly SeedRule[];
+  readonly injection_policy: InjectionPolicy;
+  readonly [key: string]: unknown;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    deepFreeze(child);
+  }
+  return Object.freeze(value);
+}
+
+// Clone first so no other importer can retain a mutable reference to the JSON
+// module, then freeze every nested rule, policy, source, and ledger entry. The
+// approval digest and all seed planning now read the same immutable snapshot.
+const lib = deepFreeze(structuredClone(library)) as unknown as CanonicalLibrary;
+
+function contentDigestFor(snapshot: CanonicalLibrary): string {
+  const {
+    status: _status,
+    seed_approval: _seedApproval,
+    ...digestableLibrary
+  } = snapshot;
+  return createHash("sha256")
+    .update(JSON.stringify(digestableLibrary))
+    .digest("hex");
+}
 
 export const LIBRARY_VERSION = lib.version;
 export const LIBRARY_STATUS = lib.status;
 export const LIBRARY_SEED_APPROVAL = lib.seed_approval;
-export const SEED_RULES: SeedRule[] = lib.rules;
+export const SEED_RULES: readonly SeedRule[] = lib.rules;
 export const INJECTION_POLICY = lib.injection_policy;
 export const MAX_CONTEXTUAL = lib.injection_policy.max_contextual_rules_per_generation;
 export const MAX_CONTEXTUAL_BY_STAGE =
@@ -54,9 +79,8 @@ export const MAX_CONTEXTUAL_BY_STAGE =
 // Bind owner approval to the exact version-controlled artifact while excluding
 // the two fields that change when approval is recorded. JSON import order is
 // stable, so this digest is deterministic in Studio, verification, and Netlify.
-const digestableLibrary = { ...(library as Record<string, unknown>) };
-delete digestableLibrary.status;
-delete digestableLibrary.seed_approval;
-export const LIBRARY_CONTENT_DIGEST = createHash("sha256")
-  .update(JSON.stringify(digestableLibrary))
-  .digest("hex");
+export const LIBRARY_CONTENT_DIGEST = contentDigestFor(lib);
+
+export function libraryContentDigestMatchesSnapshot(): boolean {
+  return contentDigestFor(lib) === LIBRARY_CONTENT_DIGEST;
+}

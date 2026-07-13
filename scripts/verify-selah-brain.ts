@@ -9,7 +9,12 @@ import {
   type ExistingLibraryRuleRow,
   type RuleRow,
 } from "../lib/server/selah-brain";
-import { LIBRARY_CONTENT_DIGEST } from "../lib/server/selah-brain-library";
+import {
+  INJECTION_POLICY,
+  LIBRARY_CONTENT_DIGEST,
+  SEED_RULES,
+  libraryContentDigestMatchesSnapshot,
+} from "../lib/server/selah-brain-library";
 
 type LibraryRule = {
   id: string;
@@ -219,6 +224,33 @@ for (const rule of library.rules) {
 const byId = new Map(library.rules.map((rule) => [rule.id, rule]));
 assert.equal(library.version, "1.7", "unexpected candidate Brain version");
 assert.match(LIBRARY_CONTENT_DIGEST, /^[a-f0-9]{64}$/);
+assert.ok(
+  libraryContentDigestMatchesSnapshot(),
+  "runtime Brain snapshot must still match the approval digest",
+);
+assert.ok(Object.isFrozen(SEED_RULES), "seed rule array must be frozen");
+assert.ok(Object.isFrozen(SEED_RULES[0]), "individual seed rules must be frozen");
+assert.ok(Object.isFrozen(SEED_RULES[0].stages), "seed rule stages must be frozen");
+assert.ok(Object.isFrozen(INJECTION_POLICY), "injection policy must be frozen");
+assert.ok(
+  Object.isFrozen(INJECTION_POLICY.always_on_rule_ids),
+  "injection policy rule IDs must be frozen",
+);
+const firstSeedRuleText = SEED_RULES[0].text;
+assert.equal(
+  Reflect.set(
+    SEED_RULES[0] as unknown as Record<string, unknown>,
+    "text",
+    "UNAPPROVED MUTATION",
+  ),
+  false,
+  "digest-bound seed rules must refuse in-memory mutation",
+);
+assert.equal(SEED_RULES[0].text, firstSeedRuleText);
+assert.ok(
+  libraryContentDigestMatchesSnapshot(),
+  "a refused mutation must leave the runtime snapshot digest-bound",
+);
 assert.ok(
   ["review_only", "approved_for_seed"].includes(library.status),
   "Brain artifact has an unknown seed status",

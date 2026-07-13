@@ -9,6 +9,7 @@ import {
   LIBRARY_SEED_APPROVAL,
   LIBRARY_STATUS,
   LIBRARY_VERSION,
+  libraryContentDigestMatchesSnapshot,
   MAX_CONTEXTUAL,
   MAX_CONTEXTUAL_BY_STAGE,
   type SeedApproval,
@@ -433,8 +434,8 @@ function canonicalSeedValues(rule: SeedRule): Record<string, unknown> {
     scope: rule.scope,
     genre: rule.genre ?? null,
     priority: rule.priority,
-    stages: rule.stages ?? [],
-    source_titles: rule.sources ?? [],
+    stages: [...(rule.stages ?? [])],
+    source_titles: [...(rule.sources ?? [])],
     version: LIBRARY_VERSION,
   };
 }
@@ -514,6 +515,15 @@ export async function seedFromLibrary(): Promise<{
   total: number;
   error?: string;
 }> {
+  if (!libraryContentDigestMatchesSnapshot()) {
+    return {
+      inserted: 0,
+      updated: 0,
+      unchanged: 0,
+      total: SEED_RULES.length,
+      error: `library ${LIBRARY_VERSION} no longer matches its approval digest`,
+    };
+  }
   if (!librarySeedApproved()) {
     return {
       inserted: 0,
