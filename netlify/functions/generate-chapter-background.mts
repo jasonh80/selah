@@ -26,12 +26,21 @@ const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 
 type ProtectedMarkDraftRunner = typeof runConfiguredProtectedMarkDraftJob;
 let protectedMarkDraftRunnerOverride: ProtectedMarkDraftRunner | null = null;
+type Mark8PermissionChecker = typeof mark8GenerationAllowed;
+let mark8PermissionCheckerOverride: Mark8PermissionChecker | null = null;
 
 /** Offline verification seam only. Production always uses the configured runner. */
 export function __setProtectedMarkDraftRunnerForTesting(
   runner: ProtectedMarkDraftRunner | null,
 ): void {
   protectedMarkDraftRunnerOverride = runner;
+}
+
+/** Offline verification seam only. Production always reads live settings. */
+export function __setMark8PermissionCheckerForTesting(
+  checker: Mark8PermissionChecker | null,
+): void {
+  mark8PermissionCheckerOverride = checker;
 }
 
 async function refuse(slug: string, reason: string, status: number): Promise<Response> {
@@ -125,7 +134,21 @@ export default async (req: Request) => {
     // Recheck the owner's live kill switch/permission immediately before the
     // protected runner can consume the claim or spend. Turning generation OFF
     // after the route queued this job therefore still stops it safely.
-    if (!(await mark8GenerationAllowed(slug))) {
+    let mark8Allowed: boolean;
+    try {
+      const checkPermission =
+        mark8PermissionCheckerOverride ?? mark8GenerationAllowed;
+      mark8Allowed = await checkPermission(slug);
+    } catch {
+      return cleanupProtectedMark8Claim(
+        slug,
+        jobId,
+        approvedManifestDigest,
+        "protected Mark 8 permission check failed",
+        500,
+      );
+    }
+    if (!mark8Allowed) {
       return cleanupProtectedMark8Claim(
         slug,
         jobId,

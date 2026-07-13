@@ -292,6 +292,7 @@ import {
 import { __setImageTestOverrides, __setImageDepsForTesting, generateAndStoreChapterImages } from "../lib/server/images";
 import { POST as adminPost } from "../app/api/admin/generation/route";
 import textWorker, {
+  __setMark8PermissionCheckerForTesting,
   __setProtectedMarkDraftRunnerForTesting,
 } from "../netlify/functions/generate-chapter-background.mts";
 import imagesWorker from "../netlify/functions/generate-images-background.mts";
@@ -1023,6 +1024,37 @@ const realRouteAndWorkers = async () => {
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
+    // R3c. A settings-read rejection is also cleaned up before either runner.
+    {
+      lastTrigger = null;
+      const protectedBefore = protectedRunnerCalls;
+      const textBefore = textGeneratorCalls;
+      const queued = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(queued.status === 200 && lastTrigger !== null, "R3c queued Mark 8 before permission-read failure");
+      __setMark8PermissionCheckerForTesting(async () => {
+        throw new Error("offline settings read rejection");
+      });
+      const stopped = await textWorker(workerReq(
+        "generate-chapter-background",
+        { ...lastTrigger!.body },
+      ));
+      __setMark8PermissionCheckerForTesting(null);
+      ok(stopped.status === 500, "R3c permission-read rejection reports failure");
+      ok(store.rows.get("mark-8")!.status === "failed", "R3c rejected permission read cleaned the exact queued job");
+      ok(
+        store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === MANIFEST_DIGEST_A,
+        "R3c cleanup remained bound to the approved manifest digest",
+      );
+      ok(protectedRunnerCalls === protectedBefore, "R3c permission-read rejection reached no protected runner");
+      ok(textGeneratorCalls === textBefore, "R3c permission-read rejection reached no generic runner");
+      store.rows.delete("mark-8");
+    }
+
     // R4. FULL PIPELINE: real route claims + triggers; real worker authenticates,
     // consumes, generates (fixture), completes a draft.
     {
@@ -1362,6 +1394,7 @@ const realRouteAndWorkers = async () => {
     __setGenerationConfigBypassForTesting(false);
     __setTriggerTransportForTesting(null);
     __setTextGeneratorForTesting(null);
+    __setMark8PermissionCheckerForTesting(null);
     __setProtectedMarkDraftRunnerForTesting(null);
   }
 };
