@@ -523,6 +523,15 @@ export default function SelahStudioPage() {
         {previewed && !published && (
           <div className="mt-3 space-y-4 rounded-lg border bg-card-soft p-4">
             <div>
+              <p className="text-[13px] font-semibold text-primary">Before you choose Ready</p>
+              <ul className="mt-2 space-y-1 text-[12px] text-secondary">
+                <li>• Bible: Is it faithful to this chapter and honest about what we do not know?</li>
+                <li>• Jesus: Does it help people see and follow Him without forcing a connection?</li>
+                <li>• Voice: Is it warm, clear, and memorable like Mark 6—without copying it?</li>
+                <li>• Usefulness: Do the explanation, application, and prayer grow from the chapter?</li>
+              </ul>
+            </div>
+            <div>
               <p className="text-[14px] font-semibold text-primary">Is this ready to publish?</p>
               <div className="mt-2 flex gap-2">
                 <Seg active={verdict === "yes"} onClick={() => { setVerdict("yes"); setNoteSaved(false); setShowFeedback(false); }}>Ready</Seg>
