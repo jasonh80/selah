@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import guidanceArtifact from "../lib/server/mark-sprint-guidance.v1.json";
 import {
+  createSupabaseMarkSprintRuntimeReadPorts,
   prepareMarkSprintRuntime,
   prepareMarkSprintRuntimePreview,
   withMarkSprintRuntimeApprovedPreparation,
@@ -168,6 +169,47 @@ async function expectEvidenceBlock(
 }
 
 async function main(): Promise<void> {
+  const adapterCalls: Array<{ method: string; args: unknown[] }> = [];
+  const adapterQuery = {
+    select(...args: unknown[]) {
+      adapterCalls.push({ method: "select", args });
+      return this;
+    },
+    in(...args: unknown[]) {
+      adapterCalls.push({ method: "in", args });
+      return this;
+    },
+    eq(...args: unknown[]) {
+      adapterCalls.push({ method: "eq", args });
+      return this;
+    },
+    then(resolve: (value: unknown) => unknown) {
+      return Promise.resolve({ data: exampleRows, error: null }).then(resolve);
+    },
+  };
+  const adapter = createSupabaseMarkSprintRuntimeReadPorts({
+    from(...args: unknown[]) {
+      adapterCalls.push({ method: "from", args });
+      return adapterQuery;
+    },
+  } as never);
+  await adapter.readVoiceExampleRows({
+    title: "Mark 6 Daily Rundown",
+    genre: "gospel narrative",
+    exampleType: "voice",
+  });
+  assert.deepEqual(
+    adapterCalls.find((call) => call.method === "in"),
+    {
+      method: "in",
+      args: [
+        "title",
+        ["Mark 6 Daily Rundown", "Mark 6 Daily Rundown Voice Example"],
+      ],
+    },
+    "the live adapter must query only the canonical and exact legacy titles",
+  );
+
   await expectEvidenceBlock(
     ports({ brain: brainRows.slice(1) }),
     "LIVE_BRAIN_MISSING",
@@ -211,7 +253,56 @@ async function main(): Promise<void> {
     ports({ examples: [{ ...exampleRows[0], active: false }] }),
     "LIVE_VOICE_EXAMPLE_MISMATCH",
   );
+  for (const invalidExample of [
+    { ...exampleRows[0], genre: "gospel" },
+    { ...exampleRows[0], example_type: "structure" },
+    { ...exampleRows[0], content: "   " },
+  ]) {
+    await expectEvidenceBlock(
+      ports({ examples: [invalidExample] }),
+      "LIVE_VOICE_EXAMPLE_MISMATCH",
+    );
+  }
+  await expectEvidenceBlock(
+    ports({
+      examples: [
+        exampleRows[0],
+        {
+          ...exampleRows[0],
+          id: "db-mark-6-daily-rundown-legacy",
+          title: "Mark 6 Daily Rundown Voice Example",
+        },
+      ],
+    }),
+    "LIVE_VOICE_EXAMPLE_MISMATCH",
+  );
+  await expectEvidenceBlock(
+    ports({
+      examples: [
+        { ...exampleRows[0], title: "Mark 6 Daily Rundown Example" },
+      ],
+    }),
+    "LIVE_VOICE_EXAMPLE_MISMATCH",
+  );
   await expectEvidenceBlock(ports({ fail: "brain" }), "LIVE_READ_FAILED");
+
+  // Studio's original saved row has this exact legacy display title. It is
+  // the same single active voice example, and its real title/id/content are
+  // still bound into the per-run manifest.
+  sourceFetchCount = 0;
+  const legacyVoiceExample = await preview(
+    ports({
+      examples: [
+        {
+          ...exampleRows[0],
+          title: "Mark 6 Daily Rundown Voice Example",
+        },
+      ],
+    }),
+  );
+  assert.equal(legacyVoiceExample.evidenceReady, true);
+  assert.deepEqual(legacyVoiceExample.evidenceBlockers, []);
+  assert.equal(sourceFetchCount, 3);
 
   // A normal Needs work note must not corrupt the exact guidance packet used
   // by the next private draft.
@@ -239,6 +330,11 @@ async function main(): Promise<void> {
   assert.equal(exact.evidenceReady, true);
   assert.equal(exact.readyForGeneration, false);
   assert.deepEqual(exact.evidenceBlockers, []);
+  assert.notEqual(
+    legacyVoiceExample.manifestDigest,
+    exact.manifestDigest,
+    "the stored legacy title must remain bound into the per-run manifest",
+  );
   assert.match(exact.sourceBundleDigest ?? "", /^[a-f0-9]{64}$/u);
   assert.match(exact.manifestDigest ?? "", /^[a-f0-9]{64}$/u);
   assert.deepEqual(
