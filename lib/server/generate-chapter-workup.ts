@@ -40,6 +40,17 @@ export async function generationAllowed(slug: string): Promise<boolean> {
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);
 }
 
+/**
+ * The only protected sprint chapter connected to paid work today. Mark 9–11
+ * remain fail-closed until their own owner-approved launch work is connected.
+ */
+export async function mark8GenerationAllowed(slug: string): Promise<boolean> {
+  if (slug !== "mark-8") return false;
+  if (!configCheckBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
+  const s = await getGenerationSettings();
+  return s.text_generation_enabled && s.allowed_slugs.includes(slug);
+}
+
 // "psalm-23" -> { book: "Psalm", chapter: 23 }
 export function parseSlug(slug: string): { book: string; chapter: number } | null {
   const m = slug.match(/^(.+)-(\d+)$/);
@@ -64,7 +75,7 @@ export function assertGenericChapterGenerationAllowed(input: {
 }): void {
   if (isProtectedMarkSprintGenerationIdentity(input)) {
     throw new Error(
-      `${input.slug} is blocked: the protected ESV generation runner is not connected`,
+      `${input.slug} is blocked from generic generation and must use its protected runner`,
     );
   }
 }

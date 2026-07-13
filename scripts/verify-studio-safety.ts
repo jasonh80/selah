@@ -281,6 +281,7 @@ import {
 } from "../lib/server/trigger-generation";
 import {
   __setGenerationTestOverrides,
+  getGenerationSettings,
   type GenerationSettings,
 } from "../lib/server/generation-settings";
 import { __setCostCaptureForTesting, type CostEventInput } from "../lib/server/cost-events-repository";
@@ -290,7 +291,9 @@ import {
 } from "../lib/server/generate-chapter-workup";
 import { __setImageTestOverrides, __setImageDepsForTesting, generateAndStoreChapterImages } from "../lib/server/images";
 import { POST as adminPost } from "../app/api/admin/generation/route";
-import textWorker from "../netlify/functions/generate-chapter-background.mts";
+import textWorker, {
+  __setProtectedMarkDraftRunnerForTesting,
+} from "../netlify/functions/generate-chapter-background.mts";
 import imagesWorker from "../netlify/functions/generate-images-background.mts";
 import type { ChapterWorkup } from "../lib/types";
 import generatedFixture from "../lib/ai/fixtures/exodus-27-generated.json";
@@ -841,6 +844,8 @@ const realRouteAndWorkers = async () => {
   } | null = null;
   let triggerResult: TriggerResult = { ok: true, status: 202 };
   let textGeneratorCalls = 0;
+  let protectedRunnerCalls = 0;
+  let protectedRunnerMode: "complete" | "throw_before" | "throw_after_consume" = "complete";
 
   __setJobStoreForTesting(store);
   __setRowLookupForTesting(storeLookup(store));
@@ -858,6 +863,47 @@ const realRouteAndWorkers = async () => {
       inputTokens: 0,
       outputTokens: 0,
     };
+  });
+  __setProtectedMarkDraftRunnerForTesting(async (input) => {
+    protectedRunnerCalls++;
+    if (protectedRunnerMode === "throw_before") {
+      throw new Error("offline runner failure before consume");
+    }
+    try {
+      await consumeGenerationClaim(
+        store,
+        input.slug,
+        input.jobId,
+        input.approvedManifestDigest,
+      );
+      if (protectedRunnerMode === "throw_after_consume") {
+        throw new Error("offline runner failure after consume");
+      }
+      await completeGenerationJob(
+        store,
+        input.slug,
+        input.jobId,
+        { workup: WORKUP, version: "offline-protected-dispatch", bibleVersion: "ESV" },
+        input.approvedManifestDigest,
+      );
+    } catch (error) {
+      if (protectedRunnerMode === "throw_after_consume") throw error;
+      return Object.freeze({
+        ok: false as const,
+        slug: input.slug,
+        status: "conflict" as const,
+        code: "CLAIM_NOT_CONSUMED" as const,
+        manifestDigest: input.approvedManifestDigest,
+      });
+    }
+    return Object.freeze({
+      ok: true as const,
+      slug: "mark-8" as const,
+      status: "draft" as const,
+      manifestDigest: input.approvedManifestDigest,
+      canonicalDraftDigest: MANIFEST_DIGEST_B,
+      snapshotVersion: null,
+    });
   });
 
   try {
@@ -877,12 +923,59 @@ const realRouteAndWorkers = async () => {
       ok(store.rows.get("mark-6")!.status === "draft" && lastTrigger === null, "R2 protected row untouched, no trigger");
     }
 
-    // R2b. Mark sprint slugs remain blocked until their protected runner is connected.
+    // R2b. Mark 8 needs the exact lowercase digest plus an explicit owner
+    // confirmation. Bad requests cannot claim, trigger, or edit the allowlist.
     {
-      const res = await adminPost(adminReq({ action: "generate", slug: "mark-8" }));
-      ok(res.status === 403, "R2b Mark sprint slug requires protected runner");
-      ok(!store.rows.has("mark-8") && lastTrigger === null, "R2b protected Mark sprint made no claim and no trigger");
-      ok(audit.some((a) => a.action === "refused:generate" && a.slug === "mark-8"), "R2b refusal durably audited");
+      const withoutMark8 = {
+        ...TEST_SETTINGS,
+        allowed_slugs: [GENERIC_SLUG],
+      };
+      __setGenerationTestOverrides({ settings: withoutMark8, captureAudit: audit });
+
+      const missing = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+      }));
+      ok(missing.status === 400, "R2b Mark 8 missing manifest digest → 400");
+
+      const uppercase = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A.toUpperCase(),
+      }));
+      ok(uppercase.status === 400, "R2b Mark 8 uppercase manifest digest → 400");
+
+      const unconfirmed = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(unconfirmed.status === 400, "R2b Mark 8 without owner confirmation → 400");
+      ok(
+        !(await getGenerationSettings()).allowed_slugs.includes("mark-8"),
+        "R2b malformed/unconfirmed requests did not edit the allowlist",
+      );
+      ok(
+        !store.rows.has("mark-8") && lastTrigger === null,
+        "R2b malformed/unconfirmed requests made no claim and no trigger",
+      );
+    }
+
+    // R2c. Mark 9–11 remain blocked and never reach generic generation.
+    {
+      for (const blockedSlug of ["mark-9", "mark-10", "mark-11"]) {
+        const res = await adminPost(adminReq({
+          action: "generate",
+          slug: blockedSlug,
+          confirm: true,
+          approvedManifestDigest: MANIFEST_DIGEST_A,
+        }));
+        ok(res.status === 403, `R2c ${blockedSlug} protected route remains blocked`);
+        ok(!store.rows.has(blockedSlug), `R2c ${blockedSlug} made no claim`);
+      }
+      ok(lastTrigger === null, "R2c Mark 9–11 sent no trigger");
     }
 
     // R3. Kill switch OFF through the REAL route: refused before any claim.
@@ -891,6 +984,42 @@ const realRouteAndWorkers = async () => {
       const res = await adminPost(adminReq({ action: "generate", slug: GENERIC_SLUG }));
       ok(res.status === 403, "R3 text kill switch OFF → 403");
       ok(!store.rows.has(GENERIC_SLUG) && lastTrigger === null, "R3 no claim, no trigger with switch OFF");
+      const mark8 = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(mark8.status === 403, "R3 protected Mark 8 also honors text kill switch OFF");
+      ok(!store.rows.has("mark-8") && lastTrigger === null, "R3 Mark 8 OFF made no claim and no trigger");
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+    }
+
+    // R3b. Turning the switch OFF after the route queued Mark 8 still stops
+    // the worker before protected dispatch and cleans up the exact claim.
+    {
+      store.rows.delete("mark-8");
+      lastTrigger = null;
+      const protectedBefore = protectedRunnerCalls;
+      const textBefore = textGeneratorCalls;
+      const queued = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(queued.status === 200 && lastTrigger !== null, "R3b Mark 8 queued while the switch was ON");
+      const body = { ...lastTrigger!.body };
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, text_generation_enabled: false },
+        captureAudit: audit,
+      });
+      const stopped = await textWorker(workerReq("generate-chapter-background", body));
+      ok(stopped.status === 403, "R3b worker-time OFF check refuses protected Mark 8");
+      ok(store.rows.get("mark-8")!.status === "failed", "R3b worker-time OFF cleanup marked the exact job failed");
+      ok(protectedRunnerCalls === protectedBefore, "R3b OFF reached no protected runner");
+      ok(textGeneratorCalls === textBefore, "R3b OFF reached no generic model path");
+      store.rows.delete("mark-8");
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
@@ -923,13 +1052,34 @@ const realRouteAndWorkers = async () => {
       ok(get.status === 405, "R5 non-POST → 405");
       const missing = await textWorker(workerReq("generate-chapter-background", { slug: "mark-8" }));
       ok(missing.status === 400, "R5 missing job id → 400");
-      const bad = await textWorker(workerReq("generate-chapter-background", { slug: "mark-8", job: jid, token: "junk" }));
+      const bad = await textWorker(workerReq("generate-chapter-background", {
+        slug: "mark-8",
+        job: jid,
+        token: "junk",
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
       ok(bad.status === 401, "R5 bad token → 401");
-      const expired = signJobToken("text", "mark-8", jid, Date.now() - 60 * 60 * 1000).token;
-      const exp = await textWorker(workerReq("generate-chapter-background", { slug: "mark-8", job: jid, token: expired }));
+      const expired = signJobToken(
+        "text",
+        "mark-8",
+        jid,
+        Date.now() - 60 * 60 * 1000,
+        MANIFEST_DIGEST_A,
+      ).token;
+      const exp = await textWorker(workerReq("generate-chapter-background", {
+        slug: "mark-8",
+        job: jid,
+        token: expired,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
       ok(exp.status === 401, "R5 expired token → 401");
       const wrongPurpose = signJobToken("image", "mark-8", jid).token;
-      const wp = await textWorker(workerReq("generate-chapter-background", { slug: "mark-8", job: jid, token: wrongPurpose }));
+      const wp = await textWorker(workerReq("generate-chapter-background", {
+        slug: "mark-8",
+        job: jid,
+        token: wrongPurpose,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
       ok(wp.status === 401, "R5 image-purpose token rejected by text worker");
       ok(audit.filter((a) => a.action === "refused:worker_generate").length >= 4, "R5 worker refusals durably audited");
     }
@@ -992,6 +1142,156 @@ const realRouteAndWorkers = async () => {
       ok(store.rows.get(GENERIC_SLUG)!.status === "draft", "R5b exact bound run saved its draft");
     }
 
+    // R5c. The real route + handler dispatch Mark 8 only through the protected
+    // runner. This offline runner seam performs the real digest-bound
+    // claim/consume/complete writes but makes no source, model, or network call.
+    {
+      store.rows.delete("mark-8");
+      lastTrigger = null;
+      const callsBefore = textGeneratorCalls;
+      const protectedBefore = protectedRunnerCalls;
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, allowed_slugs: [GENERIC_SLUG] },
+        captureAudit: audit,
+      });
+
+      const routeResponse = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(routeResponse.status === 200, "R5c confirmed Mark 8 route accepted the protected draft");
+      ok(lastTrigger !== null, "R5c protected route sent an authenticated trigger");
+      ok(
+        (await getGenerationSettings()).allowed_slugs.includes("mark-8"),
+        "R5c confirmed Mark 8 was automatically added to the allowlist",
+      );
+      const firstBody = { ...lastTrigger!.body };
+      ok(
+        firstBody.slug === "mark-8" &&
+          firstBody.approvedManifestDigest === MANIFEST_DIGEST_A,
+        "R5c trigger carries exact Mark 8 slug + manifest digest",
+      );
+      ok(
+        store.rows.get("mark-8")!.workup_json[TEXT_JOB_STATE_KEY] === "queued" &&
+          store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === MANIFEST_DIGEST_A,
+        "R5c route atomically queued the digest-bound job",
+      );
+
+      const omitted = await textWorker(workerReq("generate-chapter-background", {
+        slug: firstBody.slug,
+        job: firstBody.job,
+        token: firstBody.token,
+      }));
+      ok(omitted.status === 400, "R5c Mark 8 worker rejects a missing digest");
+      const wrong = await textWorker(workerReq("generate-chapter-background", {
+        ...firstBody,
+        approvedManifestDigest: MANIFEST_DIGEST_B,
+      }));
+      ok(wrong.status === 401, "R5c Mark 8 worker rejects a digest not bound to its token");
+      ok(protectedRunnerCalls === protectedBefore, "R5c bad digest requests never reached the protected runner");
+
+      const exact = await textWorker(workerReq("generate-chapter-background", firstBody));
+      ok(exact.status === 200, `R5c exact protected dispatch completed (HTTP ${exact.status})`);
+      ok(protectedRunnerCalls === protectedBefore + 1, "R5c protected runner dispatched exactly once");
+      ok(textGeneratorCalls === callsBefore, "R5c generic generator never handled Mark 8");
+      ok(store.rows.get("mark-8")!.status === "draft", "R5c protected dispatch saved only a private draft");
+
+      const replay = await textWorker(workerReq("generate-chapter-background", firstBody));
+      ok(replay.status === 409, "R5c duplicate protected delivery is refused");
+      ok(store.rows.get("mark-8")!.status === "draft", "R5c duplicate delivery changed nothing");
+
+      lastTrigger = null;
+      const secondRoute = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_B,
+      }));
+      ok(secondRoute.status === 200 && lastTrigger !== null, "R5c a new confirmed Mark 8 job can be queued");
+      const secondBody = { ...lastTrigger!.body };
+      const stale = await textWorker(workerReq("generate-chapter-background", firstBody));
+      ok(stale.status === 409, "R5c stale delivery cannot consume a newer job");
+      ok(
+        store.rows.get("mark-8")!.workup_json[TEXT_JOB_KEY] === secondBody.job &&
+          store.rows.get("mark-8")!.workup_json[TEXT_JOB_STATE_KEY] === "queued" &&
+          store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === MANIFEST_DIGEST_B,
+        "R5c stale delivery left the newer digest-bound job untouched",
+      );
+      const secondExact = await textWorker(workerReq("generate-chapter-background", secondBody));
+      ok(secondExact.status === 200, "R5c newer exact delivery completes normally");
+      ok(textGeneratorCalls === callsBefore, "R5c no Mark 8 path reached generic generation");
+      store.rows.delete("mark-8");
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+    }
+
+    // R5d. The actual worker refuses Mark 9–11 before either generator runs.
+    {
+      const callsBefore = textGeneratorCalls;
+      const protectedBefore = protectedRunnerCalls;
+      for (const blockedSlug of ["mark-9", "mark-10", "mark-11"]) {
+        const job = `offline-${blockedSlug}-job`;
+        const token = signJobToken(
+          "text",
+          blockedSlug,
+          job,
+          undefined,
+          MANIFEST_DIGEST_A,
+        ).token;
+        const response = await textWorker(workerReq("generate-chapter-background", {
+          slug: blockedSlug,
+          job,
+          token,
+          approvedManifestDigest: MANIFEST_DIGEST_A,
+        }));
+        ok(response.status === 403, `R5d worker keeps ${blockedSlug} blocked`);
+      }
+      ok(textGeneratorCalls === callsBefore, "R5d Mark 9–11 never reached generic generation");
+      ok(protectedRunnerCalls === protectedBefore, "R5d Mark 9–11 never reached the Mark 8 runner");
+    }
+
+    // R5e. An unexpected protected-runner throw cannot strand Studio in
+    // generating, whether it happens before or after claim consumption.
+    {
+      store.rows.delete("mark-8");
+      lastTrigger = null;
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+
+      protectedRunnerMode = "throw_before";
+      const beforeRoute = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(beforeRoute.status === 200 && lastTrigger !== null, "R5e queued throw-before job");
+      const beforeResponse = await textWorker(workerReq(
+        "generate-chapter-background",
+        { ...lastTrigger!.body },
+      ));
+      ok(beforeResponse.status === 500, "R5e throw before consume reports worker failure");
+      ok(store.rows.get("mark-8")!.status === "failed", "R5e throw before consume cleaned the queued job");
+
+      lastTrigger = null;
+      protectedRunnerMode = "throw_after_consume";
+      const afterRoute = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_B,
+      }));
+      ok(afterRoute.status === 200 && lastTrigger !== null, "R5e queued throw-after-consume job");
+      const afterResponse = await textWorker(workerReq(
+        "generate-chapter-background",
+        { ...lastTrigger!.body },
+      ));
+      ok(afterResponse.status === 500, "R5e throw after consume reports worker failure");
+      ok(store.rows.get("mark-8")!.status === "failed", "R5e throw after consume cleaned the running job");
+      protectedRunnerMode = "complete";
+      store.rows.delete("mark-8");
+    }
+
     // R6. Trigger failure through the REAL route: job failed + truthful response.
     {
       store.rows.delete(GENERIC_SLUG);
@@ -1027,6 +1327,33 @@ const realRouteAndWorkers = async () => {
       store.rows.delete(GENERIC_SLUG);
       triggerResult = { ok: true, status: 202 };
     }
+
+    // R6c. Mark 8 trigger cleanup must present the same manifest digest that
+    // was bound to the claim; omitting it would conflict and strand the row.
+    {
+      store.rows.delete("mark-8");
+      lastTrigger = null;
+      triggerResult = { ok: false, error: "offline protected trigger failure" };
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, allowed_slugs: [GENERIC_SLUG] },
+        captureAudit: audit,
+      });
+      const response = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-8",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(response.status === 502, "R6c Mark 8 trigger failure → 502");
+      ok(store.rows.get("mark-8")!.status === "failed", "R6c exact digest cleanup marked the protected job failed");
+      ok(
+        store.rows.get("mark-8")!.workup_json[TEXT_JOB_MANIFEST_DIGEST_KEY] === MANIFEST_DIGEST_A,
+        "R6c cleanup stayed pinned to the original manifest digest",
+      );
+      store.rows.delete("mark-8");
+      triggerResult = { ok: true, status: 202 };
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+    }
   } finally {
     __setJobStoreForTesting(null);
     __setRowLookupForTesting(null);
@@ -1035,6 +1362,7 @@ const realRouteAndWorkers = async () => {
     __setGenerationConfigBypassForTesting(false);
     __setTriggerTransportForTesting(null);
     __setTextGeneratorForTesting(null);
+    __setProtectedMarkDraftRunnerForTesting(null);
   }
 };
 

@@ -8,6 +8,7 @@ import {
 import {
   generationAllowed,
   isProtectedMarkSprintGenerationIdentity,
+  mark8GenerationAllowed,
   parseSlug,
 } from "@/lib/server/generate-chapter-workup";
 import {
@@ -66,6 +67,8 @@ import {
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
 export const dynamic = "force-dynamic";
+
+const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 
 function authed(req: Request): boolean {
   const expected = process.env.DEV_ADMIN_TOKEN || "";
@@ -317,17 +320,133 @@ export async function POST(req: Request) {
     // Issue #8 mutation guard: published/protected chapters cannot be regenerated.
     const blocked = await guardOrRefuse(slug, "generate", "createGeneratingChapterWorkup");
     if (blocked) return blocked;
-    const confirm = body.confirm === true || body.confirm === "yes";
-    // Refuse before the ordinary admin flow can add the slug to the persistent
-    // allowlist or claim a generating row. Mark 8–11 require the protected path.
-    if (isProtectedMarkSprintGenerationIdentity({ slug })) {
-      return refuse(
+    const protectedMarkSprint = isProtectedMarkSprintGenerationIdentity({ slug });
+
+    // Mark 8 is the only protected sprint chapter connected to the worker.
+    // Its owner-confirmed manifest digest is carried through the atomic claim,
+    // signed trigger, worker authentication, and every cleanup/terminal write.
+    // Mark 9–11 remain blocked and can never fall through to generic generation.
+    if (protectedMarkSprint) {
+      if (slug !== MARK_8_STUDIO_SLUG) {
+        return refuse(
+          slug,
+          "generate",
+          "blocked — only the protected Mark 8 draft runner is connected",
+          403,
+        );
+      }
+      const approvedManifestDigest =
+        typeof body.approvedManifestDigest === "string"
+          ? body.approvedManifestDigest
+          : "";
+      if (!LOWERCASE_SHA256.test(approvedManifestDigest)) {
+        return refuse(
+          slug,
+          "generate",
+          "Mark 8 requires the exact prepared manifest digest",
+          400,
+        );
+      }
+      if (body.confirm !== true) {
+        return refuse(slug, "generate", "confirmation required", 400);
+      }
+
+      let settings = await getGenerationSettings();
+      if (!settings.text_generation_enabled) {
+        return refuse(
+          slug,
+          "generate",
+          "Text Generation is OFF — turn it on in Advanced Settings.",
+          403,
+        );
+      }
+      // Studio promises chapter access is automatic. Only after the exact
+      // digest, owner confirmation, and text switch pass may this one chapter
+      // be added; malformed/unconfirmed requests never change settings.
+      if (!settings.allowed_slugs.includes(slug)) {
+        const updated = await updateGenerationSettings({
+          allowed_slugs: [...settings.allowed_slugs, slug],
+        });
+        if (!updated || !updated.allowed_slugs.includes(slug)) {
+          return refuse(
+            slug,
+            "generate",
+            "Studio could not approve Mark 8 for this private draft.",
+            500,
+          );
+        }
+        settings = updated;
+      }
+      if (!(await mark8GenerationAllowed(slug))) {
+        return refuse(
+          slug,
+          "generate",
+          "blocked — protected Mark 8 generation is not fully configured",
+          403,
+        );
+      }
+
+      const parsed = parseSlug(slug);
+      if (!parsed || parsed.book !== "Mark" || parsed.chapter !== 8) {
+        return refuse(slug, "generate", "invalid protected Mark 8 chapter", 400);
+      }
+
+      let jobId: string;
+      try {
+        jobId = await claimGenerationJob(
+          requireJobStore(slug, "generate"),
+          slug,
+          {
+            book: parsed.book,
+            chapter: parsed.chapter,
+            title: `${parsed.book} ${parsed.chapter}`,
+            source: "generated",
+            approvedManifestDigest,
+          },
+        );
+      } catch (e) {
+        return mapMutationError(slug, "generate", e);
+      }
+
+      const triggered = await triggerBackgroundGeneration(
         slug,
-        "generate",
-        "blocked — this chapter requires the protected Mark sprint runner",
-        403,
+        new URL(req.url).host,
+        jobId,
+        approvedManifestDigest,
       );
+      if (!triggered.ok) {
+        const cleanup = await failGenerationJob(
+          requireJobStore(slug, "generate"),
+          slug,
+          jobId,
+          `trigger failed: ${triggered.error ?? triggered.status}`,
+          approvedManifestDigest,
+        );
+        const cleanupNote =
+          cleanup === "marked_failed"
+            ? "job marked failed"
+            : cleanup === "conflict"
+              ? "a newer run owns this chapter; nothing was overwritten"
+              : "CLEANUP WRITE FAILED — the row may still be marked generating";
+        return refuse(
+          slug,
+          "generate",
+          `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ${cleanupNote}`,
+          cleanup === "write_failed" ? 500 : 502,
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        triggered: true,
+        slug,
+        jobId,
+        model: settings.selected_text_model,
+        note: "Creating one private Mark 8 draft. Nothing is published.",
+      });
     }
+
+    const confirm = body.confirm === true || body.confirm === "yes";
     const settings = await getGenerationSettings();
 
     if (settings.require_confirm && !confirm) {

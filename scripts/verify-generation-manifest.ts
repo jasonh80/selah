@@ -429,7 +429,7 @@ assert.throws(
       book: "Mark",
       chapter: 8,
     }),
-  /protected ESV generation runner is not connected/,
+  /blocked from generic generation/,
   "generic generation must refuse the Mark sprint before OpenAI configuration or calls",
 );
 for (const protectedIdentity of [
@@ -444,7 +444,7 @@ for (const protectedIdentity of [
   );
   assert.throws(
     () => assertGenericChapterGenerationAllowed(protectedIdentity),
-    /protected ESV generation runner is not connected/,
+    /blocked from generic generation/,
     `generic generation accepted protected identity ${JSON.stringify(protectedIdentity)}`,
   );
 }

@@ -66,6 +66,19 @@ const EDITABLE_KEYS: (keyof GenerationSettings)[] = [
 export async function updateGenerationSettings(
   patch: Partial<GenerationSettings>,
 ): Promise<GenerationSettings | null> {
+  if (settingsOverride) {
+    const next: GenerationSettings = {
+      ...settingsOverride,
+      updated_at: new Date().toISOString(),
+    };
+    for (const key of EDITABLE_KEYS) {
+      if (key in patch) {
+        (next[key] as GenerationSettings[typeof key]) = patch[key] as GenerationSettings[typeof key];
+      }
+    }
+    settingsOverride = next;
+    return next;
+  }
   const db = getSupabaseAdmin();
   if (!db) return null;
   const clean: Record<string, unknown> = { updated_at: new Date().toISOString() };

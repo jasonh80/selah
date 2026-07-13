@@ -1,9 +1,9 @@
-// SERVER-ONLY. Disconnected protected Mark 8–11 draft-job orchestrator.
+// SERVER-ONLY. Protected Mark sprint draft-job orchestrator.
 //
-// This module is intentionally not imported by a route or Netlify handler. It
+// The authenticated Netlify text worker dispatches only Mark 8 here. This
 // consumes an existing digest-bound job before source/model work, rebuilds the
 // exact approved runtime, runs one private draft, and leaves publication to a
-// later owner-reviewed boundary.
+// later owner-reviewed boundary. Mark 9–11 remain disconnected.
 import { estimateChapterWorkupCost } from "@/lib/ai/costs";
 import type { ChapterWorkup } from "@/lib/types";
 import {
@@ -518,7 +518,7 @@ class EsvKeyMissingError extends Error {
   }
 }
 
-/** Production adapters. This function is deliberately disconnected. */
+/** Production adapters used only by the authenticated protected worker path. */
 export async function runConfiguredProtectedMarkDraftJob(
   input: RunProtectedMarkDraftJobInput,
 ): Promise<ProtectedMarkDraftJobResult> {
