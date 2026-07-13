@@ -15,6 +15,7 @@ import {
 import {
   MARK_8_SETUP_NOTES,
   MARK_8_SETUP_NOTES_DIGEST,
+  MARK_8_GUIDANCE_DIGEST,
   MARK_8_SETUP_SCOPE,
   MARK_8_SETUP_SLUG,
   MARK_8_STUDIO_SETUP_APPROVAL,
@@ -43,12 +44,13 @@ const ADMIN_TOKEN = "offline-mark8-studio-token";
 const MANIFEST_DIGEST = "a".repeat(64);
 const SOURCE_DIGEST = "b".repeat(64);
 
-const validMark8NotesApproval: Mark8StudioSetupApproval = {
+const validMark8GuidanceApproval: Mark8StudioSetupApproval = {
   scope: MARK_8_SETUP_SCOPE,
   slug: MARK_8_SETUP_SLUG,
   approved_by: "owner-test",
   approved_at: "2026-07-13T12:00:00.000Z",
-  evidence: "offline exact-note receipt test",
+  evidence: "offline exact Mark 8 guidance receipt test",
+  guidance_digest: MARK_8_GUIDANCE_DIGEST,
   notes_digest: MARK_8_SETUP_NOTES_DIGEST,
   receipt_digest: MARK_8_STUDIO_SETUP_DIGEST,
 };
@@ -253,13 +255,14 @@ async function main(): Promise<void> {
   assert.match(MARK_8_SOURCE_PREPARATION_MESSAGE, /Nothing is sent to the writing AI, saved, or published yet/u);
 
   // The new setup remains inert at this head: Brain uses its own existing
-  // approval and the separate receipt approves exactly ten Mark 8 notes.
+  // approval and the separate receipt binds the exact Mark 8 guidance and ten
+  // notes.
   assert.equal(MARK_8_STUDIO_SETUP_APPROVAL, null);
   assert.equal(librarySeedApproved(), false);
   assert.equal(mark8StudioSetupApprovalMatches(null), false);
-  assert.equal(mark8StudioSetupApprovalMatches(validMark8NotesApproval), true);
-  assert.equal(mark8ScopedSetupApprovalApplies("mark-8", validMark8NotesApproval), true);
-  assert.equal(mark8ScopedSetupApprovalApplies("mark-9", validMark8NotesApproval), false);
+  assert.equal(mark8StudioSetupApprovalMatches(validMark8GuidanceApproval), true);
+  assert.equal(mark8ScopedSetupApprovalApplies("mark-8", validMark8GuidanceApproval), true);
+  assert.equal(mark8ScopedSetupApprovalApplies("mark-9", validMark8GuidanceApproval), false);
   assert.equal(MARK_8_SETUP_NOTES.length, 10);
   assert.equal(new Set(MARK_8_SETUP_NOTES.map((note) => note.rowId)).size, 10);
   assert.ok(MARK_8_SETUP_NOTES.every((note) => /^M8-/u.test(note.guidanceId)));
@@ -270,25 +273,33 @@ async function main(): Promise<void> {
   );
   assert.equal(
     mark8StudioSetupApprovalMatches({
-      ...validMark8NotesApproval,
+      ...validMark8GuidanceApproval,
       notes_digest: "0".repeat(64),
     }),
     false,
   );
 
-  const noteApprovedPolicy = buildMarkSprintManifestPolicy("mark-8", {
-    mark8NotesApproval: validMark8NotesApproval,
+  assert.equal(
+    mark8StudioSetupApprovalMatches({
+      ...validMark8GuidanceApproval,
+      guidance_digest: "0".repeat(64),
+    }),
+    false,
+  );
+
+  const guidanceApprovedPolicy = buildMarkSprintManifestPolicy("mark-8", {
+    mark8GuidanceApproval: validMark8GuidanceApproval,
   });
   assert.ok(
-    !noteApprovedPolicy.blockers.some((blocker) => blocker.code === "guidance_not_approved"),
-    "the exact Mark 8 note receipt satisfies only Mark 8 guidance",
+    !guidanceApprovedPolicy.blockers.some((blocker) => blocker.code === "guidance_not_approved"),
+    "the exact Mark 8 projection receipt satisfies only Mark 8 guidance",
   );
   assert.ok(
-    noteApprovedPolicy.blockers.some((blocker) => blocker.code === "brain_artifact_not_approved"),
-    "a valid Mark 8 note receipt must not bypass the unapproved Brain",
+    guidanceApprovedPolicy.blockers.some((blocker) => blocker.code === "brain_artifact_not_approved"),
+    "a valid Mark 8 guidance receipt must not bypass the unapproved Brain",
   );
   const mark9Policy = buildMarkSprintManifestPolicy("mark-9", {
-    mark8NotesApproval: validMark8NotesApproval,
+    mark8GuidanceApproval: validMark8GuidanceApproval,
   });
   assert.ok(
     mark9Policy.blockers.some((blocker) => blocker.code === "guidance_not_approved"),
@@ -452,7 +463,7 @@ async function main(): Promise<void> {
   const bodyCannotApproveSetup = await route.POST(
     adminRequest({
       ...buildMark8StudioSetupRequest(setupDecision),
-      approval: validMark8NotesApproval,
+      approval: validMark8GuidanceApproval,
     }),
   );
   assert.equal(bodyCannotApproveSetup.status, 403);

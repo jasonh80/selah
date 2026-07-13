@@ -205,7 +205,7 @@ export function isMarkSprintSlug(value: string): value is MarkSprintSlug {
  */
 export function buildMarkSprintManifestPolicy(
   slug: MarkSprintSlug,
-  options: { mark8NotesApproval?: Mark8StudioSetupApproval | null } = {},
+  options: { mark8GuidanceApproval?: Mark8StudioSetupApproval | null } = {},
 ): MarkSprintManifestPolicy {
   const requiredCoreRuleIds = [...INJECTION_POLICY.always_on_rule_ids].sort();
   const requiredContextualRuleIds = [
@@ -222,13 +222,13 @@ export function buildMarkSprintManifestPolicy(
     LIBRARY_VERSION,
     LIBRARY_CONTENT_DIGEST,
   );
-  // The separate receipt approves only the ten Mark 8 notes. Selah Brain must
-  // still pass its own existing artifact approval below, and Mark 9–11 can
-  // never use this receipt.
-  const exactMark8NotesApproved = mark8ScopedSetupApprovalApplies(
+  // The separate receipt binds the exact Mark 8 projection and its ten notes.
+  // Selah Brain must still pass its own artifact approval below, and Mark 9–11
+  // can never use this receipt.
+  const exactMark8GuidanceApproved = mark8ScopedSetupApprovalApplies(
     slug,
-    Object.prototype.hasOwnProperty.call(options, "mark8NotesApproval")
-      ? options.mark8NotesApproval ?? null
+    Object.prototype.hasOwnProperty.call(options, "mark8GuidanceApproval")
+      ? options.mark8GuidanceApproval ?? null
       : MARK_8_STUDIO_SETUP_APPROVAL,
   );
   const mark8StoredNoteIds = new Map(
@@ -335,7 +335,7 @@ export function buildMarkSprintManifestPolicy(
   const blockers: MarkSprintPolicyBlocker[] = [];
   if (
     guidance.status !== "approved_for_generation" &&
-    !exactMark8NotesApproved
+    !exactMark8GuidanceApproved
   ) {
     blockers.push({
       code: "guidance_not_approved",

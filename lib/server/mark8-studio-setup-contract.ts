@@ -1,14 +1,25 @@
-// SERVER-ONLY. Exact Mark-8-only receipt for ten reviewed chapter notes.
-// Selah Brain keeps its own existing status + seed approval; this receipt can
-// never substitute for that approval or authorize another chapter.
+// SERVER-ONLY. Exact Mark-8-only receipt for the reviewed authoring guidance
+// and ten chapter notes. Selah Brain keeps its own status + seed approval;
+// this receipt can never substitute for that approval or authorize another
+// chapter.
 import { createHash } from "node:crypto";
 import guidanceArtifact from "./mark-sprint-guidance.v1.json";
 import { sha256Canonical, sha256Text } from "./generation-manifest";
 
 export const MARK_8_SETUP_SLUG = "mark-8" as const;
-export const MARK_8_SETUP_SCOPE = "private_studio_mark8_notes_only" as const;
+export const MARK_8_SETUP_SCOPE = "private_studio_mark8_guidance_and_notes" as const;
 
 interface Mark8GuidanceSnapshot {
+  packet_id: string;
+  version: string;
+  status: string;
+  library_version: string;
+  authoring_policy: Record<string, unknown>;
+  owner_source_decision: Record<string, unknown>;
+  source_requirement: Record<string, unknown>;
+  expected_model: string;
+  required_rule_ids: Record<string, unknown>;
+  required_voice_example: Record<string, unknown>;
   chapters: {
     "mark-8": { notes: Array<{ id: string; text: string }> };
   };
@@ -21,6 +32,32 @@ function deepFreeze<T>(value: T): T {
   for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
   return Object.freeze(value);
 }
+
+// Bind the Mark 8 approval to every shared setting that can affect its draft,
+// while deliberately excluding Mark 9–11 notes. A note-only receipt must never
+// be able to approve an otherwise review-only multi-chapter packet.
+export const MARK_8_GUIDANCE_PROJECTION = deepFreeze(
+  structuredClone({
+    packetId: guidance.packet_id,
+    packetVersion: guidance.version,
+    packetStatusAtReview: guidance.status,
+    libraryVersion: guidance.library_version,
+    authoringPolicy: guidance.authoring_policy,
+    ownerSourceDecision: guidance.owner_source_decision,
+    sourceRequirement: guidance.source_requirement,
+    expectedModel: guidance.expected_model,
+    requiredRuleIds: guidance.required_rule_ids,
+    requiredVoiceExample: guidance.required_voice_example,
+    chapter: {
+      slug: MARK_8_SETUP_SLUG,
+      notes: guidance.chapters[MARK_8_SETUP_SLUG].notes,
+    },
+  }),
+);
+
+export const MARK_8_GUIDANCE_DIGEST = sha256Canonical(
+  MARK_8_GUIDANCE_PROJECTION,
+);
 
 function deterministicNoteUuid(noteId: string, textDigest: string): string {
   const hex = createHash("sha256")
@@ -63,6 +100,7 @@ export const MARK_8_SETUP_NOTES_DIGEST = sha256Canonical(
 export const MARK_8_STUDIO_SETUP_DIGEST = sha256Canonical({
   scope: MARK_8_SETUP_SCOPE,
   slug: MARK_8_SETUP_SLUG,
+  guidanceDigest: MARK_8_GUIDANCE_DIGEST,
   noteCount: MARK_8_SETUP_NOTES.length,
   notesDigest: MARK_8_SETUP_NOTES_DIGEST,
 });
@@ -73,11 +111,13 @@ export interface Mark8StudioSetupApproval {
   readonly approved_by: string;
   readonly approved_at: string;
   readonly evidence: string;
+  readonly guidance_digest: string;
   readonly notes_digest: string;
   readonly receipt_digest: string;
 }
 
-// Intentionally null until the owner approves exactly these ten Mark 8 notes.
+// Intentionally null until the owner approves the exact Mark 8 projection and
+// its ten notes.
 export const MARK_8_STUDIO_SETUP_APPROVAL: Mark8StudioSetupApproval | null = null;
 
 export function mark8StudioSetupApprovalMatches(
@@ -90,6 +130,7 @@ export function mark8StudioSetupApprovalMatches(
       approval.approved_by.trim() &&
       approval.evidence.trim() &&
       !Number.isNaN(Date.parse(approval.approved_at)) &&
+      approval.guidance_digest === MARK_8_GUIDANCE_DIGEST &&
       approval.notes_digest === MARK_8_SETUP_NOTES_DIGEST &&
       approval.receipt_digest === MARK_8_STUDIO_SETUP_DIGEST &&
       MARK_8_SETUP_NOTES.length === 10,
