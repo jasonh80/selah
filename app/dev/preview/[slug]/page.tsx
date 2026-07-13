@@ -1,9 +1,14 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
 import { getDraftWorkup } from "@/lib/server/chapter-workups-repository";
 import { devRoutesEnabled } from "@/lib/server/dev-guard";
 import { getChapterImagePlan } from "@/lib/content/chapter-content";
+import {
+  STUDIO_PREVIEW_COOKIE,
+  verifyStudioPreviewAccess,
+} from "@/lib/server/studio-preview-access";
 
 // DEV ONLY: render a stored chapter at ANY status (incl. draft) so an admin can
 // review it before publishing via /dev/publish. Reads stored content only —
@@ -12,15 +17,17 @@ export const dynamic = "force-dynamic";
 
 export default async function DraftPreviewPage({
   params,
-  searchParams,
 }: {
   params: { slug: string };
-  searchParams: { token?: string };
 }) {
-  // Accessible via the dev-routes flag OR the admin token (so the admin console
-  // can preview drafts without touching Netlify env vars).
-  const tokenOk = Boolean(process.env.DEV_ADMIN_TOKEN) && searchParams?.token === process.env.DEV_ADMIN_TOKEN;
-  if (!devRoutesEnabled() && !tokenOk) notFound();
+  // Local dev may opt in explicitly. Everywhere else, Studio mints a short-lived,
+  // slug-bound, read-only HttpOnly cookie; the permanent admin token stays out
+  // of browser history, logs, referrers, and preview URLs.
+  const previewAccess = verifyStudioPreviewAccess(
+    cookies().get(STUDIO_PREVIEW_COOKIE)?.value,
+    params.slug,
+  );
+  if (!devRoutesEnabled() && !previewAccess) notFound();
   const draft = await getDraftWorkup(params.slug);
   if (!draft) notFound();
   const imagePlan = getChapterImagePlan(params.slug);
@@ -31,7 +38,7 @@ export default async function DraftPreviewPage({
       <div className="mx-auto max-w-[1180px] px-4 pt-3 lg:px-6">
         <div className="rounded-md border border-dashed bg-card-soft px-3 py-2 text-[12px] text-secondary">
           <span className="font-semibold text-accent-strong">DRAFT PREVIEW</span> · {params.slug} · status:{" "}
-          <code>{draft.status}</code> · publish with <code>/dev/publish?slug={params.slug}&amp;confirm=yes</code>
+          <code>{draft.status}</code>
         </div>
         {imagePlan && (
           <details className="mt-2 rounded-md border border-dashed bg-card-soft px-3 py-2 text-[12px] text-secondary">

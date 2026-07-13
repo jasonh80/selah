@@ -6,7 +6,7 @@ import { isChapterMutationError } from "@/lib/server/protected-chapters";
 import { triggerBackgroundGeneration } from "@/lib/server/trigger-generation";
 import { logGenerationAudit } from "@/lib/server/generation-settings";
 import { CHAPTER_WORKUP_TEXT_MODEL } from "@/lib/server/openai";
-import { devRoutesEnabled } from "@/lib/server/dev-guard";
+import { devMutationTokenAuthorized, devRoutesEnabled } from "@/lib/server/dev-guard";
 
 // DEV/admin legacy generation trigger. Two steps for safety:
 //   1. GET /dev/regenerate?slug=<slug>             → PREVIEW (no generation)
@@ -26,10 +26,9 @@ export async function GET(request: Request) {
   if (!devRoutesEnabled()) return NextResponse.json({ error: "not found" }, { status: 404 });
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") || "";
-  const token = url.searchParams.get("token") || "";
   const confirm = url.searchParams.get("confirm") === "yes";
 
-  if (process.env.REGEN_TOKEN && token !== process.env.REGEN_TOKEN) {
+  if (!devMutationTokenAuthorized(request)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   if (!(await generationAllowed(slug))) {

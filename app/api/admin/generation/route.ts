@@ -63,6 +63,12 @@ import {
   MARK_8_PREFLIGHT_ERROR,
   MARK_8_STUDIO_SLUG,
 } from "@/lib/studio-mark8-preflight";
+import {
+  mintStudioPreviewAccess,
+  STUDIO_PREVIEW_COOKIE,
+  STUDIO_PREVIEW_MAX_AGE_SECONDS,
+  studioPreviewCookiePath,
+} from "@/lib/server/studio-preview-access";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -103,6 +109,30 @@ export async function POST(req: Request) {
       return refuse(slug, what, `${e.code}: ${e.message}`, status);
     }
     return refuse(slug, what, String((e as Error).message ?? "unknown error").slice(0, 300), 500);
+  }
+
+  // ---- short-lived, read-only draft preview access ----
+  // This cookie is accepted only by /dev/preview/<slug>. It cannot authorize
+  // this admin API or any write, generation, image, or publish action.
+  if (action === "preview_access") {
+    const slug = String(body.slug ?? "");
+    const value = mintStudioPreviewAccess(slug);
+    const path = studioPreviewCookiePath(slug);
+    if (!value || !path) {
+      return NextResponse.json(
+        { ok: false, error: "Studio could not open the draft preview." },
+        { status: 400 },
+      );
+    }
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(STUDIO_PREVIEW_COOKIE, value, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: STUDIO_PREVIEW_MAX_AGE_SECONDS,
+      path,
+    });
+    return response;
   }
 
   // ---- read-only Mark 8 owner preparation ----

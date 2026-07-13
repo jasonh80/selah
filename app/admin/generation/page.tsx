@@ -10,6 +10,7 @@ import {
   MARK_8_PREFLIGHT_ERROR,
   MARK_8_STUDIO_SLUG,
 } from "@/lib/studio-mark8-preflight";
+import { studioPreviewUrl } from "@/lib/studio-preview";
 
 // Selah Studio — a calm, guided publishing flow (not a developer console).
 // Choose Chapter → Generate Draft → Preview Draft → Publish Final. All technical
@@ -336,9 +337,29 @@ export default function SelahStudioPage() {
     void pollStatus(target);
   }
 
-  function previewDraft() {
-    window.open(`/dev/preview/${slug}?token=${encodeURIComponent(token)}`, "_blank", "noreferrer");
-    setPreviewed(true);
+  async function previewDraft() {
+    const target = slug;
+    const previewUrl = studioPreviewUrl(target);
+    if (!previewUrl) return;
+
+    // Open synchronously so browsers do not block the tab while Studio waits
+    // for the authenticated cookie response.
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      setReviewMsg("Allow pop-ups for Selah, then try Preview Draft again.");
+      return;
+    }
+    previewWindow.opener = null;
+    try {
+      const response = await api("POST", { action: "preview_access", slug: target });
+      if (!response.ok) throw new Error("preview access refused");
+      previewWindow.location.href = previewUrl;
+      setPreviewed(true);
+      setReviewMsg("");
+    } catch {
+      previewWindow.close();
+      setReviewMsg("Studio could not open the preview. Try again.");
+    }
   }
 
   function toggleTag(t: string) {
@@ -607,17 +628,10 @@ export default function SelahStudioPage() {
             <button type="button" onClick={previewDraft} disabled={!draftReady} className={ghost}>
               Preview Draft ↗
             </button>
-            {draftReady && (
-              <a
-                href={`/dev/compare/${slug}?token=${encodeURIComponent(token)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[13px] text-secondary underline"
-              >
-                Compare versions ↗
-              </a>
-            )}
           </div>
+        )}
+        {reviewMsg && !previewed && (
+          <p role="alert" className="mt-2.5 text-[13px] text-jesus-red">{reviewMsg}</p>
         )}
         {draftReady && !published && !previewed && (
           <p className="mt-2.5 text-[13px] text-secondary">Open the preview, then tell Selah how it feels.</p>

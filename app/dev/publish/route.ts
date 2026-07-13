@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { devRoutesEnabled } from "@/lib/server/dev-guard";
+import { devMutationTokenAuthorized, devRoutesEnabled } from "@/lib/server/dev-guard";
 import { getDraftWorkup, publishChapter } from "@/lib/server/chapter-workups-repository";
 import { isChapterMutationError } from "@/lib/server/protected-chapters";
 import { logGenerationAudit } from "@/lib/server/generation-settings";
@@ -8,17 +8,16 @@ import { logGenerationAudit } from "@/lib/server/generation-settings";
 // public read-through serves). Two steps:
 //   GET /dev/publish?slug=mark-6              → preview current status
 //   GET /dev/publish?slug=mark-6&confirm=yes  → publish
-// Gated by ENABLE_DEV_ROUTES (+ optional REGEN_TOKEN).
+// Gated by ENABLE_DEV_ROUTES + a required exact REGEN_TOKEN.
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!devRoutesEnabled()) return new NextResponse("Not found", { status: 404 });
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") || "";
-  const token = url.searchParams.get("token") || "";
   const confirm = url.searchParams.get("confirm") === "yes";
 
-  if (process.env.REGEN_TOKEN && token !== process.env.REGEN_TOKEN) {
+  if (!devMutationTokenAuthorized(request)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
