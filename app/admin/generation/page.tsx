@@ -12,6 +12,7 @@ import {
   MARK_8_STUDIO_SLUG,
 } from "@/lib/studio-mark8-preflight";
 import { studioPreviewUrl } from "@/lib/studio-preview";
+import { parseOverlapAuditDiagnostics } from "@/lib/audit-overlap-diagnostics";
 import {
   buildMark8StudioSetupRequest,
   decideMark8StudioSetup,
@@ -39,6 +40,7 @@ type AuditEntry = {
   slug: string | null;
   status: string;
   model: string | null;
+  message?: string | null;
 };
 
 type Rule = {
@@ -1593,13 +1595,35 @@ export default function SelahStudioPage() {
                 ) : audit.length === 0 ? (
                   <p className="text-[12px] text-secondary">Nothing yet.</p>
                 ) : (
-                  audit.map((e, i) => (
-                    <p key={i} className="text-[12px] text-secondary">
-                      <span className="text-primary">{e.action}</span>
-                      {e.slug ? ` · ${e.slug}` : ""} · {e.status}
-                      {e.created_at ? ` · ${e.created_at.slice(0, 16).replace("T", " ")}` : ""}
-                    </p>
-                  ))
+                  audit.map((e, i) => {
+                    // Issue #17: overlap stops get a rebuilt diagnostic line.
+                    // The raw stored message is NEVER rendered — only the
+                    // strictly parsed, whitelisted fields are.
+                    const overlap = parseOverlapAuditDiagnostics(e);
+                    return (
+                      <div key={i}>
+                        <p className="text-[12px] text-secondary">
+                          <span className="text-primary">{e.action}</span>
+                          {e.slug ? ` · ${e.slug}` : ""} · {e.status}
+                          {e.created_at ? ` · ${e.created_at.slice(0, 16).replace("T", " ")}` : ""}
+                        </p>
+                        {overlap ? (
+                          <div className="ml-3 mt-0.5 space-y-0.5 font-mono text-[11px] text-secondary">
+                            <p>
+                              {overlap.code} · manifest {overlap.manifestDigestPrefix}…
+                              {overlap.cleanup ? ` · cleanup ${overlap.cleanup}` : ""}
+                            </p>
+                            {overlap.findings.map((f, j) => (
+                              <p key={j}>
+                                {f.code} [{f.severity}] {f.path} · {f.tokens} tokens · {f.chars} chars
+                              </p>
+                            ))}
+                            {overlap.more > 0 ? <p>+{overlap.more} more finding{overlap.more === 1 ? "" : "s"}</p> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </details>
