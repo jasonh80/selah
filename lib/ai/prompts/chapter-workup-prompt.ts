@@ -1,7 +1,8 @@
 // Builds the prompt that asks the model for ONE shared global Selah chapter
 // workup. No API call here — this only assembles the instruction string.
+import markSprintAcceptance from "../quality/mark-sprint-acceptance.v1.json";
 
-export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v5";
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v6";
 
 export type GenerationSourceSectionRole =
   | "context_before"
@@ -75,6 +76,39 @@ function buildChapterWorkupPromptInternal(
     }
   }
   const slug = `${book.toLowerCase().replace(/\s+/g, "-")}-${chapter}`;
+  // The acceptance gate (mark-sprint-quality.ts COV-003) requires each of the
+  // chapter's required_movements to appear as its own verseByVerse entry with
+  // EXACT bounds. Render those bounds from the SAME fixture the gate reads, so
+  // instruction and grader can never drift (issue #17, run 9).
+  const requiredMovements =
+    (
+      markSprintAcceptance as {
+        chapters?: Record<
+          string,
+          {
+            required_movements?: Array<{
+              id: string;
+              startVerse: number;
+              endVerse: number;
+            }>;
+          }
+        >;
+      }
+    ).chapters?.[slug]?.required_movements ?? [];
+  const movementLabel = (m: { startVerse: number; endVerse: number }) =>
+    m.startVerse === m.endVerse
+      ? String(m.startVerse)
+      : `${m.startVerse}–${m.endVerse}`;
+  const movementsBlock = requiredMovements.length
+    ? `\n\nREQUIRED PASSAGE-FLOW BOUNDARIES FOR ${book} ${chapter} (machine-checked)
+"verseByVerse" MUST contain exactly one entry for EACH of these inclusive verse
+ranges, in this order, with these exact startVerse/endVerse bounds and a
+matching rangeLabel: ${requiredMovements.map(movementLabel).join(", ")}.
+Do not merge, split, extend, or renumber any of these ranges — the draft is
+rejected automatically if a listed range is missing or altered. Put finer
+sub-scene observations inside the "sections" prose, never as extra spine
+entries.`
+    : "";
   const rulesBlock =
     globalRules && globalRules.length
       ? `\n\nWHAT SELAH HAS LEARNED (active rules — apply to EVERY section)\n${globalRules
@@ -339,7 +373,7 @@ RULES
 - Mark the timeline item for THIS chapter with "active": true.
 - "bibleText.version" records the reader-display version only. Generation
   provenance is server-owned and bound separately even when both use ESV.
-- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${rulesBlock}${chapterBlock}${examplesBlock}${
+- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${movementsBlock}${rulesBlock}${chapterBlock}${examplesBlock}${
     generationSourceBlock
   }`;
 }

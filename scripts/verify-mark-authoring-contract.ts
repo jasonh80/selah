@@ -880,6 +880,66 @@ assert.equal(
   "ordinary source-free prompt does NOT carry the source-specific rule",
 );
 assert.match(genericSourceFreePrompt, /Do NOT include copyrighted Bible verse text anywhere/u, "generic prompt keeps its original copyright line");
+
+// Issue #17 (run 9, COV-003): the prompt must state the EXACT movement bounds
+// the acceptance gate enforces, rendered from the same fixture, so a faithful
+// fully-covering draft can no longer fail on self-chosen segmentation.
+{
+  const mark8Contract = getMarkSprintChapterContract("mark-8");
+  assert.ok(mark8Contract);
+  const expectedList = mark8Contract.required_movements
+    .map((m) =>
+      m.startVerse === m.endVerse
+        ? String(m.startVerse)
+        : `${m.startVerse}–${m.endVerse}`,
+    )
+    .join(", ");
+  assert.match(
+    prompt,
+    /REQUIRED PASSAGE-FLOW BOUNDARIES FOR Mark 8 \(machine-checked\)/u,
+    "protected prompt carries the required-boundaries block",
+  );
+  assert.ok(
+    prompt.includes(expectedList),
+    "protected prompt lists the fixture's exact movement ranges",
+  );
+  assert.equal(
+    buildChapterWorkupPrompt({ book: "Mark", chapter: 7, bibleVersion: "ESV" })
+      .includes("REQUIRED PASSAGE-FLOW BOUNDARIES"),
+    false,
+    "chapters without an acceptance contract get no boundaries block",
+  );
+
+  // The run-9 failure shape: merge two adjacent required movements. Coverage
+  // stays contiguous (COV-002 passes) yet COV-003 must still fire — proving
+  // the gate the prompt now teaches the model about.
+  const merged = passingDraft("mark-8");
+  const flow = merged.verseByVerse;
+  const a = flow[flow.length - 2];
+  const b = flow[flow.length - 1];
+  const combined = {
+    ...a,
+    endVerse: b.endVerse,
+    rangeLabel: `${a.startVerse}–${b.endVerse}`,
+  };
+  const mergedDraft = {
+    ...merged,
+    verseByVerse: [...flow.slice(0, -2), combined],
+  };
+  const mergedReport = evaluateMarkSprintDraft(
+    parseChapterWorkupJson(JSON.stringify(mergedDraft)),
+    "mark-8",
+  );
+  assert.equal(
+    hasCode(mergedReport, "COV-002 VERSE_COVERAGE_GAP"),
+    false,
+    "merged movements keep contiguous coverage",
+  );
+  assert.ok(
+    hasCode(mergedReport, "COV-003 MOVEMENT_RANGE_UNCOVERED"),
+    "merged movements still fail the exact-boundary gate",
+  );
+}
 assert.throws(
   () =>
     buildProtectedChapterWorkupPrompt({
