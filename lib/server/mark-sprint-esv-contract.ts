@@ -16,7 +16,7 @@ export const MARK_SPRINT_ESV_SOURCE_BUNDLE_SCHEMA =
 export const MARK_SPRINT_ESV_MAX_RESPONSE_BYTES = 250_000;
 export const MARK_SPRINT_ESV_TIMEOUT_MS = 15_000;
 export const MARK_SPRINT_ESV_OVERLAP_SCANNER_REVISION =
-  "esv-exact-overlap-scanner-v4";
+  "esv-exact-overlap-scanner-v5";
 export const MARK_SPRINT_ESV_OVERLAP_NORMALIZER_REVISION =
   "nfkc-lower-default-ignorable-token-v2";
 export const MARK_SPRINT_ESV_OVERLAP_CANDIDATE_TOKENS = 4;
@@ -41,6 +41,40 @@ export const MARK_SPRINT_ESV_OVERLAP_LONG_FOUR_CHARS = 32;
 // what stops "of the / and he / in the" bigrams scattered across a large JSON
 // object from accumulating into a false-positive block.
 export const MARK_SPRINT_ESV_OVERLAP_CROSS_FIELD_CONTENT_TOKENS = 4;
+// Issue #17 calibration (v5, from the 12:20 run): FIXED SCRIPTURE TERMS —
+// titles, names, and liturgical commands that faithful teaching cannot avoid
+// and that our own prompt explicitly permits ("proper names, titles, and
+// unavoidable fixed terms may stay natural"). Accumulation pieces (mosaic /
+// cross-field) whose output span falls entirely inside an occurrence of one
+// of these terms do NOT count toward a block. Direct contiguous findings
+// (EXACT_*) are unaffected — quoting a verse verbatim still blocks because
+// the match extends beyond any fixed term. Normalized with the scanner's
+// tokenizer; pinned here so the calibration is code-reviewed and digest-bound.
+export const MARK_SPRINT_ESV_OVERLAP_FIXED_TERMS: readonly string[] =
+  Object.freeze([
+    "son of man",
+    "the son of man",
+    "the christ",
+    "you are the christ",
+    "caesarea philippi",
+    "bethsaida",
+    "the decapolis",
+    "deny himself",
+    "deny yourself",
+    "take up his cross",
+    "take up your cross",
+    "and follow me",
+    "follow me",
+    "take up his cross and follow me",
+    "deny himself and take up his cross",
+    "four thousand",
+    "the four thousand",
+    "seven baskets",
+    "the leaven of the pharisees",
+    "leaven of the pharisees",
+    "the leaven of herod",
+  ]);
+
 // Closed-class English function words only (articles, conjunctions,
 // prepositions, pronouns, auxiliaries, negation, common discourse particles).
 // Deliberately NO content vocabulary — nouns/verbs like "said", "bread",
