@@ -277,22 +277,39 @@ function withManifestDigest(
   } as ChapterWorkup;
 }
 
+/**
+ * Bounded, excerpt-free diagnostic summary for the durable audit row (issue
+ * #17 acceptance 5): finding codes, structural paths, and counts only — a
+ * future stop can be reconstructed without ever persisting ESV text, prompt
+ * text, or rejected draft text.
+ */
+function boundedDiagnostics(diagnostics: readonly string[]): string {
+  const kept = diagnostics.slice(0, 6);
+  const suffix =
+    diagnostics.length > kept.length
+      ? `; +${diagnostics.length - kept.length} more`
+      : "";
+  return `${kept.join("; ")}${suffix}`.slice(0, 400);
+}
+
 async function auditFailure(
   ports: ProtectedMarkDraftJobPorts,
   slug: string,
   code: ProtectedMarkDraftJobFailureCode,
   manifestDigest: string,
   cleanup?: FailJobOutcome,
+  safeDiagnostics: readonly string[] = [],
 ): Promise<void> {
   await writeSafeAudit(ports, {
     action: "protected_mark_draft",
     slug,
     status: "failed",
-    message: safeMessage(
-      code,
-      manifestDigest,
-      cleanup ? { cleanup } : {},
-    ),
+    message: safeMessage(code, manifestDigest, {
+      ...(cleanup ? { cleanup } : {}),
+      ...(safeDiagnostics.length
+        ? { diagnostics: boundedDiagnostics(safeDiagnostics) }
+        : {}),
+    }),
   });
 }
 
@@ -301,6 +318,7 @@ async function failConsumedJob(
   input: RunProtectedMarkDraftJobInput,
   code: ProtectedMarkDraftJobFailureCode,
   expectedState: TextJobFailureState = "running",
+  safeDiagnostics: readonly string[] = [],
 ): Promise<ProtectedMarkDraftJobResult> {
   let cleanup: FailJobOutcome;
   try {
@@ -324,6 +342,7 @@ async function failConsumedJob(
     code,
     input.approvedManifestDigest,
     cleanup,
+    safeDiagnostics,
   );
   return Object.freeze({
     ok: false,
@@ -557,7 +576,15 @@ export async function runProtectedMarkDraftJob(
     } catch {
       return await failConsumedJob(ports, input, "COST_LOG_FAILED");
     }
-    return await failConsumedJob(ports, input, code);
+    // Safe diagnostics (finding code/path/counts — never excerpts) travel into
+    // the durable audit so an overlap stop can be reconstructed (issue #17).
+    return await failConsumedJob(
+      ports,
+      input,
+      code,
+      "running",
+      pipelineError?.safeDiagnostics ?? [],
+    );
   }
   deadline.dispose();
 
@@ -631,6 +658,13 @@ export async function runProtectedMarkDraftJob(
     message: safeMessage("DRAFT_SAVED", input.approvedManifestDigest, {
       canonicalDraftDigest: result.canonicalDraftDigest,
       snapshot: snapshotState,
+      ...(result.overlapReviewDiagnostics.length
+        ? {
+            overlapReviewDiagnostics: boundedDiagnostics(
+              result.overlapReviewDiagnostics,
+            ),
+          }
+        : {}),
     }),
   });
 

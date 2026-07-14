@@ -1,0 +1,115 @@
+{
+  "book": "Mark",
+  "chapter": 8,
+  "slug": "mark-8",
+  "title": "Mark 8",
+  "subtitle": "Bread, Blindness, and the Turning Point",
+  "status": "draft",
+  "version": "fixture-1",
+  "reviewedAt": "",
+  "theme": "Jesus opens blind eyes in stages while his closest followers slowly learn who he is",
+  "estimatedDate": "Around AD 29, late in the Galilean ministry",
+  "estimatedLocation": "The Decapolis region, Bethsaida, and the villages near Caesarea Philippi",
+  "modernLocationNote": "Banias in the Golan foothills preserves the ancient site associated with Caesarea Philippi.",
+  "primaryCharacters": ["Jesus", "Peter", "The disciples"],
+  "summary": "Mark 8 sits at the hinge of the Gospel. A hungry crowd is fed in Gentile country, religious leaders demand a heavenly proof, and the disciples fret over a forgotten loaf while missing what their own eyes have watched happen twice. A blind man receives sight in two stages, and Peter finally names Jesus as Messiah — only to recoil when Jesus explains that the Son of Man must walk a road of rejection and death before rising.",
+  "sceneSetter": "Dry hills east of the lake, far from friendly villages. A crowd has stayed three days, food is gone, and the nearest bakery might as well be in another country. Compassion, not spectacle, sets this miracle in motion.",
+  "historicalContext": "This feeding happens in largely Gentile territory, which makes the moment pointed: the bread of Israel's Messiah reaches outsiders. Pharisees arriving to demand a sign reflect a habit of testing teachers, and the strange pairing with Herod in the warning about leaven hints at how political and religious power could quietly agree about getting rid of a prophet.",
+  "whatHappens": "Jesus feeds a great crowd from a handful of loaves, and the leftovers fill seven baskets. About four thousand people eat. Crossing the lake, the disciples realize they brought a single loaf, and Jesus warns them about the leaven of the Pharisees and of Herod. At Bethsaida a blind man sees people like walking trees before his sight fully clears. On the road north, Peter confesses that Jesus is the Messiah, Jesus begins teaching that suffering comes before glory, Peter objects, and Jesus rebukes him sharply before calling the crowd to a cross-shaped life.",
+  "whatPeopleMiss": "The two-stage healing is not a failed first attempt. Placed between the boat conversation and Peter's confession, it acts out what is happening to the disciples themselves: they see, but only partly. When Jesus asks, do you not yet understand, the question hangs over every reader too. Clarity about Jesus comes gradually, and half-sight is a real stage on the way, not a disqualification.",
+  "jesusConnection": {
+    "title": "The Christ Who Redefines the Title",
+    "explanation": "Peter's words, you are the Christ, land as the summit of everything Mark has built so far. Yet the very next scene shows how loaded that title was. Peter means victory; Jesus points to a cross. The confession is right, and the imagination behind it still needs healing — like eyes that see people as trees walking.",
+    "modernEcho": "It is possible to use the right words about Jesus while quietly expecting him to serve our script. Mark 8 invites us to let him define the title we give him."
+  },
+  "theologyPrinciple": {
+    "title": "Sight Comes in Stages",
+    "explanation": "Revelation in Mark is a gift that unfolds. Bread multiplies twice and the disciples still worry about lunch; a blind man sees twice before he sees well. God is patient with partial understanding, and he does not leave people there.",
+    "whyItMatters": "Churches are full of half-healed sight, and so is every honest heart. The chapter teaches patience with process and honesty about what we still get wrong."
+  },
+  "application": "Following this Messiah is not a hobby added to an unchanged life. Jesus says that anyone who wants to come after him must deny himself and take up his cross and follow me. In practice that means surrendering the version of the story where we are the hero he assists, trading self-protection for love that costs something, and trusting that a life given away is the only kind that is finally kept.",
+  "prayer": "Lord, I am often the one in the boat with bread in hand, worrying about bread. Heal my slow eyes. Teach me to welcome your patience with my partial sight, and give me courage to release my grip on the life I am trying to save. Amen.",
+  "timeline": {
+    "chapterLabel": "Late Galilean ministry, before the final journey south",
+    "bigStoryLabel": "The Gospel turns from who Jesus is to why he came"
+  },
+  "maps": {
+    "regionLabel": "Decapolis, Bethsaida, and the far north of Galilee",
+    "note": "The feeding sits in Gentile country east of the lake; the confession happens in the villages around the northern springs. Where the text gives only a region, the map shows a translucent area rather than a pin."
+  },
+  "keyObjects": [
+    {
+      "name": "Barley loaves",
+      "meaning": "Ordinary provision made abundant in the Messiah's hands, twice"
+    },
+    {
+      "name": "The single loaf in the boat",
+      "meaning": "A prop in the disciples' anxiety and a quiet joke on their forgetfulness"
+    },
+    {
+      "name": "The leaven",
+      "meaning": "A spreading influence of unbelief that works invisibly, like yeast through dough"
+    }
+  ],
+  "keyPeople": [
+    {
+      "name": "Peter",
+      "role": "First to confess the Messiah and first to misunderstand him"
+    },
+    {
+      "name": "The blind man of Bethsaida",
+      "role": "A living parable of gradual sight"
+    }
+  ],
+  "generatedImages": [
+    {
+      "kind": "feeding",
+      "prompt": "Photorealistic historical scene of a large first-century crowd seated on dry Decapolis hillsides receiving flatbread from disciples with woven containers, late golden light, documentary realism, no halos, no text.",
+      "alt": "A vast crowd on dry hills receiving bread from disciples carrying woven containers.",
+      "caption": "Provision in the wilderness, again"
+    },
+    {
+      "kind": "healing",
+      "prompt": "Photorealistic close scene outside a small fishing village: Jesus with his hands over the eyes of a weathered blind man, onlookers blurred, quiet intensity, natural light, no glow, no lettering.",
+      "alt": "Jesus places his hands over the eyes of a weathered man outside a village.",
+      "caption": "Sight in two stages"
+    },
+    {
+      "kind": "confession",
+      "prompt": "Photorealistic scene on a rocky northern road near spring-fed cliffs, a small band of travelers paused mid-conversation, one man stepping forward earnestly toward his teacher, overcast light, documentary realism, no text.",
+      "alt": "Travelers pause on a rocky northern road as one steps toward his teacher.",
+      "caption": "The question on the road"
+    }
+  ],
+  "verseByVerse": [
+    {
+      "reference": "8:1-10",
+      "explanation": "The second feeding is not a rerun for slow readers. Its Gentile setting widens the table: the Shepherd who fed Israel now feeds the nations, and the leftovers outnumber the loaves they started with."
+    },
+    {
+      "reference": "8:14-21",
+      "explanation": "The boat scene runs on irony. And he said to them a warning about leaven, and they hear a complaint about lunch. The one loaf sitting in the boat is enough — the point is who is in the boat with it."
+    },
+    {
+      "reference": "8:31-33",
+      "explanation": "The first passion prediction reframes everything Peter just confessed. Rebuking Jesus is unthinkable a verse after calling him Messiah, which is exactly Mark's point about how deep our scripts for God run."
+    }
+  ],
+  "goDeeper": {
+    "crossReferences": ["Exodus 16", "Isaiah 35:5-6", "Mark 6:30-44"],
+    "reflectionQuestion": "Where am I still seeing people like trees walking — right about Jesus, but with an imagination he has not yet healed?",
+    "practice": "Name one place this week where self-denial would look like concrete love, and do it without announcing it."
+  },
+  "bibleText": {
+    "version": "ESV",
+    "included": false,
+    "note": "No Scripture text is reproduced in this fixture; it is a faithful paraphrase for overlap-gate calibration.",
+    "copyright": ""
+  },
+  "cost": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "estimatedCostUsd": 0,
+    "note": "fixture"
+  }
+}

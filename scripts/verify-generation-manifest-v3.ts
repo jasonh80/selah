@@ -345,7 +345,7 @@ async function main(): Promise<void> {
     { sourceBundle: bundleA, modelRequest: requestA },
     cleanDraft,
   );
-  assert.equal(overlapReport.reportVersion, "mark-sprint-esv-overlap-report-v2");
+  assert.equal(overlapReport.reportVersion, "mark-sprint-esv-overlap-report-v3");
   assert.equal(overlapReport.manifestDigest, green.manifestDigest);
   assert.equal(overlapReport.verdict, "pass");
   assert.doesNotThrow(() =>
@@ -410,6 +410,39 @@ async function main(): Promise<void> {
       { sourceBundle: bundleA, modelRequest: requestA },
       blockReport,
       blockDraft,
+    ),
+  );
+  // Issue #17: a short unavoidable overlap is a REVIEW diagnostic — the run
+  // passes and acceptance still mints; the diagnostic stays in the report.
+  const reviewDraft = JSON.stringify({
+    summary: "An original teaching line mentions cedar amber lantern mercy river once.",
+  });
+  const reviewReport = evaluateGenerationManifestV3Overlap(
+    preflight,
+    { sourceBundle: bundleA, modelRequest: requestA },
+    reviewDraft,
+  );
+  assert.equal(reviewReport.verdict, "pass");
+  assert.equal(reviewReport.blockFindingCount, 0);
+  assert.ok(reviewReport.reviewFindingCount >= 1);
+  assert.ok(reviewReport.findings.every((finding) => finding.severity === "review"));
+  assert.doesNotThrow(() =>
+    createGenerationManifestV3OverlapAcceptanceCapability(
+      preflight,
+      { sourceBundle: bundleA, modelRequest: requestA },
+      reviewReport,
+      reviewDraft,
+    ),
+  );
+  // A tampered severity can never smuggle a blocker into acceptance.
+  const tamperedSeverity = structuredClone(reviewReport);
+  if (tamperedSeverity.findings[0]) tamperedSeverity.findings[0].severity = "block";
+  assert.throws(() =>
+    createGenerationManifestV3OverlapAcceptanceCapability(
+      preflight,
+      { sourceBundle: bundleA, modelRequest: requestA },
+      tamperedSeverity,
+      reviewDraft,
     ),
   );
   const reformattedCleanDraft = `{\n  "summary": "A wholly distinct synthetic explanation for overlap verification."\n}`;
