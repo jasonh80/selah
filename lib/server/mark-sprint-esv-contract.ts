@@ -16,7 +16,7 @@ export const MARK_SPRINT_ESV_SOURCE_BUNDLE_SCHEMA =
 export const MARK_SPRINT_ESV_MAX_RESPONSE_BYTES = 250_000;
 export const MARK_SPRINT_ESV_TIMEOUT_MS = 15_000;
 export const MARK_SPRINT_ESV_OVERLAP_SCANNER_REVISION =
-  "esv-exact-overlap-scanner-v3";
+  "esv-exact-overlap-scanner-v4";
 export const MARK_SPRINT_ESV_OVERLAP_NORMALIZER_REVISION =
   "nfkc-lower-default-ignorable-token-v2";
 export const MARK_SPRINT_ESV_OVERLAP_CANDIDATE_TOKENS = 4;
@@ -27,6 +27,14 @@ export const MARK_SPRINT_ESV_OVERLAP_LONG_FOUR_CHARS = 32;
 // diagnostics, not blockers. Stitched copying is caught by the always-on
 // mosaic detector (bounded source/output gaps), never by a distance-blind
 // combination rule.
+// Issue #17 calibration (v4, from the five live runs): accumulation pieces
+// must be at least THREE tokens. A two-token fragment ("his cross", "follow
+// me") is vocabulary, not phrasing — the run-5 evidence showed faithful
+// verse-teaching necessarily uses several such terms from one source
+// sentence, summing to the mosaic threshold. Declared trade-off: deliberate
+// two-word-chunk stitching is no longer blocked in-field (it destroys the
+// wording fidelity copying exists to preserve, and every draft passes owner
+// review before publish).
 // Mosaic/cross-field accumulation pieces must carry at least one CONTENT token
 // (a token outside the closed-class function-word list below), and a
 // cross-field component must cover at least this many content tokens. This is

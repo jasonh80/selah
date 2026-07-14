@@ -799,9 +799,9 @@ const MAX_REPORT_FINDINGS = 100;
 const MAX_DRAFT_DEPTH = 100;
 const MAX_DRAFT_STRING_LEAVES = 5_000;
 const MOSAIC_MINIMUM_TOKENS = 10;
-const MOSAIC_CANDIDATE_TOKENS = 2;
+const MOSAIC_CANDIDATE_TOKENS = 3; // v4: two-token fragments are vocabulary, not phrasing
 const CROSS_FIELD_MINIMUM_TOKENS = 8;
-const CROSS_FIELD_CANDIDATE_TOKENS = 2;
+const CROSS_FIELD_CANDIDATE_TOKENS = 3; // v4: trigram pieces, same vocabulary-vs-phrasing line
 const MOSAIC_MAXIMUM_SOURCE_GAP = 12;
 const MOSAIC_MAXIMUM_OUTPUT_GAP = 20;
 
@@ -1115,20 +1115,24 @@ function crossFieldCoverageMatch(
   sourceTokens: readonly string[],
 ): ReportMatch | null {
   const outputTokensByLeaf = leaves.map((leaf) => overlapTokens(leaf.value));
-  const sourceBigramPositions = new Map<string, number[]>();
-  for (let sourceStart = 0; sourceStart + 1 < sourceTokens.length; sourceStart++) {
-    // Bigrams made purely of function words ("of the", "and he") appear in any
-    // faithful English prose; they cannot seed a cross-field component.
-    if (
-      !isContentToken(sourceTokens[sourceStart]) &&
-      !isContentToken(sourceTokens[sourceStart + 1])
-    ) {
-      continue;
-    }
-    const key = `${sourceTokens[sourceStart]} ${sourceTokens[sourceStart + 1]}`;
-    const positions = sourceBigramPositions.get(key) ?? [];
+  const sourceGramPositions = new Map<string, number[]>();
+  for (
+    let sourceStart = 0;
+    sourceStart + CROSS_FIELD_CANDIDATE_TOKENS <= sourceTokens.length;
+    sourceStart++
+  ) {
+    const gram = sourceTokens.slice(
+      sourceStart,
+      sourceStart + CROSS_FIELD_CANDIDATE_TOKENS,
+    );
+    // Pieces made purely of function words appear in any faithful English
+    // prose; they cannot seed a cross-field component. Two-token pieces are
+    // vocabulary, not phrasing (v4) — pieces are now trigrams.
+    if (!gram.some((token) => isContentToken(token))) continue;
+    const key = gram.join(" ");
+    const positions = sourceGramPositions.get(key) ?? [];
     positions.push(sourceStart);
-    sourceBigramPositions.set(key, positions);
+    sourceGramPositions.set(key, positions);
   }
   const pieces: Array<{
     leafIndex: number;
@@ -1139,9 +1143,15 @@ function crossFieldCoverageMatch(
   for (let leafIndex = 0; leafIndex < outputTokensByLeaf.length; leafIndex++) {
     const outputTokens = outputTokensByLeaf[leafIndex];
     if (outputTokens.length < CROSS_FIELD_CANDIDATE_TOKENS) continue;
-    for (let outputStart = 0; outputStart + 1 < outputTokens.length; outputStart++) {
-      const key = `${outputTokens[outputStart]} ${outputTokens[outputStart + 1]}`;
-      for (const sourceStart of sourceBigramPositions.get(key) ?? []) {
+    for (
+      let outputStart = 0;
+      outputStart + CROSS_FIELD_CANDIDATE_TOKENS <= outputTokens.length;
+      outputStart++
+    ) {
+      const key = outputTokens
+        .slice(outputStart, outputStart + CROSS_FIELD_CANDIDATE_TOKENS)
+        .join(" ");
+      for (const sourceStart of sourceGramPositions.get(key) ?? []) {
         pieces.push({
           leafIndex,
           outputStart,
