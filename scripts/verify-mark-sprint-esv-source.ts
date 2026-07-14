@@ -884,6 +884,53 @@ const fragmentMosaic = scanScripture(
 assert.equal(fragmentMosaic.verdict, "block");
 assert.ok(fragmentMosaic.findings.some((finding) => finding.code === "MOSAIC_10_PLUS"));
 
+// PRODUCTION SHAPE (live runs 03:18 / 04:25): the offending strings sat in
+// sections[].fullContent and verseByVerse[].explanation. A TEACHING
+// explanation that paraphrases passes; an 11+-token reconstruction of the
+// source sentence inside an explanation blocks, exactly as observed live.
+const teachingShapePass = scanScripture(
+  JSON.stringify({
+    sections: [
+      {
+        id: "s1",
+        title: "The turning point",
+        fullContent:
+          "Mark builds this whole chapter toward one exchange on the northern road. The disciples have watched two feedings and still fret about bread, so their teacher slows down and works on their sight — first a blind man's, in stages, then theirs.",
+      },
+    ],
+    verseByVerse: [
+      {
+        startVerse: 31,
+        endVerse: 33,
+        explanation:
+          "Right after the confession, the teaching turns hard: suffering and rejection are announced as the road ahead, and glory only after. Peter cannot square that with the title he just used, which is precisely Mark's point.",
+      },
+    ],
+  }),
+);
+assert.equal(teachingShapePass.verdict, "pass");
+assert.equal(teachingShapePass.blockFindingCount, 0);
+const teachingShapeBlock = scanScripture(
+  JSON.stringify({
+    sections: [
+      {
+        id: "s1",
+        title: "The turning point",
+        fullContent:
+          "Here he began to teach them clearly that the son of man must endure rejection before anything else.",
+      },
+    ],
+  }),
+);
+assert.equal(teachingShapeBlock.verdict, "block");
+assert.ok(
+  teachingShapeBlock.findings.some(
+    (finding) =>
+      (finding.code === "MOSAIC_10_PLUS" || finding.code === "EXACT_8_PLUS") &&
+      finding.severity === "block",
+  ),
+);
+
 // 4. Pure function-word bigrams scattered across many fields can no longer
 // accumulate into a cross-field false positive.
 const functionWordScatter = scanScripture(

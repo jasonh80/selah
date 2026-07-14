@@ -853,6 +853,21 @@ const genericPromptWithInjectedSource = buildChapterWorkupPrompt({
 } as unknown as Parameters<typeof buildChapterWorkupPrompt>[0]);
 assert.doesNotMatch(genericPromptWithInjectedSource, /must not enter generic prompt|private-primary/);
 assert.doesNotMatch(genericPromptWithInjectedSource, /SERVER-SUPPLIED GENERATION SOURCE/);
+
+// Issue #17 (live-run fix): the hard copyright-discipline rule must be in BOTH
+// prompt paths and reinforced beside the source text, naming the two field
+// families that failed in production and the four-consecutive-word bound.
+for (const [label, text] of [
+  ["protected", prompt],
+  ["generic", buildChapterWorkupPrompt({ book: "Mark", chapter: 7, bibleVersion: "ESV" })],
+] as const) {
+  assert.match(text, /COPYRIGHT DISCIPLINE \(HARD RULE/u, `${label} prompt carries the hard rule`);
+  assert.match(text, /more than FOUR consecutive words/u, `${label} prompt states the 4-word bound`);
+  assert.match(text, /sections\[\]\.fullContent/u, `${label} prompt names sections[].fullContent`);
+  assert.match(text, /verseByVerse\[\]\.explanation/u, `${label} prompt names verseByVerse[].explanation`);
+  assert.match(text, /stitch verse wording|reassembled phrasing/u, `${label} prompt forbids fragment stitching`);
+}
+assert.match(prompt, /never more than four consecutive words of it/u, "source block reiterates the bound beside the source text");
 assert.throws(
   () =>
     buildProtectedChapterWorkupPrompt({

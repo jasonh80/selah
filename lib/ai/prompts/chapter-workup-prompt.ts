@@ -1,7 +1,7 @@
 // Builds the prompt that asks the model for ONE shared global Selah chapter
 // workup. No API call here — this only assembles the instruction string.
 
-export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v4";
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v5";
 
 export type GenerationSourceSectionRole =
   | "context_before"
@@ -97,7 +97,9 @@ function buildChapterWorkupPromptInternal(
     ? `\n\nSERVER-SUPPLIED GENERATION SOURCE (${generationSource.label.trim()})
 Use PRIMARY CHAPTER for this workup. CONTEXT BEFORE and CONTEXT AFTER may only
 ground surrounding-chapter Book Flow. Do not blend their events into the
-primary chapter. Do not quote or reproduce source wording in the output.
+primary chapter. The COPYRIGHT DISCIPLINE rule above applies to every word of
+this source: never more than four consecutive words of it may appear in your
+output, whether quoted directly or reassembled from fragments.
 Footnote callouts and bodies, when present, are translator/editorial notes—not
 verse text. They may inform an explicitly labeled textual note but must never be
 silently presented as the words of Scripture.
@@ -133,7 +135,20 @@ VOICE & VALUES
 - Accessible, modern language. Not academic coldness, not cheesy devotional
   clichés. Practical application WITHOUT moralism. Theology principle starts
   simple (level "beginner" for foundational chapters).
-- Do NOT include copyrighted Bible verse text anywhere.
+
+COPYRIGHT DISCIPLINE (HARD RULE — a violating draft is automatically DESTROYED
+after generation and the run is wasted)
+- NEVER reproduce more than FOUR consecutive words from any Bible translation,
+  including any server-supplied source text below. No exception for famous
+  lines: express every verse's meaning in fresh sentences of your own.
+- Short fixed names and titles are fine ("Son of Man", "Caesarea Philippi",
+  "the Christ"); sentence fragments of verse wording are not.
+- Do not stitch verse wording back together from separated short fragments —
+  reassembled phrasing is detected exactly like direct quoting.
+- This applies MOST STRONGLY to sections[].fullContent and
+  verseByVerse[].explanation: TEACH the verse, never re-say the verse.
+- Before returning, re-scan those two field families and rewrite any span that
+  echoes five or more consecutive words of the source.
 
 OUTPUT
 Return ONE JSON object and NOTHING else (no markdown, no code fences, no prose).
