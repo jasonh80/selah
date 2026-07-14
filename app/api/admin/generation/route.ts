@@ -395,6 +395,14 @@ export async function POST(req: Request) {
   }
   if (action === "version_restore") {
     const slug = String(body.slug ?? "");
+    if (slug === MARK_8_IMAGE_SLUG) {
+      return refuse(
+        slug,
+        "version_restore",
+        "Mark 8 version changes are paused during its protected launch review. Create and review the current Studio draft instead.",
+        403,
+      );
+    }
     const blocked = await guardOrRefuse(slug, "version_restore", "restoreVersion");
     if (blocked) return blocked;
     const ok = await restoreVersion(slug, Number(body.version));
@@ -407,6 +415,14 @@ export async function POST(req: Request) {
   }
   if (action === "version_apply") {
     const slug = String(body.slug ?? "");
+    if (slug === MARK_8_IMAGE_SLUG) {
+      return refuse(
+        slug,
+        "version_apply",
+        "Mark 8 version changes are paused during its protected launch review. Create and review the current Studio draft instead.",
+        403,
+      );
+    }
     const blocked = await guardOrRefuse(slug, "version_apply", "applyMergedDraft");
     if (blocked) return blocked;
     const result = await applyMergedDraft(
@@ -493,7 +509,13 @@ export async function POST(req: Request) {
       binding,
     );
     if (!triggered.ok) {
-      const released = await releaseImageJob(store, slug, imageJobId, "queued");
+      const released = await releaseImageJob(
+        store,
+        slug,
+        imageJobId,
+        "queued",
+        binding,
+      );
       return refuse(
         slug,
         "generate_images",

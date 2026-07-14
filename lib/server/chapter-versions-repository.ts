@@ -5,6 +5,7 @@ import type { ChapterWorkup } from "../types";
 import { getSupabaseAdmin } from "./supabase";
 import { chapterMutationDecision } from "./protected-chapters";
 import type { ChapterRowSnapshot } from "./protected-chapters";
+import { MARK_8_IMAGE_SLUG } from "./mark8-image-plan";
 
 const TABLE = "chapter_workup_versions";
 
@@ -77,6 +78,9 @@ export async function getVersionWorkup(slug: string, version: number): Promise<C
 // Restore an existing archived version as the working draft (kept 'draft').
 // Does NOT create a new version — the archive is unchanged. Never publishes.
 export async function restoreVersion(slug: string, version: number): Promise<boolean> {
+  // Mark 8's copy-warning approval is bound to the exact current draft. Until
+  // Studio can rescan arbitrary restored text, do not let history bypass it.
+  if (slug === MARK_8_IMAGE_SLUG) return false;
   const decision = await chapterMutationDecision(slug, "restoreVersion");
   if (!decision.allowed) {
     console.error(`[selah] mutation guard: ${decision.reason}`);
@@ -101,6 +105,9 @@ export async function applyMergedDraft(
   workup: ChapterWorkup,
   label?: string,
 ): Promise<{ ok: boolean; version: number | null }> {
+  // See restoreVersion: arbitrary merged text must not inherit or erase a
+  // protected wording-review marker without a fresh scan.
+  if (slug === MARK_8_IMAGE_SLUG) return { ok: false, version: null };
   const decision = await chapterMutationDecision(slug, "applyMergedDraft");
   if (!decision.allowed) {
     console.error(`[selah] mutation guard: ${decision.reason}`);

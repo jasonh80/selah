@@ -36,8 +36,10 @@ export const IMAGE_JOB_KEY = "imageJobId";
 export const IMAGE_JOB_STATE_KEY = "imageJobState";
 export const IMAGE_JOB_PLAN_DIGEST_KEY = "imageJobPlanDigest";
 export const IMAGE_JOB_MODEL_KEY = "imageJobModel";
+export const IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY = "imageJobSourceOverlapReportDigest";
 export const IMAGE_JOB_SPENT_COUNT_KEY = "imageJobSpentCount";
 export const IMAGE_JOB_ERROR_CODE_KEY = "imageJobErrorCode";
+export const IMAGE_JOB_SOURCE_OVERLAP_CLEAN = "clean";
 
 const LOWERCASE_SHA256 = /^[0-9a-f]{64}$/;
 
@@ -215,6 +217,7 @@ const IMAGE_JOB_METADATA_KEYS = [
   IMAGE_JOB_STATE_KEY,
   IMAGE_JOB_PLAN_DIGEST_KEY,
   IMAGE_JOB_MODEL_KEY,
+  IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY,
   IMAGE_JOB_SPENT_COUNT_KEY,
   IMAGE_JOB_ERROR_CODE_KEY,
 ] as const;
@@ -701,6 +704,14 @@ function validatedImageBinding(
   };
 }
 
+function sourceOverlapClaimValue(
+  slug: string,
+  binding: ImageJobBinding | undefined,
+): string | undefined {
+  if (slug !== MARK_8_IMAGE_SLUG) return undefined;
+  return binding?.sourceOverlapReportDigest ?? IMAGE_JOB_SOURCE_OVERLAP_CLEAN;
+}
+
 function imageBindingPredicates(
   row: JobRow,
   slug: string,
@@ -715,8 +726,14 @@ function imageBindingPredicates(
   );
   const storedDigest = row.workupJson[IMAGE_JOB_PLAN_DIGEST_KEY];
   const storedModel = row.workupJson[IMAGE_JOB_MODEL_KEY];
+  const storedSourceOverlapDigest =
+    row.workupJson[IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY];
   if (expected === undefined) {
-    if (storedDigest !== undefined || storedModel !== undefined) {
+    if (
+      storedDigest !== undefined ||
+      storedModel !== undefined ||
+      storedSourceOverlapDigest !== undefined
+    ) {
       throw new ChapterMutationError("CONFLICT", action, slug, "unexpected image-job binding on a legacy claim");
     }
     return [];
@@ -724,9 +741,84 @@ function imageBindingPredicates(
   if (storedDigest !== expected.planDigest || storedModel !== expected.model) {
     throw new ChapterMutationError("CONFLICT", action, slug, "image plan or model does not match this claim");
   }
-  return [
+  const predicates = [
     { key: IMAGE_JOB_PLAN_DIGEST_KEY, equals: expected.planDigest },
     { key: IMAGE_JOB_MODEL_KEY, equals: expected.model },
+  ];
+  if (slug === MARK_8_IMAGE_SLUG) {
+    const expectedSourceOverlapDigest = sourceOverlapClaimValue(slug, expected)!;
+    if (storedSourceOverlapDigest !== expectedSourceOverlapDigest) {
+      throw new ChapterMutationError(
+        "CONFLICT",
+        action,
+        slug,
+        "Bible-wording review does not match this image claim",
+      );
+    }
+    predicates.push({
+      key: IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY,
+      equals: expectedSourceOverlapDigest,
+    });
+  } else if (storedSourceOverlapDigest !== undefined) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      action,
+      slug,
+      "unexpected Bible-wording binding on a legacy image claim",
+    );
+  }
+  return predicates;
+}
+
+function imageReleasePredicates(
+  row: JobRow,
+  slug: string,
+  binding: ImageJobBinding | undefined,
+): { key: string; equals: string }[] {
+  if (slug !== MARK_8_IMAGE_SLUG) {
+    return imageBindingPredicates(row, slug, binding, "releaseImageJob");
+  }
+  const storedPlan = row.workupJson[IMAGE_JOB_PLAN_DIGEST_KEY];
+  const storedModel = row.workupJson[IMAGE_JOB_MODEL_KEY];
+  const storedSource =
+    row.workupJson[IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY];
+  if (
+    typeof storedPlan !== "string" ||
+    !LOWERCASE_SHA256.test(storedPlan) ||
+    storedModel !== MARK_8_IMAGE_MODEL ||
+    typeof storedSource !== "string" ||
+    (storedSource !== IMAGE_JOB_SOURCE_OVERLAP_CLEAN &&
+      !LOWERCASE_SHA256.test(storedSource))
+  ) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "releaseImageJob",
+      slug,
+      "stored image-job binding is malformed",
+    );
+  }
+  if (binding) {
+    const expectedSource = sourceOverlapClaimValue(slug, binding)!;
+    if (
+      binding.planDigest !== storedPlan ||
+      binding.model !== storedModel ||
+      expectedSource !== storedSource
+    ) {
+      throw new ChapterMutationError(
+        "CONFLICT",
+        "releaseImageJob",
+        slug,
+        "image-job binding does not match this claim",
+      );
+    }
+  }
+  return [
+    { key: IMAGE_JOB_PLAN_DIGEST_KEY, equals: storedPlan },
+    { key: IMAGE_JOB_MODEL_KEY, equals: storedModel },
+    {
+      key: IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY,
+      equals: storedSource,
+    },
   ];
 }
 
@@ -782,6 +874,12 @@ export async function claimImageJob(
           ? {
               [IMAGE_JOB_PLAN_DIGEST_KEY]: exactBinding.planDigest,
               [IMAGE_JOB_MODEL_KEY]: exactBinding.model,
+              ...(slug === MARK_8_IMAGE_SLUG
+                ? {
+                    [IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY]:
+                      sourceOverlapClaimValue(slug, exactBinding),
+                  }
+                : {}),
             }
           : {}),
       },
@@ -839,13 +937,21 @@ export async function completeImageJob(
   slug: string,
   jobId: string,
   finalWorkup: ChapterWorkup,
+  binding?: ImageJobBinding,
 ): Promise<void> {
   const row = await readRowForTerminalWrite(store, slug, "completeImageJob");
+  const bindingPredicates = imageBindingPredicates(
+    row,
+    slug,
+    binding,
+    "completeImageJob",
+  );
   const json = { ...(finalWorkup as unknown as Record<string, unknown>) };
   delete json[IMAGE_JOB_KEY];
   delete json[IMAGE_JOB_STATE_KEY];
   delete json[IMAGE_JOB_PLAN_DIGEST_KEY];
   delete json[IMAGE_JOB_MODEL_KEY];
+  delete json[IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY];
   delete json[IMAGE_JOB_SPENT_COUNT_KEY];
   delete json[IMAGE_JOB_ERROR_CODE_KEY];
   const changed = await store.update(
@@ -856,6 +962,7 @@ export async function completeImageJob(
       json: [
         { key: IMAGE_JOB_KEY, equals: jobId },
         { key: IMAGE_JOB_STATE_KEY, equals: "running" },
+        ...bindingPredicates,
       ],
     },
     { workup_json: json, updated_at: new Date().toISOString() },
@@ -876,6 +983,7 @@ export async function releaseImageJob(
   slug: string,
   jobId: string,
   expectedState?: "queued" | "running",
+  binding?: ImageJobBinding,
 ): Promise<boolean> {
   let row: JobRow;
   try {
@@ -886,11 +994,19 @@ export async function releaseImageJob(
   }
   if (row.workupJson?.[IMAGE_JOB_KEY] !== jobId) return false;
   if (expectedState !== undefined && row.workupJson?.[IMAGE_JOB_STATE_KEY] !== expectedState) return false;
+  let bindingPredicates: { key: string; equals: string }[];
+  try {
+    bindingPredicates = imageReleasePredicates(row, slug, binding);
+  } catch (error) {
+    console.error(`[selah] releaseImageJob(${slug}): ${(error as Error).message}`);
+    return false;
+  }
   const json = { ...row.workupJson };
   delete json[IMAGE_JOB_KEY];
   delete json[IMAGE_JOB_STATE_KEY];
   delete json[IMAGE_JOB_PLAN_DIGEST_KEY];
   delete json[IMAGE_JOB_MODEL_KEY];
+  delete json[IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY];
   delete json[IMAGE_JOB_SPENT_COUNT_KEY];
   delete json[IMAGE_JOB_ERROR_CODE_KEY];
   const changed = await store.update(
@@ -903,6 +1019,7 @@ export async function releaseImageJob(
         ...(expectedState === undefined
           ? []
           : [{ key: IMAGE_JOB_STATE_KEY, equals: expectedState }]),
+        ...bindingPredicates,
       ],
     },
     { workup_json: json, updated_at: new Date().toISOString() },

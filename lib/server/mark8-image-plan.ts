@@ -155,6 +155,7 @@ export function mark8FinalReviewDigest(workup: ChapterWorkup): string | null {
     imageJobState: _jobState,
     imageJobPlanDigest: _planDigest,
     imageJobModel: _model,
+    imageJobSourceOverlapReportDigest: _sourceOverlapReportDigest,
     ...finalWorkup
   } = workup as unknown as Record<string, unknown>;
   const storedJsonShape = JSON.parse(JSON.stringify(finalWorkup)) as Record<string, unknown>;

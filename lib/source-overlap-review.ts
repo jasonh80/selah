@@ -12,6 +12,9 @@ const KNOWN_CODES = new Set([
 ]);
 
 export const SOURCE_OVERLAP_REVIEW_KEY = "sourceOverlapReview";
+// The scanner keeps at most 100 detailed findings, but its truthful total can
+// be higher. Keep the count finite without rejecting a valid truncated report.
+export const SOURCE_OVERLAP_REVIEW_MAX_FINDING_COUNT = 100_000;
 
 export interface SourceOverlapReviewWarning {
   readonly version: 1;
@@ -39,7 +42,11 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isBoundedCount(value: unknown): value is number {
-  return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 100;
+  return (
+    Number.isSafeInteger(value) &&
+    (value as number) >= 0 &&
+    (value as number) <= SOURCE_OVERLAP_REVIEW_MAX_FINDING_COUNT
+  );
 }
 
 function exactKeys(record: Record<string, unknown>): boolean {

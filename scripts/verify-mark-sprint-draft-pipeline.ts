@@ -31,6 +31,7 @@ import {
   type JobRow,
   type JobStorePort,
 } from "../lib/server/generation-jobs";
+import { createSourceOverlapReviewWarning } from "../lib/source-overlap-review";
 
 class FakeJobStore implements JobStorePort {
   private rows = new Map<
@@ -101,6 +102,21 @@ async function expectPipelineError(
 }
 
 async function main(): Promise<void> {
+  const largeTruncatedWarning = createSourceOverlapReviewWarning({
+    manifestDigest: "a".repeat(64),
+    reportDigest: "b".repeat(64),
+    canonicalDraftDigest: "c".repeat(64),
+    blockerCodes: ["MOSAIC_10_PLUS"],
+    findingCount: 105,
+    blockFindingCount: 5,
+    reviewFindingCount: 100,
+  });
+  assert.equal(
+    largeTruncatedWarning.findingCount,
+    105,
+    "a valid truncated overlap report must remain reviewable instead of hard-failing",
+  );
+
   const sourceBundle = await bundle("mark-8", "draft-pipeline");
   const preparationInput = fixtureInput(sourceBundle);
   const modelRequest = prepareGenerationModelRequestV3(preparationInput);
