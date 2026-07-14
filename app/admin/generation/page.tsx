@@ -354,6 +354,9 @@ export default function SelahStudioPage() {
       setPublished(st === "reviewed");
       setGenMsg("");
       setDraftTakingLonger(false);
+      // A run just reached a terminal state — pull fresh history so Recent
+      // activity reflects it without a full page reload (issue #17).
+      void loadAudit();
       if (st !== "reviewed" && target === MARK_8_STUDIO_SLUG) void loadImagesStatus(target);
     } else if (st === "failed") {
       setPhase("error");
@@ -361,6 +364,7 @@ export default function SelahStudioPage() {
       const safeFailure = typeof j.failureMessage === "string" ? j.failureMessage : "Something went wrong while writing the draft.";
       setGenMsg(safeFailure);
       setDraftTakingLonger(false);
+      void loadAudit();
     } else {
       setTimeout(() => pollStatus(target, attempt + 1), 5000);
     }
@@ -1660,6 +1664,13 @@ export default function SelahStudioPage() {
             <details className="border-t pt-3">
               <summary className="cursor-pointer text-[13px] font-medium text-primary">Recent activity</summary>
               <div className="mt-1.5 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => void loadAudit()}
+                  className="text-[12px] text-secondary underline"
+                >
+                  Refresh history
+                </button>
                 {audit === null ? (
                   <p className="text-[12px] text-secondary">Loading…</p>
                 ) : audit.length === 0 ? (

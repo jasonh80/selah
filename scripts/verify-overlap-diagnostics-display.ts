@@ -179,6 +179,8 @@ function overlapMessage(
   ok(page.includes("Bible wording needs your review"), "6 warned private draft gets plain owner guidance");
   ok(page.includes("I reviewed the wording — Ready"), "6 owner review is explicit before images");
   ok(page.includes("sourceOverlapReportDigest"), "6 owner review digest travels to server gates");
+  ok(page.includes("Refresh history"), "6 Recent activity has a manual refresh control");
+  ok(/st === "failed";?[\s\S]{0,400}?void loadAudit\(\)/.test(page), "6 terminal run states refresh history");
 }
 
 console.log(
