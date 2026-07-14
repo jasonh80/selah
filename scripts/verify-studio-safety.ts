@@ -13,6 +13,7 @@ import {
   type RowLookup,
   type ChapterRowSnapshot,
 } from "../lib/server/protected-chapters";
+import { parseStudioOverlapAuditEntry } from "../lib/studio-audit-diagnostics";
 
 let checks = 0;
 function ok(cond: boolean, label: string): void {
@@ -915,6 +916,129 @@ const integration = async () => {
       safeProtectedMarkFailure("private database error") === null &&
         safeProtectedMarkFailure("protected_mark_draft:UNKNOWN_PRIVATE_CODE") === null,
       "I4c unknown or private errors are never exposed",
+    );
+  }
+
+  // I4d. Studio reconstructs safe overlap metadata without rendering audit text.
+  {
+    const digest = "a".repeat(64);
+    const auditEntry = (
+      diagnostics: string,
+      overrides: Record<string, unknown> = {},
+    ) => ({
+      action: "protected_mark_draft",
+      status: "failed",
+      message: JSON.stringify({
+        code: "SOURCE_OVERLAP_BLOCKED",
+        manifestDigest: digest,
+        cleanup: "marked_failed",
+        diagnostics,
+        ...overrides,
+      }),
+    });
+    const exact = "EXACT_8_PLUS[block]@/object/1/value tokens=8 chars=47";
+    const mosaic = "MOSAIC_10_PLUS[block]@/object/4/value tokens=11 chars=63";
+    const cross = "CROSS_FIELD_8_PLUS[block]@/cross-field tokens=9 chars=52";
+    const review = "EXACT_5_TO_7[review]@/object/2/value tokens=6 chars=33";
+
+    const valid = parseStudioOverlapAuditEntry(auditEntry(mosaic));
+    ok(
+      valid?.findings[0]?.code === "MOSAIC_10_PLUS" &&
+        valid.findings[0].tokenCount === 11 &&
+        valid.findings[0].characterCount === 63,
+      "I4d valid overlap blocker is reconstructed from allowlisted fields",
+    );
+    const exactAndCross = parseStudioOverlapAuditEntry(auditEntry(`${exact}; ${cross}`));
+    ok(
+      exactAndCross?.findings.map((finding) => finding.code).join(",") ===
+        "EXACT_8_PLUS,CROSS_FIELD_8_PLUS",
+      "I4d exact and cross-field blockers are accepted",
+    );
+    const nested = parseStudioOverlapAuditEntry(
+      auditEntry("MOSAIC_10_PLUS[block]@/object/1/value/array/2/object/3/value tokens=10 chars=58"),
+    );
+    ok(
+      nested?.findings[0]?.path === "/object/1/value/array/2/object/3/value",
+      "I4d numeric nested structural paths are accepted",
+    );
+    const mixed = parseStudioOverlapAuditEntry(auditEntry(`${exact}; ${review}`));
+    ok(
+      mixed?.findings.length === 2 && mixed.findings[1].severity === "review",
+      "I4d review metadata may accompany a blocker",
+    );
+    ok(
+      parseStudioOverlapAuditEntry({ ...auditEntry(exact), action: "other" }) === null &&
+        parseStudioOverlapAuditEntry({ ...auditEntry(exact), status: "succeeded" }) === null &&
+        parseStudioOverlapAuditEntry(auditEntry(exact, { code: "OTHER" })) === null,
+      "I4d only the exact failed overlap audit shape is accepted",
+    );
+    ok(
+      parseStudioOverlapAuditEntry({
+        action: "protected_mark_draft",
+        status: "failed",
+        message: "{broken",
+      }) === null,
+      "I4d malformed audit JSON is refused",
+    );
+    ok(
+      parseStudioOverlapAuditEntry(auditEntry(exact, { prompt: "INJECTED_PRIVATE_PROSE" })) === null &&
+        parseStudioOverlapAuditEntry(auditEntry(`${exact}; INJECTED_BIBLE_TEXT`)) === null,
+      "I4d injected prose is never accepted or rendered",
+    );
+    ok(
+      parseStudioOverlapAuditEntry(
+        auditEntry("MOSAIC_10_PLUS[block]@/summary tokens=10 chars=50"),
+      ) === null,
+      "I4d named-property paths are refused",
+    );
+    ok(
+      parseStudioOverlapAuditEntry(
+        auditEntry("UNKNOWN_CODE[block]@/root tokens=10 chars=50"),
+      ) === null &&
+        parseStudioOverlapAuditEntry(
+          auditEntry("EXACT_8_PLUS[review]@/root tokens=8 chars=50"),
+        ) === null,
+      "I4d unknown codes and mismatched severities are refused",
+    );
+    ok(
+      parseStudioOverlapAuditEntry(
+        auditEntry("EXACT_8_PLUS[block]@/root tokens=7 chars=50"),
+      ) === null &&
+        parseStudioOverlapAuditEntry(
+          auditEntry("LONG_EXACT_FOUR[review]@/root tokens=5 chars=30"),
+        ) === null,
+      "I4d code-specific token ranges are enforced",
+    );
+    const seven = Array.from({ length: 7 }, (_, index) =>
+      `EXACT_8_PLUS[block]@/object/${index}/value tokens=8 chars=40`,
+    ).join("; ");
+    ok(
+      parseStudioOverlapAuditEntry(auditEntry(seven))?.findings.length === 6,
+      "I4d visible diagnostic details are capped at six",
+    );
+    const withMore = parseStudioOverlapAuditEntry(auditEntry(`${exact}; +4 more`));
+    ok(withMore?.moreCount === 4, "I4d bounded +N more marker is accepted");
+
+    const truncatedPrefix = `${exact}; CROSS_FIELD_8_PLUS[block]@/cross-field tokens=`;
+    const truncated = truncatedPrefix.padEnd(400, "x");
+    const recovered = parseStudioOverlapAuditEntry(auditEntry(truncated));
+    ok(
+      recovered?.findings.length === 1 && recovered.findings[0].code === "EXACT_8_PLUS",
+      "I4d a final 400-character cut is ignored after complete safe details",
+    );
+    const truncatedMorePrefix = `${exact}; +4 mo`;
+    const truncatedMore = truncatedMorePrefix.padEnd(400, "x");
+    ok(
+      parseStudioOverlapAuditEntry(auditEntry(truncatedMore))?.findings.length === 1,
+      "I4d a truncated +N more marker is ignored",
+    );
+    ok(
+      parseStudioOverlapAuditEntry(auditEntry(`${exact}; broken; ${cross}`)) === null,
+      "I4d an invalid nonfinal detail refuses the whole diagnostic",
+    );
+    ok(
+      parseStudioOverlapAuditEntry(auditEntry(review)) === null,
+      "I4d review-only metadata never explains a blocked run",
     );
   }
 

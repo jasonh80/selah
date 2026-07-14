@@ -11,6 +11,7 @@ import {
   MARK_8_SOURCE_PREPARATION_MESSAGE,
   MARK_8_STUDIO_SLUG,
 } from "@/lib/studio-mark8-preflight";
+import { parseStudioOverlapAuditEntry } from "@/lib/studio-audit-diagnostics";
 import { studioPreviewUrl } from "@/lib/studio-preview";
 import {
   buildMark8StudioSetupRequest,
@@ -39,6 +40,7 @@ type AuditEntry = {
   slug: string | null;
   status: string;
   model: string | null;
+  message: string | null;
 };
 
 type Rule = {
@@ -1593,13 +1595,28 @@ export default function SelahStudioPage() {
                 ) : audit.length === 0 ? (
                   <p className="text-[12px] text-secondary">Nothing yet.</p>
                 ) : (
-                  audit.map((e, i) => (
-                    <p key={i} className="text-[12px] text-secondary">
-                      <span className="text-primary">{e.action}</span>
-                      {e.slug ? ` · ${e.slug}` : ""} · {e.status}
-                      {e.created_at ? ` · ${e.created_at.slice(0, 16).replace("T", " ")}` : ""}
-                    </p>
-                  ))
+                  audit.map((e, i) => {
+                    const overlap = parseStudioOverlapAuditEntry(e);
+                    return (
+                      <div key={i} className="text-[12px] text-secondary">
+                        <p>
+                          <span className="text-primary">{e.action}</span>
+                          {e.slug ? ` · ${e.slug}` : ""} · {e.status}
+                          {e.created_at ? ` · ${e.created_at.slice(0, 16).replace("T", " ")}` : ""}
+                        </p>
+                        {overlap ? (
+                          <div className="mt-1 space-y-0.5 rounded-lg border bg-card-soft px-2.5 py-2 font-mono text-[11px]">
+                            {overlap.findings.map((finding, findingIndex) => (
+                              <p key={`${finding.code}-${finding.path}-${findingIndex}`}>
+                                {finding.code} · {finding.path} · {finding.tokenCount} tokens · {finding.characterCount} characters
+                              </p>
+                            ))}
+                            {overlap.moreCount > 0 ? <p>+{overlap.moreCount} more</p> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </details>
