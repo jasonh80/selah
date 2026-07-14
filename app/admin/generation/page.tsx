@@ -959,7 +959,9 @@ export default function SelahStudioPage() {
     // The worker persists the chapter status FIRST and writes the history row
     // just after (completeGenerationJob/failGenerationJob → audit), so a read
     // triggered by the terminal status can land one row early. One bounded
-    // delayed follow-up read covers that gap — no loop, no retry policy.
+    // delayed follow-up read narrows that window — it cannot guarantee closure
+    // if the insert lags past it; the manual Refresh control is the backstop.
+    // No loop, no retry policy.
     void loadAudit();
     setTimeout(() => void loadAudit(), 1500);
   }
