@@ -97,9 +97,13 @@ function buildChapterWorkupPromptInternal(
     ? `\n\nSERVER-SUPPLIED GENERATION SOURCE (${generationSource.label.trim()})
 Use PRIMARY CHAPTER for this workup. CONTEXT BEFORE and CONTEXT AFTER may only
 ground surrounding-chapter Book Flow. Do not blend their events into the
-primary chapter. The COPYRIGHT DISCIPLINE rule above applies to every word of
-this source: never more than four consecutive words of it may appear in your
-output, whether quoted directly or reassembled from fragments.
+primary chapter.
+Write from the meaning, not the wording. In sections[].fullContent and
+verseByVerse[].explanation, do not copy five or more consecutive words from
+the supplied Bible source, and do not rebuild source wording by stitching
+shorter phrases together—even across fields. Proper names, titles, and
+unavoidable fixed terms may stay natural. When exact wording matters, cite the
+verse and explain it freshly.
 Footnote callouts and bodies, when present, are translator/editorial notes—not
 verse text. They may inform an explicitly labeled textual note but must never be
 silently presented as the words of Scripture.
@@ -135,20 +139,7 @@ VOICE & VALUES
 - Accessible, modern language. Not academic coldness, not cheesy devotional
   clichés. Practical application WITHOUT moralism. Theology principle starts
   simple (level "beginner" for foundational chapters).
-
-COPYRIGHT DISCIPLINE (HARD RULE — a violating draft is automatically DESTROYED
-after generation and the run is wasted)
-- NEVER reproduce more than FOUR consecutive words from any Bible translation,
-  including any server-supplied source text below. No exception for famous
-  lines: express every verse's meaning in fresh sentences of your own.
-- Short fixed names and titles are fine ("Son of Man", "Caesarea Philippi",
-  "the Christ"); sentence fragments of verse wording are not.
-- Do not stitch verse wording back together from separated short fragments —
-  reassembled phrasing is detected exactly like direct quoting.
-- This applies MOST STRONGLY to sections[].fullContent and
-  verseByVerse[].explanation: TEACH the verse, never re-say the verse.
-- Before returning, re-scan those two field families and rewrite any span that
-  echoes five or more consecutive words of the source.
+- Do NOT include copyrighted Bible verse text anywhere.
 
 OUTPUT
 Return ONE JSON object and NOTHING else (no markdown, no code fences, no prose).

@@ -910,24 +910,42 @@ const teachingShapePass = scanScripture(
 );
 assert.equal(teachingShapePass.verdict, "pass");
 assert.equal(teachingShapePass.blockFindingCount, 0);
-const teachingShapeBlock = scanScripture(
+// EXACT copying inside sections[].fullContent → contiguous-run block.
+const fullContentExactBlock = scanScripture(
   JSON.stringify({
     sections: [
       {
         id: "s1",
         title: "The turning point",
         fullContent:
-          "Here he began to teach them clearly that the son of man must endure rejection before anything else.",
+          "Mark reports that he began to teach them that the son of man must endure rejection, and the room goes quiet.",
       },
     ],
   }),
 );
-assert.equal(teachingShapeBlock.verdict, "block");
+assert.equal(fullContentExactBlock.verdict, "block");
 assert.ok(
-  teachingShapeBlock.findings.some(
-    (finding) =>
-      (finding.code === "MOSAIC_10_PLUS" || finding.code === "EXACT_8_PLUS") &&
-      finding.severity === "block",
+  fullContentExactBlock.findings.some(
+    (finding) => finding.code === "EXACT_8_PLUS" && finding.severity === "block",
+  ),
+);
+// STITCHED reconstruction inside verseByVerse[].explanation → mosaic block.
+const explanationStitchBlock = scanScripture(
+  JSON.stringify({
+    verseByVerse: [
+      {
+        startVerse: 31,
+        endVerse: 33,
+        explanation:
+          "The verse says he began to teach them, then insists the son of man must, and finally lands on endure rejection as the road ahead.",
+      },
+    ],
+  }),
+);
+assert.equal(explanationStitchBlock.verdict, "block");
+assert.ok(
+  explanationStitchBlock.findings.some(
+    (finding) => finding.code === "MOSAIC_10_PLUS" && finding.severity === "block",
   ),
 );
 
