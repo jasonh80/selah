@@ -275,6 +275,8 @@ import {
   IMAGE_JOB_STATE_KEY,
   IMAGE_JOB_PLAN_DIGEST_KEY,
   IMAGE_JOB_MODEL_KEY,
+  IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY,
+  IMAGE_JOB_SOURCE_OVERLAP_CLEAN,
   IMAGE_JOB_SPENT_COUNT_KEY,
   IMAGE_JOB_ERROR_CODE_KEY,
   ALLOW_DISCARD_COMPLETED_IMAGES,
@@ -936,8 +938,11 @@ const integration = async () => {
     const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
     ok(
       store.rows.get("mark-8")!.workup_json[IMAGE_JOB_PLAN_DIGEST_KEY] === MARK8_IMAGE_BINDING.planDigest &&
-        store.rows.get("mark-8")!.workup_json[IMAGE_JOB_MODEL_KEY] === MARK_8_IMAGE_MODEL,
-      "I5 Mark 8 claim binds the exact ordered plan and gpt-image-2",
+        store.rows.get("mark-8")!.workup_json[IMAGE_JOB_MODEL_KEY] === MARK_8_IMAGE_MODEL &&
+        store.rows.get("mark-8")!.workup_json[
+          IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY
+        ] === IMAGE_JOB_SOURCE_OVERLAP_CLEAN,
+      "I5 Mark 8 claim binds the exact ordered plan, model, and clean wording state",
     );
     await expectCode(
       () => claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING),
@@ -950,12 +955,27 @@ const integration = async () => {
       "CONFLICT",
       "I5 duplicate image delivery cannot consume twice",
     );
-    ok(await releaseImageJob(store, "mark-8", jobId), "I5 failed run releases claim");
+    ok(
+      await releaseImageJob(store, "mark-8", jobId, undefined, MARK8_IMAGE_BINDING),
+      "I5 failed run releases claim",
+    );
     const second = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
     ok(second.jobId !== jobId, "I5 retry gets a fresh job id");
     await consumeImageClaim(store, "mark-8", second.jobId, MARK8_IMAGE_BINDING);
-    await completeImageJob(store, "mark-8", second.jobId, { title: "Mark 8", images: [{}] } as unknown as ChapterWorkup);
-    ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "I5 completion clears the claim");
+    await completeImageJob(
+      store,
+      "mark-8",
+      second.jobId,
+      { title: "Mark 8", images: [{}] } as unknown as ChapterWorkup,
+      MARK8_IMAGE_BINDING,
+    );
+    ok(
+      store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined &&
+        store.rows.get("mark-8")!.workup_json[
+          IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY
+        ] === undefined,
+      "I5 completion clears the claim and its wording binding",
+    );
   }
 
   // I6. Stale image worker: superseded run cannot apply; bytes stay orphaned.
@@ -963,16 +983,31 @@ const integration = async () => {
     const store = new FakeJobStore();
     store.seed("mark-8", "draft", structuredClone(MARK8_IMAGE_WORKUP) as unknown as Record<string, unknown>);
     const first = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
-    ok(await releaseImageJob(store, "mark-8", first.jobId), "I6 first run released");
+    ok(
+      await releaseImageJob(store, "mark-8", first.jobId, undefined, MARK8_IMAGE_BINDING),
+      "I6 first run released",
+    );
     const second = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
     await expectCode(
-      () => completeImageJob(store, "mark-8", first.jobId, { title: "stale" } as unknown as ChapterWorkup),
+      () => completeImageJob(
+        store,
+        "mark-8",
+        first.jobId,
+        { title: "stale" } as unknown as ChapterWorkup,
+        MARK8_IMAGE_BINDING,
+      ),
       "CONFLICT",
       "I6 stale image worker cannot apply (orphaned files stay isolated)",
     );
     ok((store.rows.get("mark-8")!.workup_json as { title?: string }).title === "Mark 8", "I6 draft untouched by stale run");
     await consumeImageClaim(store, "mark-8", second.jobId, MARK8_IMAGE_BINDING);
-    await completeImageJob(store, "mark-8", second.jobId, { title: "Mark 8", images: [{}] } as unknown as ChapterWorkup);
+    await completeImageJob(
+      store,
+      "mark-8",
+      second.jobId,
+      { title: "Mark 8", images: [{}] } as unknown as ChapterWorkup,
+      MARK8_IMAGE_BINDING,
+    );
   }
 
   // I7. Claims refuse protected / published / quarantined / null-revision rows.
@@ -1835,6 +1870,28 @@ const realImagePipeline = async () => {
     // M0. REAL Studio admin route: exact draft plan + project-standard model
     // are bound before its authenticated background dispatch.
     {
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      const protectedVersionApply = await adminPost(adminReq({
+        action: "version_apply",
+        slug: "mark-8",
+        workup: structuredClone(workupJson),
+      }));
+      const protectedVersionRestore = await adminPost(adminReq({
+        action: "version_restore",
+        slug: "mark-8",
+        version: 1,
+      }));
+      ok(
+        protectedVersionApply.status === 403 && protectedVersionRestore.status === 403,
+        "M0 Mark 8 compare/restore writes stay paused during protected wording review",
+      );
+      ok(
+        store.rows.get("mark-8")!.status === "draft" &&
+          store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined,
+        "M0 refused Mark 8 version writes leave the launch draft untouched",
+      );
+      store.rows.delete("mark-8");
+
       const warnedWorkup = {
         ...structuredClone(workupJson),
         sourceOverlapReview: SOURCE_OVERLAP_WARNING,
@@ -1887,11 +1944,21 @@ const realImagePipeline = async () => {
         "M0 exact copy-warning review stays bound through worker dispatch",
       );
       ok(
+        store.rows.get("mark-8")!.workup_json[
+          IMAGE_JOB_SOURCE_OVERLAP_REPORT_DIGEST_KEY
+        ] === SOURCE_OVERLAP_REPORT_DIGEST,
+        "M0 atomic image claim persists the exact approved warning digest",
+      );
+      ok(
         await releaseImageJob(
           store,
           "mark-8",
           String(reviewedWarningBody.jobId),
           "queued",
+          {
+            ...MARK8_IMAGE_BINDING,
+            sourceOverlapReportDigest: SOURCE_OVERLAP_REPORT_DIGEST,
+          },
         ),
         "M0 reviewed warning test releases its unspent claim",
       );
@@ -1935,7 +2002,13 @@ const realImagePipeline = async () => {
         "M0 Studio status truthfully reports queued exact-model work",
       );
       ok(
-        await releaseImageJob(store, "mark-8", String(body.jobId), "queued"),
+        await releaseImageJob(
+          store,
+          "mark-8",
+          String(body.jobId),
+          "queued",
+          MARK8_IMAGE_BINDING,
+        ),
         "M0 unspent route claim releases cleanly",
       );
       store.rows.delete("mark-8");
@@ -2119,7 +2192,16 @@ const realImagePipeline = async () => {
       ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_SPENT_COUNT_KEY] === 2, "M4 terminal state exposes exact spend count");
       const retry = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
       ok(retry.jobId !== jobId && store.rows.get("mark-8")!.workup_json[IMAGE_JOB_STATE_KEY] === "queued", "M4 explicit owner retry replaces only failed state");
-      ok(await releaseImageJob(store, "mark-8", retry.jobId, "queued"), "M4 retry claim can be safely released before spend");
+      ok(
+        await releaseImageJob(
+          store,
+          "mark-8",
+          retry.jobId,
+          "queued",
+          MARK8_IMAGE_BINDING,
+        ),
+        "M4 retry claim can be safely released before spend",
+      );
       store.rows.delete("mark-8");
     }
 

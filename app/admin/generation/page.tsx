@@ -18,6 +18,7 @@ import {
   decideMark8StudioSetup,
   type Mark8StudioSetupDecision,
 } from "@/lib/studio-mark8-setup";
+import { SOURCE_OVERLAP_REVIEW_MAX_FINDING_COUNT } from "@/lib/source-overlap-review";
 
 // Selah Studio — a calm, guided publishing flow (not a developer console).
 // Choose Chapter → Generate Draft → Preview Text → Create & Review Images →
@@ -1762,7 +1763,7 @@ function readStudioCopyReview(value: unknown): StudioCopyReview | null {
     !LOWERCASE_SHA256.test(review.reportDigest) ||
     !Number.isSafeInteger(review.findingCount) ||
     (review.findingCount as number) < 1 ||
-    (review.findingCount as number) > 100
+    (review.findingCount as number) > SOURCE_OVERLAP_REVIEW_MAX_FINDING_COUNT
   ) {
     return { status: "invalid" };
   }

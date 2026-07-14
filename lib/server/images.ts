@@ -605,7 +605,13 @@ async function generateAndStoreChapterImagesWithinDeadline(
         },
       });
     }
-    const released = await releaseImageJob(store, slug, jobId, "running");
+    const released = await releaseImageJob(
+      store,
+      slug,
+      jobId,
+      "running",
+      binding,
+    );
     await logGenerationAudit({
       action: "image_run_failed",
       slug,
@@ -703,7 +709,13 @@ async function generateAndStoreChapterImagesWithinDeadline(
   try {
     // Terminal write pinned to THIS job id: a superseded/stale run is a typed
     // CONFLICT and the uploaded bytes stay isolated in the job directory.
-    await completeImageJob(store, slug, jobId, { ...exactWorkup, images: updatedImages });
+    await completeImageJob(
+      store,
+      slug,
+      jobId,
+      { ...exactWorkup, images: updatedImages },
+      binding,
+    );
   } catch (e) {
     const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
     console.error(`[selah] image run for ${slug} not applied — ${msg}`);

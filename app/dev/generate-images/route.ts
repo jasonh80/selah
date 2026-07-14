@@ -96,7 +96,13 @@ export async function GET(request: Request) {
   }
   const triggered = await triggerBackgroundImageGeneration(slug, url.host, jobId, binding);
   if (!triggered.ok) {
-    const released = await releaseImageJob(store, slug, jobId, "queued");
+    const released = await releaseImageJob(
+      store,
+      slug,
+      jobId,
+      "queued",
+      binding,
+    );
     const note = released ? "image claim released" : "image claim could NOT be released; the row may still hold a stale claim";
     await logGenerationAudit({
       action: "refused:dev_generate_images",
