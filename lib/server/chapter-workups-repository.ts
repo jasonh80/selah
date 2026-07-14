@@ -1,4 +1,8 @@
 import type { ChapterWorkup } from "../types";
+import {
+  inspectSourceOverlapReview,
+  sourceOverlapReviewAccepted,
+} from "../source-overlap-review";
 import { getSupabaseAdmin, warnSupabaseMissing } from "./supabase";
 import {
   decideMutation,
@@ -48,6 +52,9 @@ export interface StudioChapterStatus {
   status: string | null;
   failureMessage?: string;
   textCredit?: StudioTextCreditStatus;
+  copyReview?:
+    | { status: "warning"; reportDigest: string; findingCount: number }
+    | { status: "invalid" };
 }
 
 const PRE_MODEL_FAILURES = new Set([
@@ -91,7 +98,7 @@ export function safeProtectedMarkFailure(
       textCredit: "used",
     },
     SOURCE_OVERLAP_BLOCKED: {
-      failureMessage: "Studio stopped the draft because it copied too much Bible wording. Text credit was used. Adjust the instructions before trying again.",
+      failureMessage: "Studio could not safely verify the Bible-wording check. Text credit was used. Do not retry until the checker is reviewed.",
       textCredit: "used",
     },
     MARK_QUALITY_BLOCKED: {
@@ -137,7 +144,15 @@ export function validateMark8PublishCandidate(
   workup: ChapterWorkup,
   submittedReviewDigest: string | undefined,
   configuredSupabaseUrl: string | undefined,
+  submittedSourceOverlapReportDigest?: string,
 ): Mark8PublishValidation {
+  const copyReview = sourceOverlapReviewAccepted(
+    workup,
+    submittedSourceOverlapReportDigest,
+  );
+  if (!copyReview.ok) {
+    return { ok: false, reason: copyReview.reason };
+  }
   if (!submittedReviewDigest || !LOWERCASE_SHA256.test(submittedReviewDigest)) {
     return {
       ok: false,
@@ -267,7 +282,7 @@ export async function getDraftWorkup(
 /** Promote a draft to published (status → reviewed). Returns the new status. */
 export async function publishChapter(
   slug: string,
-  options: { reviewDigest?: string } = {},
+  options: { reviewDigest?: string; sourceOverlapReportDigest?: string } = {},
 ): Promise<string> {
   // Publishing promotes exactly a DRAFT (per-action transition). Legacy "ready"
   // rows and re-publishes are refused. Read status + revision + full workup ONCE,
@@ -284,6 +299,7 @@ export async function publishChapter(
       row.workupJson as unknown as ChapterWorkup,
       options.reviewDigest,
       process.env.NEXT_PUBLIC_SUPABASE_URL,
+      options.sourceOverlapReportDigest,
     );
     if (!validation.ok) {
       throw new ChapterMutationError("REFUSED", "publishChapter", slug, validation.reason);
@@ -343,7 +359,7 @@ export async function getStudioChapterStatus(slug: string): Promise<StudioChapte
   }
   const { data, error } = await db
     .from(TABLE)
-    .select("status,generation_error")
+    .select("status,generation_error,workup_json")
     .eq("slug", slug)
     .maybeSingle();
   if (error) return { status: null };
@@ -352,7 +368,18 @@ export async function getStudioChapterStatus(slug: string): Promise<StudioChapte
     slug === MARK_8_IMAGE_SLUG && status === "failed"
       ? safeProtectedMarkFailure(data?.generation_error)
       : null;
-  return { status, ...(safeFailure ?? {}) };
+  const copyInspection = inspectSourceOverlapReview(data?.workup_json);
+  const copyReview =
+    copyInspection.kind === "warning"
+      ? {
+          status: "warning" as const,
+          reportDigest: copyInspection.warning.reportDigest,
+          findingCount: copyInspection.warning.findingCount,
+        }
+      : copyInspection.kind === "invalid" && data?.workup_json
+        ? { status: "invalid" as const }
+        : undefined;
+  return { status, ...(safeFailure ?? {}), ...(copyReview ? { copyReview } : {}) };
 }
 
 

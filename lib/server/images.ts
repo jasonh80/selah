@@ -2,6 +2,10 @@
 // Heavily gated and ALLOWLISTED. Never called from a public page load.
 // Text generation is NOT touched here.
 import type { ChapterWorkup, ImageKind } from "@/lib/types";
+import {
+  inspectSourceOverlapReview,
+  sourceOverlapReviewAccepted,
+} from "@/lib/source-overlap-review";
 import { getOpenAI, isOpenAIConfigured } from "./openai";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { ChapterMutationError, isChapterMutationError } from "./protected-chapters";
@@ -180,6 +184,7 @@ export interface PreparedImageJobBinding extends ImageJobBinding {
 export async function prepareImageJobBinding(
   store: JobStorePort,
   slug: string,
+  approvedSourceOverlapReportDigest?: string,
 ): Promise<PreparedImageJobBinding | undefined> {
   if (slug !== MARK_8_IMAGE_SLUG) return undefined;
   // Mark 8 deliberately uses the project-standard model directly. The Studio
@@ -196,9 +201,22 @@ export async function prepareImageJobBinding(
   }
   try {
     const workup = row.workupJson as unknown as ChapterWorkup;
+    const copyReview = sourceOverlapReviewAccepted(
+      workup,
+      approvedSourceOverlapReportDigest,
+    );
+    if (!copyReview.ok) throw new Error(copyReview.reason);
+    const copyInspection = inspectSourceOverlapReview(workup);
     assertMark8ImagesArePlaceholders(workup);
     const plan = deriveMark8ImagePlan(workup);
-    return { planDigest: plan.digest, model, imageCount: plan.images.length };
+    return {
+      planDigest: plan.digest,
+      model,
+      imageCount: plan.images.length,
+      ...(copyInspection.kind === "warning"
+        ? { sourceOverlapReportDigest: copyInspection.warning.reportDigest }
+        : {}),
+    };
   } catch (error) {
     throw new ChapterMutationError(
       "REFUSED",

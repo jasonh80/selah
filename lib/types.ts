@@ -137,6 +137,11 @@ export interface ChapterWorkup {
   generationError?: string;
   updatedAt?: string;
   reviewedAt?: string;
+  // Server-owned provenance and private-draft review metadata. The overlap
+  // marker contains only digests, closed finding codes, and counts—never Bible
+  // text, generated prose, prompts, or excerpts.
+  generationManifestDigest?: string;
+  sourceOverlapReview?: import("./source-overlap-review").SourceOverlapReviewWarning;
 
   slug: string;
   book: string;

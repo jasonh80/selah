@@ -30,9 +30,19 @@ export default async (req: Request) => {
   const token = typeof body.token === "string" ? body.token : "";
   const imagePlanDigest = typeof body.imagePlanDigest === "string" ? body.imagePlanDigest : "";
   const imageModel = typeof body.imageModel === "string" ? body.imageModel : "";
+  const sourceOverlapReportDigest =
+    typeof body.sourceOverlapReportDigest === "string"
+      ? body.sourceOverlapReportDigest
+      : "";
   const binding: ImageJobBinding | undefined =
     imagePlanDigest && imageModel
-      ? { planDigest: imagePlanDigest, model: imageModel }
+      ? {
+          planDigest: imagePlanDigest,
+          model: imageModel,
+          ...(sourceOverlapReportDigest
+            ? { sourceOverlapReportDigest }
+            : {}),
+        }
       : undefined;
   if (!slug || !jobId) {
     return refuse(slug, "missing slug or job id — refusing unclaimed image work", 400);

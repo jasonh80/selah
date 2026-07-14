@@ -157,6 +157,9 @@ function overlapMessage(
   ok(page.includes("parseOverlapAuditDiagnostics("), "6 page uses the strict parser");
   ok(!/\{e\.message/.test(page) && !/\{entry\.message/.test(page), "6 page never interpolates a raw audit message");
   ok(page.includes("message?: string | null"), "6 AuditEntry carries message for the parser only");
+  ok(page.includes("Bible wording needs your review"), "6 warned private draft gets plain owner guidance");
+  ok(page.includes("I reviewed the wording — Ready"), "6 owner review is explicit before images");
+  ok(page.includes("sourceOverlapReportDigest"), "6 owner review digest travels to server gates");
 }
 
 console.log(

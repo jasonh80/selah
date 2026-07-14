@@ -7,9 +7,14 @@
 import { generatedToRenderWorkup } from "@/lib/ai/adapters/generated-to-workup";
 import { evaluateMarkSprintDraft } from "@/lib/ai/quality/mark-sprint-quality";
 import { parseChapterWorkupJson } from "@/lib/ai/schemas/chapter-workup-schema";
+import {
+  createSourceOverlapReviewWarning,
+  type SourceOverlapReviewWarning,
+} from "@/lib/source-overlap-review";
 import type { ChapterWorkup } from "@/lib/types";
 import {
   assertGenerationManifestV3OverlapAcceptanceCapability,
+  assertGenerationManifestV3OverlapReportIntegrity,
   assertGenerationManifestV3PreflightCapability,
   createGenerationManifestV3OverlapAcceptanceCapability,
   evaluateGenerationManifestV3Overlap,
@@ -107,13 +112,15 @@ export interface ProtectedMarkSprintDraftResult {
   rawDraftDigest: string;
   canonicalDraftDigest: string;
   overlapReportDigest: string;
+  overlapVerdict: "pass" | "block";
   /**
-   * Review-severity overlap diagnostics that accompanied a PASS (unavoidable
-   * short phrases). Safe metadata only — code, structural path, counts.
+   * Excerpt-free diagnostics for owner review and durable audit. These are
+   * code, structural path, and counts only.
    */
-  overlapReviewDiagnostics: readonly string[];
+  overlapDiagnostics: readonly string[];
+  sourceOverlapReview: SourceOverlapReviewWarning | null;
   tokenUsage: Readonly<MarkSprintDraftTokenUsage>;
-  overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability;
+  overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability | null;
   quality: {
     machineVerdict: "pass";
     overallStatus: "needs_owner_review";
@@ -216,36 +223,10 @@ export async function runProtectedMarkSprintDraft(
       preparation,
       execution.rawDraftJson,
     );
-  } catch {
-    throw new MarkSprintDraftPipelineError(
-      "SOURCE_OVERLAP_BLOCKED",
-      [],
-      tokenUsage,
-    );
-  }
-  if (overlapReport.verdict !== "pass") {
-    throw new MarkSprintDraftPipelineError(
-      "SOURCE_OVERLAP_BLOCKED",
-      overlapReport.findings
-        .filter((finding) => finding.severity === "block")
-        .map((finding) => finding.code),
-      tokenUsage,
-      overlapReport.findings.map(safeOverlapDiagnostic),
-    );
-  }
-  let overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability;
-  try {
-    overlapAcceptance =
-      createGenerationManifestV3OverlapAcceptanceCapability(
-        input.preflight,
-        preparation,
-        overlapReport,
-        execution.rawDraftJson,
-      );
-    assertGenerationManifestV3OverlapAcceptanceCapability(
-      overlapAcceptance,
+    assertGenerationManifestV3OverlapReportIntegrity(
       input.preflight,
       preparation,
+      overlapReport,
       execution.rawDraftJson,
     );
   } catch {
@@ -254,6 +235,51 @@ export async function runProtectedMarkSprintDraft(
       [],
       tokenUsage,
     );
+  }
+  let overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability | null = null;
+  let sourceOverlapReview: SourceOverlapReviewWarning | null = null;
+  if (overlapReport.verdict === "pass") {
+    try {
+      overlapAcceptance =
+        createGenerationManifestV3OverlapAcceptanceCapability(
+          input.preflight,
+          preparation,
+          overlapReport,
+          execution.rawDraftJson,
+        );
+      assertGenerationManifestV3OverlapAcceptanceCapability(
+        overlapAcceptance,
+        input.preflight,
+        preparation,
+        execution.rawDraftJson,
+      );
+    } catch {
+      throw new MarkSprintDraftPipelineError(
+        "SOURCE_OVERLAP_BLOCKED",
+        [],
+        tokenUsage,
+      );
+    }
+  } else {
+    try {
+      sourceOverlapReview = createSourceOverlapReviewWarning({
+        manifestDigest: input.preflight.manifestDigest,
+        reportDigest: overlapReport.reportDigest,
+        canonicalDraftDigest: overlapReport.canonicalDraftDigest,
+        blockerCodes: overlapReport.findings
+          .filter((finding) => finding.severity === "block")
+          .map((finding) => finding.code),
+        findingCount: overlapReport.findingCount,
+        blockFindingCount: overlapReport.blockFindingCount,
+        reviewFindingCount: overlapReport.reviewFindingCount,
+      });
+    } catch {
+      throw new MarkSprintDraftPipelineError(
+        "SOURCE_OVERLAP_BLOCKED",
+        [],
+        tokenUsage,
+      );
+    }
   }
 
   const quality = evaluateMarkSprintDraft(generated, input.sourceBundle.slug);
@@ -273,7 +299,9 @@ export async function runProtectedMarkSprintDraft(
     rawDraftDigest: overlapReport.rawDraftDigest,
     canonicalDraftDigest: overlapReport.canonicalDraftDigest,
     overlapReportDigest: overlapReport.reportDigest,
-    overlapReviewDiagnostics: overlapReport.findings.map(safeOverlapDiagnostic),
+    overlapVerdict: overlapReport.verdict,
+    overlapDiagnostics: overlapReport.findings.map(safeOverlapDiagnostic),
+    sourceOverlapReview,
     tokenUsage,
     overlapAcceptance,
     quality: {

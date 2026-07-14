@@ -227,19 +227,23 @@ async function main(): Promise<void> {
   copiedSource.summary = `${SOURCE_PHRASE}. ${copiedSource.summary}`;
   const overlap = executor(JSON.stringify(copiedSource));
   const overlapAuthorization = await authorization();
-  const overlapError = await expectPipelineError(
-    runProtectedMarkSprintDraft({
-      sourceBundle,
-      modelRequest,
-      preflight,
-      ...overlapAuthorization,
-      executor: overlap.port,
-    }),
-    "SOURCE_OVERLAP_BLOCKED",
-  );
+  const overlapResult = await runProtectedMarkSprintDraft({
+    sourceBundle,
+    modelRequest,
+    preflight,
+    ...overlapAuthorization,
+    executor: overlap.port,
+  });
   assert.equal(overlap.calls(), 1);
-  assert.ok(overlapError.blockerCodes.length > 0);
-  assert.deepEqual(overlapError.tokenUsage, {
+  assert.equal(overlapResult.overlapVerdict, "block");
+  assert.equal(overlapResult.overlapAcceptance, null);
+  assert.ok(overlapResult.sourceOverlapReview);
+  assert.ok(overlapResult.sourceOverlapReview.blockerCodes.length > 0);
+  assert.ok(
+    overlapResult.overlapDiagnostics.some((line) => line.includes("[block]")),
+  );
+  assert.equal(overlapResult.renderWorkup.slug, "mark-8");
+  assert.deepEqual(overlapResult.tokenUsage, {
     inputTokens: 321,
     outputTokens: 654,
   });
@@ -285,6 +289,8 @@ async function main(): Promise<void> {
   assert.equal(result.rawDraftDigest, sha256Text(happyJson));
   assert.equal(result.canonicalDraftDigest, sha256Canonical(JSON.parse(happyJson)));
   assert.match(result.overlapReportDigest, /^[a-f0-9]{64}$/u);
+  assert.equal(result.overlapVerdict, "pass");
+  assert.equal(result.sourceOverlapReview, null);
   assert.deepEqual(result.tokenUsage, { inputTokens: 321, outputTokens: 654 });
   assert.equal(result.quality.machineVerdict, "pass");
   assert.equal(result.quality.overallStatus, "needs_owner_review");
@@ -293,8 +299,9 @@ async function main(): Promise<void> {
   assert.equal(result.renderWorkup.verses.length, 0);
   assert.ok(Object.isFrozen(result));
   assert.ok(Object.isFrozen(result.renderWorkup));
+  assert.ok(result.overlapAcceptance);
   assertGenerationManifestV3OverlapAcceptanceCapability(
-    result.overlapAcceptance,
+    result.overlapAcceptance!,
     preflight,
     { sourceBundle, modelRequest },
     happyJson,
