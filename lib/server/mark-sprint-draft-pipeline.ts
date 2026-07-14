@@ -284,10 +284,16 @@ export async function runProtectedMarkSprintDraft(
 
   const quality = evaluateMarkSprintDraft(generated, input.sourceBundle.slug);
   if (quality.machineVerdict !== "pass" || quality.blockers.length > 0) {
+    // Persist WHY (issue #17, third diagnostic gap): quality blocker codes are
+    // short safe enums — carry them as safeDiagnostics so the durable audit
+    // and Studio can show them. Never draft text, never excerpts.
     throw new MarkSprintDraftPipelineError(
       "MARK_QUALITY_BLOCKED",
       quality.blockers.map((finding) => finding.code),
       tokenUsage,
+      quality.blockers.map(
+        (finding) => `QUALITY:${finding.code}`,
+      ),
     );
   }
 

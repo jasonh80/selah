@@ -117,7 +117,7 @@ function overlapMessage(
   ok(parseOverlapAuditDiagnostics({ action: "generate_text", status: "failed", message: overlapMessage("") }) === null, "4 other actions never parse");
   ok(parseOverlapAuditDiagnostics({ action: "protected_mark_draft", status: "succeeded", message: overlapMessage("") }) === null, "4 non-failed rows never parse");
   ok(parseOverlapAuditDiagnostics(auditRow("not json {{{")) === null, "4 malformed JSON → null");
-  ok(parseOverlapAuditDiagnostics(auditRow(JSON.stringify({ code: "MARK_QUALITY_BLOCKED", manifestDigest: DIGEST }))) === null, "4 other failure codes → null");
+  ok(parseOverlapAuditDiagnostics(auditRow(JSON.stringify({ code: "MODEL_RESPONSE_INVALID", manifestDigest: DIGEST }))) === null, "4 other failure codes → null");
   ok(parseOverlapAuditDiagnostics(auditRow(JSON.stringify({ code: "SOURCE_OVERLAP_BLOCKED", manifestDigest: "not-a-digest" }))) === null, "4 invalid digest → null");
   ok(parseOverlapAuditDiagnostics(auditRow(overlapMessage("", { cleanup: "definitely_not_known" } as never))) === null, "4 unknown cleanup → null");
 }
@@ -149,6 +149,25 @@ function overlapMessage(
   for (const leak of ["shepherd", "profit", "SYSTEM PROMPT", "/summary", "MYSTERY", "fatal", "whole world"]) {
     ok(!rendered.includes(leak), `5 no leak of "${leak}"`);
   }
+}
+
+// ---------- 5b. Quality-stop rows render their codes (issue #17, gap 3) ----------
+{
+  const qmsg = JSON.stringify({
+    code: "MARK_QUALITY_BLOCKED",
+    manifestDigest: DIGEST,
+    cleanup: "marked_failed",
+    diagnostics: "QUALITY:WHAT_PEOPLE_ASK_COUNT; QUALITY:VERSE_COVERAGE_GAP; not a valid segment; QUALITY:bad-lowercase",
+  });
+  const parsed = parseOverlapAuditDiagnostics(auditRow(qmsg));
+  ok(parsed !== null, "5b quality stop parses");
+  ok(parsed!.code === "MARK_QUALITY_BLOCKED", "5b code preserved");
+  ok(parsed!.qualityCodes.length === 2 && parsed!.qualityCodes[0] === "WHAT_PEOPLE_ASK_COUNT", "5b only grammar-valid codes kept");
+  ok(parsed!.droppedSegments === 2, "5b malformed/injected segments dropped");
+  ok(!JSON.stringify(parsed).includes("bad-lowercase"), "5b invalid code never rendered");
+  // Overlap rows keep an empty qualityCodes array.
+  const overlapParsed = parseOverlapAuditDiagnostics(auditRow(overlapMessage("")));
+  ok(overlapParsed !== null && overlapParsed.qualityCodes.length === 0, "5b overlap rows unaffected");
 }
 
 // ---------- 6. The Studio page renders ONLY the parsed model ----------
