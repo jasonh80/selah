@@ -53,7 +53,9 @@ export interface ParsedOverlapFinding {
 }
 
 export interface ParsedOverlapDiagnostics {
-  code: "SOURCE_OVERLAP_BLOCKED";
+  code: "SOURCE_OVERLAP_BLOCKED" | "MARK_QUALITY_BLOCKED";
+  /** Strictly validated QUALITY:<CODE> lines for quality stops. */
+  qualityCodes: string[];
   manifestDigestPrefix: string; // first 12 hex chars of the validated digest
   cleanup: (typeof KNOWN_CLEANUPS)[number] | null;
   findings: ParsedOverlapFinding[];
@@ -108,7 +110,12 @@ export function parseOverlapAuditDiagnostics(entry: {
     return null;
   }
   const record = payload as Record<string, unknown>;
-  if (record.code !== "SOURCE_OVERLAP_BLOCKED") return null;
+  if (
+    record.code !== "SOURCE_OVERLAP_BLOCKED" &&
+    record.code !== "MARK_QUALITY_BLOCKED"
+  ) {
+    return null;
+  }
   if (
     typeof record.manifestDigest !== "string" ||
     !LOWERCASE_SHA256.test(record.manifestDigest)
@@ -127,13 +134,20 @@ export function parseOverlapAuditDiagnostics(entry: {
   }
 
   const findings: ParsedOverlapFinding[] = [];
+  const qualityCodes: string[] = [];
   let more = 0;
   let droppedSegments = 0;
+  const QUALITY_GRAMMAR = /^QUALITY:([A-Z0-9_]{2,48})$/;
   if (record.diagnostics !== undefined) {
     if (typeof record.diagnostics !== "string") return null;
     const segments = record.diagnostics.split("; ");
     for (let index = 0; index < segments.length; index++) {
       const segment = segments[index];
+      const quality = QUALITY_GRAMMAR.exec(segment);
+      if (quality) {
+        qualityCodes.push(quality[1]);
+        continue;
+      }
       const moreMatch = MORE_GRAMMAR.exec(segment);
       if (moreMatch && index === segments.length - 1) {
         more = boundedInteger(moreMatch[1], 100_000) ?? 0;
@@ -162,7 +176,8 @@ export function parseOverlapAuditDiagnostics(entry: {
   }
 
   return {
-    code: "SOURCE_OVERLAP_BLOCKED",
+    code: record.code as "SOURCE_OVERLAP_BLOCKED" | "MARK_QUALITY_BLOCKED",
+    qualityCodes,
     manifestDigestPrefix: record.manifestDigest.slice(0, 12),
     cleanup,
     findings,

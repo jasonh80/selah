@@ -1683,6 +1683,9 @@ export default function SelahStudioPage() {
                               {overlap.code} · manifest {overlap.manifestDigestPrefix}…
                               {overlap.cleanup ? ` · cleanup ${overlap.cleanup}` : ""}
                             </p>
+                            {overlap.qualityCodes.map((code, j) => (
+                              <p key={`q${j}`}>quality check failed: {code}</p>
+                            ))}
                             {overlap.findings.map((f, j) => (
                               <p key={j}>
                                 {f.code} [{f.severity}] {f.path} · {f.tokens} tokens · {f.chars} chars
