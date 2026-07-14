@@ -354,6 +354,9 @@ export default function SelahStudioPage() {
       setPublished(st === "reviewed");
       setGenMsg("");
       setDraftTakingLonger(false);
+      // A run just reached a terminal state — pull fresh history so Recent
+      // activity reflects it without a full page reload (issue #17).
+      refreshAuditAfterTerminalRun();
       if (st !== "reviewed" && target === MARK_8_STUDIO_SLUG) void loadImagesStatus(target);
     } else if (st === "failed") {
       setPhase("error");
@@ -361,6 +364,7 @@ export default function SelahStudioPage() {
       const safeFailure = typeof j.failureMessage === "string" ? j.failureMessage : "Something went wrong while writing the draft.";
       setGenMsg(safeFailure);
       setDraftTakingLonger(false);
+      refreshAuditAfterTerminalRun();
     } else {
       setTimeout(() => pollStatus(target, attempt + 1), 5000);
     }
@@ -949,6 +953,17 @@ export default function SelahStudioPage() {
   async function loadAudit() {
     const j = await api("POST", { action: "audit" });
     if (j.ok) setAudit(j.entries as AuditEntry[]);
+  }
+
+  function refreshAuditAfterTerminalRun() {
+    // The worker persists the chapter status FIRST and writes the history row
+    // just after (completeGenerationJob/failGenerationJob → audit), so a read
+    // triggered by the terminal status can land one row early. One bounded
+    // delayed follow-up read narrows that window — it cannot guarantee closure
+    // if the insert lags past it; the manual Refresh control is the backstop.
+    // No loop, no retry policy.
+    void loadAudit();
+    setTimeout(() => void loadAudit(), 1500);
   }
 
   function setS<K extends keyof GenSettings>(k: K, v: GenSettings[K]) {
@@ -1660,6 +1675,13 @@ export default function SelahStudioPage() {
             <details className="border-t pt-3">
               <summary className="cursor-pointer text-[13px] font-medium text-primary">Recent activity</summary>
               <div className="mt-1.5 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => void loadAudit()}
+                  className="text-[12px] text-secondary underline"
+                >
+                  Refresh history
+                </button>
                 {audit === null ? (
                   <p className="text-[12px] text-secondary">Loading…</p>
                 ) : audit.length === 0 ? (

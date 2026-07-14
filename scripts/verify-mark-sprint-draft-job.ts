@@ -30,6 +30,10 @@ import {
   runProtectedMarkDraftJob,
   type ProtectedMarkDraftJobPorts,
 } from "../lib/server/mark-sprint-draft-job";
+import {
+  __setGenerationTestOverrides,
+  logGenerationAuditVerified,
+} from "../lib/server/generation-settings";
 import type {
   MarkSprintRuntimeApprovedPreparation,
   MarkSprintRuntimePreparationResult,
@@ -328,6 +332,7 @@ async function main(): Promise<void> {
       },
       async audit(entry) {
         audits.push(structuredClone(entry));
+        return true;
       },
       async snapshot(slug, label) {
         const row = store.rows.get(slug);
@@ -669,6 +674,42 @@ async function main(): Promise<void> {
     assert.equal(failed.store.rows.get(SLUG)?.status, "failed");
   }
 
+  // PRODUCTION-SHAPED audit outage (issue #17, runs 7/8): writeGenerationAudit
+  // RESOLVES false — it does not throw — when Supabase is unavailable or the
+  // insert errors. That resolved-false must behave exactly like the throw:
+  // loud in logs, invisible to the truthful chapter/job outcome.
+  {
+    const loggedErrors: string[] = [];
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      loggedErrors.push(args.map(String).join(" "));
+    };
+    try {
+      const saved = harness("happy");
+      saved.ports.audit = async () => false;
+      const savedResult = await runProtectedMarkDraftJob(input, saved.ports);
+      assert.equal(savedResult.ok, true);
+      assert.equal(saved.store.rows.get(SLUG)?.status, "draft");
+
+      const failed = harness("review_only");
+      failed.ports.audit = async () => false;
+      const failedResult = await runProtectedMarkDraftJob(input, failed.ports);
+      assert.equal(failedResult.ok, false);
+      assert.equal(failedResult.code, "PREPARATION_REFUSED");
+      assert.equal(failed.store.rows.get(SLUG)?.status, "failed");
+    } finally {
+      console.error = originalConsoleError;
+    }
+    // The outage must be explicit in the function log — silent false-success
+    // is exactly what hid runs 7 and 8 from Studio's history.
+    assert.ok(
+      loggedErrors.some((line) =>
+        line.includes("protected_mark_draft audit write failed"),
+      ),
+      "resolved-false audit outage must be loudly logged",
+    );
+  }
+
   // Exact OpenAI adapter passes the genuine request object without cloning.
   {
     let received: unknown;
@@ -763,6 +804,33 @@ async function main(): Promise<void> {
     await recordCostEventStrict(costInput);
     assert.equal(captured.length, 1);
     __setCostCaptureForTesting(null);
+  }
+
+  // The REAL verified writer propagates a resolved-false outage (production
+  // shape: Supabase unavailable / insert error) instead of resolving as
+  // success — the exact hole that hid runs 7 and 8 (issue #17).
+  {
+    __setGenerationTestOverrides({ auditResolvedFalse: true });
+    assert.equal(
+      await logGenerationAuditVerified({
+        action: "protected_mark_draft",
+        status: "failed",
+        message: "synthetic outage probe",
+      }),
+      false,
+    );
+    const capturedAudit: Array<Record<string, unknown>> = [];
+    __setGenerationTestOverrides({ captureAudit: capturedAudit });
+    assert.equal(
+      await logGenerationAuditVerified({
+        action: "protected_mark_draft",
+        status: "failed",
+        message: "synthetic save probe",
+      }),
+      true,
+    );
+    assert.equal(capturedAudit.length, 1);
+    __setGenerationTestOverrides(null);
   }
 
   console.log(

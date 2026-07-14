@@ -21,7 +21,7 @@ import {
   type JobStorePort,
   type TextJobFailureState,
 } from "./generation-jobs";
-import { logGenerationAudit } from "./generation-settings";
+import { logGenerationAuditVerified } from "./generation-settings";
 import type { GenerationModelRequestV3 } from "./generation-manifest-v3";
 import {
   MarkSprintDraftPipelineError,
@@ -177,7 +177,13 @@ export interface ProtectedMarkDraftJobPorts {
   useApprovedPreparation: ApprovedPreparationConsumer;
   createModelExecutor(signal: AbortSignal): MarkSprintModelExecutorPort;
   recordCost(input: CostEventInput): Promise<void>;
-  audit(entry: SafeAuditEntry): Promise<void>;
+  /**
+   * Durable activity write. MUST resolve `true` only when the row was actually
+   * saved — resolving on failure is the false-success bug that hid runs from
+   * Studio's history (issue #17). Wire logGenerationAuditVerified, never the
+   * void logGenerationAudit.
+   */
+  audit(entry: SafeAuditEntry): Promise<boolean>;
   snapshot(slug: string, label: string): Promise<number | null>;
 }
 
@@ -258,17 +264,22 @@ async function writeSafeAudit(
   ports: ProtectedMarkDraftJobPorts,
   entry: SafeAuditEntry,
 ): Promise<boolean> {
+  // The chapter/job result stays authoritative. An audit outage must never
+  // turn a saved private draft into a reported failure or hide cleanup truth.
+  // But it must also never look like success: a resolved `false` (Supabase
+  // unavailable or insert error — the production shape) is an outage too.
+  let saved = false;
   try {
-    await ports.audit(entry);
-    return true;
+    saved = (await ports.audit(entry)) === true;
   } catch {
-    // The chapter/job result stays authoritative. An audit outage must never
-    // turn a saved private draft into a reported failure or hide cleanup truth.
-    console.error(
-      `[selah] protected_mark_draft audit write failed (${entry.status})`,
-    );
-    return false;
+    saved = false;
   }
+  if (!saved) {
+    console.error(
+      `[selah] protected_mark_draft audit write failed (${entry.status}) — run history row is missing; Studio history will not show this run until it is re-logged`,
+    );
+  }
+  return saved;
 }
 
 function withManifestDigest(
@@ -731,7 +742,7 @@ export async function runConfiguredProtectedMarkDraftJob(
       );
     },
     recordCost: recordCostEventStrict,
-    audit: logGenerationAudit,
+    audit: logGenerationAuditVerified,
     snapshot: snapshotVersion,
   };
   return runProtectedMarkDraftJob(input, ports);

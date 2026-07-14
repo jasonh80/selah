@@ -18,7 +18,7 @@ import {
   requireJobStore,
   verifyJobToken,
 } from "../../lib/server/generation-jobs";
-import { logGenerationAudit } from "../../lib/server/generation-settings";
+import { logGenerationAuditVerified } from "../../lib/server/generation-settings";
 import { runConfiguredProtectedMarkDraftJob } from "../../lib/server/mark-sprint-draft-job";
 
 const MARK_8_SLUG = "mark-8";
@@ -43,8 +43,27 @@ export function __setMark8PermissionCheckerForTesting(
   mark8PermissionCheckerOverride = checker;
 }
 
+// Same false-success hole as the job orchestrator (issue #17): the void
+// logGenerationAudit swallowed failed inserts, so refused runs vanished from
+// Studio's history. Resolved `false` is an outage — say so in the function log.
+async function auditWorkerRefusal(
+  entry: Parameters<typeof logGenerationAuditVerified>[0],
+): Promise<void> {
+  let saved = false;
+  try {
+    saved = await logGenerationAuditVerified(entry);
+  } catch {
+    saved = false;
+  }
+  if (!saved) {
+    console.error(
+      "[selah] worker refusal audit write failed — run history row is missing",
+    );
+  }
+}
+
 async function refuse(slug: string, reason: string, status: number): Promise<Response> {
-  await logGenerationAudit({
+  await auditWorkerRefusal({
     action: "refused:worker_generate",
     slug: slug || undefined,
     status: "failed",
@@ -180,7 +199,7 @@ export default async (req: Request) => {
           { status: 200 },
         );
       }
-      await logGenerationAudit({
+      await auditWorkerRefusal({
         action: "refused:worker_generate",
         slug,
         status: "failed",
@@ -226,7 +245,7 @@ export default async (req: Request) => {
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 300);
     console.error("[selah] background generation error:", msg);
-    await logGenerationAudit({ action: "refused:worker_generate", slug, status: "failed", message: msg });
+    await auditWorkerRefusal({ action: "refused:worker_generate", slug, status: "failed", message: msg });
     return new Response(JSON.stringify({ ok: false, error: msg }), { status: 500 });
   }
 };

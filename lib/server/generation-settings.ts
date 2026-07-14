@@ -37,14 +37,22 @@ const FALLBACK: GenerationSettings = {
 let settingsOverride: GenerationSettings | null = null;
 let auditCapture: Array<Record<string, unknown>> | null = null;
 let auditFailureForTesting = false;
+let auditResolvedFalseForTesting = false;
 export function __setGenerationTestOverrides(overrides: {
   settings?: GenerationSettings | null;
   captureAudit?: Array<Record<string, unknown>> | null;
   auditFailure?: boolean;
+  /**
+   * Production-shaped outage: writeGenerationAudit RESOLVES false (Supabase
+   * unavailable / insert error) instead of throwing. This is the path that
+   * actually fires in production — a thrown error never does.
+   */
+  auditResolvedFalse?: boolean;
 } | null): void {
   settingsOverride = overrides?.settings ?? null;
   auditCapture = overrides?.captureAudit ?? null;
   auditFailureForTesting = overrides?.auditFailure ?? false;
+  auditResolvedFalseForTesting = overrides?.auditResolvedFalse ?? false;
 }
 
 export async function getGenerationSettings(): Promise<GenerationSettings> {
@@ -111,6 +119,7 @@ export interface GenerationAuditEntry {
 
 async function writeGenerationAudit(entry: GenerationAuditEntry): Promise<boolean> {
   if (auditFailureForTesting) throw new Error("simulated generation audit outage");
+  if (auditResolvedFalseForTesting) return false;
   if (auditCapture) {
     auditCapture.push({ ...entry });
     return true;
