@@ -356,7 +356,7 @@ export default function SelahStudioPage() {
       setDraftTakingLonger(false);
       // A run just reached a terminal state — pull fresh history so Recent
       // activity reflects it without a full page reload (issue #17).
-      void loadAudit();
+      refreshAuditAfterTerminalRun();
       if (st !== "reviewed" && target === MARK_8_STUDIO_SLUG) void loadImagesStatus(target);
     } else if (st === "failed") {
       setPhase("error");
@@ -364,7 +364,7 @@ export default function SelahStudioPage() {
       const safeFailure = typeof j.failureMessage === "string" ? j.failureMessage : "Something went wrong while writing the draft.";
       setGenMsg(safeFailure);
       setDraftTakingLonger(false);
-      void loadAudit();
+      refreshAuditAfterTerminalRun();
     } else {
       setTimeout(() => pollStatus(target, attempt + 1), 5000);
     }
@@ -953,6 +953,15 @@ export default function SelahStudioPage() {
   async function loadAudit() {
     const j = await api("POST", { action: "audit" });
     if (j.ok) setAudit(j.entries as AuditEntry[]);
+  }
+
+  function refreshAuditAfterTerminalRun() {
+    // The worker persists the chapter status FIRST and writes the history row
+    // just after (completeGenerationJob/failGenerationJob → audit), so a read
+    // triggered by the terminal status can land one row early. One bounded
+    // delayed follow-up read covers that gap — no loop, no retry policy.
+    void loadAudit();
+    setTimeout(() => void loadAudit(), 1500);
   }
 
   function setS<K extends keyof GenSettings>(k: K, v: GenSettings[K]) {

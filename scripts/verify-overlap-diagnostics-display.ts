@@ -180,7 +180,11 @@ function overlapMessage(
   ok(page.includes("I reviewed the wording — Ready"), "6 owner review is explicit before images");
   ok(page.includes("sourceOverlapReportDigest"), "6 owner review digest travels to server gates");
   ok(page.includes("Refresh history"), "6 Recent activity has a manual refresh control");
-  ok(/st === "failed";?[\s\S]{0,400}?void loadAudit\(\)/.test(page), "6 terminal run states refresh history");
+  // Both terminal poll branches must refresh through the helper, and the
+  // helper must do the bounded delayed follow-up read (status persists before
+  // the history row — an immediate-only read can land one row early).
+  ok(page.split("refreshAuditAfterTerminalRun()").length >= 3, "6 both terminal run states refresh history");
+  ok(/function refreshAuditAfterTerminalRun\(\)[\s\S]{0,600}?void loadAudit\(\);[\s\S]{0,200}?setTimeout\(\(\) => void loadAudit\(\), 1500\)/.test(page), "6 bounded delayed follow-up history read (no loop)");
 }
 
 console.log(
