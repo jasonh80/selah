@@ -39,18 +39,38 @@ export class MarkSprintDraftPipelineError extends Error {
   readonly code: MarkSprintDraftPipelineErrorCode;
   readonly blockerCodes: readonly string[];
   readonly tokenUsage: Readonly<MarkSprintDraftTokenUsage> | null;
+  /**
+   * Safe diagnostic metadata for reconstructing WHY a run stopped: finding
+   * code, structural output path (positional, never property names), and
+   * token/character counts. NEVER contains ESV excerpts, prompt text, or
+   * rejected draft text (issue #17 acceptance 5).
+   */
+  readonly safeDiagnostics: readonly string[];
 
   constructor(
     code: MarkSprintDraftPipelineErrorCode,
     blockerCodes: readonly string[] = [],
     tokenUsage: MarkSprintDraftTokenUsage | null = null,
+    safeDiagnostics: readonly string[] = [],
   ) {
     super(`Protected Mark draft stopped: ${code}`);
     this.name = "MarkSprintDraftPipelineError";
     this.code = code;
     this.blockerCodes = Object.freeze([...new Set(blockerCodes)].sort());
     this.tokenUsage = tokenUsage ? Object.freeze({ ...tokenUsage }) : null;
+    this.safeDiagnostics = Object.freeze([...safeDiagnostics]);
   }
+}
+
+/** Compact, excerpt-free diagnostic line for one overlap finding. */
+export function safeOverlapDiagnostic(finding: {
+  code: string;
+  severity: string;
+  outputPath: string;
+  tokenCount: number;
+  characterCount: number;
+}): string {
+  return `${finding.code}[${finding.severity}]@${finding.outputPath} tokens=${finding.tokenCount} chars=${finding.characterCount}`;
 }
 
 export interface MarkSprintModelExecutionResult {
@@ -87,6 +107,11 @@ export interface ProtectedMarkSprintDraftResult {
   rawDraftDigest: string;
   canonicalDraftDigest: string;
   overlapReportDigest: string;
+  /**
+   * Review-severity overlap diagnostics that accompanied a PASS (unavoidable
+   * short phrases). Safe metadata only — code, structural path, counts.
+   */
+  overlapReviewDiagnostics: readonly string[];
   tokenUsage: Readonly<MarkSprintDraftTokenUsage>;
   overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability;
   quality: {
@@ -201,8 +226,11 @@ export async function runProtectedMarkSprintDraft(
   if (overlapReport.verdict !== "pass") {
     throw new MarkSprintDraftPipelineError(
       "SOURCE_OVERLAP_BLOCKED",
-      overlapReport.findings.map((finding) => finding.code),
+      overlapReport.findings
+        .filter((finding) => finding.severity === "block")
+        .map((finding) => finding.code),
       tokenUsage,
+      overlapReport.findings.map(safeOverlapDiagnostic),
     );
   }
   let overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability;
@@ -245,6 +273,7 @@ export async function runProtectedMarkSprintDraft(
     rawDraftDigest: overlapReport.rawDraftDigest,
     canonicalDraftDigest: overlapReport.canonicalDraftDigest,
     overlapReportDigest: overlapReport.reportDigest,
+    overlapReviewDiagnostics: overlapReport.findings.map(safeOverlapDiagnostic),
     tokenUsage,
     overlapAcceptance,
     quality: {
