@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { parseChapterWorkupJson } from "../lib/ai/schemas/chapter-workup-schema";
 import {
   assertMarkSprintEsvBundleIntegrity,
   assertMarkSprintEsvOverlapReportIntegrity,
@@ -605,8 +606,8 @@ assert.ok(
   sourceLongFour.findings.every((finding) => finding.severity === "review"),
 );
 
-// COMBINED EVIDENCE still blocks: two non-overlapping short spans from the
-// same passage in ONE field reach the escalation budget and become blockers.
+// NEARBY short spans still block: two review-level spans reconstructing one
+// source region trip the always-on mosaic detector (the ONE bounded rule).
 const combinedShortSpans = scan(
   JSON.stringify({
     summary:
@@ -614,11 +615,15 @@ const combinedShortSpans = scan(
   }),
 );
 assert.equal(combinedShortSpans.verdict, "block");
-assert.ok(combinedShortSpans.blockFindingCount >= 2);
 assert.ok(
-  combinedShortSpans.findings.every((finding) =>
-    ["EXACT_5_TO_7", "LONG_EXACT_FOUR"].includes(finding.code),
+  combinedShortSpans.findings.some(
+    (finding) => finding.code === "MOSAIC_10_PLUS" && finding.severity === "block",
   ),
+);
+assert.ok(
+  combinedShortSpans.findings
+    .filter((finding) => finding.code === "EXACT_5_TO_7")
+    .every((finding) => finding.severity === "review"),
 );
 
 const mosaic = scan(
@@ -718,7 +723,7 @@ const SCRIPTURE_STYLE_PHRASES: Record<number, string> = {
   27: "then they went on toward the villages of caesarea philippi speaking together",
   29: "peter answered him saying plainly you are the christ the promised one",
   31: SCRIPTURE_STYLE_V31,
-  34: "let him renounce his own way take up his cross and follow me on this road",
+  34: "whoever would come after me let him deny himself and take up his cross and follow me",
 };
 function scriptureStyleChapterText(reference: string): string {
   const markers = expectedMarkChapterVerseMarkers(reference);
@@ -755,6 +760,9 @@ const paraphraseFixtureJson = readFileSync(
   "lib/ai/fixtures/mark-8-paraphrase-workup.json",
   "utf8",
 );
+// The fixture must be REAL: fully valid under the production workup schema,
+// so the scan exercises the exact shape a production draft will have.
+assert.doesNotThrow(() => parseChapterWorkupJson(paraphraseFixtureJson));
 const paraphraseFixture = JSON.parse(paraphraseFixtureJson) as Record<string, unknown>;
 const realistic = scanScripture(paraphraseFixtureJson);
 assert.equal(realistic.verdict, "pass", `realistic paraphrase must pass (block findings: ${realistic.findings.filter((f) => f.severity === "block").map((f) => `${f.code}@${f.outputPath}`).join(", ")})`);
@@ -783,6 +791,22 @@ const quotation = scanScripture(
 );
 assert.equal(quotation.verdict, "block");
 assert.ok(quotation.findings.some((finding) => finding.code === "EXACT_8_PLUS" && finding.severity === "block"));
+// The unavoidable-phrase boundary is real: quoting the 7-token core
+// ("take up his cross and follow me") is a review diagnostic — the fixture
+// does exactly that — but quoting the 9-token span WITH its lead-in blocks.
+const nineTokenQuote = scanScripture(
+  JSON.stringify({
+    ...paraphraseFixture,
+    application:
+      "Discipleship means one must deny himself and take up his cross and follow me, lived out in ordinary days.",
+  }),
+);
+assert.equal(nineTokenQuote.verdict, "block");
+assert.ok(
+  nineTokenQuote.findings.some(
+    (finding) => finding.code === "EXACT_8_PLUS" && finding.severity === "block",
+  ),
+);
 
 // 3. Deliberate split copying still blocks — across fields...
 const splitCopy = scanScripture(
@@ -794,7 +818,7 @@ const splitCopy = scanScripture(
 );
 assert.equal(splitCopy.verdict, "block");
 assert.ok(splitCopy.findings.some((finding) => finding.code === "CROSS_FIELD_8_PLUS"));
-// ...interleaved short spans inside one field (combined-evidence escalation)...
+// ...interleaved short spans inside one field (the always-on mosaic)...
 const interleaved = scanScripture(
   JSON.stringify({
     summary:
@@ -802,7 +826,54 @@ const interleaved = scanScripture(
   }),
 );
 assert.equal(interleaved.verdict, "block");
-assert.ok(interleaved.findings.some((finding) => finding.severity === "block"));
+assert.ok(
+  interleaved.findings.some(
+    (finding) => finding.code === "MOSAIC_10_PLUS" && finding.severity === "block",
+  ),
+);
+// Codex's proven gap: one review-level five-word match plus smaller copied
+// fragments (11+ exact source tokens in one field) must now block — the
+// review match no longer suppresses the mosaic detector.
+const reviewPlusFragments = scanScripture(
+  JSON.stringify({
+    summary:
+      "began to teach FILLER that the son of man must FILLER endure rejection FILLER rise again",
+  }),
+);
+assert.equal(reviewPlusFragments.verdict, "block");
+assert.ok(
+  reviewPlusFragments.findings.some(
+    (finding) => finding.code === "MOSAIC_10_PLUS" && finding.severity === "block",
+  ),
+);
+// DISTANT natural phrases in one field never combine: verse-17 and verse-34
+// phrases are hundreds of source tokens apart, so both stay review and pass.
+const distantNaturalPhrases = scanScripture(
+  JSON.stringify({
+    summary:
+      "Jesus asks do you not yet understand and much later calls each disciple to take up his cross and follow me in daily life.",
+  }),
+);
+assert.equal(distantNaturalPhrases.verdict, "pass");
+assert.equal(distantNaturalPhrases.blockFindingCount, 0);
+assert.ok(distantNaturalPhrases.reviewFindingCount >= 2);
+// REVIEW-ONLY TRUNCATION stays a pass: 40+ fields sharing one harmless short
+// phrase produce >100 review diagnostics; the verdict remains pass and no
+// blocker can hide in the truncated tail (blockers sort first).
+const manyReviewFields: Record<string, string> = {};
+for (let index = 0; index < 105; index++) {
+  manyReviewFields[`field${index}`] = `original thought ${index} echoes do you not yet understand as a question`;
+}
+const truncatedReview = scanScripture(JSON.stringify(manyReviewFields));
+assert.equal(truncatedReview.verdict, "pass");
+assert.equal(truncatedReview.blockFindingCount, 0);
+assert.equal(truncatedReview.findingsTruncated, true);
+assert.ok(truncatedReview.findings.every((finding) => finding.severity === "review"));
+assertMarkSprintEsvOverlapReportIntegrity(truncatedReview, {
+  bundle: scriptureBundle,
+  manifestDigest: MANIFEST_DIGEST,
+  rawDraftJson: JSON.stringify(manyReviewFields),
+});
 // ...and tiny content-bearing fragments that mosaic back into the sentence.
 const fragmentMosaic = scanScripture(
   JSON.stringify({
@@ -844,9 +915,12 @@ console.log(
         longFour: `${sourceLongFour.verdict} (review)`,
         combinedShortSpans: combinedShortSpans.verdict,
         mosaic: mosaic.verdict,
-        realisticMark8Paraphrase: `${realistic.verdict} (${realistic.reviewFindingCount} review)`,
+        realisticMark8Paraphrase: `${realistic.verdict} (${realistic.reviewFindingCount} review, schema-valid)`,
         trueQuotation: quotation.verdict,
         splitCopy: splitCopy.verdict,
+        reviewPlusNearbyFragments: reviewPlusFragments.verdict,
+        distantNaturalPhrases: distantNaturalPhrases.verdict,
+        reviewOnlyTruncation: `${truncatedReview.verdict} (truncated ${truncatedReview.findingCount})`,
         functionWordScatter: functionWordScatter.verdict,
       },
       networkCalls: 0,

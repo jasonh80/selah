@@ -445,6 +445,30 @@ async function main(): Promise<void> {
       reviewDraft,
     ),
   );
+  // Review-only truncation still mints acceptance: >100 harmless diagnostics
+  // truncate the list, but blockers sort first and integrity recomputes the
+  // report, so zero blockFindingCount proves the tail is review-only.
+  const truncatedFields: Record<string, string> = {};
+  for (let index = 0; index < 40; index++) {
+    truncatedFields[`field${index}`] = `original note ${index} mentions cedar amber lantern mercy river briefly`;
+  }
+  const truncatedDraft = JSON.stringify(truncatedFields);
+  const truncatedReport = evaluateGenerationManifestV3Overlap(
+    preflight,
+    { sourceBundle: bundleA, modelRequest: requestA },
+    truncatedDraft,
+  );
+  assert.equal(truncatedReport.verdict, "pass");
+  assert.equal(truncatedReport.blockFindingCount, 0);
+  assert.equal(truncatedReport.findingsTruncated, true);
+  assert.doesNotThrow(() =>
+    createGenerationManifestV3OverlapAcceptanceCapability(
+      preflight,
+      { sourceBundle: bundleA, modelRequest: requestA },
+      truncatedReport,
+      truncatedDraft,
+    ),
+  );
   const reformattedCleanDraft = `{\n  "summary": "A wholly distinct synthetic explanation for overlap verification."\n}`;
   assert.equal(
     sha256Canonical(JSON.parse(reformattedCleanDraft)),

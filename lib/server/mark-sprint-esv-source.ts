@@ -29,7 +29,6 @@ import {
   MARK_SPRINT_ESV_OVERLAP_FUNCTION_WORDS,
   MARK_SPRINT_ESV_OVERLAP_LONG_FOUR_CHARS,
   MARK_SPRINT_ESV_OVERLAP_NORMALIZER_REVISION,
-  MARK_SPRINT_ESV_OVERLAP_REVIEW_ESCALATION_TOKENS,
   MARK_SPRINT_ESV_OVERLAP_REVIEW_TOKENS,
   MARK_SPRINT_ESV_OVERLAP_SCANNER_REVISION,
   MARK_SPRINT_ESV_REQUEST_OPTIONS,
@@ -725,9 +724,10 @@ export type MarkSprintEsvOverlapFindingCode =
 /**
  * "block" stops the run. "review" is a safe diagnostic: a short overlap that
  * faithful teaching cannot always avoid ("Son of Man", "and he said to them").
- * Review findings never contain excerpts — only structural paths and counts —
- * and they escalate to block when combined evidence in one field shows real
- * copying (see MARK_SPRINT_ESV_OVERLAP_REVIEW_ESCALATION_TOKENS).
+ * Review findings never contain excerpts — only structural paths and counts.
+ * Stitched copying is caught by the ALWAYS-ON mosaic detector: a short match
+ * plus NEARBY fragments reconstructing extended source wording blocks, while
+ * distant natural phrases never combine (bounded source/output gaps).
  */
 export type MarkSprintEsvOverlapFindingSeverity = "block" | "review";
 
@@ -767,7 +767,6 @@ export interface MarkSprintEsvOverlapReport {
     crossFieldTokens: number;
     crossFieldCandidateTokens: number;
     crossFieldContentTokens: number;
-    reviewEscalationTokens: number;
     functionWordCount: number;
   };
   verdict: "pass" | "block";
@@ -1070,35 +1069,6 @@ function directFindingCode(
   return null;
 }
 
-/**
- * Combined-evidence escalation (issue #17): a single short overlap in a field
- * is an unavoidable-phrase diagnostic, but TWO OR MORE non-overlapping short
- * spans from the same passage in the same field, together reaching the block
- * budget, is copying assembled from pieces — those findings become blockers.
- */
-function escalateCombinedReviewFindings(
-  findings: MarkSprintEsvOverlapFinding[],
-): void {
-  const review = findings
-    .filter((finding) => finding.severity === "review")
-    .sort((left, right) => left.outputStartToken - right.outputStartToken);
-  let combinedTokens = 0;
-  let pieces = 0;
-  let lastEnd = -1;
-  for (const finding of review) {
-    if (finding.outputStartToken < lastEnd) continue; // overlapping span
-    combinedTokens += finding.tokenCount;
-    pieces += 1;
-    lastEnd = finding.outputEndToken;
-  }
-  if (
-    pieces >= 2 &&
-    combinedTokens >= MARK_SPRINT_ESV_OVERLAP_REVIEW_ESCALATION_TOKENS
-  ) {
-    for (const finding of review) finding.severity = "block";
-  }
-}
-
 function mosaicMatch(
   matches: readonly TokenMatch[],
   outputTokens: readonly string[],
@@ -1155,7 +1125,7 @@ function crossFieldCoverageMatch(
     ) {
       continue;
     }
-    const key = `${sourceTokens[sourceStart]}\u0000${sourceTokens[sourceStart + 1]}`;
+    const key = `${sourceTokens[sourceStart]} ${sourceTokens[sourceStart + 1]}`;
     const positions = sourceBigramPositions.get(key) ?? [];
     positions.push(sourceStart);
     sourceBigramPositions.set(key, positions);
@@ -1170,7 +1140,7 @@ function crossFieldCoverageMatch(
     const outputTokens = outputTokensByLeaf[leafIndex];
     if (outputTokens.length < CROSS_FIELD_CANDIDATE_TOKENS) continue;
     for (let outputStart = 0; outputStart + 1 < outputTokens.length; outputStart++) {
-      const key = `${outputTokens[outputStart]}\u0000${outputTokens[outputStart + 1]}`;
+      const key = `${outputTokens[outputStart]} ${outputTokens[outputStart + 1]}`;
       for (const sourceStart of sourceBigramPositions.get(key) ?? []) {
         pieces.push({
           leafIndex,
@@ -1271,9 +1241,9 @@ function crossFieldCoverageMatch(
 
 /**
  * Default severity per code. EXACT_8_PLUS (meaningful contiguous copying),
- * MOSAIC_10_PLUS, and CROSS_FIELD_8_PLUS (deliberate split copying) block;
- * short single overlaps are review diagnostics unless escalated by combined
- * evidence in the same field.
+ * MOSAIC_10_PLUS (nearby fragments reconstructing extended wording), and
+ * CROSS_FIELD_8_PLUS (deliberate split copying) block; short single overlaps
+ * are review diagnostics.
  */
 function defaultFindingSeverity(
   code: MarkSprintEsvOverlapFindingCode,
@@ -1372,9 +1342,6 @@ export function evaluateMarkSprintEsvOverlap(input: {
           );
         }
       }
-      // Combined-evidence escalation runs on the COMPLETE per-field/passage
-      // set, before truncation, so split short spans cannot hide in the tail.
-      escalateCombinedReviewFindings(directMatches);
       // Keep at most the three longest direct spans for one field/passage
       // (blockers first). The aggregate count still records every retained
       // finding without excerpts.
@@ -1389,26 +1356,28 @@ export function evaluateMarkSprintEsvOverlap(input: {
           )
           .slice(0, 3),
       );
-      if (!directMatches.length) {
-        // Mosaic accumulation only counts pieces carrying content vocabulary —
-        // pure function-word fragments ("of the", "and he") cannot chain into
-        // a false-positive block across ordinary faithful prose.
-        const mosaic = mosaicMatch(
-          matches.filter((match) =>
-            matchHasContentToken(outputTokenList, match),
+      // The ONE bounded rule for stitched copying (issue #17 review): the
+      // mosaic detector ALWAYS runs — a review-level short match plus nearby
+      // copied fragments that together reconstruct extended source wording
+      // block, while DISTANT natural phrases never combine (the source/output
+      // gap bounds keep paragraphs-apart phrases separate). Pieces must carry
+      // content vocabulary — pure function-word fragments ("of the", "and
+      // he") cannot chain into a false-positive block.
+      const mosaic = mosaicMatch(
+        matches.filter((match) =>
+          matchHasContentToken(outputTokenList, match),
+        ),
+        outputTokenList,
+      );
+      if (mosaic) {
+        findings.push(
+          overlapFinding(
+            "MOSAIC_10_PLUS",
+            leaf,
+            passage,
+            mosaic,
           ),
-          outputTokenList,
         );
-        if (mosaic) {
-          findings.push(
-            overlapFinding(
-              "MOSAIC_10_PLUS",
-              leaf,
-              passage,
-              mosaic,
-            ),
-          );
-        }
       }
     }
   }
@@ -1473,7 +1442,6 @@ export function evaluateMarkSprintEsvOverlap(input: {
       crossFieldTokens: CROSS_FIELD_MINIMUM_TOKENS,
       crossFieldCandidateTokens: CROSS_FIELD_CANDIDATE_TOKENS,
       crossFieldContentTokens: MARK_SPRINT_ESV_OVERLAP_CROSS_FIELD_CONTENT_TOKENS,
-      reviewEscalationTokens: MARK_SPRINT_ESV_OVERLAP_REVIEW_ESCALATION_TOKENS,
       functionWordCount: MARK_SPRINT_ESV_OVERLAP_FUNCTION_WORDS.length,
     },
     // Only BLOCK-severity findings stop a run. Review findings stay in the
@@ -1520,7 +1488,6 @@ export function assertMarkSprintEsvOverlapReportIntegrity(
     crossFieldTokens: CROSS_FIELD_MINIMUM_TOKENS,
     crossFieldCandidateTokens: CROSS_FIELD_CANDIDATE_TOKENS,
     crossFieldContentTokens: MARK_SPRINT_ESV_OVERLAP_CROSS_FIELD_CONTENT_TOKENS,
-    reviewEscalationTokens: MARK_SPRINT_ESV_OVERLAP_REVIEW_ESCALATION_TOKENS,
     functionWordCount: MARK_SPRINT_ESV_OVERLAP_FUNCTION_WORDS.length,
   };
   if (

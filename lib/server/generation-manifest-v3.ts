@@ -1008,9 +1008,11 @@ export function createGenerationManifestV3OverlapAcceptanceCapability(
   if (
     report.verdict !== "pass" ||
     report.blockFindingCount !== 0 ||
-    report.findingsTruncated !== false ||
     // Review-severity diagnostics (unavoidable short phrases) may accompany a
-    // pass; anything block-severity can never mint acceptance.
+    // pass — even when the diagnostic LIST is truncated: blockers sort first
+    // and integrity recomputes the whole report, so zero blockFindingCount
+    // proves the truncated tail is review-only. Anything block-severity can
+    // never mint acceptance.
     !report.findings.every((finding) => finding.severity === "review")
   ) {
     throw new Error("Generation manifest v3 overlap report did not pass");

@@ -24,9 +24,9 @@ export const MARK_SPRINT_ESV_OVERLAP_REVIEW_TOKENS = 5;
 export const MARK_SPRINT_ESV_OVERLAP_BLOCK_TOKENS = 8;
 export const MARK_SPRINT_ESV_OVERLAP_LONG_FOUR_CHARS = 32;
 // Issue #17 calibration (v3): short overlaps are severity "review" — safe
-// diagnostics, not blockers — UNLESS combined evidence in one field shows real
-// copying (two or more non-overlapping review spans totaling this many tokens).
-export const MARK_SPRINT_ESV_OVERLAP_REVIEW_ESCALATION_TOKENS = 10;
+// diagnostics, not blockers. Stitched copying is caught by the always-on
+// mosaic detector (bounded source/output gaps), never by a distance-blind
+// combination rule.
 // Mosaic/cross-field accumulation pieces must carry at least one CONTENT token
 // (a token outside the closed-class function-word list below), and a
 // cross-field component must cover at least this many content tokens. This is
