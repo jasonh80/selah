@@ -853,6 +853,33 @@ const genericPromptWithInjectedSource = buildChapterWorkupPrompt({
 } as unknown as Parameters<typeof buildChapterWorkupPrompt>[0]);
 assert.doesNotMatch(genericPromptWithInjectedSource, /must not enter generic prompt|private-primary/);
 assert.doesNotMatch(genericPromptWithInjectedSource, /SERVER-SUPPLIED GENERATION SOURCE/);
+
+// Issue #17 (live-run fix, per Codex correction): the fresh-writing rule
+// appears EXACTLY ONCE in the final protected request text — inside the
+// source block — and never in the ordinary source-free prompt, so this Mark 8
+// fix cannot silently change every future chapter.
+const FRESH_WRITING_RULE = "Write from the meaning, not the wording.";
+const genericSourceFreePrompt = buildChapterWorkupPrompt({
+  book: "Mark",
+  chapter: 7,
+  bibleVersion: "ESV",
+});
+assert.equal(
+  prompt.split(FRESH_WRITING_RULE).length - 1,
+  1,
+  "protected request carries the fresh-writing rule exactly once",
+);
+assert.match(prompt, /do not copy five or more consecutive words/u, "protected rule states the bound");
+assert.match(prompt, /sections\[\]\.fullContent/u, "protected rule names sections[].fullContent");
+assert.match(prompt, /verseByVerse\[\]\.explanation/u, "protected rule names verseByVerse[].explanation");
+assert.match(prompt, /stitching\s+shorter phrases together—even across fields/u, "protected rule forbids stitching across fields");
+assert.match(prompt, /cite the\s+verse and explain it freshly/u, "protected rule gives the positive alternative");
+assert.equal(
+  genericSourceFreePrompt.includes(FRESH_WRITING_RULE),
+  false,
+  "ordinary source-free prompt does NOT carry the source-specific rule",
+);
+assert.match(genericSourceFreePrompt, /Do NOT include copyrighted Bible verse text anywhere/u, "generic prompt keeps its original copyright line");
 assert.throws(
   () =>
     buildProtectedChapterWorkupPrompt({

@@ -1,7 +1,7 @@
 // Builds the prompt that asks the model for ONE shared global Selah chapter
 // workup. No API call here — this only assembles the instruction string.
 
-export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v4";
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v5";
 
 export type GenerationSourceSectionRole =
   | "context_before"
@@ -97,7 +97,13 @@ function buildChapterWorkupPromptInternal(
     ? `\n\nSERVER-SUPPLIED GENERATION SOURCE (${generationSource.label.trim()})
 Use PRIMARY CHAPTER for this workup. CONTEXT BEFORE and CONTEXT AFTER may only
 ground surrounding-chapter Book Flow. Do not blend their events into the
-primary chapter. Do not quote or reproduce source wording in the output.
+primary chapter.
+Write from the meaning, not the wording. In sections[].fullContent and
+verseByVerse[].explanation, do not copy five or more consecutive words from
+the supplied Bible source, and do not rebuild source wording by stitching
+shorter phrases together—even across fields. Proper names, titles, and
+unavoidable fixed terms may stay natural. When exact wording matters, cite the
+verse and explain it freshly.
 Footnote callouts and bodies, when present, are translator/editorial notes—not
 verse text. They may inform an explicitly labeled textual note but must never be
 silently presented as the words of Scripture.

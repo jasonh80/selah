@@ -884,6 +884,71 @@ const fragmentMosaic = scanScripture(
 assert.equal(fragmentMosaic.verdict, "block");
 assert.ok(fragmentMosaic.findings.some((finding) => finding.code === "MOSAIC_10_PLUS"));
 
+// PRODUCTION SHAPE (live runs 03:18 / 04:25): the offending strings sat in
+// sections[].fullContent and verseByVerse[].explanation. A TEACHING
+// explanation that paraphrases passes; an 11+-token reconstruction of the
+// source sentence inside an explanation blocks, exactly as observed live.
+const teachingShapePass = scanScripture(
+  JSON.stringify({
+    sections: [
+      {
+        id: "s1",
+        title: "The turning point",
+        fullContent:
+          "Mark builds this whole chapter toward one exchange on the northern road. The disciples have watched two feedings and still fret about bread, so their teacher slows down and works on their sight — first a blind man's, in stages, then theirs.",
+      },
+    ],
+    verseByVerse: [
+      {
+        startVerse: 31,
+        endVerse: 33,
+        explanation:
+          "Right after the confession, the teaching turns hard: suffering and rejection are announced as the road ahead, and glory only after. Peter cannot square that with the title he just used, which is precisely Mark's point.",
+      },
+    ],
+  }),
+);
+assert.equal(teachingShapePass.verdict, "pass");
+assert.equal(teachingShapePass.blockFindingCount, 0);
+// EXACT copying inside sections[].fullContent → contiguous-run block.
+const fullContentExactBlock = scanScripture(
+  JSON.stringify({
+    sections: [
+      {
+        id: "s1",
+        title: "The turning point",
+        fullContent:
+          "Mark reports that he began to teach them that the son of man must endure rejection, and the room goes quiet.",
+      },
+    ],
+  }),
+);
+assert.equal(fullContentExactBlock.verdict, "block");
+assert.ok(
+  fullContentExactBlock.findings.some(
+    (finding) => finding.code === "EXACT_8_PLUS" && finding.severity === "block",
+  ),
+);
+// STITCHED reconstruction inside verseByVerse[].explanation → mosaic block.
+const explanationStitchBlock = scanScripture(
+  JSON.stringify({
+    verseByVerse: [
+      {
+        startVerse: 31,
+        endVerse: 33,
+        explanation:
+          "The verse says he began to teach them, then insists the son of man must, and finally lands on endure rejection as the road ahead.",
+      },
+    ],
+  }),
+);
+assert.equal(explanationStitchBlock.verdict, "block");
+assert.ok(
+  explanationStitchBlock.findings.some(
+    (finding) => finding.code === "MOSAIC_10_PLUS" && finding.severity === "block",
+  ),
+);
+
 // 4. Pure function-word bigrams scattered across many fields can no longer
 // accumulate into a cross-field false positive.
 const functionWordScatter = scanScripture(
