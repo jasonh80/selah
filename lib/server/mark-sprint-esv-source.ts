@@ -26,7 +26,6 @@ import {
   MARK_SPRINT_ESV_OVERLAP_BLOCK_TOKENS,
   MARK_SPRINT_ESV_OVERLAP_CANDIDATE_TOKENS,
   MARK_SPRINT_ESV_OVERLAP_CROSS_FIELD_CONTENT_TOKENS,
-  MARK_SPRINT_ESV_OVERLAP_FIXED_TERMS,
   MARK_SPRINT_ESV_OVERLAP_FUNCTION_WORDS,
   MARK_SPRINT_ESV_OVERLAP_LONG_FOUR_CHARS,
   MARK_SPRINT_ESV_OVERLAP_NORMALIZER_REVISION,
@@ -769,7 +768,6 @@ export interface MarkSprintEsvOverlapReport {
     crossFieldCandidateTokens: number;
     crossFieldContentTokens: number;
     functionWordCount: number;
-    fixedTermCount: number;
   };
   verdict: "pass" | "block";
   findingCount: number;
@@ -957,40 +955,6 @@ function collectStringLeaves(
 }
 
 const FUNCTION_WORDS = new Set(MARK_SPRINT_ESV_OVERLAP_FUNCTION_WORDS);
-const FIXED_TERM_TOKENS: readonly (readonly string[])[] = Object.freeze(
-  MARK_SPRINT_ESV_OVERLAP_FIXED_TERMS.map((term) => overlapTokens(term)),
-);
-
-/**
- * Occurrences of pinned fixed scripture terms in a token list, as [start, end)
- * spans. Accumulation pieces contained entirely inside one of these spans are
- * vocabulary the prompt explicitly permits and never count toward a block.
- */
-function fixedTermSpans(tokens: readonly string[]): Array<readonly [number, number]> {
-  const spans: Array<readonly [number, number]> = [];
-  for (const term of FIXED_TERM_TOKENS) {
-    if (!term.length || term.length > tokens.length) continue;
-    for (let start = 0; start + term.length <= tokens.length; start++) {
-      let matched = true;
-      for (let offset = 0; offset < term.length; offset++) {
-        if (tokens[start + offset] !== term[offset]) {
-          matched = false;
-          break;
-        }
-      }
-      if (matched) spans.push([start, start + term.length] as const);
-    }
-  }
-  return spans;
-}
-
-function insideFixedTerm(
-  spans: readonly (readonly [number, number])[],
-  start: number,
-  end: number,
-): boolean {
-  return spans.some(([spanStart, spanEnd]) => start >= spanStart && end <= spanEnd);
-}
 
 function isContentToken(token: string): boolean {
   return !FUNCTION_WORDS.has(token);
@@ -1179,21 +1143,11 @@ function crossFieldCoverageMatch(
   for (let leafIndex = 0; leafIndex < outputTokensByLeaf.length; leafIndex++) {
     const outputTokens = outputTokensByLeaf[leafIndex];
     if (outputTokens.length < CROSS_FIELD_CANDIDATE_TOKENS) continue;
-    const leafFixedSpans = fixedTermSpans(outputTokens);
     for (
       let outputStart = 0;
       outputStart + CROSS_FIELD_CANDIDATE_TOKENS <= outputTokens.length;
       outputStart++
     ) {
-      if (
-        insideFixedTerm(
-          leafFixedSpans,
-          outputStart,
-          outputStart + CROSS_FIELD_CANDIDATE_TOKENS,
-        )
-      ) {
-        continue;
-      }
       const key = outputTokens
         .slice(outputStart, outputStart + CROSS_FIELD_CANDIDATE_TOKENS)
         .join(" ");
@@ -1419,16 +1373,9 @@ export function evaluateMarkSprintEsvOverlap(input: {
       // gap bounds keep paragraphs-apart phrases separate). Pieces must carry
       // content vocabulary — pure function-word fragments ("of the", "and
       // he") cannot chain into a false-positive block.
-      const outputFixedSpans = fixedTermSpans(outputTokenList);
       const mosaic = mosaicMatch(
-        matches.filter(
-          (match) =>
-            matchHasContentToken(outputTokenList, match) &&
-            !insideFixedTerm(
-              outputFixedSpans,
-              match.outputStart,
-              match.outputStart + match.length,
-            ),
+        matches.filter((match) =>
+          matchHasContentToken(outputTokenList, match),
         ),
         outputTokenList,
       );
@@ -1506,7 +1453,6 @@ export function evaluateMarkSprintEsvOverlap(input: {
       crossFieldCandidateTokens: CROSS_FIELD_CANDIDATE_TOKENS,
       crossFieldContentTokens: MARK_SPRINT_ESV_OVERLAP_CROSS_FIELD_CONTENT_TOKENS,
       functionWordCount: MARK_SPRINT_ESV_OVERLAP_FUNCTION_WORDS.length,
-      fixedTermCount: MARK_SPRINT_ESV_OVERLAP_FIXED_TERMS.length,
     },
     // Only BLOCK-severity findings stop a run. Review findings stay in the
     // report as safe diagnostics (structural path + counts, never excerpts).
@@ -1553,7 +1499,6 @@ export function assertMarkSprintEsvOverlapReportIntegrity(
     crossFieldCandidateTokens: CROSS_FIELD_CANDIDATE_TOKENS,
     crossFieldContentTokens: MARK_SPRINT_ESV_OVERLAP_CROSS_FIELD_CONTENT_TOKENS,
     functionWordCount: MARK_SPRINT_ESV_OVERLAP_FUNCTION_WORDS.length,
-    fixedTermCount: MARK_SPRINT_ESV_OVERLAP_FIXED_TERMS.length,
   };
   if (
     !isPlainRecord(report) ||

@@ -5,6 +5,7 @@
 // exact approved runtime, runs one private draft, and leaves publication to a
 // later owner-reviewed boundary. Mark 9–11 remain disconnected.
 import { estimateChapterWorkupCost } from "@/lib/ai/costs";
+import type { SourceOverlapReviewWarning } from "@/lib/source-overlap-review";
 import type { ChapterWorkup } from "@/lib/types";
 import {
   recordCostEventStrict,
@@ -137,6 +138,7 @@ export type ProtectedMarkDraftJobResult =
       readonly status: "draft";
       readonly manifestDigest: string;
       readonly canonicalDraftDigest: string;
+      readonly copyWarning: boolean;
       readonly snapshotVersion: number | null;
     }
   | {
@@ -238,7 +240,10 @@ export function createExactOpenAiMarkSprintExecutor(
 }
 
 function safeMessage(
-  code: ProtectedMarkDraftJobFailureCode | "DRAFT_SAVED",
+  code:
+    | ProtectedMarkDraftJobFailureCode
+    | "DRAFT_SAVED"
+    | "DRAFT_SAVED_WITH_COPY_WARNING",
   manifestDigest: string,
   extra: Record<string, string> = {},
 ): string {
@@ -269,11 +274,13 @@ async function writeSafeAudit(
 function withManifestDigest(
   workup: ChapterWorkup,
   manifestDigest: string,
+  sourceOverlapReview: SourceOverlapReviewWarning | null,
 ): ChapterWorkup {
   return {
     ...workup,
     // Safe provenance only. No ESV, prompt, exemplar, or raw response bytes.
     generationManifestDigest: manifestDigest,
+    ...(sourceOverlapReview ? { sourceOverlapReview } : {}),
   } as ChapterWorkup;
 }
 
@@ -612,7 +619,10 @@ export async function runProtectedMarkDraftJob(
       input.approvedManifestDigest,
       preparationModel,
       result.tokenUsage,
-      "PIPELINE_PASSED",
+      result.sourceOverlapReview
+        ? "PIPELINE_PASSED_WITH_COPY_WARNING"
+        : "PIPELINE_PASSED",
+      result.sourceOverlapReview ? { copyWarning: true } : {},
     );
   } catch {
     return await failConsumedJob(ports, input, "COST_LOG_FAILED");
@@ -627,6 +637,7 @@ export async function runProtectedMarkDraftJob(
         workup: withManifestDigest(
           result.renderWorkup,
           input.approvedManifestDigest,
+          result.sourceOverlapReview,
         ),
         version: result.renderWorkup.version,
         bibleVersion: "ESV",
@@ -655,17 +666,22 @@ export async function runProtectedMarkDraftJob(
     model: preparationModel,
     ...(estimatedCost === null ? {} : { estimatedCost }),
     status: "succeeded",
-    message: safeMessage("DRAFT_SAVED", input.approvedManifestDigest, {
-      canonicalDraftDigest: result.canonicalDraftDigest,
-      snapshot: snapshotState,
-      ...(result.overlapReviewDiagnostics.length
-        ? {
-            overlapReviewDiagnostics: boundedDiagnostics(
-              result.overlapReviewDiagnostics,
-            ),
-          }
-        : {}),
-    }),
+    message: safeMessage(
+      result.sourceOverlapReview
+        ? "DRAFT_SAVED_WITH_COPY_WARNING"
+        : "DRAFT_SAVED",
+      input.approvedManifestDigest,
+      {
+        canonicalDraftDigest: result.canonicalDraftDigest,
+        snapshot: snapshotState,
+        overlapVerdict: result.overlapVerdict,
+        ...(result.overlapDiagnostics.length
+          ? {
+              diagnostics: boundedDiagnostics(result.overlapDiagnostics),
+            }
+          : {}),
+      },
+    ),
   });
 
   return Object.freeze({
@@ -674,6 +690,7 @@ export async function runProtectedMarkDraftJob(
     status: "draft",
     manifestDigest: input.approvedManifestDigest,
     canonicalDraftDigest: result.canonicalDraftDigest,
+    copyWarning: result.sourceOverlapReview !== null,
     snapshotVersion: snapshot,
   });
 }

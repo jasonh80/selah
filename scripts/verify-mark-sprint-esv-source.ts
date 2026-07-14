@@ -881,49 +881,11 @@ assertMarkSprintEsvOverlapReportIntegrity(truncatedReview, {
 const fragmentMosaic = scanScripture(
   JSON.stringify({
     summary:
-      "began to teach them INSERTED one must endure rejection INSERTED and rise again INSERTED end",
+      "began to teach INSERTED the son of man INSERTED endure rejection and rise INSERTED said plainly nothing",
   }),
 );
 assert.equal(fragmentMosaic.verdict, "block");
 assert.ok(fragmentMosaic.findings.some((finding) => finding.code === "MOSAIC_10_PLUS"));
-
-// RUN-6 PRODUCTION SHAPE (12:20, r89/v4): faithful teaching chains FIXED
-// TERMS the prompt explicitly permits ("take up his cross" + "and follow me"
-// + "the son of man" = 11 tokens) inside one explanation, and echoes the same
-// fixed phrase in two fields. Under v4 both blocked; under v5 fixed-term
-// spans never count toward accumulation and both pass.
-const fixedTermChain = scanScripture(
-  JSON.stringify({
-    verseByVerse: [
-      {
-        startVerse: 34,
-        endVerse: 34,
-        explanation:
-          "The call is concrete: take up his cross and follow me, spoken to everyone, so that the son of man defines what winning a life actually means.",
-      },
-    ],
-  }),
-);
-assert.equal(fixedTermChain.verdict, "pass", `fixedTermChain: ${fixedTermChain.findings.filter((f) => f.severity === "block").map((f) => `${f.code}@${f.outputPath}`).join(", ")}`);
-assert.equal(fixedTermChain.blockFindingCount, 0);
-const fixedTermAcrossFields = scanScripture(
-  JSON.stringify({
-    application: "Discipleship still sounds like take up his cross and follow me in every generation.",
-    summary: "Peter learns that you are the christ leads straight to a cross, and that the son of man walks there first.",
-  }),
-);
-assert.equal(fixedTermAcrossFields.verdict, "pass");
-assert.equal(fixedTermAcrossFields.blockFindingCount, 0);
-// Guard: fixed terms cannot LAUNDER real copying — verbatim context around a
-// fixed term is a contiguous direct match and still blocks.
-const fixedTermLaundering = scanScripture(
-  JSON.stringify({
-    summary:
-      "He said whoever would come after me let him deny himself and take up his cross and follow me today.",
-  }),
-);
-assert.equal(fixedTermLaundering.verdict, "block");
-assert.ok(fixedTermLaundering.findings.some((finding) => finding.code === "EXACT_8_PLUS"));
 
 // RUN-5 PRODUCTION SHAPE (05:15, r88): faithful verse-teaching necessarily
 // uses several SHORT (2-token) natural terms from one source sentence. Under

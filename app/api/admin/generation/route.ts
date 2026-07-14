@@ -319,6 +319,10 @@ export async function POST(req: Request) {
       const status = await publishChapter(slug, {
         reviewDigest:
           typeof body.reviewDigest === "string" ? body.reviewDigest : undefined,
+        sourceOverlapReportDigest:
+          typeof body.sourceOverlapReportDigest === "string"
+            ? body.sourceOverlapReportDigest
+            : undefined,
       });
       try {
         await logGenerationAudit({ action: "publish", slug, status: "succeeded" });
@@ -444,7 +448,13 @@ export async function POST(req: Request) {
     }
     let binding: Awaited<ReturnType<typeof prepareImageJobBinding>>;
     try {
-      binding = await prepareImageJobBinding(store, slug);
+      binding = await prepareImageJobBinding(
+        store,
+        slug,
+        typeof body.sourceOverlapReportDigest === "string"
+          ? body.sourceOverlapReportDigest
+          : undefined,
+      );
     } catch (error) {
       return mapMutationError(slug, "generate_images", error);
     }

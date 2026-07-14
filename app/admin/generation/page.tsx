@@ -89,6 +89,10 @@ type StudioImageStatus = {
   estimatedCostUsd: number;
 };
 
+type StudioCopyReview =
+  | { status: "warning"; reportDigest: string; findingCount: number }
+  | { status: "invalid" };
+
 const QUICK_TAGS = [
   "Too academic",
   "Too generic",
@@ -132,6 +136,8 @@ export default function SelahStudioPage() {
   const [noteSaved, setNoteSaved] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [reviewMsg, setReviewMsg] = useState("");
+  const [copyReview, setCopyReview] = useState<StudioCopyReview | null>(null);
+  const [approvedCopyReviewDigest, setApprovedCopyReviewDigest] = useState<string | null>(null);
 
   const [imagePhase, setImagePhase] = useState<ImagePhase>("idle");
   const [imageStatus, setImageStatus] = useState<StudioImageStatus | null>(null);
@@ -152,6 +158,7 @@ export default function SelahStudioPage() {
   const mark8PreflightRequest = useRef(0);
   const imageStatusRequest = useRef(0);
   const currentImageReviewDigest = useRef("");
+  const currentCopyReviewDigest = useRef("");
   const confirmedSettings = useRef<GenSettings | null>(null);
   const slug = slugFor(book, chapter) ?? "";
 
@@ -212,9 +219,23 @@ export default function SelahStudioPage() {
     setNoteSaved(false);
     setShowFeedback(false);
     setReviewMsg("");
+    currentCopyReviewDigest.current = "";
+    setCopyReview(null);
+    setApprovedCopyReviewDigest(null);
     resetImageReview();
     setPublished(false);
     setPublishMsg("");
+  }
+
+  function applyCopyReview(value: unknown) {
+    const next = readStudioCopyReview(value);
+    const nextDigest = next?.status === "warning" ? next.reportDigest : "";
+    if (currentCopyReviewDigest.current !== nextDigest) {
+      currentCopyReviewDigest.current = nextDigest;
+      setApprovedCopyReviewDigest(null);
+      setVerdict("");
+    }
+    setCopyReview(next);
   }
 
   function onPickChapter(nextBook: string, nextChapter: number) {
@@ -268,6 +289,7 @@ export default function SelahStudioPage() {
     }
 
     const status = j.status as string | null;
+    applyCopyReview(j.copyReview);
     setStatusProblem(false);
     if (status === "reviewed") {
       setPhase("ready");
@@ -326,6 +348,7 @@ export default function SelahStudioPage() {
       return;
     }
     const st = j.status as string | null;
+    applyCopyReview(j.copyReview);
     if (st === "draft" || st === "ready" || st === "reviewed") {
       setPhase("ready");
       setPublished(st === "reviewed");
@@ -675,7 +698,12 @@ export default function SelahStudioPage() {
   }
 
   function confirmImageCreation() {
-    if (slug !== MARK_8_STUDIO_SLUG || verdict !== "yes" || !previewed) return;
+    if (
+      slug !== MARK_8_STUDIO_SLUG ||
+      verdict !== "yes" ||
+      !previewed ||
+      !copyReviewApproved(copyReview, approvedCopyReviewDigest)
+    ) return;
     if (!imageStatus || (imageStatus.total !== 3 && imageStatus.total !== 5)) {
       void loadImagesStatus(slug);
       return;
@@ -690,6 +718,7 @@ export default function SelahStudioPage() {
       target !== MARK_8_STUDIO_SLUG ||
       verdict !== "yes" ||
       !previewed ||
+      !copyReviewApproved(copyReview, approvedCopyReviewDigest) ||
       settings?.image_generation_enabled !== true ||
       confirmedSettings.current?.image_generation_enabled !== true ||
       !imageStatus ||
@@ -711,6 +740,9 @@ export default function SelahStudioPage() {
         approvedImagePlanDigest: imageStatus.planDigest,
         approvedImageCount: imageStatus.total,
         approvedImageModel: imageStatus.model,
+        ...(approvedCopyReviewDigest
+          ? { sourceOverlapReportDigest: approvedCopyReviewDigest }
+          : {}),
       });
       if (activeSlug.current !== target || imageStatusRequest.current !== requestId) return;
       if (!response.ok) {
@@ -815,6 +847,9 @@ export default function SelahStudioPage() {
         action: "publish",
         slug: target,
         ...(target === MARK_8_STUDIO_SLUG ? { reviewDigest: approvedReviewDigest } : {}),
+        ...(target === MARK_8_STUDIO_SLUG && approvedCopyReviewDigest
+          ? { sourceOverlapReportDigest: approvedCopyReviewDigest }
+          : {}),
       });
       if (activeSlug.current !== target) {
         return;
@@ -963,6 +998,11 @@ export default function SelahStudioPage() {
   const isMark8 = slug === MARK_8_STUDIO_SLUG;
   const mark8SetupReady = !isMark8 || mark8SetupDecision?.kind === "ready";
   const draftReady = phase === "ready";
+  const wordingReviewed = copyReviewApproved(
+    copyReview,
+    approvedCopyReviewDigest,
+  );
+  const textApproved = previewed && verdict === "yes" && wordingReviewed;
   const exactImagesReady =
     imagePhase === "ready" &&
     Boolean(imageStatus?.reviewDigest) &&
@@ -979,8 +1019,7 @@ export default function SelahStudioPage() {
     approvedReviewDigest === imageStatus?.reviewDigest;
   const canPublish =
     draftReady &&
-    previewed &&
-    verdict === "yes" &&
+    textApproved &&
     !published &&
     (!isMark8 || imagesApproved);
 
@@ -988,7 +1027,7 @@ export default function SelahStudioPage() {
   const step2: StepState =
     published ? "done" : phase === "idle" ? "todo" : phase === "ready" ? "done" : "current";
   const step3: StepState = published || previewed ? "done" : draftReady ? "current" : "todo";
-  const step4: StepState = published || imagesApproved ? "done" : verdict === "yes" && previewed ? "current" : "todo";
+  const step4: StepState = published || imagesApproved ? "done" : textApproved ? "current" : "todo";
   const publishStep: StepState = published ? "done" : canPublish ? "current" : "todo";
 
   return (
@@ -1198,13 +1237,29 @@ export default function SelahStudioPage() {
             Finish or safely resolve the current image step before creating a new text draft.
           </p>
         )}
-        {draftReady && !published && <p className="mt-2.5 text-[13px] font-medium text-accent-strong">✓ Draft ready to review</p>}
+        {draftReady && !published && <p className="mt-2.5 text-[13px] font-medium text-accent-strong">✓ Private draft saved</p>}
         {published && <p className="mt-2.5 text-[13px] font-medium text-accent-strong">✓ This chapter is already live</p>}
         {phase === "error" && genMsg && <p role="alert" className="mt-2.5 text-[13px] text-jesus-red">{genMsg}</p>}
       </Step>
 
       {/* Step 3 — Preview Draft + Selah Brain review */}
       <Step n={3} title="Preview Draft" state={step3}>
+        {copyReview?.status === "warning" && (
+          <div role="alert" className="mb-3 rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] font-semibold text-primary">Bible wording needs your review</p>
+            <p className="mt-1 text-[13px] text-secondary">
+              Selah found wording that may be too close to the Bible text. The draft is saved and nothing is live. Preview it, then decide whether the wording is acceptable.
+            </p>
+          </div>
+        )}
+        {copyReview?.status === "invalid" && (
+          <div role="alert" className="mb-3 rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] font-semibold text-primary">This draft needs attention</p>
+            <p className="mt-1 text-[13px] text-secondary">
+              Studio could not verify its Bible-wording review. You can preview the draft, but images and publishing stay locked.
+            </p>
+          </div>
+        )}
         {published ? (
           <a href={`/chapter/${slug}`} target="_blank" rel="noreferrer" className="text-[13px] text-primary underline">
             View live chapter ↗
@@ -1241,11 +1296,17 @@ export default function SelahStudioPage() {
               <div className="mt-2 flex gap-2">
                 <Seg
                   active={verdict === "yes"}
+                  disabled={copyReview?.status === "invalid"}
                   onClick={() => {
                     const newlyReady = verdict !== "yes";
                     setVerdict("yes");
                     setNoteSaved(false);
                     setShowFeedback(false);
+                    setApprovedCopyReviewDigest(
+                      copyReview?.status === "warning"
+                        ? copyReview.reportDigest
+                        : null,
+                    );
                     if (isMark8 && newlyReady) {
                       setImagesPreviewed(false);
                       setApprovedReviewDigest(null);
@@ -1255,12 +1316,15 @@ export default function SelahStudioPage() {
                     }
                   }}
                 >
-                  Ready
+                  {copyReview?.status === "warning"
+                    ? "I reviewed the wording — Ready"
+                    : "Ready"}
                 </Seg>
                 <Seg
                   active={verdict === "needs_work"}
                   onClick={() => {
                     setVerdict("needs_work");
+                    setApprovedCopyReviewDigest(null);
                     setNoteSaved(false);
                     setShowFeedback(true);
                     setImagesPreviewed(false);
@@ -1350,8 +1414,14 @@ export default function SelahStudioPage() {
         <Step n={4} title="Create & Review Images" state={step4}>
           {published ? (
             <p className="text-[13px] font-medium text-accent-strong">✓ Images approved</p>
-          ) : verdict !== "yes" || !previewed ? (
-            <p className="text-[13px] text-secondary">Preview the draft and mark the text Ready first.</p>
+          ) : !textApproved ? (
+            <p className="text-[13px] text-secondary">
+              {copyReview?.status === "warning"
+                ? "Preview the draft and review its Bible wording first."
+                : copyReview?.status === "invalid"
+                  ? "The Bible-wording review must be repaired before creating images."
+                  : "Preview the draft and mark the text Ready first."}
+            </p>
           ) : imagePhase === "checking" ? (
             <p role="status" className="text-[13px] text-secondary">Checking the image plan…</p>
           ) : imagePhase === "confirming" && imageStatus ? (
@@ -1457,7 +1527,7 @@ export default function SelahStudioPage() {
               ? "Generate a draft first."
               : !previewed
                 ? "Preview the draft first."
-                : verdict !== "yes"
+                : verdict !== "yes" || !wordingReviewed
                   ? "Confirm it feels like Selah above to unlock publishing."
                   : isMark8 && !exactImagesReady
                     ? "Create and review the images first."
@@ -1657,17 +1727,60 @@ function Step({ n, title, state, children }: { n: number; title: string; state: 
   );
 }
 
-function Seg({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function Seg({
+  active,
+  disabled = false,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`rounded-full border px-4 py-1.5 text-[13px] transition ${
         active ? "border-transparent bg-accent-strong text-white" : "bg-card text-secondary"
-      }`}
+      } disabled:cursor-not-allowed disabled:opacity-40`}
     >
       {children}
     </button>
+  );
+}
+
+function readStudioCopyReview(value: unknown): StudioCopyReview | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const review = value as Record<string, unknown>;
+  if (review.status === "invalid") return { status: "invalid" };
+  if (
+    review.status !== "warning" ||
+    typeof review.reportDigest !== "string" ||
+    !LOWERCASE_SHA256.test(review.reportDigest) ||
+    !Number.isSafeInteger(review.findingCount) ||
+    (review.findingCount as number) < 1 ||
+    (review.findingCount as number) > 100
+  ) {
+    return { status: "invalid" };
+  }
+  return {
+    status: "warning",
+    reportDigest: review.reportDigest,
+    findingCount: review.findingCount as number,
+  };
+}
+
+function copyReviewApproved(
+  review: StudioCopyReview | null,
+  approvedDigest: string | null,
+): boolean {
+  if (review === null) return true;
+  return (
+    review.status === "warning" &&
+    approvedDigest === review.reportDigest
   );
 }
 

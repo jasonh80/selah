@@ -14,6 +14,7 @@
 // REAL route/worker orchestration against a fake store.
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { ChapterWorkup } from "../types";
+import { sourceOverlapReviewAccepted } from "../source-overlap-review";
 import { getSupabaseAdmin } from "./supabase";
 import {
   decideMutation,
@@ -63,6 +64,7 @@ export interface JobStorePort {
 export interface ImageJobBinding {
   planDigest: string;
   model: string;
+  sourceOverlapReportDigest?: string;
 }
 
 function toLookup(row: JobRow | null | { error: string }): RowLookup {
@@ -668,6 +670,18 @@ function validatedImageBinding(
   if (binding.model !== MARK_8_IMAGE_MODEL) {
     throw new ChapterMutationError("REFUSED", action, slug, `Mark 8 requires ${MARK_8_IMAGE_MODEL} exactly`);
   }
+  const copyReview = sourceOverlapReviewAccepted(
+    workup,
+    binding.sourceOverlapReportDigest,
+  );
+  if (!copyReview.ok) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      action,
+      slug,
+      copyReview.reason,
+    );
+  }
   let derived;
   try {
     assertMark8ImagesArePlaceholders(workup);
@@ -678,7 +692,13 @@ function validatedImageBinding(
   if (derived.digest !== binding.planDigest) {
     throw new ChapterMutationError("CONFLICT", action, slug, "stored Mark 8 image plan no longer matches this claim");
   }
-  return { planDigest: derived.digest, model: MARK_8_IMAGE_MODEL };
+  return {
+    planDigest: derived.digest,
+    model: MARK_8_IMAGE_MODEL,
+    ...(binding.sourceOverlapReportDigest
+      ? { sourceOverlapReportDigest: binding.sourceOverlapReportDigest }
+      : {}),
+  };
 }
 
 function imageBindingPredicates(

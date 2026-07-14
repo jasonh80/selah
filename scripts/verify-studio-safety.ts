@@ -317,6 +317,7 @@ import textWorker, {
 } from "../netlify/functions/generate-chapter-background.mts";
 import imagesWorker from "../netlify/functions/generate-images-background.mts";
 import type { ChapterWorkup } from "../lib/types";
+import { createSourceOverlapReviewWarning } from "../lib/source-overlap-review";
 import generatedFixture from "../lib/ai/fixtures/exodus-27-generated.json";
 
 class FakeJobStore implements JobStorePort {
@@ -423,6 +424,16 @@ function completedMark8Workup(
 }
 const MANIFEST_DIGEST_A = "a".repeat(64);
 const MANIFEST_DIGEST_B = "b".repeat(64);
+const SOURCE_OVERLAP_REPORT_DIGEST = "c".repeat(64);
+const SOURCE_OVERLAP_WARNING = createSourceOverlapReviewWarning({
+  manifestDigest: MANIFEST_DIGEST_A,
+  reportDigest: SOURCE_OVERLAP_REPORT_DIGEST,
+  canonicalDraftDigest: "d".repeat(64),
+  blockerCodes: ["MOSAIC_10_PLUS"],
+  findingCount: 2,
+  blockFindingCount: 1,
+  reviewFindingCount: 1,
+});
 
 async function expectCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
   try {
@@ -1824,6 +1835,69 @@ const realImagePipeline = async () => {
     // M0. REAL Studio admin route: exact draft plan + project-standard model
     // are bound before its authenticated background dispatch.
     {
+      const warnedWorkup = {
+        ...structuredClone(workupJson),
+        sourceOverlapReview: SOURCE_OVERLAP_WARNING,
+      };
+      store.seed("mark-8", "draft", warnedWorkup);
+      const warningNotReviewed = await adminPost(adminReq({
+        action: "generate_images",
+        slug: "mark-8",
+        approvedImagePlanDigest: MARK8_IMAGE_BINDING.planDigest,
+        approvedImageCount: 3,
+        approvedImageModel: MARK_8_IMAGE_MODEL,
+      }));
+      ok(
+        warningNotReviewed.status === 403,
+        "M0 copy-warning draft cannot spend on images before owner review",
+      );
+      ok(
+        store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined &&
+          imageTrigger === null,
+        "M0 unreviewed copy warning claims nothing and triggers nothing",
+      );
+      const wrongWarningReview = await adminPost(adminReq({
+        action: "generate_images",
+        slug: "mark-8",
+        approvedImagePlanDigest: MARK8_IMAGE_BINDING.planDigest,
+        approvedImageCount: 3,
+        approvedImageModel: MARK_8_IMAGE_MODEL,
+        sourceOverlapReportDigest: "e".repeat(64),
+      }));
+      ok(
+        wrongWarningReview.status === 403 && imageTrigger === null,
+        "M0 stale copy-warning approval cannot spend",
+      );
+      const reviewedWarning = await adminPost(adminReq({
+        action: "generate_images",
+        slug: "mark-8",
+        approvedImagePlanDigest: MARK8_IMAGE_BINDING.planDigest,
+        approvedImageCount: 3,
+        approvedImageModel: MARK_8_IMAGE_MODEL,
+        sourceOverlapReportDigest: SOURCE_OVERLAP_REPORT_DIGEST,
+      }));
+      const reviewedWarningBody = await reviewedWarning.json() as Record<string, unknown>;
+      ok(
+        reviewedWarning.status === 200 && reviewedWarningBody.triggered === true,
+        "M0 exact copy-warning review unlocks only the confirmed image run",
+      );
+      ok(
+        (imageTrigger as unknown as { body: Record<string, unknown> }).body
+          .sourceOverlapReportDigest === SOURCE_OVERLAP_REPORT_DIGEST,
+        "M0 exact copy-warning review stays bound through worker dispatch",
+      );
+      ok(
+        await releaseImageJob(
+          store,
+          "mark-8",
+          String(reviewedWarningBody.jobId),
+          "queued",
+        ),
+        "M0 reviewed warning test releases its unspent claim",
+      );
+      store.rows.delete("mark-8");
+      imageTrigger = null;
+
       store.seed("mark-8", "draft", structuredClone(workupJson));
       const unconfirmed = await adminPost(adminReq({
         action: "generate_images",
@@ -2190,6 +2264,49 @@ const realImagePipeline = async () => {
             process.env.NEXT_PUBLIC_SUPABASE_URL,
           ).ok,
           "N1 exact final review + trusted storage passes the pure publish gate",
+        );
+        const warnedFinalWorkup = {
+          ...finalWorkup,
+          sourceOverlapReview: SOURCE_OVERLAP_WARNING,
+        } as ChapterWorkup;
+        const warnedFinalDigest = mark8FinalReviewDigest(warnedFinalWorkup);
+        ok(
+          !validateMark8PublishCandidate(
+            warnedFinalWorkup,
+            warnedFinalDigest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          ).ok,
+          "N1 copy-warning draft cannot publish before exact owner review",
+        );
+        ok(
+          validateMark8PublishCandidate(
+            warnedFinalWorkup,
+            warnedFinalDigest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            SOURCE_OVERLAP_REPORT_DIGEST,
+          ).ok,
+          "N1 exact copy-warning review and final review unlock publishing",
+        );
+        ok(
+          !validateMark8PublishCandidate(
+            warnedFinalWorkup,
+            warnedFinalDigest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            "e".repeat(64),
+          ).ok,
+          "N1 stale copy-warning review cannot publish",
+        );
+        ok(
+          !validateMark8PublishCandidate(
+            {
+              ...finalWorkup,
+              sourceOverlapReview: { version: 1 },
+            } as ChapterWorkup,
+            digest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            SOURCE_OVERLAP_REPORT_DIGEST,
+          ).ok,
+          "N1 malformed copy-warning metadata fails closed",
         );
         ok(
           !validateMark8PublishCandidate(

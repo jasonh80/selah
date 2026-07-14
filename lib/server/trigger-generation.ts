@@ -24,6 +24,7 @@ interface TriggerRequest {
     approvedManifestDigest?: string;
     imagePlanDigest?: string;
     imageModel?: string;
+    sourceOverlapReportDigest?: string;
   };
 }
 
@@ -84,6 +85,12 @@ async function trigger(
         : {
             imagePlanDigest: imageBinding.planDigest,
             imageModel: imageBinding.model,
+            ...(imageBinding.sourceOverlapReportDigest
+              ? {
+                  sourceOverlapReportDigest:
+                    imageBinding.sourceOverlapReportDigest,
+                }
+              : {}),
           }),
     },
   };

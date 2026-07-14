@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { passingDraft } from "./verify-mark-authoring-contract";
+import { inspectSourceOverlapReview } from "../lib/source-overlap-review";
 import {
   PRIVATE_EXAMPLE,
   PRIVATE_GUIDANCE_ARTIFACT,
@@ -446,7 +447,6 @@ async function main(): Promise<void> {
   for (const [mode, code, usageKnown] of [
     ["model", "MODEL_EXECUTION_FAILED", false],
     ["schema", "MODEL_RESPONSE_INVALID", true],
-    ["overlap", "SOURCE_OVERLAP_BLOCKED", true],
     ["quality", "MARK_QUALITY_BLOCKED", true],
   ] as const) {
     const h = harness(mode);
@@ -466,6 +466,57 @@ async function main(): Promise<void> {
       JSON.stringify(h.audits).includes(code),
       `${mode} safe failure code missing from audit`,
     );
+  }
+
+  // Copy overlap is advisory for a valid private draft: save it once, expose
+  // only digest/count metadata, and require the owner review before images or
+  // publishing. No retry and no failure cleanup occur.
+  {
+    const h = harness("overlap");
+    const result = await runProtectedMarkDraftJob(input, h.ports);
+    assert.equal(result.ok, true);
+    if (!result.ok) assert.fail("warned draft was discarded");
+    assert.equal(result.status, "draft");
+    assert.equal(result.copyWarning, true);
+    assert.equal(h.modelCalls(), 1);
+    assert.equal(h.store.rows.get(SLUG)?.status, "draft");
+    assert.equal(h.costs.length, 1);
+    assert.equal(
+      h.costs[0].metadata?.outcomeCode,
+      "PIPELINE_PASSED_WITH_COPY_WARNING",
+    );
+    assert.equal(h.costs[0].metadata?.copyWarning, true);
+    assert.equal(h.snapshots.length, 1);
+    const inspection = inspectSourceOverlapReview(
+      h.store.rows.get(SLUG)?.workupJson,
+    );
+    assert.equal(inspection.kind, "warning");
+    if (inspection.kind !== "warning") assert.fail("warning marker missing");
+    assert.equal(inspection.warning.manifestDigest, manifestDigest);
+    assert.ok(inspection.warning.blockFindingCount > 0);
+    const publicEvidence = JSON.stringify({
+      result,
+      costs: h.costs,
+      audits: h.audits,
+      warning: inspection.warning,
+    });
+    for (const privateValue of [
+      PRIVATE_ESV_KEY,
+      SYNTHETIC_KEY,
+      SOURCE_PHRASE,
+      PRIVATE_RULE,
+      PRIVATE_NOTE,
+      PRIVATE_EXAMPLE,
+      PRIVATE_GUIDANCE_ARTIFACT,
+      modelRequest.messages[0].content,
+      modelRequest.messages[1].content,
+    ]) {
+      assert.ok(
+        !publicEvidence.includes(privateValue),
+        `warning evidence leaked: ${privateValue}`,
+      );
+    }
+    assert.ok(publicEvidence.includes("DRAFT_SAVED_WITH_COPY_WARNING"));
   }
 
   // One absolute run deadline covers source preparation before any model
