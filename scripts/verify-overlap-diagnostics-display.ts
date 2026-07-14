@@ -8,7 +8,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseOverlapAuditDiagnostics } from "../lib/audit-overlap-diagnostics";
-import { safeOverlapDiagnostic } from "../lib/server/mark-sprint-draft-pipeline";
+import {
+  safeOverlapDiagnostic,
+  safeQualityDiagnostic,
+} from "../lib/server/mark-sprint-draft-pipeline";
 
 let checks = 0;
 function ok(cond: boolean, label: string): void {
@@ -153,16 +156,24 @@ function overlapMessage(
 
 // ---------- 5b. Quality-stop rows render their codes (issue #17, gap 3) ----------
 {
+  // REAL evaluateMarkSprintDraft code shapes ("COV-002 VERSE_COVERAGE_GAP" —
+  // prefix, hyphen, digits, space) pushed through the REAL producer.
   const qmsg = JSON.stringify({
     code: "MARK_QUALITY_BLOCKED",
     manifestDigest: DIGEST,
     cleanup: "marked_failed",
-    diagnostics: "QUALITY:WHAT_PEOPLE_ASK_COUNT; QUALITY:VERSE_COVERAGE_GAP; not a valid segment; QUALITY:bad-lowercase",
+    diagnostics: boundedDiagnostics([
+      safeQualityDiagnostic("COV-002 VERSE_COVERAGE_GAP"),
+      safeQualityDiagnostic("STR-004 EMPTY_REQUIRED_CONTENT"),
+      "not a valid segment",
+      "QUALITY:bad-lowercase",
+    ]),
   });
   const parsed = parseOverlapAuditDiagnostics(auditRow(qmsg));
   ok(parsed !== null, "5b quality stop parses");
   ok(parsed!.code === "MARK_QUALITY_BLOCKED", "5b code preserved");
-  ok(parsed!.qualityCodes.length === 2 && parsed!.qualityCodes[0] === "WHAT_PEOPLE_ASK_COUNT", "5b only grammar-valid codes kept");
+  ok(parsed!.qualityCodes.length === 2 && parsed!.qualityCodes[0] === "COV-002_VERSE_COVERAGE_GAP", "5b real code shape survives the grammar");
+  ok(parsed!.qualityCodes[1] === "STR-004_EMPTY_REQUIRED_CONTENT", "5b second real code kept");
   ok(parsed!.droppedSegments === 2, "5b malformed/injected segments dropped");
   ok(!JSON.stringify(parsed).includes("bad-lowercase"), "5b invalid code never rendered");
   // Overlap rows keep an empty qualityCodes array.

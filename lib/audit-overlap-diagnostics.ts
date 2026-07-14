@@ -137,7 +137,10 @@ export function parseOverlapAuditDiagnostics(entry: {
   const qualityCodes: string[] = [];
   let more = 0;
   let droppedSegments = 0;
-  const QUALITY_GRAMMAR = /^QUALITY:([A-Z0-9_]{2,48})$/;
+  // Real quality codes look like "COV-002 VERSE_COVERAGE_GAP"; the producer
+  // (safeQualityDiagnostic) folds whitespace to "_", so the grammar admits
+  // uppercase, digits, "_" and "-" only — one token, bounded length.
+  const QUALITY_GRAMMAR = /^QUALITY:([A-Z0-9_-]{2,64})$/;
   if (record.diagnostics !== undefined) {
     if (typeof record.diagnostics !== "string") return null;
     const segments = record.diagnostics.split("; ");
