@@ -67,6 +67,15 @@ export class MarkSprintDraftPipelineError extends Error {
   }
 }
 
+/**
+ * Excerpt-free diagnostic for one quality blocker. Real codes contain spaces
+ * ("COV-002 VERSE_COVERAGE_GAP"); whitespace becomes "_" so the segment fits
+ * the strict single-token QUALITY grammar the Studio parser enforces.
+ */
+export function safeQualityDiagnostic(code: string): string {
+  return `QUALITY:${code.trim().split(/\s+/).join("_")}`;
+}
+
 /** Compact, excerpt-free diagnostic line for one overlap finding. */
 export function safeOverlapDiagnostic(finding: {
   code: string;
@@ -291,9 +300,7 @@ export async function runProtectedMarkSprintDraft(
       "MARK_QUALITY_BLOCKED",
       quality.blockers.map((finding) => finding.code),
       tokenUsage,
-      quality.blockers.map(
-        (finding) => `QUALITY:${finding.code}`,
-      ),
+      quality.blockers.map((finding) => safeQualityDiagnostic(finding.code)),
     );
   }
 
