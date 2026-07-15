@@ -759,7 +759,7 @@ export async function prepareMarkSprintRuntime(
     );
   }
 
-  const chapter = Number(slug.split("-")[1]) as 8 | 9 | 10 | 11;
+  const chapter = Number(slug.split("-")[1]) as 7 | 8 | 9 | 10 | 11;
   const brainApproved = !policy.blockers.some(
     (blocker) => blocker.code === "brain_artifact_not_approved",
   );

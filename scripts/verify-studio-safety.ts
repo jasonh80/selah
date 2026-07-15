@@ -265,6 +265,7 @@ import {
   consumeImageClaim,
   completeImageJob,
   releaseImageJob,
+  markImageJobTerminalFailure,
   signJobToken,
   verifyJobToken,
   __setJobStoreForTesting,
@@ -302,14 +303,22 @@ import {
 import { __setImageTestOverrides, __setImageDepsForTesting, generateAndStoreChapterImages } from "../lib/server/images";
 import {
   deriveMark8ImagePlan,
+  deriveMarkSprintImagePlan,
   isStoredMark8ImageUrl,
   mark8FinalReviewDigest,
+  markSprintFinalReviewDigest,
   MARK_8_IMAGE_MODEL,
 } from "../lib/server/mark8-image-plan";
 import {
+  protectedChapterServeAllowed,
   safeProtectedMarkFailure,
   validateMark8PublishCandidate,
+  validateMarkSprintPublishCandidate,
 } from "../lib/server/chapter-workups-repository";
+import {
+  connectedChapterReceiptApplies,
+  __setConnectedReceiptOverridesForTesting,
+} from "../lib/server/mark-sprint-setup-contracts";
 import { POST as adminPost } from "../app/api/admin/generation/route";
 import textWorker, {
   __setMark8PermissionCheckerForTesting,
@@ -368,6 +377,8 @@ const WORKUP = { slug: "mark-8", title: "Mark 8" } as unknown as ChapterWorkup;
 const MARK8_IMAGE_WORKUP = {
   slug: "mark-8",
   title: "Mark 8",
+  book: "Mark",
+  chapter: 8,
   heroKind: "peter-confession",
   images: [
     {
@@ -409,6 +420,65 @@ const MARK8_IMAGE_BINDING = {
   planDigest: deriveMark8ImagePlan(MARK8_IMAGE_WORKUP).digest,
   model: MARK_8_IMAGE_MODEL,
 };
+
+// Generic protected-sprint image workup for the connected-chapter binding and
+// publish fail-closed cases (PR #32 blockers 1 and 3).
+function makeSprintImageWorkup(slug: string): ChapterWorkup {
+  const chapter = Number(slug.split("-")[1]);
+  return {
+    slug,
+    title: `Mark ${chapter}`,
+    book: "Mark",
+    chapter,
+    heroKind: "scene-two",
+    images: [
+      {
+        kind: "scene-one",
+        index: 1,
+        label: "Scene One",
+        prompt: "A historically grounded opening scene.",
+        caption: "The chapter opens.",
+        src: "/img/placeholder/establishing.svg",
+        alt: "The opening scene.",
+        status: "placeholder",
+      },
+      {
+        kind: "scene-two",
+        index: 2,
+        label: "Scene Two",
+        prompt: "A historically grounded middle scene.",
+        caption: "The chapter turns.",
+        src: "/img/placeholder/detail.svg",
+        alt: "The middle scene.",
+        status: "placeholder",
+      },
+      {
+        kind: "scene-three",
+        index: 3,
+        label: "Scene Three",
+        prompt: "A historically grounded closing scene.",
+        caption: "The chapter closes.",
+        src: "/img/placeholder/human.svg",
+        alt: "The closing scene.",
+        status: "placeholder",
+      },
+    ],
+  } as unknown as ChapterWorkup;
+}
+
+function completedSprintWorkup(
+  slug: string,
+  jobId = "44444444-4444-4444-8444-444444444444",
+  origin = "https://offline-selah.supabase.co",
+): ChapterWorkup {
+  const workup = makeSprintImageWorkup(slug);
+  workup.images = workup.images.map((image) => ({
+    ...image,
+    status: "complete" as const,
+    src: `${origin}/storage/v1/object/public/chapter-images/${slug}/${jobId}/${image.kind}.png`,
+  }));
+  return workup;
+}
 
 function completedMark8Workup(
   jobId = "44444444-4444-4444-8444-444444444444",
@@ -958,6 +1028,120 @@ const integration = async () => {
     ok(store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined, "I5 completion clears the claim");
   }
 
+  // I5b. Mark 7 carries the FULL exact image binding (PR #32 blocker 1): the
+  // connected-chapter guard revalidates copy review, untouched placeholders,
+  // and the exact plan digest at claim/consume, and gets the same
+  // owner-confirmed exact-binding retry as Mark 8.
+  {
+    const mark7Workup = makeSprintImageWorkup("mark-7");
+    const mark7Binding = {
+      planDigest: deriveMarkSprintImagePlan("mark-7", mark7Workup).digest,
+      model: MARK_8_IMAGE_MODEL,
+    };
+
+    // Mark 7 no longer takes the legacy unbound path.
+    {
+      const store = new FakeJobStore();
+      store.seed("mark-7", "draft", structuredClone(mark7Workup) as unknown as Record<string, unknown>);
+      await expectCode(
+        () => claimImageJob(store, "mark-7"),
+        "REFUSED",
+        "I5b Mark 7 refuses an unbound image claim",
+      );
+      ok(store.rows.get("mark-7")!.workup_json[IMAGE_JOB_KEY] === undefined, "I5b unbound refusal wrote nothing");
+    }
+
+    // A stale copy review refuses BEFORE the claim write (no spend possible).
+    {
+      const store = new FakeJobStore();
+      const warned = {
+        ...structuredClone(mark7Workup),
+        sourceOverlapReview: SOURCE_OVERLAP_WARNING,
+      } as unknown as Record<string, unknown>;
+      store.seed("mark-7", "draft", warned);
+      await expectCode(
+        () => claimImageJob(store, "mark-7", mark7Binding),
+        "REFUSED",
+        "I5b stale/missing copy-review approval refuses the Mark 7 claim",
+      );
+      ok(store.rows.get("mark-7")!.workup_json[IMAGE_JOB_KEY] === undefined, "I5b stale-review refusal wrote nothing");
+      const exact = await claimImageJob(store, "mark-7", {
+        ...mark7Binding,
+        sourceOverlapReportDigest: SOURCE_OVERLAP_REPORT_DIGEST,
+      });
+      ok(Boolean(exact.jobId), "I5b the exact copy-review digest unlocks the Mark 7 claim");
+      await expectCode(
+        () => consumeImageClaim(store, "mark-7", exact.jobId, mark7Binding),
+        "REFUSED",
+        "I5b consume also revalidates the copy-review approval",
+      );
+      await consumeImageClaim(store, "mark-7", exact.jobId, {
+        ...mark7Binding,
+        sourceOverlapReportDigest: SOURCE_OVERLAP_REPORT_DIGEST,
+      });
+    }
+
+    // Touched placeholders refuse before any claim write.
+    {
+      const store = new FakeJobStore();
+      const touched = structuredClone(mark7Workup);
+      touched.images[0] = {
+        ...touched.images[0],
+        status: "complete" as const,
+        src: "https://offline-selah.supabase.co/storage/v1/object/public/chapter-images/mark-7/x/scene-one.png",
+      };
+      store.seed("mark-7", "draft", touched as unknown as Record<string, unknown>);
+      await expectCode(
+        () => claimImageJob(store, "mark-7", mark7Binding),
+        "REFUSED",
+        "I5b non-placeholder Mark 7 images refuse a fresh paid claim",
+      );
+    }
+
+    // Cross-slug/plan drift: a Mark 8 digest can never bind a Mark 7 claim,
+    // and a row change between claim and consume is a typed conflict.
+    {
+      const store = new FakeJobStore();
+      store.seed("mark-7", "draft", structuredClone(mark7Workup) as unknown as Record<string, unknown>);
+      await expectCode(
+        () => claimImageJob(store, "mark-7", MARK8_IMAGE_BINDING),
+        "CONFLICT",
+        "I5b a Mark 8 plan digest cannot claim Mark 7",
+      );
+      const { jobId } = await claimImageJob(store, "mark-7", mark7Binding);
+      const row = store.rows.get("mark-7")!;
+      const drifted = structuredClone(row.workup_json) as unknown as ChapterWorkup;
+      drifted.images[1] = { ...drifted.images[1], prompt: "changed after the owner reviewed the plan" };
+      row.workup_json = drifted as unknown as Record<string, unknown>;
+      await expectCode(
+        () => consumeImageClaim(store, "mark-7", jobId, mark7Binding),
+        "CONFLICT",
+        "I5b plan drift between claim and consume refuses before spend",
+      );
+    }
+
+    // The owner-confirmed exact-binding retry path now covers Mark 7.
+    {
+      const store = new FakeJobStore();
+      store.seed("mark-7", "draft", structuredClone(mark7Workup) as unknown as Record<string, unknown>);
+      const first = await claimImageJob(store, "mark-7", mark7Binding);
+      await consumeImageClaim(store, "mark-7", first.jobId, mark7Binding);
+      ok(
+        await markImageJobTerminalFailure(store, "mark-7", first.jobId, "failed", 1, "image_run_failed", mark7Binding),
+        "I5b failed paid Mark 7 run locks with its exact binding",
+      );
+      const retry = await claimImageJob(store, "mark-7", mark7Binding);
+      ok(retry.jobId !== first.jobId, "I5b owner-confirmed Mark 7 retry issues a fresh exact-binding claim");
+    }
+
+    // Mark 8 behavior and digests are unchanged by the generalization.
+    ok(
+      deriveMarkSprintImagePlan("mark-8", MARK8_IMAGE_WORKUP).digest ===
+        deriveMark8ImagePlan(MARK8_IMAGE_WORKUP).digest,
+      "I5b Mark 8 plan digest is identical through the generalized derivation",
+    );
+  }
+
   // I6. Stale image worker: superseded run cannot apply; bytes stay orphaned.
   {
     const store = new FakeJobStore();
@@ -1255,6 +1439,70 @@ const realRouteAndWorkers = async () => {
         ok(!store.rows.has(blockedSlug), `R2c ${blockedSlug} made no claim`);
       }
       ok(lastTrigger === null, "R2c Mark 9–11 sent no trigger");
+    }
+
+    // R2d. The exact per-chapter owner receipt gates the protected route
+    // BEFORE any allowlist write, claim, or trigger (PR #32 blocker 2 / the
+    // original PR #30 hole-3 invariant). The seam stands in for a null,
+    // mismatched, or drifted receipt — the gate collapses all three to
+    // "does not apply".
+    {
+      ok(connectedChapterReceiptApplies("mark-7"), "R2d the recorded Mark 7 receipt applies");
+      ok(connectedChapterReceiptApplies("mark-8"), "R2d the frozen Mark 8 receipt applies");
+      for (const unreceipted of ["mark-9", "mark-10", "mark-11", "exodus-27"]) {
+        ok(!connectedChapterReceiptApplies(unreceipted), `R2d ${unreceipted} has no applicable receipt`);
+      }
+
+      const withoutMark7 = { ...TEST_SETTINGS, allowed_slugs: [GENERIC_SLUG] };
+      __setGenerationTestOverrides({ settings: withoutMark7, captureAudit: audit });
+      lastTrigger = null;
+      __setConnectedReceiptOverridesForTesting({ "mark-7": false });
+      try {
+        const refused = await adminPost(adminReq({
+          action: "generate",
+          slug: "mark-7",
+          confirm: true,
+          approvedManifestDigest: MANIFEST_DIGEST_A,
+        }));
+        ok(refused.status === 403, "R2d Mark 7 with a missing/drifted receipt → 403");
+        ok(
+          !(await getGenerationSettings()).allowed_slugs.includes("mark-7"),
+          "R2d a refused receipt never edits the allowlist",
+        );
+        ok(
+          !store.rows.has("mark-7") && lastTrigger === null,
+          "R2d a refused receipt makes no claim and no trigger",
+        );
+        ok(
+          audit.some(
+            (entry) =>
+              entry.action === "refused:generate" &&
+              entry.slug === "mark-7" &&
+              String(entry.message ?? "").includes("receipt"),
+          ),
+          "R2d the receipt refusal is durably audited",
+        );
+      } finally {
+        __setConnectedReceiptOverridesForTesting(null);
+      }
+
+      // With the real recorded receipt, the same request passes the gate and
+      // only THEN is Mark 7 allowlisted, claimed, and triggered.
+      lastTrigger = null;
+      const queued = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-7",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(queued.status === 200 && lastTrigger !== null, "R2d the exact Mark 7 receipt lets the draft queue");
+      ok(
+        (await getGenerationSettings()).allowed_slugs.includes("mark-7"),
+        "R2d Mark 7 is allowlisted only after its receipt passed",
+      );
+      store.rows.delete("mark-7");
+      lastTrigger = null;
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
     // R3. Kill switch OFF through the REAL route: refused before any claim.
@@ -2443,6 +2691,271 @@ const realImagePipeline = async () => {
         ok(legacy.status === 200, "N3 real admin route preserves non-Mark draft publishing");
         ok(store.rows.get("exodus-27")!.status === "reviewed", "N3 non-Mark draft publish behavior is preserved");
         store.rows.delete("exodus-27");
+
+        // N4. Mark 9–11 stay unpublishable even with otherwise valid-looking
+        // completed images and a matching review digest (PR #32 blocker 3):
+        // the strict validator refuses any slug that is not explicitly
+        // connected AND exactly owner-receipted, both directly and through
+        // the real admin route.
+        for (const blockedSlug of ["mark-9", "mark-10", "mark-11"]) {
+          const outOfBand = completedSprintWorkup(blockedSlug);
+          const outOfBandDigest = markSprintFinalReviewDigest(blockedSlug, outOfBand);
+          ok(
+            outOfBandDigest !== null,
+            `N4 ${blockedSlug} synthetic out-of-band draft LOOKS complete (digest derivable)`,
+          );
+          const verdict = validateMarkSprintPublishCandidate(
+            blockedSlug,
+            outOfBand,
+            outOfBandDigest ?? undefined,
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+          );
+          ok(
+            !verdict.ok && verdict.reason.includes("not an owner-approved publishable chapter"),
+            `N4 ${blockedSlug} is refused by the connected+receipt gate, not by luck`,
+          );
+          store.seed(
+            blockedSlug,
+            "draft",
+            structuredClone(outOfBand) as unknown as Record<string, unknown>,
+          );
+          const routeRefusal = await adminPost(adminReq({
+            action: "publish",
+            slug: blockedSlug,
+            reviewDigest: outOfBandDigest,
+          }));
+          ok(routeRefusal.status === 403, `N4 real admin route refuses ${blockedSlug} publish`);
+          ok(store.rows.get(blockedSlug)!.status === "draft", `N4 ${blockedSlug} stays private`);
+          store.rows.delete(blockedSlug);
+        }
+
+        // Mark 7 takes its own slug-scoped path: the connected+receipt gate
+        // passes and the exact final-review flow governs the outcome.
+        {
+          const mark7Final = completedSprintWorkup("mark-7");
+          const mark7Digest = markSprintFinalReviewDigest("mark-7", mark7Final);
+          ok(mark7Digest !== null, "N4 complete synthetic Mark 7 workup has a final review digest");
+          ok(
+            validateMarkSprintPublishCandidate(
+              "mark-7",
+              mark7Final,
+              mark7Digest ?? undefined,
+              process.env.NEXT_PUBLIC_SUPABASE_URL,
+            ).ok,
+            "N4 receipted Mark 7 passes the strict publish gate on exact review",
+          );
+          ok(
+            !validateMarkSprintPublishCandidate(
+              "mark-7",
+              mark7Final,
+              undefined,
+              process.env.NEXT_PUBLIC_SUPABASE_URL,
+            ).ok,
+            "N4 Mark 7 without the exact owner review digest is refused",
+          );
+          __setConnectedReceiptOverridesForTesting({ "mark-7": false });
+          try {
+            const drifted = validateMarkSprintPublishCandidate(
+              "mark-7",
+              mark7Final,
+              mark7Digest ?? undefined,
+              process.env.NEXT_PUBLIC_SUPABASE_URL,
+            );
+            ok(
+              !drifted.ok && drifted.reason.includes("not an owner-approved publishable chapter"),
+              "N4 a drifted Mark 7 receipt blocks publish too",
+            );
+          } finally {
+            __setConnectedReceiptOverridesForTesting(null);
+          }
+          // A cross-slug digest can never publish another chapter's workup.
+          ok(
+            !validateMarkSprintPublishCandidate(
+              "mark-8",
+              mark7Final,
+              mark7Digest ?? undefined,
+              process.env.NEXT_PUBLIC_SUPABASE_URL,
+            ).ok,
+            "N4 a Mark 7 workup cannot pass Mark 8's slug-scoped validation",
+          );
+        }
+
+        // N5. Alias/mismatched protected rows can never publish (PR #32
+        // re-review): a stored "mark-09"-style alias, or an innocuously named
+        // row whose WORKUP identifies as a protected Mark chapter, is refused
+        // by the alias-aware identity gate before the generic path — so it
+        // stays draft and is never publicly served at its raw URL.
+        {
+          const aliasCases: Array<{ rowSlug: string; workupSlug: string }> = [
+            { rowSlug: "mark-09", workupSlug: "mark-9" },
+            { rowSlug: "mark-007", workupSlug: "mark-7" },
+            { rowSlug: "mark-0008", workupSlug: "mark-0008" },
+          ];
+          for (const { rowSlug, workupSlug } of aliasCases) {
+            const aliasWorkup = completedSprintWorkup(workupSlug);
+            (aliasWorkup as unknown as Record<string, unknown>).slug = workupSlug;
+            const aliasDigest = markSprintFinalReviewDigest(workupSlug, aliasWorkup);
+            store.seed(
+              rowSlug,
+              "draft",
+              structuredClone(aliasWorkup) as unknown as Record<string, unknown>,
+            );
+            const refused = await adminPost(adminReq({
+              action: "publish",
+              slug: rowSlug,
+              ...(aliasDigest ? { reviewDigest: aliasDigest } : {}),
+            }));
+            ok(refused.status === 403, `N5 alias row ${rowSlug} cannot publish`);
+            ok(
+              store.rows.get(rowSlug)!.status === "draft",
+              `N5 ${rowSlug} stays draft — never publicly resolvable`,
+            );
+            store.rows.delete(rowSlug);
+          }
+
+          // An innocuous row slug carrying a protected workup identity (by
+          // workup slug, or by book/chapter alone) is also refused.
+          const smuggledBySlug = completedSprintWorkup("mark-9");
+          store.seed(
+            "gospel-mark-nine",
+            "draft",
+            structuredClone(smuggledBySlug) as unknown as Record<string, unknown>,
+          );
+          const smuggledSlugRefusal = await adminPost(adminReq({
+            action: "publish",
+            slug: "gospel-mark-nine",
+          }));
+          ok(smuggledSlugRefusal.status === 403, "N5 smuggled protected workup slug cannot publish");
+          ok(store.rows.get("gospel-mark-nine")!.status === "draft", "N5 smuggled row stays draft");
+          store.rows.delete("gospel-mark-nine");
+
+          const smuggledByIdentity = completedSprintWorkup("mark-10");
+          const smuggledRecord = smuggledByIdentity as unknown as Record<string, unknown>;
+          smuggledRecord.slug = "study-notes";
+          smuggledRecord.book = "Mark";
+          smuggledRecord.chapter = 10;
+          store.seed(
+            "study-notes",
+            "draft",
+            structuredClone(smuggledRecord),
+          );
+          const smuggledIdentityRefusal = await adminPost(adminReq({
+            action: "publish",
+            slug: "study-notes",
+          }));
+          ok(
+            smuggledIdentityRefusal.status === 403,
+            "N5 smuggled Mark book/chapter identity cannot publish",
+          );
+          ok(store.rows.get("study-notes")!.status === "draft", "N5 identity-smuggled row stays draft");
+          store.rows.delete("study-notes");
+
+          // A canonical row whose workup slug does not match its row slug is
+          // refused by the mismatch arm of the same gate.
+          const mismatched = completedSprintWorkup("mark-9");
+          store.seed(
+            "mark-7",
+            "draft",
+            structuredClone(mismatched) as unknown as Record<string, unknown>,
+          );
+          const mismatchRefusal = await adminPost(adminReq({
+            action: "publish",
+            slug: "mark-7",
+            reviewDigest: markSprintFinalReviewDigest("mark-9", mismatched) ?? undefined,
+          }));
+          ok(mismatchRefusal.status === 403, "N5 canonical slug with mismatched workup slug cannot publish");
+          ok(store.rows.get("mark-7")!.status === "draft", "N5 mismatched row stays draft");
+          store.rows.delete("mark-7");
+        }
+
+        // N6. The READ boundary fails closed too (PR #32 re-review P1): rows
+        // that are ALREADY "reviewed" out of band are still never served when
+        // they carry a protected alias or smuggled identity. This is the
+        // serve-decision both public resolvers (getChapterWorkupBySlug and
+        // getDraftWorkup) now consult before returning a row.
+        {
+          // Already-reviewed protected alias rows are never served.
+          const aliasReviewed = completedSprintWorkup("mark-9");
+          ok(
+            !protectedChapterServeAllowed("mark-09", aliasReviewed),
+            "N6 reviewed alias row mark-09 is never served",
+          );
+          ok(
+            !protectedChapterServeAllowed("mark-007", completedSprintWorkup("mark-7")),
+            "N6 reviewed alias row mark-007 is never served",
+          );
+          // Innocuously named reviewed rows smuggling a protected identity
+          // (by workup slug, or by book/chapter alone) are never served.
+          ok(
+            !protectedChapterServeAllowed("gospel-mark-nine", completedSprintWorkup("mark-9")),
+            "N6 reviewed row smuggling a protected workup slug is never served",
+          );
+          const smuggledIdentity = completedSprintWorkup("mark-10") as unknown as Record<string, unknown>;
+          smuggledIdentity.slug = "study-notes";
+          smuggledIdentity.book = "Mark";
+          smuggledIdentity.chapter = 10;
+          ok(
+            !protectedChapterServeAllowed("study-notes", smuggledIdentity as unknown as ChapterWorkup),
+            "N6 reviewed row smuggling a Mark book/chapter identity is never served",
+          );
+          // Canonical but NON-CONNECTED sprint chapters are never served,
+          // even with a self-consistent reviewed workup.
+          for (const blockedSlug of ["mark-9", "mark-10", "mark-11"]) {
+            ok(
+              !protectedChapterServeAllowed(blockedSlug, completedSprintWorkup(blockedSlug)),
+              `N6 non-connected ${blockedSlug} is never served even when self-consistent`,
+            );
+          }
+          // Canonical connected chapters with matching identity still serve,
+          // and a mismatched workup under a connected slug does not.
+          ok(
+            protectedChapterServeAllowed("mark-7", completedSprintWorkup("mark-7")),
+            "N6 published Mark 7 serves normally",
+          );
+          ok(
+            protectedChapterServeAllowed("mark-8", completedMark8Workup()),
+            "N6 published Mark 8 serves normally",
+          );
+          ok(
+            !protectedChapterServeAllowed("mark-7", completedSprintWorkup("mark-9")),
+            "N6 a mark-9 workup under the mark-7 slug is never served",
+          );
+          // A self-labeling workup whose required book/chapter fields disagree
+          // with the canonical slug is never served (final re-review): slug
+          // and workup slug can both say "mark-7" while the body is Mark 9.
+          const conflictingChapter = completedSprintWorkup("mark-7") as unknown as Record<string, unknown>;
+          conflictingChapter.chapter = 9;
+          ok(
+            !protectedChapterServeAllowed("mark-7", conflictingChapter as unknown as ChapterWorkup),
+            "N6 a mark-7-labeled workup with chapter 9 is never served",
+          );
+          const conflictingBook = completedSprintWorkup("mark-7") as unknown as Record<string, unknown>;
+          conflictingBook.book = "Matthew";
+          ok(
+            !protectedChapterServeAllowed("mark-7", conflictingBook as unknown as ChapterWorkup),
+            "N6 a mark-7-labeled workup from another book is never served",
+          );
+          const missingIdentityFields = completedSprintWorkup("mark-7") as unknown as Record<string, unknown>;
+          delete missingIdentityFields.book;
+          delete missingIdentityFields.chapter;
+          ok(
+            !protectedChapterServeAllowed("mark-7", missingIdentityFields as unknown as ChapterWorkup),
+            "N6 a protected workup missing its required book/chapter fields fails closed",
+          );
+          // Non-sprint chapters are untouched by the gate.
+          ok(
+            protectedChapterServeAllowed("exodus-27", { slug: "exodus-27" } as unknown as ChapterWorkup),
+            "N6 ordinary chapters serve as before",
+          );
+          ok(
+            protectedChapterServeAllowed("psalm-23", { slug: "psalm-23" } as unknown as ChapterWorkup),
+            "N6 legacy psalm-23 serves as before",
+          );
+          ok(
+            protectedChapterServeAllowed("mark-6", { slug: "mark-6", book: "Mark", chapter: 6 } as unknown as ChapterWorkup),
+            "N6 published Mark 6 serves as before",
+          );
+        }
       } finally {
         if (savedSupabaseUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
         else process.env.NEXT_PUBLIC_SUPABASE_URL = savedSupabaseUrl;

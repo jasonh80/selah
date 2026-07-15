@@ -311,7 +311,7 @@ assert.notEqual(metadataChanged.bundleDigest, mark8Bundle.bundleDigest);
 
 await expectSourceError("slug allowlist", "SLUG_NOT_ALLOWED", () =>
   loadMarkSprintEsvSourceBundle({
-    slug: "mark-7",
+    slug: "mark-5",
     apiKey: SYNTHETIC_KEY,
     fetchImpl: syntheticFetcher().fetchImpl,
   }),

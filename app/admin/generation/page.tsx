@@ -4,12 +4,14 @@ import { useRef, useState, type ReactNode } from "react";
 import { BIBLE_BOOKS, chapterCount, slugFor } from "@/lib/bible/books";
 import {
   buildStudioGenerateRequest,
+  connectedChapterLabel,
   decideMark8StudioPreflight,
+  isConnectedStudioSlug,
   isStudioGenerateEntryDisabled,
-  MARK_8_CONFIRMATION_MESSAGE,
-  MARK_8_PREFLIGHT_ERROR,
-  MARK_8_SOURCE_PREPARATION_MESSAGE,
   MARK_8_STUDIO_SLUG,
+  studioConfirmationMessage,
+  studioPreflightError,
+  studioSourcePreparationMessage,
 } from "@/lib/studio-mark8-preflight";
 import { studioPreviewUrl } from "@/lib/studio-preview";
 import { parseOverlapAuditDiagnostics } from "@/lib/audit-overlap-diagnostics";
@@ -18,6 +20,10 @@ import {
   decideMark8StudioSetup,
   type Mark8StudioSetupDecision,
 } from "@/lib/studio-mark8-setup";
+import {
+  buildMarkSprintStudioSetupRequest,
+  decideMarkSprintStudioSetup,
+} from "@/lib/studio-mark-sprint-setup";
 
 // Selah Studio — a calm, guided publishing flow (not a developer console).
 // Choose Chapter → Generate Draft → Preview Text → Create & Review Images →
@@ -264,7 +270,7 @@ export default function SelahStudioPage() {
   }
 
   async function loadChapterStatus(target: string) {
-    if (target === MARK_8_STUDIO_SLUG) void loadMark8Setup(target);
+    if (isConnectedStudioSlug(target)) void loadMark8Setup(target);
     setPhase("checking");
     setStatusProblem(false);
     setGenMsg("");
@@ -299,7 +305,7 @@ export default function SelahStudioPage() {
       setPhase("ready");
       setPublished(false);
       setGenMsg("");
-      if (target === MARK_8_STUDIO_SLUG) void loadImagesStatus(target);
+      if (isConnectedStudioSlug(target)) void loadImagesStatus(target);
     } else if (status === "generating") {
       setPhase("generating");
       setPublished(false);
@@ -357,7 +363,7 @@ export default function SelahStudioPage() {
       // A run just reached a terminal state — pull fresh history so Recent
       // activity reflects it without a full page reload (issue #17).
       refreshAuditAfterTerminalRun();
-      if (st !== "reviewed" && target === MARK_8_STUDIO_SLUG) void loadImagesStatus(target);
+      if (st !== "reviewed" && isConnectedStudioSlug(target)) void loadImagesStatus(target);
     } else if (st === "failed") {
       setPhase("error");
       setStatusProblem(false);
@@ -370,18 +376,26 @@ export default function SelahStudioPage() {
     }
   }
 
+  // Mark 8 keeps its original frozen setup action; chapters approved after it
+  // (Mark 7 onward) use the receipt-gated factory action with the same UX.
+  function decideStudioSetup(target: string, response: unknown): Mark8StudioSetupDecision {
+    return target === MARK_8_STUDIO_SLUG
+      ? decideMark8StudioSetup(response)
+      : decideMarkSprintStudioSetup(target, response);
+  }
+
   async function loadMark8Setup(target: string) {
-    if (target !== MARK_8_STUDIO_SLUG) return;
+    if (!isConnectedStudioSlug(target)) return;
     const requestId = ++mark8SetupRequest.current;
     setMark8SetupDecision(null);
     setMark8SetupMsg("");
     try {
       const response = await api("POST", {
-        action: "mark8_setup_status",
+        action: target === MARK_8_STUDIO_SLUG ? "mark8_setup_status" : "mark_sprint_setup_status",
         slug: target,
       });
       if (activeSlug.current !== target || mark8SetupRequest.current !== requestId) return;
-      setMark8SetupDecision(decideMark8StudioSetup(response));
+      setMark8SetupDecision(decideStudioSetup(target, response));
     } catch {
       if (activeSlug.current === target && mark8SetupRequest.current === requestId) {
         setMark8SetupDecision({ kind: "error" });
@@ -392,26 +406,32 @@ export default function SelahStudioPage() {
   async function setupMark8() {
     const target = slug;
     const decision = mark8SetupDecision;
-    if (target !== MARK_8_STUDIO_SLUG || decision?.kind !== "setup") return;
+    if (!isConnectedStudioSlug(target) || decision?.kind !== "setup") return;
+    const label = connectedChapterLabel(target);
     const requestId = ++mark8SetupRequest.current;
     setMark8SetupBusy(true);
     setMark8SetupMsg("");
     try {
-      const response = await api("POST", buildMark8StudioSetupRequest(decision));
+      const response = await api(
+        "POST",
+        target === MARK_8_STUDIO_SLUG
+          ? buildMark8StudioSetupRequest(decision)
+          : buildMarkSprintStudioSetupRequest(target, decision),
+      );
       if (activeSlug.current !== target || mark8SetupRequest.current !== requestId) return;
-      const next = decideMark8StudioSetup(response);
+      const next = decideStudioSetup(target, response);
       setMark8SetupDecision(next);
       if (next.kind !== "ready") {
         setMark8SetupMsg(
           typeof response.error === "string"
             ? response.error
-            : "Studio could not safely finish Mark 8 setup.",
+            : `Studio could not safely finish ${label} setup.`,
         );
       }
     } catch {
       if (activeSlug.current === target && mark8SetupRequest.current === requestId) {
         setMark8SetupDecision({ kind: "error" });
-        setMark8SetupMsg("Studio could not safely finish Mark 8 setup.");
+        setMark8SetupMsg(`Studio could not safely finish ${label} setup.`);
       }
     } finally {
       if (activeSlug.current === target && mark8SetupRequest.current === requestId) {
@@ -422,7 +442,7 @@ export default function SelahStudioPage() {
 
   function onGenerateClick() {
     const imageWorkLocked =
-      slug === MARK_8_STUDIO_SLUG &&
+      isConnectedStudioSlug(slug) &&
       (imagePhase === "checking" || imagePhase === "queued" || imagePhase === "running" ||
         imageStatus?.state === "failed" || imageStatus?.state === "blocked");
     if (
@@ -433,9 +453,9 @@ export default function SelahStudioPage() {
       statusProblem ||
       published ||
       imageWorkLocked ||
-      (slug === MARK_8_STUDIO_SLUG && mark8SetupDecision?.kind !== "ready")
+      (isConnectedStudioSlug(slug) && mark8SetupDecision?.kind !== "ready")
     ) return;
-    if (slug === MARK_8_STUDIO_SLUG) {
+    if (isConnectedStudioSlug(slug)) {
       if ((imageStatus?.stored ?? 0) > 0 && !approvedImageDiscard) {
         setConfirming(false);
         setConfirmingMark8Source(false);
@@ -463,7 +483,7 @@ export default function SelahStudioPage() {
 
   async function prepareMark8ForConfirmation() {
     const target = slug;
-    if (target !== MARK_8_STUDIO_SLUG) return;
+    if (!isConnectedStudioSlug(target)) return;
     const requestId = ++mark8PreflightRequest.current;
     setConfirmingMark8Source(false);
     setPreparingMark8(true);
@@ -479,7 +499,7 @@ export default function SelahStudioPage() {
         slug: target,
       });
       if (activeSlug.current !== target || mark8PreflightRequest.current !== requestId) return;
-      const decision = decideMark8StudioPreflight(response);
+      const decision = decideMark8StudioPreflight(response, target);
       if (decision.kind === "blocked") {
         setApprovedImageDiscard(false);
         setMark8Blockers(decision.blockers);
@@ -490,7 +510,7 @@ export default function SelahStudioPage() {
     } catch {
       if (activeSlug.current === target && mark8PreflightRequest.current === requestId) {
         setApprovedImageDiscard(false);
-        setMark8Blockers([MARK_8_PREFLIGHT_ERROR]);
+        setMark8Blockers([studioPreflightError(target)]);
       }
     } finally {
       if (activeSlug.current === target && mark8PreflightRequest.current === requestId) {
@@ -501,12 +521,12 @@ export default function SelahStudioPage() {
 
   async function doGenerate() {
     const target = slug;
-    const discardCompletedImages = target === MARK_8_STUDIO_SLUG && approvedImageDiscard;
-    const approvedManifestDigest =
-      target === MARK_8_STUDIO_SLUG ? mark8ManifestDigest : null;
-    if (target === MARK_8_STUDIO_SLUG && !approvedManifestDigest) {
+    const connectedTarget = isConnectedStudioSlug(target);
+    const discardCompletedImages = connectedTarget && approvedImageDiscard;
+    const approvedManifestDigest = connectedTarget ? mark8ManifestDigest : null;
+    if (isConnectedStudioSlug(target) && !approvedManifestDigest) {
       setConfirming(false);
-      setMark8Blockers([MARK_8_PREFLIGHT_ERROR]);
+      setMark8Blockers([studioPreflightError(target)]);
       return;
     }
     setConfirming(false);
@@ -532,7 +552,7 @@ export default function SelahStudioPage() {
     if (activeSlug.current !== target) return;
     if (!j.ok) {
       setPhase("error");
-      if (target === MARK_8_STUDIO_SLUG) setMark8ManifestDigest(null);
+      if (connectedTarget) setMark8ManifestDigest(null);
       setGenMsg(typeof j.error === "string" ? j.error : "Couldn't start the draft.");
       return;
     }
@@ -608,7 +628,7 @@ export default function SelahStudioPage() {
   }
 
   async function loadImagesStatus(target: string) {
-    if (target !== MARK_8_STUDIO_SLUG) return;
+    if (!isConnectedStudioSlug(target)) return;
     const requestId = ++imageStatusRequest.current;
     setImagePhase("checking");
     setImageMsg("");
@@ -703,7 +723,7 @@ export default function SelahStudioPage() {
 
   function confirmImageCreation() {
     if (
-      slug !== MARK_8_STUDIO_SLUG ||
+      !isConnectedStudioSlug(slug) ||
       verdict !== "yes" ||
       !previewed ||
       !copyReviewApproved(copyReview, approvedCopyReviewDigest)
@@ -719,7 +739,7 @@ export default function SelahStudioPage() {
   async function createImages() {
     const target = slug;
     if (
-      target !== MARK_8_STUDIO_SLUG ||
+      !isConnectedStudioSlug(target) ||
       verdict !== "yes" ||
       !previewed ||
       !copyReviewApproved(copyReview, approvedCopyReviewDigest) ||
@@ -850,8 +870,8 @@ export default function SelahStudioPage() {
       const j = await api("POST", {
         action: "publish",
         slug: target,
-        ...(target === MARK_8_STUDIO_SLUG ? { reviewDigest: approvedReviewDigest } : {}),
-        ...(target === MARK_8_STUDIO_SLUG && approvedCopyReviewDigest
+        ...(isConnectedStudioSlug(target) ? { reviewDigest: approvedReviewDigest } : {}),
+        ...(isConnectedStudioSlug(target) && approvedCopyReviewDigest
           ? { sourceOverlapReportDigest: approvedCopyReviewDigest }
           : {}),
       });
@@ -861,7 +881,7 @@ export default function SelahStudioPage() {
       setPublished(Boolean(j.ok));
       if (!j.ok) {
         setPublishMsg(j.error || "Publish failed.");
-        if (target === MARK_8_STUDIO_SLUG) {
+        if (isConnectedStudioSlug(target)) {
           setImagesPreviewed(false);
           setApprovedReviewDigest(null);
           void loadImagesStatus(target);
@@ -1010,8 +1030,12 @@ export default function SelahStudioPage() {
   const imagesOff =
     settings.image_generation_enabled !== true ||
     confirmedSettings.current?.image_generation_enabled !== true;
-  const isMark8 = slug === MARK_8_STUDIO_SLUG;
-  const mark8SetupReady = !isMark8 || mark8SetupDecision?.kind === "ready";
+  // Protected connected chapters (Mark 8, then Mark 7) share the guided
+  // setup → prepare → confirm → images flow; only the wording changes.
+  const connectedSlug = isConnectedStudioSlug(slug) ? slug : null;
+  const isProtectedChapter = connectedSlug !== null;
+  const chapterLabel = connectedSlug ? connectedChapterLabel(connectedSlug) : `${book} ${chapter}`;
+  const mark8SetupReady = !isProtectedChapter || mark8SetupDecision?.kind === "ready";
   const draftReady = phase === "ready";
   const wordingReviewed = copyReviewApproved(
     copyReview,
@@ -1024,7 +1048,7 @@ export default function SelahStudioPage() {
     imageStatus?.stored === imageStatus?.total &&
     (imageStatus?.total === 3 || imageStatus?.total === 5);
   const mark8ImageWorkLocked =
-    isMark8 &&
+    isProtectedChapter &&
     (imagePhase === "checking" || imagePhase === "queued" || imagePhase === "running" ||
       imageStatus?.state === "failed" || imageStatus?.state === "blocked");
   const imagesApproved =
@@ -1036,7 +1060,7 @@ export default function SelahStudioPage() {
     draftReady &&
     textApproved &&
     !published &&
-    (!isMark8 || imagesApproved);
+    (!isProtectedChapter || imagesApproved);
 
   const step1: StepState = phase === "idle" && !published ? "current" : "done";
   const step2: StepState =
@@ -1082,21 +1106,21 @@ export default function SelahStudioPage() {
 
       {/* Step 2 — Generate Draft */}
       <Step n={2} title="Generate Draft" state={step2}>
-        {isMark8 && mark8SetupDecision === null && (
-          <p className="text-[13px] text-secondary">Checking Mark 8 setup…</p>
+        {isProtectedChapter && mark8SetupDecision === null && (
+          <p className="text-[13px] text-secondary">Checking {chapterLabel} setup…</p>
         )}
-        {isMark8 && mark8SetupDecision?.kind === "locked" && (
+        {isProtectedChapter && mark8SetupDecision?.kind === "locked" && (
           <div className="rounded-lg border bg-card-soft p-3">
-            <p className="text-[13px] font-semibold text-primary">Mark 8 setup is locked</p>
+            <p className="text-[13px] font-semibold text-primary">{chapterLabel} setup is locked</p>
             <p className="mt-1 text-[13px] text-secondary">
-              The exact Selah Brain and 10 Mark 8 notes still need your approval.
+              The exact Selah Brain and 10 {chapterLabel} notes still need your approval.
             </p>
           </div>
         )}
-        {isMark8 && mark8SetupDecision?.kind === "setup" && (
+        {isProtectedChapter && mark8SetupDecision?.kind === "setup" && (
           <div className="rounded-lg border bg-card-soft p-3">
             <p className="text-[13px] text-primary">
-              Load the approved {mark8SetupDecision.ruleCount} Selah Brain rules and {mark8SetupDecision.noteCount} Mark 8 notes into private Studio? This creates no draft and publishes nothing.
+              Load the approved {mark8SetupDecision.ruleCount} Selah Brain rules and {mark8SetupDecision.noteCount} {chapterLabel} notes into private Studio? This creates no draft and publishes nothing.
             </p>
             <button
               type="button"
@@ -1104,23 +1128,23 @@ export default function SelahStudioPage() {
               disabled={mark8SetupBusy}
               className={`${primary} mt-2.5`}
             >
-              {mark8SetupBusy ? "Setting up…" : "Set up Mark 8"}
+              {mark8SetupBusy ? "Setting up…" : `Set up ${chapterLabel}`}
             </button>
           </div>
         )}
-        {isMark8 && mark8SetupDecision?.kind === "error" && (
+        {isProtectedChapter && mark8SetupDecision?.kind === "error" && (
           <div className="rounded-lg border bg-card-soft p-3">
             <p className="text-[13px] text-jesus-red">
-              {mark8SetupMsg || "Studio could not safely check Mark 8 setup."}
+              {mark8SetupMsg || `Studio could not safely check ${chapterLabel} setup.`}
             </p>
             <button type="button" onClick={() => void loadMark8Setup(slug)} className={`${ghost} mt-2.5`}>
               Check setup again
             </button>
           </div>
         )}
-        {isMark8 && mark8SetupDecision?.kind === "ready" && (
+        {isProtectedChapter && mark8SetupDecision?.kind === "ready" && (
           <p className="mb-2.5 text-[13px] font-medium text-accent-strong">
-            ✓ Selah Brain and Mark 8 notes are ready
+            ✓ Selah Brain and {chapterLabel} notes are ready
           </p>
         )}
         {mark8SetupReady && (statusProblem ? (
@@ -1130,7 +1154,7 @@ export default function SelahStudioPage() {
         ) : confirmingImageDiscard ? (
           <div className="rounded-lg border bg-card-soft p-3">
             <p className="text-[13px] text-primary">
-              Creating a new Mark 8 draft will remove the current {imageStatus?.stored ?? 0} finished images.
+              Creating a new {chapterLabel} draft will remove the current {imageStatus?.stored ?? 0} finished images.
               Their image credit cannot be recovered. Continue?
             </p>
             <div className="mt-2.5 flex gap-2">
@@ -1150,16 +1174,16 @@ export default function SelahStudioPage() {
               </button>
             </div>
           </div>
-        ) : confirmingMark8Source ? (
+        ) : confirmingMark8Source && connectedSlug ? (
           <div className="rounded-lg border bg-card-soft p-3">
-            <p className="text-[13px] text-primary">{MARK_8_SOURCE_PREPARATION_MESSAGE}</p>
+            <p className="text-[13px] text-primary">{studioSourcePreparationMessage(connectedSlug)}</p>
             <div className="mt-2.5 flex gap-2">
               <button
                 type="button"
                 onClick={() => void prepareMark8ForConfirmation()}
                 className={primary}
               >
-                Prepare Mark 8
+                Prepare {chapterLabel}
               </button>
               <button
                 type="button"
@@ -1198,15 +1222,15 @@ export default function SelahStudioPage() {
                   ? "Generating…"
                   : draftReady
                     ? "Generate Again"
-                    : isMark8
-                      ? "Prepare Mark 8"
+                    : isProtectedChapter
+                      ? `Prepare ${chapterLabel}`
                       : "Generate Draft"}
           </button>
         ) : (
           <div className="rounded-lg border bg-card-soft p-3">
             <p className="text-[13px] text-primary">
-              {slug === MARK_8_STUDIO_SLUG ? (
-                <>{MARK_8_CONFIRMATION_MESSAGE}</>
+              {connectedSlug ? (
+                <>{studioConfirmationMessage(connectedSlug)}</>
               ) : (
                 <>Create one fresh private draft of <span className="font-semibold">{book} {chapter}</span>? It will not publish, and it uses a small amount of credit.</>
               )}
@@ -1217,7 +1241,7 @@ export default function SelahStudioPage() {
                 type="button"
                 onClick={() => {
                   setConfirming(false);
-                  if (slug === MARK_8_STUDIO_SLUG) {
+                  if (isProtectedChapter) {
                     setMark8ManifestDigest(null);
                     setApprovedImageDiscard(false);
                   }
@@ -1232,7 +1256,7 @@ export default function SelahStudioPage() {
 
         {mark8Blockers.length > 0 && (
           <div role="alert" className="mt-3 rounded-lg border bg-card-soft p-3">
-            <p className="text-[13px] font-semibold text-primary">Mark 8 is still locked:</p>
+            <p className="text-[13px] font-semibold text-primary">{chapterLabel} is still locked:</p>
             <ul className="mt-1.5 space-y-1 text-[13px] text-secondary">
               {mark8Blockers.map((blocker) => <li key={blocker}>• {blocker}</li>)}
             </ul>
@@ -1306,7 +1330,7 @@ export default function SelahStudioPage() {
             </div>
             <div>
               <p className="text-[14px] font-semibold text-primary">
-                {isMark8 ? "Is the text ready?" : "Is this ready to publish?"}
+                {isProtectedChapter ? "Is the text ready?" : "Is this ready to publish?"}
               </p>
               <div className="mt-2 flex gap-2">
                 <Seg
@@ -1322,7 +1346,7 @@ export default function SelahStudioPage() {
                         ? copyReview.reportDigest
                         : null,
                     );
-                    if (isMark8 && newlyReady) {
+                    if (isProtectedChapter && newlyReady) {
                       setImagesPreviewed(false);
                       setApprovedReviewDigest(null);
                       if (imagePhase !== "queued" && imagePhase !== "running") {
@@ -1424,8 +1448,8 @@ export default function SelahStudioPage() {
         )}
       </Step>
 
-      {/* Mark 8 launch gate — images are a separate, owner-approved spend and review. */}
-      {isMark8 && (
+      {/* Protected-chapter launch gate — images are a separate, owner-approved spend and review. */}
+      {isProtectedChapter && (
         <Step n={4} title="Create & Review Images" state={step4}>
           {published ? (
             <p className="text-[13px] font-medium text-accent-strong">✓ Images approved</p>
@@ -1442,7 +1466,7 @@ export default function SelahStudioPage() {
           ) : imagePhase === "confirming" && imageStatus ? (
             <div className="rounded-lg border bg-card-soft p-3">
               <p className="text-[13px] text-primary">
-                Create these <span className="font-semibold">{imageStatus.total} images</span> for Mark 8?
+                Create these <span className="font-semibold">{imageStatus.total} images</span> for {chapterLabel}?
                 Estimated image cost: <span className="font-semibold">about {formatUsd(imageStatus.estimatedCostUsd)}</span>.
                 This uses image credit and does not publish the chapter.
               </p>
@@ -1525,8 +1549,8 @@ export default function SelahStudioPage() {
         </Step>
       )}
 
-      {/* Publish stays Step 4 for legacy chapters and becomes Step 5 for Mark 8. */}
-      <Step n={isMark8 ? 5 : 4} title="Publish Final" state={isMark8 ? publishStep : step4}>
+      {/* Publish stays Step 4 for legacy chapters and becomes Step 5 for protected chapters. */}
+      <Step n={isProtectedChapter ? 5 : 4} title="Publish Final" state={isProtectedChapter ? publishStep : step4}>
         <button type="button" onClick={publishFinal} disabled={!canPublish || busy} className={primary}>
           {publishing ? "Publishing…" : "Publish Final"}
         </button>
@@ -1544,11 +1568,11 @@ export default function SelahStudioPage() {
                 ? "Preview the draft first."
                 : verdict !== "yes" || !wordingReviewed
                   ? "Confirm it feels like Selah above to unlock publishing."
-                  : isMark8 && !exactImagesReady
+                  : isProtectedChapter && !exactImagesReady
                     ? "Create and review the images first."
-                    : isMark8 && !imagesPreviewed
+                    : isProtectedChapter && !imagesPreviewed
                       ? "Preview the finished chapter with its images."
-                      : isMark8 && !imagesApproved
+                      : isProtectedChapter && !imagesApproved
                         ? "Confirm the images look right to unlock publishing."
                         : "Ready to go live."}
           </p>
@@ -1832,7 +1856,7 @@ function DraftWaitCard({ reference, takingLonger }: { reference: string; takingL
       </div>
       <p className="mt-2 text-[13px] text-secondary">
         {takingLonger
-          ? "This chapter is taking longer, but Studio is still checking it. A full Mark 8 draft can take up to about 10 minutes."
+          ? `This chapter is taking longer, but Studio is still checking it. A full ${reference} draft can take up to about 10 minutes.`
           : "This usually takes 2–4 minutes while Selah studies the chapter, writes the work-up, and checks it for completeness."}
       </p>
       <p className="mt-2 text-[13px] font-medium text-primary">

@@ -23,8 +23,15 @@ import {
   mark8ScopedSetupApprovalApplies,
   type Mark8StudioSetupApproval,
 } from "./mark8-studio-setup-contract";
+import {
+  MARK_7_SETUP_CONTRACT,
+  MARK_7_STUDIO_SETUP_APPROVAL,
+  markSprintScopedSetupApprovalApplies,
+  type MarkSprintStudioSetupApproval,
+} from "./mark-sprint-setup-contracts";
 
 export const MARK_SPRINT_SLUGS = [
+  "mark-7",
   "mark-8",
   "mark-9",
   "mark-10",
@@ -205,7 +212,10 @@ export function isMarkSprintSlug(value: string): value is MarkSprintSlug {
  */
 export function buildMarkSprintManifestPolicy(
   slug: MarkSprintSlug,
-  options: { mark8GuidanceApproval?: Mark8StudioSetupApproval | null } = {},
+  options: {
+    mark8GuidanceApproval?: Mark8StudioSetupApproval | null;
+    mark7GuidanceApproval?: MarkSprintStudioSetupApproval | null;
+  } = {},
 ): MarkSprintManifestPolicy {
   const requiredCoreRuleIds = [...INJECTION_POLICY.always_on_rule_ids].sort();
   const requiredContextualRuleIds = [
@@ -222,18 +232,38 @@ export function buildMarkSprintManifestPolicy(
     LIBRARY_VERSION,
     LIBRARY_CONTENT_DIGEST,
   );
-  // The separate receipt binds the exact Mark 8 projection and its ten notes.
-  // Selah Brain must still pass its own artifact approval below, and Mark 9–11
-  // can never use this receipt.
+  // Each connected chapter carries its OWN scoped receipt binding its exact
+  // projection and ten notes. Selah Brain must still pass its own artifact
+  // approval below, and no chapter can ever use another chapter's receipt.
   const exactMark8GuidanceApproved = mark8ScopedSetupApprovalApplies(
     slug,
     Object.prototype.hasOwnProperty.call(options, "mark8GuidanceApproval")
       ? options.mark8GuidanceApproval ?? null
       : MARK_8_STUDIO_SETUP_APPROVAL,
   );
-  const mark8StoredNoteIds = new Map(
-    MARK_8_SETUP_NOTES.map((note) => [note.guidanceId, note.rowId]),
+  const exactMark7GuidanceApproved = markSprintScopedSetupApprovalApplies(
+    slug,
+    MARK_7_SETUP_CONTRACT,
+    Object.prototype.hasOwnProperty.call(options, "mark7GuidanceApproval")
+      ? options.mark7GuidanceApproval ?? null
+      : MARK_7_STUDIO_SETUP_APPROVAL,
   );
+  const exactChapterGuidanceApproved =
+    exactMark8GuidanceApproved || exactMark7GuidanceApproved;
+  // Deterministic note rows bind ONLY once the chapter's own scoped receipt
+  // exists — an unapproved chapter stays blocked by BOTH guidance approval and
+  // missing note rows (fail-closed staging, same as Mark 8 before 07-13).
+  const storedNoteIds: ReadonlyMap<string, string> | null =
+    slug === "mark-8"
+      ? new Map(MARK_8_SETUP_NOTES.map((note) => [note.guidanceId, note.rowId]))
+      : slug === "mark-7" && exactMark7GuidanceApproved
+        ? new Map(
+            MARK_7_SETUP_CONTRACT.notes.map((note) => [
+              note.guidanceId,
+              note.rowId,
+            ]),
+          )
+        : null;
 
   const requirements: MarkSprintManifestRequirements = {
     slug,
@@ -265,8 +295,7 @@ export function buildMarkSprintManifestPolicy(
     chapterNotes: guidance.chapters[slug].notes.map((note) => ({
       id: note.id,
       textDigest: sha256Text(note.text),
-      expectedStoredRowId:
-        slug === "mark-8" ? mark8StoredNoteIds.get(note.id) ?? null : null,
+      expectedStoredRowId: storedNoteIds?.get(note.id) ?? null,
     })),
     source: (() => {
       const chapter = Number(slug.split("-")[1]);
@@ -335,7 +364,7 @@ export function buildMarkSprintManifestPolicy(
   const blockers: MarkSprintPolicyBlocker[] = [];
   if (
     guidance.status !== "approved_for_generation" &&
-    !exactMark8GuidanceApproved
+    !exactChapterGuidanceApproved
   ) {
     blockers.push({
       code: "guidance_not_approved",
