@@ -816,8 +816,8 @@ assert.match(
 );
 assert.deepEqual(
   Object.keys(guidance.chapters).sort(),
-  ["mark-10", "mark-11", "mark-8", "mark-9"],
-  "guidance must cover exactly the Tuesday Mark sprint",
+  ["mark-10", "mark-11", "mark-7", "mark-8", "mark-9"],
+  "guidance must cover exactly the approved Mark sprint chapters (7-11; Mark 7 added by owner direction 2026-07-15)",
 );
 assert.deepEqual(
   guidance.required_rule_ids.gospel_contextual,
@@ -860,7 +860,7 @@ for (const [slug, chapter] of Object.entries(guidance.chapters)) {
     );
   });
   for (const note of chapter.notes) {
-    assert.match(note.id, /^M(?:8|9|10|11)-\d{2}$/);
+    assert.match(note.id, /^M(?:7|8|9|10|11)-\d{2}$/);
     assert.ok(note.text.trim().length >= 40, `${note.id} is too thin`);
     allNoteIds.push(note.id);
   }

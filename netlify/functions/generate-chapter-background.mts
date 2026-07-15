@@ -22,6 +22,7 @@ import { logGenerationAuditVerified } from "../../lib/server/generation-settings
 import { runConfiguredProtectedMarkDraftJob } from "../../lib/server/mark-sprint-draft-job";
 
 const MARK_8_SLUG = "mark-8";
+const CONNECTED_PROTECTED_SLUGS = ["mark-8", "mark-7"];
 const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 
 type ProtectedMarkDraftRunner = typeof runConfiguredProtectedMarkDraftJob;
@@ -128,7 +129,7 @@ export default async (req: Request) => {
     return refuse(slug, "missing slug or job id — refusing unclaimed work", 400);
   }
   if (
-    slug === MARK_8_SLUG &&
+    CONNECTED_PROTECTED_SLUGS.includes(slug) &&
     (approvedManifestDigest === undefined ||
       !LOWERCASE_SHA256.test(approvedManifestDigest))
   ) {
@@ -146,7 +147,7 @@ export default async (req: Request) => {
   // Protected sprint chapters can never fall through to the generic generator.
   // Only Mark 8 is connected; Mark 9–11 remain explicitly blocked.
   if (isProtectedMarkSprintGenerationIdentity({ slug })) {
-    if (slug !== MARK_8_SLUG || approvedManifestDigest === undefined) {
+    if (!CONNECTED_PROTECTED_SLUGS.includes(slug) || approvedManifestDigest === undefined) {
       return refuse(
         slug,
         "protected Mark sprint generation is not connected for this chapter",

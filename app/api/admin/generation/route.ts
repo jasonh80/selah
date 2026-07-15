@@ -79,6 +79,7 @@ import {
   buildMark8StudioPreflightResponse,
   MARK_8_PREFLIGHT_ERROR,
   MARK_8_STUDIO_SLUG,
+  isConnectedStudioSlug,
 } from "@/lib/studio-mark8-preflight";
 import {
   mintStudioPreviewAccess,
@@ -268,11 +269,12 @@ export async function POST(req: Request) {
   // Reads exact live Brain/notes/example evidence plus ESV Mark 7–9. It cannot
   // claim a job, call a model, write Supabase, publish, or authorize a run.
   if (action === "mark_sprint_prepare") {
-    if (String(body.slug ?? "") !== MARK_8_STUDIO_SLUG) {
+    const prepareSlug = String(body.slug ?? "");
+    if (!isConnectedStudioSlug(prepareSlug)) {
       return NextResponse.json({ ok: false, error: MARK_8_PREFLIGHT_ERROR }, { status: 400 });
     }
     try {
-      const preview = await loadMark8RuntimePreview();
+      const preview = await loadMark8RuntimePreview(prepareSlug);
       return NextResponse.json(buildMark8StudioPreflightResponse(preview));
     } catch {
       // Do not reveal which key, service, row, or source check is unavailable.
@@ -637,11 +639,11 @@ export async function POST(req: Request) {
     // signed trigger, worker authentication, and every cleanup/terminal write.
     // Mark 9–11 remain blocked and can never fall through to generic generation.
     if (protectedMarkSprint) {
-      if (slug !== MARK_8_STUDIO_SLUG) {
+      if (!isConnectedStudioSlug(slug)) {
         return refuse(
           slug,
           "generate",
-          "blocked — only the protected Mark 8 draft runner is connected",
+          "blocked — only owner-approved protected chapters are connected",
           403,
         );
       }

@@ -40,12 +40,13 @@ export async function generationAllowed(slug: string): Promise<boolean> {
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);
 }
 
-/**
- * The only protected sprint chapter connected to paid work today. Mark 9–11
- * remain fail-closed until their own owner-approved launch work is connected.
- */
+// Protected sprint chapters connected to paid work. Each entered only with
+// its own owner-approved setup receipt; Mark 9-11 remain fail-closed until
+// their own launch work is connected.
+export const CONNECTED_PROTECTED_TEXT_SLUGS = ["mark-8", "mark-7"] as const;
+
 export async function mark8GenerationAllowed(slug: string): Promise<boolean> {
-  if (slug !== "mark-8") return false;
+  if (!(CONNECTED_PROTECTED_TEXT_SLUGS as readonly string[]).includes(slug)) return false;
   if (!configCheckBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
   const s = await getGenerationSettings();
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);

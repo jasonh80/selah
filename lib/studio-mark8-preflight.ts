@@ -1,6 +1,12 @@
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 export const MARK_8_STUDIO_SLUG = "mark-8" as const;
+// Chapters connected to the protected Studio flow. Order = launch order.
+export const CONNECTED_STUDIO_SLUGS = ["mark-8", "mark-7"] as const;
+export type ConnectedStudioSlug = (typeof CONNECTED_STUDIO_SLUGS)[number];
+export function isConnectedStudioSlug(value: string): value is ConnectedStudioSlug {
+  return (CONNECTED_STUDIO_SLUGS as readonly string[]).includes(value);
+}
 export const MARK_8_PREFLIGHT_ERROR =
   "Studio could not safely check Mark 8 readiness. Try again before creating a draft.";
 export const MARK_8_SOURCE_PREPARATION_MESSAGE =

@@ -475,15 +475,31 @@ assert.equal(
   true,
   "zero-padded Mark sprint alias reached the ordinary flow",
 );
+// Mark 7 joined the protected sprint (owner direction 2026-07-15): it must be
+// recognized as protected and can never fall through to ordinary generation.
 assert.equal(
   isProtectedMarkSprintGenerationIdentity({ slug: "mark-7" }),
+  true,
+  "mark-7 must be protected now that it is a sprint chapter",
+);
+assert.throws(
+  () =>
+    assertGenericChapterGenerationAllowed({
+      slug: "mark-7",
+      book: "Mark",
+      chapter: 7,
+    }),
+  /blocked from generic generation/,
+);
+assert.equal(
+  isProtectedMarkSprintGenerationIdentity({ slug: "mark-5" }),
   false,
 );
 assert.doesNotThrow(() =>
   assertGenericChapterGenerationAllowed({
-    slug: "mark-7",
+    slug: "mark-5",
     book: "Mark",
-    chapter: 7,
+    chapter: 5,
   }),
 );
 
