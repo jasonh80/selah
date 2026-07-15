@@ -14,11 +14,14 @@ const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
 };
 
 // Verse-instance totals for each chapter's protected ESV window (the chapter
-// plus one adjacent chapter on each side), using the canonical ESV numbering
-// the source contract binds: Mark 6=56, 7=37, 8=38, 9=50.
+// plus one adjacent chapter on each side). Mark 7's count reflects what the
+// ESV actually returns: Mark 6 = 56, Mark 7 = 36 (the ESV omits the disputed
+// 7:16 from its critical-text numbering), Mark 8 = 38 → 130. Mark 8's 125 is
+// the owner-approved frozen wording from its 2026-07 launch (nominal counts)
+// and must stay byte-identical.
 const WINDOW_VERSE_INSTANCES: Record<ConnectedStudioSlug, number> = {
   "mark-8": 125,
-  "mark-7": 131,
+  "mark-7": 130,
 };
 
 export function connectedChapterLabel(slug: ConnectedStudioSlug): string {

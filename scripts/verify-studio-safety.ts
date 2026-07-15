@@ -2774,6 +2774,94 @@ const realImagePipeline = async () => {
             "N4 a Mark 7 workup cannot pass Mark 8's slug-scoped validation",
           );
         }
+
+        // N5. Alias/mismatched protected rows can never publish (PR #32
+        // re-review): a stored "mark-09"-style alias, or an innocuously named
+        // row whose WORKUP identifies as a protected Mark chapter, is refused
+        // by the alias-aware identity gate before the generic path — so it
+        // stays draft and is never publicly served at its raw URL.
+        {
+          const aliasCases: Array<{ rowSlug: string; workupSlug: string }> = [
+            { rowSlug: "mark-09", workupSlug: "mark-9" },
+            { rowSlug: "mark-007", workupSlug: "mark-7" },
+            { rowSlug: "mark-0008", workupSlug: "mark-0008" },
+          ];
+          for (const { rowSlug, workupSlug } of aliasCases) {
+            const aliasWorkup = completedSprintWorkup(workupSlug);
+            (aliasWorkup as unknown as Record<string, unknown>).slug = workupSlug;
+            const aliasDigest = markSprintFinalReviewDigest(workupSlug, aliasWorkup);
+            store.seed(
+              rowSlug,
+              "draft",
+              structuredClone(aliasWorkup) as unknown as Record<string, unknown>,
+            );
+            const refused = await adminPost(adminReq({
+              action: "publish",
+              slug: rowSlug,
+              ...(aliasDigest ? { reviewDigest: aliasDigest } : {}),
+            }));
+            ok(refused.status === 403, `N5 alias row ${rowSlug} cannot publish`);
+            ok(
+              store.rows.get(rowSlug)!.status === "draft",
+              `N5 ${rowSlug} stays draft — never publicly resolvable`,
+            );
+            store.rows.delete(rowSlug);
+          }
+
+          // An innocuous row slug carrying a protected workup identity (by
+          // workup slug, or by book/chapter alone) is also refused.
+          const smuggledBySlug = completedSprintWorkup("mark-9");
+          store.seed(
+            "gospel-mark-nine",
+            "draft",
+            structuredClone(smuggledBySlug) as unknown as Record<string, unknown>,
+          );
+          const smuggledSlugRefusal = await adminPost(adminReq({
+            action: "publish",
+            slug: "gospel-mark-nine",
+          }));
+          ok(smuggledSlugRefusal.status === 403, "N5 smuggled protected workup slug cannot publish");
+          ok(store.rows.get("gospel-mark-nine")!.status === "draft", "N5 smuggled row stays draft");
+          store.rows.delete("gospel-mark-nine");
+
+          const smuggledByIdentity = completedSprintWorkup("mark-10");
+          const smuggledRecord = smuggledByIdentity as unknown as Record<string, unknown>;
+          smuggledRecord.slug = "study-notes";
+          smuggledRecord.book = "Mark";
+          smuggledRecord.chapter = 10;
+          store.seed(
+            "study-notes",
+            "draft",
+            structuredClone(smuggledRecord),
+          );
+          const smuggledIdentityRefusal = await adminPost(adminReq({
+            action: "publish",
+            slug: "study-notes",
+          }));
+          ok(
+            smuggledIdentityRefusal.status === 403,
+            "N5 smuggled Mark book/chapter identity cannot publish",
+          );
+          ok(store.rows.get("study-notes")!.status === "draft", "N5 identity-smuggled row stays draft");
+          store.rows.delete("study-notes");
+
+          // A canonical row whose workup slug does not match its row slug is
+          // refused by the mismatch arm of the same gate.
+          const mismatched = completedSprintWorkup("mark-9");
+          store.seed(
+            "mark-7",
+            "draft",
+            structuredClone(mismatched) as unknown as Record<string, unknown>,
+          );
+          const mismatchRefusal = await adminPost(adminReq({
+            action: "publish",
+            slug: "mark-7",
+            reviewDigest: markSprintFinalReviewDigest("mark-9", mismatched) ?? undefined,
+          }));
+          ok(mismatchRefusal.status === 403, "N5 canonical slug with mismatched workup slug cannot publish");
+          ok(store.rows.get("mark-7")!.status === "draft", "N5 mismatched row stays draft");
+          store.rows.delete("mark-7");
+        }
       } finally {
         if (savedSupabaseUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
         else process.env.NEXT_PUBLIC_SUPABASE_URL = savedSupabaseUrl;

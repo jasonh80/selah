@@ -720,9 +720,11 @@ async function verifyMark7Enablement(): Promise<void> {
   assert.ok(lockedMark7.blockers.includes("Mark 7 study notes are missing."));
   assert.doesNotMatch(JSON.stringify(lockedMark7), /PRIVATE/u);
 
-  // Owner-facing copy: Mark 7 prepares the ESV Mark 6–8 window.
+  // Owner-facing copy: Mark 7 prepares the ESV Mark 6–8 window. 130 verse
+  // instances = 56 + 36 + 38 — the ESV omits the disputed Mark 7:16, so the
+  // human-facing count matches what is actually loaded (PR #32 re-review).
   assert.match(studioSourcePreparationMessage("mark-7"), /Mark 6–8/u);
-  assert.match(studioSourcePreparationMessage("mark-7"), /131 verse-instances/u);
+  assert.match(studioSourcePreparationMessage("mark-7"), /130 verse-instances/u);
   assert.match(studioConfirmationMessage("mark-7"), /one private Mark 7 draft/u);
   assert.equal(studioSourcePreparationMessage("mark-8"), MARK_8_SOURCE_PREPARATION_MESSAGE);
   assert.equal(studioConfirmationMessage("mark-8"), MARK_8_CONFIRMATION_MESSAGE);
