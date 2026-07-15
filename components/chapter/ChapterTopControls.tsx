@@ -7,19 +7,20 @@ import { useVersion } from "@/components/VersionProvider";
 import { useEsvText } from "@/components/chapter/useEsvText";
 import { ScriptureReader } from "@/components/chapter/ScriptureReader";
 
-// The top control cluster (layout spec §2/§3/§16):
-//   [ Read Mark 6 ]  [ Quick Dive | Deep Dive ]  [ Selah Focus ]
+// The top control cluster (layout spec §2/§3; owner direction 2026-07-15):
+//   [ Read Mark 6 ]  [ Quick Dive ]  [ Deep Dive ]  — centered, one row
 // plus a collapsed Scripture preview (first words of the selected translation).
 // "Read Mark 6" expands the FULL chapter inline right here — content pushes
 // down, no jump to a lower section. Expanded, the control reads "Hide Mark 6".
+// Selah Focus lives in the app header beside the version/theme controls.
 export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
-  const { mode, setMode, focus, setFocus } = useReadingMode();
+  const { mode, setMode } = useReadingMode();
   const { version } = useVersion();
   const [scriptureOpen, setScriptureOpen] = useState(false);
   const esv = useEsvText(data.reference, version === "ESV");
 
   const base =
-    "flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[13px] font-medium transition";
+    "flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium transition sm:px-4";
 
   const modeBtn = (m: ReadingMode) =>
     `${base} ${mode === m ? "bg-accent-strong text-white shadow-hair" : "border bg-card text-secondary hover:text-primary"}`;
@@ -31,7 +32,7 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
 
   return (
     <div id="chapter" className="scroll-mt-20 space-y-s3">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-nowrap items-center justify-center gap-s2">
         <button
           onClick={() => setScriptureOpen((open) => !open)}
           aria-expanded={scriptureOpen}
@@ -47,15 +48,6 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
         </button>
         <button onClick={() => setMode("deep")} aria-pressed={mode === "deep"} className={modeBtn("deep")}>
           Deep Dive
-        </button>
-        <button
-          onClick={() => setFocus(!focus)}
-          aria-pressed={focus}
-          title="Dim everything except the chapter"
-          className={`${base} ${focus ? "bg-accent-strong text-white shadow-hair" : "border bg-card text-secondary hover:text-primary"}`}
-        >
-          <span aria-hidden className="text-[10px]">◉</span>
-          Selah Focus
         </button>
       </div>
 

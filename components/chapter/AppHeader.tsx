@@ -6,10 +6,12 @@ import { Logo } from "@/components/Logo";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { VersionSelect } from "@/components/chapter/VersionSelect";
 import { VERSIONS, useVersion } from "@/components/VersionProvider";
+import { useReadingMode } from "@/components/ReadingModeProvider";
 import { NAV, isActive } from "@/components/shell/nav";
 
 export function AppHeader() {
   const { version, setVersion } = useVersion();
+  const { focus, setFocus } = useReadingMode();
   const pathname = usePathname() ?? "/";
 
   return (
@@ -42,10 +44,26 @@ export function AppHeader() {
           })}
         </nav>
 
-        {/* Quiet controls */}
-        <div className="selah-chrome flex items-center gap-1.5">
-          <VersionSelect versions={[...VERSIONS]} value={version} onChange={(v) => setVersion(v as typeof version)} />
-          <ThemeSwitcher />
+        {/* Quiet controls. Selah Focus sits OUTSIDE the dimmed .selah-chrome
+            wrapper so it stays visible and tappable while focus is on —
+            otherwise the reader could never turn it off. */}
+        <div className="flex items-center gap-1.5">
+          <span className="selah-chrome flex items-center gap-1.5">
+            <VersionSelect versions={[...VERSIONS]} value={version} onChange={(v) => setVersion(v as typeof version)} />
+            <ThemeSwitcher />
+          </span>
+          <button
+            onClick={() => setFocus(!focus)}
+            aria-pressed={focus}
+            aria-label="Selah Focus — dim everything except the chapter"
+            title="Selah Focus"
+            className={`flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition ${
+              focus ? "bg-accent-strong text-white shadow-hair" : "bg-card-soft text-secondary hover:text-primary"
+            }`}
+          >
+            <span aria-hidden className="text-[10px]">◉</span>
+            <span className="hidden sm:inline">Focus</span>
+          </button>
         </div>
       </div>
     </header>
