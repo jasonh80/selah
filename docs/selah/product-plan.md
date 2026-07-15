@@ -78,11 +78,23 @@ approach when built).
 4. Kelly's 9 fixes + portrait prompts → wire Key People (portraits + ages) ·
    disciple-making module in prompt v7.
 
-## Next: automation sprint
+## Next: automation sprint (owner-committed 2026-07-15 — "fix this band-aid ASAP")
 
 Teach Studio to "Prepare Chapter": Brain drafts the preload pack (movements,
 guidance notes, map pins) → owner approves on screen. Preparation stops being
-a PR and becomes a click. Mark 7's manual preload is the template.
+a PR and becomes a click. Concrete path, in order:
+
+1. Generalize what PR #30 seeded: the per-chapter setup-contract factory
+   (`mark-sprint-setup-contracts.ts`) becomes the single preparation surface;
+   the remaining mark-8-literal modules (setup seeding, preflight loader,
+   Studio client constants) go fully slug-parameterized. Mark 9/10/11 then
+   land as fixture entries + approval receipts (~20 lines each), not
+   expeditions.
+2. Studio "Prepare Chapter" screen: Brain proposes movements/notes/map pins →
+   owner reads and approves on screen → receipt recorded, notes seeded — no
+   code change, no PR, no Claude in the loop for preparation.
+3. Scheduled cloud agents take over the overnight homework loop (Mac no
+   longer needs to stay awake).
 
 ## Roadmap after that
 

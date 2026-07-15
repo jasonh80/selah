@@ -316,7 +316,7 @@ function hasCode(report: ReturnType<typeof evaluateMarkSprintDraft>, code: strin
 
 export function verifyMarkAuthoringContract(): void {
 
-for (const slug of ["mark-8", "mark-9", "mark-10", "mark-11"]) {
+for (const slug of ["mark-7", "mark-8", "mark-9", "mark-10", "mark-11"]) {
   const parsed = parseChapterWorkupJson(JSON.stringify(passingDraft(slug)));
   const report = evaluateMarkSprintDraft(parsed, slug);
   const expected = getMarkSprintChapterContract(slug);
@@ -904,10 +904,15 @@ assert.match(genericSourceFreePrompt, /Do NOT include copyrighted Bible verse te
     "protected prompt lists the fixture's exact movement ranges",
   );
   assert.equal(
-    buildChapterWorkupPrompt({ book: "Mark", chapter: 7, bibleVersion: "ESV" })
+    buildChapterWorkupPrompt({ book: "Mark", chapter: 5, bibleVersion: "ESV" })
       .includes("REQUIRED PASSAGE-FLOW BOUNDARIES"),
     false,
     "chapters without an acceptance contract get no boundaries block",
+  );
+  assert.match(
+    buildChapterWorkupPrompt({ book: "Mark", chapter: 7, bibleVersion: "ESV" }),
+    /REQUIRED PASSAGE-FLOW BOUNDARIES FOR Mark 7 \(machine-checked\)/u,
+    "mark-7 now carries its exact boundaries in the prompt",
   );
 
   // The run-9 failure shape: merge two adjacent required movements. Coverage

@@ -1,12 +1,56 @@
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 export const MARK_8_STUDIO_SLUG = "mark-8" as const;
-export const MARK_8_PREFLIGHT_ERROR =
-  "Studio could not safely check Mark 8 readiness. Try again before creating a draft.";
+// Chapters connected to the protected Studio flow. Order = launch order.
+export const CONNECTED_STUDIO_SLUGS = ["mark-8", "mark-7"] as const;
+export type ConnectedStudioSlug = (typeof CONNECTED_STUDIO_SLUGS)[number];
+export function isConnectedStudioSlug(value: string): value is ConnectedStudioSlug {
+  return (CONNECTED_STUDIO_SLUGS as readonly string[]).includes(value);
+}
+
+const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
+  "mark-8": 8,
+  "mark-7": 7,
+};
+
+// Verse-instance totals for each chapter's protected ESV window (the chapter
+// plus one adjacent chapter on each side). Mark 7's count reflects what the
+// ESV actually returns: Mark 6 = 56, Mark 7 = 36 (the ESV omits the disputed
+// 7:16 from its critical-text numbering), Mark 8 = 38 → 130. Mark 8's 125 is
+// the owner-approved frozen wording from its 2026-07 launch (nominal counts)
+// and must stay byte-identical.
+const WINDOW_VERSE_INSTANCES: Record<ConnectedStudioSlug, number> = {
+  "mark-8": 125,
+  "mark-7": 130,
+};
+
+export function connectedChapterLabel(slug: ConnectedStudioSlug): string {
+  return `Mark ${CHAPTER_NUMBERS[slug]}`;
+}
+
+export function connectedWindowLabel(slug: ConnectedStudioSlug): string {
+  const chapter = CHAPTER_NUMBERS[slug];
+  return `Mark ${chapter - 1}–${chapter + 1}`;
+}
+
+export function studioPreflightError(slug: ConnectedStudioSlug): string {
+  return `Studio could not safely check ${connectedChapterLabel(slug)} readiness. Try again before creating a draft.`;
+}
+
+export function studioSourcePreparationMessage(slug: ConnectedStudioSlug): string {
+  return `Studio will privately load ${connectedWindowLabel(slug)} from the official ESV API (${WINDOW_VERSE_INSTANCES[slug]} verse-instances) to prepare this one-chapter pilot. Crossway's public terms do not specifically address this AI preparation, and you chose to proceed with that uncertainty. Nothing is sent to the writing AI, saved, or published yet.`;
+}
+
+export function studioConfirmationMessage(slug: ConnectedStudioSlug): string {
+  return `Studio will now use the prepared ESV ${connectedWindowLabel(slug)} context to create one private ${connectedChapterLabel(slug)} draft. This uses a small amount of AI credit and publishes nothing.`;
+}
+
+// Frozen Mark 8 wording (asserted byte-for-byte by the offline verifier).
+export const MARK_8_PREFLIGHT_ERROR = studioPreflightError(MARK_8_STUDIO_SLUG);
 export const MARK_8_SOURCE_PREPARATION_MESSAGE =
-  "Studio will privately load Mark 7–9 from the official ESV API (125 verse-instances) to prepare this one-chapter pilot. Crossway's public terms do not specifically address this AI preparation, and you chose to proceed with that uncertainty. Nothing is sent to the writing AI, saved, or published yet.";
+  studioSourcePreparationMessage(MARK_8_STUDIO_SLUG);
 export const MARK_8_CONFIRMATION_MESSAGE =
-  "Studio will now use the prepared ESV Mark 7–9 context to create one private Mark 8 draft. This uses a small amount of AI credit and publishes nothing.";
+  studioConfirmationMessage(MARK_8_STUDIO_SLUG);
 
 type EvidenceBlocker = {
   code: string;
@@ -32,7 +76,7 @@ export interface Mark8RuntimePreviewLike {
 }
 
 export interface Mark8StudioSafePreview {
-  slug: typeof MARK_8_STUDIO_SLUG;
+  slug: ConnectedStudioSlug;
   evidenceReady: boolean;
   readyForGeneration: boolean;
   readyToConfirm: boolean;
@@ -59,38 +103,42 @@ const EXPECTED_CONFIRMATION_FINDINGS = new Set([
   "MANIFEST_APPROVAL_MISSING",
 ]);
 
-const PLAIN_EVIDENCE_BLOCKERS: Record<string, string> = {
-  VERSIONED_REQUIREMENTS_MISMATCH:
-    "The saved Mark 8 plan does not match its safety checks.",
-  LIVE_READ_FAILED: "Studio could not safely check Selah Brain.",
-  LIVE_BRAIN_MISSING: "Selah Brain is missing required learning.",
-  LIVE_BRAIN_MISMATCH:
-    "The live Selah Brain does not match the approved version.",
-  LIVE_CHAPTER_NOTES_MISSING: "Mark 8 study notes are missing.",
-  LIVE_CHAPTER_NOTES_MISMATCH:
-    "The live Mark 8 notes do not match the approved set.",
-  LIVE_VOICE_EXAMPLE_MISSING: "The Mark 6 voice example is missing.",
-  LIVE_VOICE_EXAMPLE_MISMATCH:
-    "The Mark 6 voice example does not match the approved example.",
-  SOURCE_LOAD_FAILED: "Studio could not safely load ESV Mark 7–9.",
-};
+function plainEvidenceBlockers(slug: ConnectedStudioSlug): Record<string, string> {
+  const label = connectedChapterLabel(slug);
+  return {
+    VERSIONED_REQUIREMENTS_MISMATCH: `The saved ${label} plan does not match its safety checks.`,
+    LIVE_READ_FAILED: "Studio could not safely check Selah Brain.",
+    LIVE_BRAIN_MISSING: "Selah Brain is missing required learning.",
+    LIVE_BRAIN_MISMATCH: "The live Selah Brain does not match the approved version.",
+    LIVE_CHAPTER_NOTES_MISSING: `${label} study notes are missing.`,
+    LIVE_CHAPTER_NOTES_MISMATCH: `The live ${label} notes do not match the approved set.`,
+    LIVE_VOICE_EXAMPLE_MISSING: "The Mark 6 voice example is missing.",
+    LIVE_VOICE_EXAMPLE_MISMATCH:
+      "The Mark 6 voice example does not match the approved example.",
+    SOURCE_LOAD_FAILED: `Studio could not safely load ESV ${connectedWindowLabel(slug)}.`,
+  };
+}
 
-const PLAIN_APPROVAL_BLOCKERS: Record<string, string> = {
-  BRAIN_ARTIFACT_APPROVAL_MISSING: "Selah Brain still needs your approval.",
-  GUIDANCE_APPROVAL_MISSING: "The Mark 8 study guide still needs your approval.",
-  SOURCE_RUNTIME_APPROVAL_MISSING: "The ESV study source is not connected yet.",
-  SOURCE_SELECTION_APPROVAL_MISSING:
-    "The ESV study source still needs your approval.",
-  MANIFEST_APPROVAL_MISMATCH:
-    "This Mark 8 preparation changed and must be checked again.",
-};
+function plainApprovalBlockers(slug: ConnectedStudioSlug): Record<string, string> {
+  const label = connectedChapterLabel(slug);
+  return {
+    BRAIN_ARTIFACT_APPROVAL_MISSING: "Selah Brain still needs your approval.",
+    GUIDANCE_APPROVAL_MISSING: `The ${label} study guide still needs your approval.`,
+    SOURCE_RUNTIME_APPROVAL_MISSING: "The ESV study source is not connected yet.",
+    SOURCE_SELECTION_APPROVAL_MISSING:
+      "The ESV study source still needs your approval.",
+    MANIFEST_APPROVAL_MISMATCH: `This ${label} preparation changed and must be checked again.`,
+  };
+}
 
-const PLAIN_MANIFEST_FINDINGS: Record<string, string> = {
-  BRAIN_NOT_APPROVED: "Selah Brain still needs your approval.",
-  GUIDANCE_NOT_APPROVED: "The Mark 8 study guide still needs your approval.",
-  MANIFEST_APPROVAL_MISMATCH:
-    "This Mark 8 preparation changed and must be checked again.",
-};
+function plainManifestFindings(slug: ConnectedStudioSlug): Record<string, string> {
+  const label = connectedChapterLabel(slug);
+  return {
+    BRAIN_NOT_APPROVED: "Selah Brain still needs your approval.",
+    GUIDANCE_NOT_APPROVED: `The ${label} study guide still needs your approval.`,
+    MANIFEST_APPROVAL_MISMATCH: `This ${label} preparation changed and must be checked again.`,
+  };
+}
 
 function unique(messages: readonly string[]): string[] {
   return [...new Set(messages)];
@@ -103,26 +151,31 @@ function unique(messages: readonly string[]): string[] {
  */
 export function buildMark8StudioPreflightResponse(
   runtime: Mark8RuntimePreviewLike,
+  expectedSlug: ConnectedStudioSlug = MARK_8_STUDIO_SLUG,
 ): Mark8StudioPreflightSuccess {
+  const label = connectedChapterLabel(expectedSlug);
+  const evidenceMessages = plainEvidenceBlockers(expectedSlug);
+  const approvalMessages = plainApprovalBlockers(expectedSlug);
+  const findingMessages = plainManifestFindings(expectedSlug);
   const blockers = unique([
     ...runtime.evidenceBlockers.map(
       ({ code }) =>
-        PLAIN_EVIDENCE_BLOCKERS[code] ??
-        "Mark 8 did not pass a required safety check.",
+        evidenceMessages[code] ??
+        `${label} did not pass a required safety check.`,
     ),
     ...runtime.approvalBlockers
       .filter(({ code }) => !EXPECTED_CONFIRMATION_APPROVALS.has(code))
       .map(
         ({ code }) =>
-          PLAIN_APPROVAL_BLOCKERS[code] ??
-          "Mark 8 still needs an owner-approved launch requirement.",
+          approvalMessages[code] ??
+          `${label} still needs an owner-approved launch requirement.`,
       ),
     ...runtime.manifestFindings
       .filter(({ code }) => !EXPECTED_CONFIRMATION_FINDINGS.has(code))
       .map(
         ({ code }) =>
-          PLAIN_MANIFEST_FINDINGS[code] ??
-          "Mark 8 did not pass a required safety check.",
+          findingMessages[code] ??
+          `${label} did not pass a required safety check.`,
       ),
   ]);
 
@@ -132,13 +185,13 @@ export function buildMark8StudioPreflightResponse(
     typeof runtime.sourceBundleDigest === "string" &&
     SHA256.test(runtime.sourceBundleDigest);
   if (runtime.evidenceReady && !exactDigests) {
-    blockers.push("Studio could not lock the exact Mark 8 preparation.");
+    blockers.push(`Studio could not lock the exact ${label} preparation.`);
   }
-  if (runtime.slug !== MARK_8_STUDIO_SLUG) {
+  if (runtime.slug !== expectedSlug) {
     blockers.push("Studio checked the wrong chapter.");
   }
   if (!runtime.evidenceReady && blockers.length === 0) {
-    blockers.push("Mark 8 is not ready for owner confirmation yet.");
+    blockers.push(`${label} is not ready for owner confirmation yet.`);
   }
 
   const plainBlockers = unique(blockers);
@@ -147,7 +200,7 @@ export function buildMark8StudioPreflightResponse(
   return {
     ok: true,
     preview: {
-      slug: MARK_8_STUDIO_SLUG,
+      slug: expectedSlug,
       evidenceReady: runtime.evidenceReady,
       readyForGeneration: runtime.readyForGeneration,
       readyToConfirm,
@@ -161,9 +214,10 @@ export function buildMark8StudioPreflightResponse(
 /** Treat the API response as untrusted before opening the spend confirmation. */
 export function decideMark8StudioPreflight(
   value: unknown,
+  expectedSlug: ConnectedStudioSlug = MARK_8_STUDIO_SLUG,
 ): Mark8StudioPreflightDecision {
   if (!value || typeof value !== "object") {
-    return { kind: "blocked", blockers: [MARK_8_PREFLIGHT_ERROR] };
+    return { kind: "blocked", blockers: [studioPreflightError(expectedSlug)] };
   }
   const response = value as {
     ok?: unknown;
@@ -180,7 +234,7 @@ export function decideMark8StudioPreflight(
   const digest = response.preview?.manifestDigest;
   if (
     response.ok === true &&
-    response.preview?.slug === MARK_8_STUDIO_SLUG &&
+    response.preview?.slug === expectedSlug &&
     response.preview?.evidenceReady === true &&
     response.preview?.readyToConfirm === true &&
     blockers.length === 0 &&
@@ -191,7 +245,7 @@ export function decideMark8StudioPreflight(
   }
   return {
     kind: "blocked",
-    blockers: blockers.length ? blockers : [MARK_8_PREFLIGHT_ERROR],
+    blockers: blockers.length ? blockers : [studioPreflightError(expectedSlug)],
   };
 }
 
@@ -200,9 +254,11 @@ export function buildStudioGenerateRequest(
   approvedManifestDigest: string | null,
   confirmDiscardCompletedImages = false,
 ): Record<string, unknown> {
-  if (slug === MARK_8_STUDIO_SLUG) {
+  if (isConnectedStudioSlug(slug)) {
     if (!approvedManifestDigest || !SHA256.test(approvedManifestDigest)) {
-      throw new Error("Mark 8 requires an exact prepared manifest digest");
+      throw new Error(
+        `${connectedChapterLabel(slug)} requires an exact prepared manifest digest`,
+      );
     }
     return {
       action: "generate",
@@ -226,6 +282,6 @@ export function isStudioGenerateEntryDisabled(input: {
     input.chapterBusy ||
     input.preflightBusy ||
     input.published ||
-    (!input.textGenerationEnabled && input.slug !== MARK_8_STUDIO_SLUG)
+    (!input.textGenerationEnabled && !isConnectedStudioSlug(input.slug))
   );
 }

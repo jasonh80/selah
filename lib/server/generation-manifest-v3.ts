@@ -50,7 +50,7 @@ export interface GenerationManifestV3Requirements {
   subject: {
     slug: MarkSprintSlug;
     book: "Mark";
-    chapter: 8 | 9 | 10 | 11;
+    chapter: 7 | 8 | 9 | 10 | 11;
     readerVersion: "ESV";
   };
   model: {
@@ -359,7 +359,7 @@ function assertPreparationInput(
     input.subject.slug !== input.bundle.slug ||
     input.subject.book !== "Mark" ||
     input.subject.chapter !== chapter ||
-    ![8, 9, 10, 11].includes(input.subject.chapter) ||
+    ![7, 8, 9, 10, 11].includes(input.subject.chapter) ||
     input.subject.readerVersion !== "ESV"
   ) {
     throw new Error("preparation subject does not match the opaque source bundle");

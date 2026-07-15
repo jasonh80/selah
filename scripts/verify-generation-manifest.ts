@@ -16,6 +16,7 @@ import {
 } from "../lib/server/mark-sprint-manifest-policy";
 import { MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST } from "../lib/server/mark-sprint-esv-contract";
 import { MARK_8_SETUP_NOTES } from "../lib/server/mark8-studio-setup-contract";
+import { MARK_7_SETUP_CONTRACT } from "../lib/server/mark-sprint-setup-contracts";
 import {
   assertGenericChapterGenerationAllowed,
   isProtectedMarkSprintGenerationIdentity,
@@ -386,6 +387,18 @@ for (const slug of MARK_SPRINT_SLUGS) {
       MARK_8_SETUP_NOTES.map((note) => note.rowId),
       "Mark 8 policy must bind the ten deterministic setup rows",
     );
+  } else if (slug === "mark-7") {
+    // Owner receipt recorded 2026-07-15 (Part 2 of the Mark 7 preload).
+    assert.ok(
+      !codes.includes("guidance_not_approved"),
+      "the exact Mark 7 receipt should satisfy only Mark 7 guidance",
+    );
+    assert.ok(!codes.includes("chapter_note_row_ids_missing"));
+    assert.deepEqual(
+      policy.requirements.chapterNotes.map((note) => note.expectedStoredRowId),
+      MARK_7_SETUP_CONTRACT.notes.map((note) => note.rowId),
+      "Mark 7 policy must bind the ten deterministic setup rows",
+    );
   } else {
     assert.ok(
       codes.includes("guidance_not_approved"),
@@ -475,15 +488,56 @@ assert.equal(
   true,
   "zero-padded Mark sprint alias reached the ordinary flow",
 );
+// Mark 7 joined the protected sprint (owner direction 2026-07-15): it must be
+// recognized as protected and can never fall through to ordinary generation.
 assert.equal(
   isProtectedMarkSprintGenerationIdentity({ slug: "mark-7" }),
+  true,
+  "mark-7 must be protected now that it is a sprint chapter",
+);
+// PR #30 review hole 1: aliases and book/chapter identities for chapter 7
+// must be protected exactly like the mark-8 aliases.
+for (const alias of ["mark-07", "mark-007", "MARK-7 ", " mark-0007"]) {
+  assert.equal(
+    isProtectedMarkSprintGenerationIdentity({ slug: alias }),
+    true,
+    `${alias} alias must be protected`,
+  );
+}
+assert.equal(
+  isProtectedMarkSprintGenerationIdentity({
+    slug: "custom-slug",
+    book: "Mark",
+    chapter: 7,
+  }),
+  true,
+  "book=Mark/chapter=7 identity must be protected regardless of slug",
+);
+assert.throws(() =>
+  assertGenericChapterGenerationAllowed({
+    slug: "mark-07",
+    book: "Mark",
+    chapter: 7,
+  }),
+);
+assert.throws(
+  () =>
+    assertGenericChapterGenerationAllowed({
+      slug: "mark-7",
+      book: "Mark",
+      chapter: 7,
+    }),
+  /blocked from generic generation/,
+);
+assert.equal(
+  isProtectedMarkSprintGenerationIdentity({ slug: "mark-5" }),
   false,
 );
 assert.doesNotThrow(() =>
   assertGenericChapterGenerationAllowed({
-    slug: "mark-7",
+    slug: "mark-5",
     book: "Mark",
-    chapter: 7,
+    chapter: 5,
   }),
 );
 

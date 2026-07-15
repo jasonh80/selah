@@ -14,18 +14,89 @@
     "prayer"
   ],
   "chapters": {
+    "mark-7": {
+      "book": "Mark",
+      "chapter": 7,
+      "expected_verse_count": 37,
+      "required_movements": [
+        {
+          "id": "M7-M01",
+          "startVerse": 1,
+          "endVerse": 5
+        },
+        {
+          "id": "M7-M02",
+          "startVerse": 6,
+          "endVerse": 13
+        },
+        {
+          "id": "M7-M03",
+          "startVerse": 14,
+          "endVerse": 23
+        },
+        {
+          "id": "M7-M04",
+          "startVerse": 24,
+          "endVerse": 30
+        },
+        {
+          "id": "M7-M05",
+          "startVerse": 31,
+          "endVerse": 37
+        }
+      ],
+      "manual_guardrails": [
+        "Do not caricature Pharisees, scribes, or Jewish people; the custom explanation is context, not collective blame.",
+        "Do not portray Jesus as racist or cruel, or the Syrophoenician mother as manipulative; be honest that his full intent is partly unknown.",
+        "Never generalize illness, disability, or mental-health conditions as demonic, and do not make persistence a miracle formula.",
+        "Treat the deaf man with dignity; no invented diagnosis, no promise that faith always heals disability.",
+        "Show the debated verse-31 route as a broad possible route, never a false precise line."
+      ],
+      "textual_variants": [
+        "Mark 7:16 is omitted from the ESV main text (later-manuscript addition; do not invent it and keep ranges spanning it contiguous).",
+        "Mark 7:4 washing terms vary across manuscripts and editions; explain without overclaiming."
+      ]
+    },
     "mark-8": {
       "book": "Mark",
       "chapter": 8,
       "expected_verse_count": 38,
       "required_movements": [
-        { "id": "M8-M01", "startVerse": 1, "endVerse": 10 },
-        { "id": "M8-M02", "startVerse": 11, "endVerse": 13 },
-        { "id": "M8-M03", "startVerse": 14, "endVerse": 21 },
-        { "id": "M8-M04", "startVerse": 22, "endVerse": 26 },
-        { "id": "M8-M05", "startVerse": 27, "endVerse": 30 },
-        { "id": "M8-M06", "startVerse": 31, "endVerse": 33 },
-        { "id": "M8-M07", "startVerse": 34, "endVerse": 38 }
+        {
+          "id": "M8-M01",
+          "startVerse": 1,
+          "endVerse": 10
+        },
+        {
+          "id": "M8-M02",
+          "startVerse": 11,
+          "endVerse": 13
+        },
+        {
+          "id": "M8-M03",
+          "startVerse": 14,
+          "endVerse": 21
+        },
+        {
+          "id": "M8-M04",
+          "startVerse": 22,
+          "endVerse": 26
+        },
+        {
+          "id": "M8-M05",
+          "startVerse": 27,
+          "endVerse": 30
+        },
+        {
+          "id": "M8-M06",
+          "startVerse": 31,
+          "endVerse": 33
+        },
+        {
+          "id": "M8-M07",
+          "startVerse": 34,
+          "endVerse": 38
+        }
       ],
       "manual_guardrails": [
         "Do not state that the feeding crowd was entirely Gentile.",
@@ -41,14 +112,46 @@
       "chapter": 9,
       "expected_verse_count": 50,
       "required_movements": [
-        { "id": "M9-M01", "startVerse": 1, "endVerse": 1 },
-        { "id": "M9-M02", "startVerse": 2, "endVerse": 8 },
-        { "id": "M9-M03", "startVerse": 9, "endVerse": 13 },
-        { "id": "M9-M04", "startVerse": 14, "endVerse": 29 },
-        { "id": "M9-M05", "startVerse": 30, "endVerse": 32 },
-        { "id": "M9-M06", "startVerse": 33, "endVerse": 37 },
-        { "id": "M9-M07", "startVerse": 38, "endVerse": 41 },
-        { "id": "M9-M08", "startVerse": 42, "endVerse": 50 }
+        {
+          "id": "M9-M01",
+          "startVerse": 1,
+          "endVerse": 1
+        },
+        {
+          "id": "M9-M02",
+          "startVerse": 2,
+          "endVerse": 8
+        },
+        {
+          "id": "M9-M03",
+          "startVerse": 9,
+          "endVerse": 13
+        },
+        {
+          "id": "M9-M04",
+          "startVerse": 14,
+          "endVerse": 29
+        },
+        {
+          "id": "M9-M05",
+          "startVerse": 30,
+          "endVerse": 32
+        },
+        {
+          "id": "M9-M06",
+          "startVerse": 33,
+          "endVerse": 37
+        },
+        {
+          "id": "M9-M07",
+          "startVerse": 38,
+          "endVerse": 41
+        },
+        {
+          "id": "M9-M08",
+          "startVerse": 42,
+          "endVerse": 50
+        }
       ],
       "manual_guardrails": [
         "Do not identify an exact Transfiguration mountain as fact.",
@@ -68,12 +171,36 @@
       "chapter": 10,
       "expected_verse_count": 52,
       "required_movements": [
-        { "id": "M10-M01", "startVerse": 1, "endVerse": 12 },
-        { "id": "M10-M02", "startVerse": 13, "endVerse": 16 },
-        { "id": "M10-M03", "startVerse": 17, "endVerse": 31 },
-        { "id": "M10-M04", "startVerse": 32, "endVerse": 34 },
-        { "id": "M10-M05", "startVerse": 35, "endVerse": 45 },
-        { "id": "M10-M06", "startVerse": 46, "endVerse": 52 }
+        {
+          "id": "M10-M01",
+          "startVerse": 1,
+          "endVerse": 12
+        },
+        {
+          "id": "M10-M02",
+          "startVerse": 13,
+          "endVerse": 16
+        },
+        {
+          "id": "M10-M03",
+          "startVerse": 17,
+          "endVerse": 31
+        },
+        {
+          "id": "M10-M04",
+          "startVerse": 32,
+          "endVerse": 34
+        },
+        {
+          "id": "M10-M05",
+          "startVerse": 35,
+          "endVerse": 45
+        },
+        {
+          "id": "M10-M06",
+          "startVerse": 46,
+          "endVerse": 52
+        }
       ],
       "manual_guardrails": [
         "Use wealthy man for Mark-local copy; young comes from Matthew and ruler from Luke.",
@@ -89,11 +216,31 @@
       "chapter": 11,
       "expected_verse_count": 33,
       "required_movements": [
-        { "id": "M11-M01", "startVerse": 1, "endVerse": 11 },
-        { "id": "M11-M02", "startVerse": 12, "endVerse": 14 },
-        { "id": "M11-M03", "startVerse": 15, "endVerse": 19 },
-        { "id": "M11-M04", "startVerse": 20, "endVerse": 26 },
-        { "id": "M11-M05", "startVerse": 27, "endVerse": 33 }
+        {
+          "id": "M11-M01",
+          "startVerse": 1,
+          "endVerse": 11
+        },
+        {
+          "id": "M11-M02",
+          "startVerse": 12,
+          "endVerse": 14
+        },
+        {
+          "id": "M11-M03",
+          "startVerse": 15,
+          "endVerse": 19
+        },
+        {
+          "id": "M11-M04",
+          "startVerse": 20,
+          "endVerse": 26
+        },
+        {
+          "id": "M11-M05",
+          "startVerse": 27,
+          "endVerse": 33
+        }
       ],
       "manual_guardrails": [
         "Do not present palms, a whip, the Court of the Gentiles, or dishonest exchange rates as Mark-explicit details.",

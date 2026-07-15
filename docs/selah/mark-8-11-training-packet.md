@@ -54,6 +54,23 @@ also binds their order and fixed API options. ESV text must remain transient and
 must not be committed, logged, persisted in a generated workup, or reproduced
 in output.
 
+## Mark 7 (`mark-7`)
+
+*Added 2026-07-15 by owner direction (small-group study); movements and notes
+from the owner-approved Codex preload spec. Movement boundaries: 1-5, 6-13,
+14-23, 24-30, 31-37; ESV omits verse 16.*
+
+1. Preserve all five movements: the purity dispute (1-5), tradition versus God's command and Corban (6-13), what truly defiles declared and explained (14-23), the Syrophoenician mother (24-30), and the healing of the deaf man (31-37). Disputed purity moves to the heart, then two boundary-crossing encounters.
+2. Do not caricature Pharisees, scribes, or Jewish people. Mark's explanation of washing customs is context for his audience, not collective blame, and not evidence that the leaders were insincere in everything.
+3. The washing dispute concerns ritual and traditional purity - not modern hygiene, and not a claim that all tradition is bad. The issue is tradition displacing God's command.
+4. Corban shows a specific misuse: dedicating resources to avoid caring for parents. Do not condemn all vows, dedicated giving, or religious institutions from this passage.
+5. Defilement comes from the heart. Do not imply bodies, food, or creation are evil. Explain Mark's 'Thus he declared all foods clean' note carefully as the narrator's inspired comment, with its implications unfolding in the early church.
+6. Preserve the hard exchange with the Syrophoenician mother without sanding it down. Do not portray Jesus as racist or cruel, and do not portray her as manipulating him. Gentile inclusion is a strong inference from the scene; Jesus' full intent in the wording remains partly unknown - say so honestly.
+7. Her daughter's unclean spirit belongs to this story. Never generalize illness, disability, or mental-health conditions as demonic, and do not present the mother's persistence as a guaranteed formula for receiving miracles.
+8. Treat the deaf man with dignity. Keep Jesus taking him aside privately, the physical actions, and the Aramaic 'Ephphatha.' Do not fabricate a medical diagnosis, and do not promise that every disability will be healed through enough faith.
+9. Map Tyre, Sidon, the Sea of Galilee, and the Decapolis honestly. The verse 31 route is unusual and debated; show a broad possible route, never a false precise line.
+10. Keep the mother/daughter scene distinct from the deaf-man scene. Jesus stays central. Label any creation or Isaiah 35 echoes as theological synthesis the church has heard in this text, not as direct textual proof.
+
 ## Mark 8 (`mark-8`)
 
 Comparison direction (not an assigned title): **Learning to See Jesus

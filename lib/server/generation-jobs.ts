@@ -23,11 +23,14 @@ import {
   type RowLookup,
 } from "./protected-chapters";
 import {
-  assertMark8ImagesArePlaceholders,
-  deriveMark8ImagePlan,
+  assertMarkSprintImagesArePlaceholders,
+  deriveMarkSprintImagePlan,
   MARK_8_IMAGE_MODEL,
-  MARK_8_IMAGE_SLUG,
 } from "./mark8-image-plan";
+import {
+  connectedChapterLabel,
+  isConnectedStudioSlug,
+} from "../studio-mark8-preflight";
 
 export const TEXT_JOB_KEY = "generationJobId";
 export const TEXT_JOB_STATE_KEY = "generationJobState";
@@ -648,27 +651,33 @@ function isProtectedFailure(e: unknown): boolean {
 
 // ---------------- image jobs (single-use; duplicates cannot double-spend) ----------------
 
+// Every connected protected chapter (Mark 8, then Mark 7) revalidates its FULL
+// binding — accepted source-overlap review, untouched placeholders, exact plan
+// digest and model — at claim, consume, and terminal-failure time, so a row
+// change between route preparation and the atomic write can never carry a
+// stale owner review into paid image generation (PR #32 review, blocker 1).
 function validatedImageBinding(
   slug: string,
   workup: ChapterWorkup,
   binding: ImageJobBinding | undefined,
   action: string,
 ): ImageJobBinding | undefined {
-  if (slug !== MARK_8_IMAGE_SLUG) {
+  if (!isConnectedStudioSlug(slug)) {
     if (binding === undefined) return undefined;
     if (!LOWERCASE_SHA256.test(binding.planDigest) || binding.model.trim() === "") {
       throw new ChapterMutationError("REFUSED", action, slug, "image-job binding is malformed");
     }
     return { planDigest: binding.planDigest, model: binding.model };
   }
+  const label = connectedChapterLabel(slug);
   if (!binding) {
-    throw new ChapterMutationError("REFUSED", action, slug, "Mark 8 requires a bound image plan and model");
+    throw new ChapterMutationError("REFUSED", action, slug, `${label} requires a bound image plan and model`);
   }
   if (!LOWERCASE_SHA256.test(binding.planDigest)) {
-    throw new ChapterMutationError("REFUSED", action, slug, "Mark 8 image-plan digest must be a lowercase SHA-256 digest");
+    throw new ChapterMutationError("REFUSED", action, slug, `${label} image-plan digest must be a lowercase SHA-256 digest`);
   }
   if (binding.model !== MARK_8_IMAGE_MODEL) {
-    throw new ChapterMutationError("REFUSED", action, slug, `Mark 8 requires ${MARK_8_IMAGE_MODEL} exactly`);
+    throw new ChapterMutationError("REFUSED", action, slug, `${label} requires ${MARK_8_IMAGE_MODEL} exactly`);
   }
   const copyReview = sourceOverlapReviewAccepted(
     workup,
@@ -684,13 +693,13 @@ function validatedImageBinding(
   }
   let derived;
   try {
-    assertMark8ImagesArePlaceholders(workup);
-    derived = deriveMark8ImagePlan(workup);
+    assertMarkSprintImagesArePlaceholders(slug, workup);
+    derived = deriveMarkSprintImagePlan(slug, workup);
   } catch (error) {
     throw new ChapterMutationError("REFUSED", action, slug, String((error as Error).message));
   }
   if (derived.digest !== binding.planDigest) {
-    throw new ChapterMutationError("CONFLICT", action, slug, "stored Mark 8 image plan no longer matches this claim");
+    throw new ChapterMutationError("CONFLICT", action, slug, `stored ${label} image plan no longer matches this claim`);
   }
   return {
     planDigest: derived.digest,
@@ -746,8 +755,10 @@ export async function claimImageJob(
   const json = (row && !("error" in row) && row.workupJson) || {};
   const previousJobId = typeof json[IMAGE_JOB_KEY] === "string" ? json[IMAGE_JOB_KEY] : "";
   const previousState = typeof json[IMAGE_JOB_STATE_KEY] === "string" ? json[IMAGE_JOB_STATE_KEY] : "";
+  // Failed paid runs stay locked until the owner confirms an exact-binding
+  // retry; every connected protected chapter gets the same retry path.
   const ownerConfirmedRetry =
-    slug === MARK_8_IMAGE_SLUG && previousJobId !== "" && previousState === "failed";
+    isConnectedStudioSlug(slug) && previousJobId !== "" && previousState === "failed";
   if (previousJobId && !ownerConfirmedRetry) {
     throw new ChapterMutationError("CONFLICT", "claimImageJob", slug, "an image job is already active for this chapter");
   }

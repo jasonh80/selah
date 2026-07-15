@@ -103,6 +103,7 @@ export const MARK_SPRINT_ESV_REQUEST_OPTIONS_DIGEST = sha256Canonical(
 );
 
 const MARK_CHAPTER_VERSE_COUNTS: Readonly<Record<number, number>> = Object.freeze({
+  6: 56,
   7: 37,
   8: 38,
   9: 50,

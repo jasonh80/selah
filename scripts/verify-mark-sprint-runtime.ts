@@ -19,6 +19,7 @@ import {
 } from "../lib/server/mark-sprint-esv-contract";
 import { LIBRARY_VERSION, SEED_RULES } from "../lib/server/selah-brain-library";
 import { MARK_8_SETUP_NOTES } from "../lib/server/mark8-studio-setup-contract";
+import { MARK_7_SETUP_CONTRACT } from "../lib/server/mark-sprint-setup-contracts";
 
 const SLUG = "mark-8" as const;
 const API_KEY = "PRIVATE RUNTIME TEST KEY";
@@ -342,6 +343,44 @@ async function main(): Promise<void> {
     ["MANIFEST_APPROVAL_MISSING"],
     "exact live evidence must leave approval findings only",
   );
+
+  // Mark 7 (connected 2026-07-15) must produce a FULL end-to-end preview —
+  // exact seeded notes, the ESV Mark 6–8 window, and a locked manifest digest.
+  // This is the regression for the production 503 on launch day: the v3
+  // manifest's runtime chapter guard still read [8, 9, 10, 11], so the
+  // mark-7 preview loaded every input and then threw instead of confirming.
+  {
+    const mark7Notes: MarkSprintLiveChapterNoteRow[] =
+      MARK_7_SETUP_CONTRACT.notes.map((note) => ({
+        id: note.rowId,
+        slug: "mark-7",
+        note: note.text,
+        scope: "chapter",
+      }));
+    sourceFetchCount = 0;
+    const mark7 = await prepareMarkSprintRuntimePreview({
+      slug: "mark-7",
+      apiKey: API_KEY,
+      ports: ports({ notes: mark7Notes }),
+      fetchImpl: syntheticFetch,
+    });
+    assert.equal(sourceFetchCount, 3, "mark-7 loads its ESV Mark 6–8 bundle");
+    assert.equal(mark7.slug, "mark-7");
+    assert.equal(mark7.evidenceReady, true, "mark-7 exact evidence is ready");
+    assert.deepEqual(mark7.evidenceBlockers, []);
+    assert.match(mark7.sourceBundleDigest ?? "", /^[a-f0-9]{64}$/u);
+    assert.match(mark7.manifestDigest ?? "", /^[a-f0-9]{64}$/u);
+    assert.deepEqual(
+      mark7.manifestFindings.map((finding) => finding.code),
+      ["MANIFEST_APPROVAL_MISSING"],
+      "mark-7 exact live evidence must leave approval findings only",
+    );
+    assert.notEqual(
+      mark7.manifestDigest,
+      exact.manifestDigest,
+      "mark-7 and mark-8 previews must never share a manifest digest",
+    );
+  }
   assert.deepEqual(
     exact.approvalBlockers.map((blocker) => blocker.code),
     ["MANIFEST_APPROVAL_MISSING", "OWNER_RUN_AUTHORIZATION_MISSING"],

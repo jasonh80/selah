@@ -5,7 +5,10 @@ import {
   prepareMarkSprintRuntimePreview,
   type MarkSprintRuntimePreview,
 } from "./mark-sprint-runtime";
-import { MARK_8_STUDIO_SLUG } from "../studio-mark8-preflight";
+import {
+  MARK_8_STUDIO_SLUG,
+  type ConnectedStudioSlug,
+} from "../studio-mark8-preflight";
 
 type Mark8PreviewLoader = () => Promise<MarkSprintRuntimePreview>;
 let mark8PreviewLoaderForTesting: Mark8PreviewLoader | null = null;
@@ -18,7 +21,9 @@ export function __setMark8PreviewLoaderForTesting(
   mark8PreviewLoaderForTesting = loader;
 }
 
-export async function loadMark8RuntimePreview(): Promise<MarkSprintRuntimePreview> {
+export async function loadMark8RuntimePreview(
+  slug: ConnectedStudioSlug = MARK_8_STUDIO_SLUG,
+): Promise<MarkSprintRuntimePreview> {
   if (mark8PreviewLoaderForTesting) return mark8PreviewLoaderForTesting();
 
   const db = getSupabaseAdmin();
@@ -26,7 +31,7 @@ export async function loadMark8RuntimePreview(): Promise<MarkSprintRuntimePrevie
   if (!db || !apiKey) throw new Error("Mark 8 preflight unavailable");
 
   return prepareMarkSprintRuntimePreview({
-    slug: MARK_8_STUDIO_SLUG,
+    slug,
     apiKey,
     ports: createSupabaseMarkSprintRuntimeReadPorts(db),
   });
