@@ -39,12 +39,20 @@ export function ChapterView({ data, source }: { data: ChapterWorkup; source?: st
           <HeroImage data={data} />
           <QuickSummaryCard data={data} />
           <MetadataChips data={data} />
+        </div>
+
+        {/* Owner direction 2026-07-15: the chapter's images ride high on the
+            page, with their scene checks directly beneath them as one visual
+            unit. True per-image interleaving lands with the layout-spec work
+            (items 8/10) once checks carry an image link. */}
+        <GeneratedImagesSection data={data} />
+        <SceneCheckSection data={data} />
+
+        <div className="space-y-3">
           <VisualDashboardGrid data={data} />
           <TimelineSection data={data} />
         </div>
 
-        <GeneratedImagesSection data={data} />
-        <SceneCheckSection data={data} />
         <AuthorAudienceEvidence data={data} />
         <InsightCardGrid data={data} />
         <WhatPeopleAskSection data={data} />
