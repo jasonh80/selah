@@ -2,7 +2,11 @@
 
 import type { ChapterWorkup } from "@/lib/types";
 import { useReadingMode } from "@/components/ReadingModeProvider";
-import { getSceneChecks, type SceneCheck } from "@/lib/content/chapter-content";
+import {
+  getSceneCheckImageKind,
+  getSceneChecks,
+  type SceneCheck,
+} from "@/lib/content/chapter-content";
 
 // Recurring "Scene Check" callouts — warm, visual nudges that correct common
 // mental-image mistakes. Quick Dive: compact (label + title + body). Deep Dive:
@@ -10,8 +14,15 @@ import { getSceneChecks, type SceneCheck } from "@/lib/content/chapter-content";
 export function SceneCheckSection({ data }: { data: ChapterWorkup }) {
   const { mode } = useReadingMode();
   // Prefer generated scene checks; fall back to static config (e.g. Psalm 23).
-  const checks: SceneCheck[] =
+  const allChecks: SceneCheck[] =
     data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
+  // Checks bound to a scene image already render on the Visual Chapter Path
+  // (layout spec §10) — only unbound checks keep their standalone cards.
+  const imageKinds = new Set(data.images.map((image) => image.kind));
+  const checks = allChecks.filter((check) => {
+    const kind = getSceneCheckImageKind(data.slug, check.title);
+    return !(kind && imageKinds.has(kind));
+  });
   if (checks.length === 0) return null;
   const deep = mode === "deep";
 
@@ -27,7 +38,7 @@ export function SceneCheckSection({ data }: { data: ChapterWorkup }) {
 function SceneCheckCard({ c, deep }: { c: SceneCheck; deep: boolean }) {
   return (
     <div
-      className="rounded-md border bg-card p-4 shadow-hair"
+      className="rounded-md border bg-card p-3.5 shadow-hair"
       style={{ borderLeft: "3px solid var(--accent-strong)" }}
     >
       <div className="flex items-center gap-1.5">

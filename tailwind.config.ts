@@ -26,6 +26,17 @@ const config: Config = {
         display: ["var(--font-display)"],
       },
       maxWidth: { page: "1120px", app: "540px" },
+      // Owner spacing scale (layout spec §5): 4/8/12/16/24/32/48 as tokens so
+      // every chapter template inherits the same rhythm.
+      spacing: {
+        s1: "var(--space-1)",
+        s2: "var(--space-2)",
+        s3: "var(--space-3)",
+        s4: "var(--space-4)",
+        s6: "var(--space-6)",
+        s8: "var(--space-8)",
+        s12: "var(--space-12)",
+      },
       borderRadius: {
         lg: "var(--radius-lg)",
         md: "var(--radius-md)",

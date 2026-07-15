@@ -4,12 +4,46 @@ import { useEffect, useState } from "react";
 import type { ChapterWorkup, Insight } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
 import { useReadingMode } from "@/components/ReadingModeProvider";
+import { getChapterMap } from "@/lib/maps/chapter-maps";
+
+// One "Deep Dive" system (layout spec §15): the former "Deeper Study" cards
+// and the former "Go Deeper" topic menu merged. A compact topic rail sits
+// above the study cards; every pill links to a real section on this page.
+type Topic = { icon: string; label: string; href: string; jesus?: boolean };
+
+const TOPICS: Topic[] = [
+  { icon: "📖", label: "Verse by Verse", href: "#chapter" },
+  { icon: "🗺", label: "Maps & Places", href: "#maps" },
+  { icon: "🕰", label: "Where It Fits", href: "#timeline" },
+  { icon: "🔍", label: "What Most People Miss", href: "#most-people-miss" },
+  { icon: "❒", label: "Related Chapters", href: "#chapters" },
+];
 
 export function InsightCardGrid({ data }: { data: ChapterWorkup }) {
+  // Only advertise sections that actually have content for this chapter.
+  const hasMap = Boolean(getChapterMap(data.slug)) || Boolean(data.modernMap ?? data.historicMap);
+  const topics = TOPICS.filter((topic) => {
+    if (topic.label === "Maps & Places") return hasMap;
+    if (topic.label === "What Most People Miss") return Boolean(data.modernReadersMiss?.trim());
+    return true;
+  });
+
   return (
     <section id="deeper-study" className="scroll-mt-20">
-      <SectionHead title="Deeper Study" />
-      <div className="grid grid-cols-2 gap-2.5">
+      <SectionHead title="Deep Dive" />
+      <div className="mb-s3 flex flex-wrap gap-s2">
+        {topics.map((topic) => (
+          <a
+            key={topic.label}
+            href={topic.href}
+            className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-[12px] font-medium text-secondary shadow-hair transition hover:border-accent/40 hover:text-primary"
+          >
+            <span aria-hidden>{topic.icon}</span>
+            {topic.label}
+          </a>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-s2">
         {data.insights.map((insight) => (
           <InsightCard key={insight.id} insight={insight} />
         ))}

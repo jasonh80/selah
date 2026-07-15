@@ -21,6 +21,18 @@
   --jesus-red: #8d3942;
   --jesus-red-soft: #f6e7e9;
 
+  /* Spacing scale (owner layout spec 2026-07-15): 4/8/12/16/24/32/48.
+     Mobile rhythm lives mostly at 12–24; 32/48 are reserved for major
+     transitions. Chapter templates use these tokens so future chapters
+     inherit the scale automatically. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
   /* Shared radius + shadow scale */
   --radius-lg: 24px;
   --radius-md: 18px;
@@ -251,4 +263,18 @@ body {
   .text-section {
     @apply font-display text-[20px] font-semibold tracking-[-0.02em];
   }
+}
+
+/* ============================================================
+   SELAH FOCUS — an undistracted study state (layout spec §16).
+   The chapter column stays; app chrome (header nav, bottom nav,
+   theme switcher) fades back and stops inviting taps.
+   ============================================================ */
+[data-focus="on"] .selah-chrome {
+  opacity: 0.18;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.selah-chrome {
+  transition: opacity 0.35s ease;
 }

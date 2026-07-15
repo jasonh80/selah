@@ -25,7 +25,7 @@ export function AppHeader() {
         </div>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="selah-chrome hidden items-center gap-1 lg:flex">
           {NAV.map((item) => {
             const active = isActive(pathname, item.href);
             return (
@@ -43,7 +43,7 @@ export function AppHeader() {
         </nav>
 
         {/* Quiet controls */}
-        <div className="flex items-center gap-1.5">
+        <div className="selah-chrome flex items-center gap-1.5">
           <VersionSelect versions={[...VERSIONS]} value={version} onChange={(v) => setVersion(v as typeof version)} />
           <ThemeSwitcher />
         </div>

@@ -1,47 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
 import { VersionSelect } from "@/components/chapter/VersionSelect";
 import { VERSIONS, useVersion } from "@/components/VersionProvider";
 import { getVerseNotes } from "@/lib/content/chapter-content";
+import { useEsvText, type EsvState } from "@/components/chapter/useEsvText";
 
 type Mode = "read" | "verse";
-type EsvState = { loading: boolean; found?: boolean; text?: string; copyright?: string };
 
-export function ScriptureReader({ data }: { data: ChapterWorkup }) {
+// Renders the full chapter text. When the parent (ChapterTopControls) already
+// fetched the ESV chapter, it passes that state down so opening the inline
+// reader never refetches; standalone use keeps its own fetch.
+export function ScriptureReader({
+  data,
+  esv: sharedEsv,
+  embedded = false,
+}: {
+  data: ChapterWorkup;
+  esv?: EsvState;
+  embedded?: boolean;
+}) {
   const { version, setVersion } = useVersion();
   const [mode, setMode] = useState<Mode>("read");
-  const [esv, setEsv] = useState<EsvState>({ loading: false });
-
-  // Fetch real ESV text server-side (key stays private) when ESV is selected.
-  useEffect(() => {
-    if (version !== "ESV") {
-      setEsv({ loading: false });
-      return;
-    }
-    let cancelled = false;
-    setEsv({ loading: true });
-    fetch(`/api/scripture?ref=${encodeURIComponent(data.reference)}`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (!cancelled) setEsv({ loading: false, found: j.found, text: j.text, copyright: j.copyright });
-      })
-      .catch(() => {
-        if (!cancelled) setEsv({ loading: false, found: false });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [version, data.reference]);
+  const ownEsv = useEsvText(data.reference, sharedEsv === undefined && version === "ESV");
+  const esv = sharedEsv ?? ownEsv;
 
   const showEsv = version === "ESV" && esv.found && Boolean(esv.text);
   const verseNotes = getVerseNotes(data.slug);
 
   return (
-    <section id="chapter" className="scroll-mt-20 space-y-3">
+    <section id={embedded ? undefined : "chapter"} className="scroll-mt-20 space-y-s3">
       <div className="flex items-end justify-between gap-3">
-        <h2 className="text-section text-primary">Read the Chapter</h2>
+        {embedded ? (
+          <span className="text-eyebrow">{data.reference}</span>
+        ) : (
+          <h2 className="text-section text-primary">Read the Chapter</h2>
+        )}
         <VersionSelect versions={[...VERSIONS]} value={version} onChange={(v) => setVersion(v as typeof version)} prefix />
       </div>
 

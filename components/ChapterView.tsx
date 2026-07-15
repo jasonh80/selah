@@ -5,65 +5,70 @@ import { MetadataChips } from "@/components/chapter/MetadataChips";
 import { VisualDashboardGrid } from "@/components/chapter/VisualDashboardGrid";
 import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
-import { GeneratedImagesSection } from "@/components/chapter/GeneratedImagesSection";
+import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
 import { InsightCardGrid } from "@/components/chapter/InsightCardGrid";
-import { ScriptureReader } from "@/components/chapter/ScriptureReader";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
-import { GoDeeperSection } from "@/components/chapter/GoDeeperSection";
-import { TransparencySection } from "@/components/chapter/TransparencySection";
-import { ChapterControls } from "@/components/chapter/ChapterControls";
+import { ChapterTopControls } from "@/components/chapter/ChapterTopControls";
+import { CompactPreviewRow } from "@/components/chapter/CompactPreviewRow";
+import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSection";
 import { SceneCheckSection } from "@/components/chapter/SceneCheckSection";
 import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
 import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection";
 
 /**
- * Reusable chapter template. Renders any global chapter workup.
- * Every section consumes `data` — no chapter content is hardcoded here.
+ * Reusable chapter template (layout spec v1, Mark 6 pilot). Renders any global
+ * chapter workup — no chapter content is hardcoded here.
  *
- * Single intentional column on every breakpoint (no desktop sidebar). The
- * facts the old "Quick Info" sidebar repeated already live in the hero +
- * MetadataChips, so they appear exactly once. Provenance sits once, quietly,
- * at the bottom via TransparencySection.
+ * Above the fold: title · Read-the-chapter control (expands Scripture INLINE)
+ * · Quick/Deep Dive · Selah Focus · collapsed Scripture preview · the key
+ * image · the start of the Visual Chapter Path. Spacing follows the owner's
+ * 4/8/12/16/24/32/48 token scale; 24px carries the section rhythm. Single
+ * intentional column on every breakpoint.
+ *
+ * Provenance/build info is intentionally NOT public (spec §18); the required
+ * ESV attribution renders with the Scripture text itself.
  */
-export function ChapterView({ data, source }: { data: ChapterWorkup; source?: string }) {
+export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) {
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
-      <main className="min-w-0 space-y-6 pb-12 pt-3 lg:pt-5">
-        <div className="space-y-3">
+      <main className="min-w-0 space-y-s6 pb-s12 pt-s2 lg:pt-s4">
+        {/* Above the fold: title, controls + inline Scripture, key image */}
+        <div className="space-y-s3">
           <ChapterHero data={data} />
-          <ChapterControls />
+          <ChapterTopControls data={data} />
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-s3">
           <HeroImage data={data} />
           <QuickSummaryCard data={data} />
           <MetadataChips data={data} />
+          <CompactPreviewRow data={data} />
         </div>
 
-        {/* Owner direction 2026-07-15: the chapter's images ride high on the
-            page, with their scene checks directly beneath them as one visual
-            unit. True per-image interleaving lands with the layout-spec work
-            (items 8/10) once checks carry an image link. */}
-        <GeneratedImagesSection data={data} />
-        <SceneCheckSection data={data} />
+        {/* The chapter as a visual walk, with its scene checks attached */}
+        <div className="space-y-s3">
+          <VisualChapterPath data={data} />
+          <SceneCheckSection data={data} />
+        </div>
 
-        <div className="space-y-3">
+        {/* The freshest insights, adjacent (spec §14) */}
+        <div className="space-y-s3">
+          <MostPeopleMissSection data={data} />
+          <WhatPeopleAskSection data={data} />
+        </div>
+
+        <div className="space-y-s3">
           <VisualDashboardGrid data={data} />
           <TimelineSection data={data} />
         </div>
 
         <AuthorAudienceEvidence data={data} />
         <InsightCardGrid data={data} />
-        <WhatPeopleAskSection data={data} />
-        <ScriptureReader data={data} />
         <MapsSection data={data} />
         <ChaptersSection data={data} />
-        <GoDeeperSection data={data} />
 
-        <TransparencySection data={data} source={source} />
-
-        <footer className="flex flex-col items-center gap-2 pt-2 text-center">
+        <footer className="flex flex-col items-center gap-s2 pt-s2 text-center">
           <span className="wordmark text-xs text-secondary">Selah</span>
           <p className="text-[11px] text-secondary">Pause. Reflect. Elevate.</p>
         </footer>

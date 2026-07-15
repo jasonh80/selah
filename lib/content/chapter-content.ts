@@ -107,6 +107,54 @@ export function getImageTitle(slug: string, kind: string, fallback: string): str
   return CHAPTER_IMAGE_TITLES[slug]?.[kind] ?? fallback;
 }
 
+// ---- Hero overrides (render-level) ------------------------------------------
+// Published protected chapters cannot change their stored heroKind, so the
+// owner's hero choice lands here as presentation config (layout spec §1:
+// walking-on-water anchors Mark 6; Nazareth joins the scene sequence).
+export const CHAPTER_HERO_OVERRIDES: Record<string, string> = {
+  "mark-6": "walking-water",
+};
+
+export function getHeroKindOverride(slug: string): string | null {
+  return CHAPTER_HERO_OVERRIDES[slug] ?? null;
+}
+
+// ---- Scene Check ↔ image hints (render-level) -------------------------------
+// Layout spec §10: a Scene Check whose title matches one of these lowercase
+// hints renders WITH its scene image on the Visual Chapter Path; unmatched
+// checks keep their standalone cards. Hints are per-slug so generated scene
+// checks (stored in the workup) can be bound without touching the data.
+export const CHAPTER_SCENE_CHECK_IMAGE_HINTS: Record<string, Record<string, string>> = {
+  "mark-6": {
+    nazareth: "nazareth",
+    synagogue: "nazareth",
+    hometown: "nazareth",
+    "two by two": "sending",
+    sandals: "sending",
+    feast: "herods-feast",
+    banquet: "herods-feast",
+    herod: "herods-feast",
+    feeding: "feeding",
+    "five thousand": "feeding",
+    picnic: "feeding",
+    loaves: "feeding",
+    lake: "walking-water",
+    galilee: "walking-water",
+    storm: "walking-water",
+    boat: "walking-water",
+  },
+};
+
+export function getSceneCheckImageKind(slug: string, checkTitle: string): string | null {
+  const hints = CHAPTER_SCENE_CHECK_IMAGE_HINTS[slug];
+  if (!hints) return null;
+  const title = checkTitle.toLowerCase();
+  for (const [hint, kind] of Object.entries(hints)) {
+    if (title.includes(hint)) return kind;
+  }
+  return null;
+}
+
 // ---- Verse-by-verse notes --------------------------------------------------
 // Brief, static, Selah-voiced explanations per verse. No generated content.
 export const CHAPTER_VERSE_NOTES: Record<string, Record<number, string>> = {
