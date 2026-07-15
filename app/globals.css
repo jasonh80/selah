@@ -120,6 +120,25 @@
   --line: #eed0b4;
 }
 
+/* Wilderness — the Judean desert as a coffee collection: deep roasted browns,
+   sand, clay. Owner concept 2026-07-15: dark brown key color, shades of brown
+   representing the desert and wilderness of the Middle East. */
+[data-theme="wilderness"] {
+  --background: #1d150f;
+  --card: #29201a;
+  --card-soft: #342a22;
+  --text-primary: #f3ece3;
+  --text-secondary: #c2ac97;
+  --line: #40332a;
+  --accent: #c89f7c;
+  --accent-strong: #a9754a;
+  --tint: #33271d;
+  --purple-soft: #33271d;
+  --purple-muted: #c89f7c;
+  --jesus-red: #d98a6a;
+  --jesus-red-soft: #3a2a22;
+}
+
 /* Starlight — sacred night, warm dark purple */
 [data-theme="starlight"] {
   --background: #0d0b14;
@@ -192,6 +211,16 @@ body {
   background-image: radial-gradient(1100px 580px at 50% 108%, rgba(224, 138, 55, 0.42), transparent 60%),
     radial-gradient(780px 440px at 16% -6%, rgba(177, 76, 42, 0.26), transparent 62%),
     radial-gradient(720px 400px at 90% 4%, rgba(214, 150, 80, 0.3), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+/* Wilderness — low desert sun over dunes: a warm sand glow from the horizon
+   and a faint roasted-clay wash, kept dim so the browns stay rich. */
+[data-theme="wilderness"] body {
+  background-image: radial-gradient(1100px 560px at 50% 110%, rgba(200, 159, 124, 0.2), transparent 60%),
+    radial-gradient(820px 440px at 85% -6%, rgba(169, 117, 74, 0.14), transparent 62%),
+    radial-gradient(700px 380px at 10% 0%, rgba(120, 84, 56, 0.16), transparent 60%);
   background-attachment: fixed;
   background-repeat: no-repeat;
 }

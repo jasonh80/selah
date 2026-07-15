@@ -8,6 +8,7 @@ export const THEMES = [
   { id: "living-water", label: "Living Water", swatch: "#1f86d6" },
   { id: "garden", label: "Garden", swatch: "#5f7153" },
   { id: "sonset", label: "Sonset", swatch: "#c98c4a" },
+  { id: "wilderness", label: "Wilderness", swatch: "#6b4a32" },
   { id: "starlight", label: "Starlight", swatch: "#8e6be8" },
 ] as const;
 
