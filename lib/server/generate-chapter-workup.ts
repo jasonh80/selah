@@ -88,12 +88,12 @@ export function isProtectedMarkSprintGenerationIdentity(input: {
 }): boolean {
   const normalizedSlug = input.slug.trim().toLowerCase();
   const protectedSlug =
-    isMarkSprintSlug(normalizedSlug) || /^mark-0*(?:8|9|10|11)$/u.test(normalizedSlug);
+    isMarkSprintSlug(normalizedSlug) || /^mark-0*(?:7|8|9|10|11)$/u.test(normalizedSlug);
   const normalizedBook = input.book?.trim().toLowerCase() ?? "";
   const protectedBookChapter =
     normalizedBook === "mark" &&
     typeof input.chapter === "number" &&
-    [8, 9, 10, 11].includes(input.chapter);
+    [7, 8, 9, 10, 11].includes(input.chapter);
   return protectedSlug || protectedBookChapter;
 }
 

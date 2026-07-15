@@ -1,4 +1,5 @@
 import type { ChapterWorkup } from "../types";
+import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
 import {
   inspectSourceOverlapReview,
   sourceOverlapReviewAccepted,
@@ -294,7 +295,11 @@ export async function publishChapter(
     throw new ChapterMutationError("REFUSED", "publishChapter", slug, decision.reason);
   }
 
-  if (slug === MARK_8_IMAGE_SLUG) {
+  // Every protected sprint chapter takes the strict final-review path — a
+  // sprint draft (including one created out-of-band) can never use the
+  // generic publish action while its owner receipt/reviews are unmet
+  // (PR #30 review, hole 2).
+  if (isMarkSprintSlug(slug)) {
     const validation = validateMark8PublishCandidate(
       row.workupJson as unknown as ChapterWorkup,
       options.reviewDigest,

@@ -482,6 +482,31 @@ assert.equal(
   true,
   "mark-7 must be protected now that it is a sprint chapter",
 );
+// PR #30 review hole 1: aliases and book/chapter identities for chapter 7
+// must be protected exactly like the mark-8 aliases.
+for (const alias of ["mark-07", "mark-007", "MARK-7 ", " mark-0007"]) {
+  assert.equal(
+    isProtectedMarkSprintGenerationIdentity({ slug: alias }),
+    true,
+    `${alias} alias must be protected`,
+  );
+}
+assert.equal(
+  isProtectedMarkSprintGenerationIdentity({
+    slug: "custom-slug",
+    book: "Mark",
+    chapter: 7,
+  }),
+  true,
+  "book=Mark/chapter=7 identity must be protected regardless of slug",
+);
+assert.throws(() =>
+  assertGenericChapterGenerationAllowed({
+    slug: "mark-07",
+    book: "Mark",
+    chapter: 7,
+  }),
+);
 assert.throws(
   () =>
     assertGenericChapterGenerationAllowed({

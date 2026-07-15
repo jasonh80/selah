@@ -7,8 +7,20 @@
 // and can never authorize another chapter.
 import { createHash } from "node:crypto";
 import guidanceArtifact from "./mark-sprint-guidance.v1.json";
+import acceptanceArtifact from "../ai/quality/mark-sprint-acceptance.v1.json";
 import { sha256Canonical, sha256Text } from "./generation-manifest";
 import type { MarkSprintSlug } from "./mark-sprint-manifest-policy";
+
+interface AcceptanceChapters {
+  chapters: Record<
+    string,
+    {
+      expected_verse_count: number;
+      required_movements: Array<{ id: string; startVerse: number; endVerse: number }>;
+      textual_variants: string[];
+    }
+  >;
+}
 
 interface GuidanceChapters {
   chapters: Record<string, { notes: Array<{ id: string; text: string }> }>;
@@ -25,6 +37,7 @@ interface GuidanceChapters {
 }
 
 const guidance = guidanceArtifact as unknown as GuidanceChapters;
+const acceptance = acceptanceArtifact as unknown as AcceptanceChapters;
 
 function deepFreeze<T>(value: T): T {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -100,6 +113,14 @@ export function buildMarkSprintSetupContract(
       requiredRuleIds: guidance.required_rule_ids,
       requiredVoiceExample: guidance.required_voice_example,
       chapter: { slug, notes: chapterNotes },
+      // The owner's receipt binds the FULL chapter contract — exact verse
+      // count, the five movement ranges, and the omitted-verse policy — not
+      // only the notes (PR #30 review, hole 4).
+      acceptance: {
+        expectedVerseCount: acceptance.chapters[slug]?.expected_verse_count ?? null,
+        requiredMovements: acceptance.chapters[slug]?.required_movements ?? [],
+        textualVariants: acceptance.chapters[slug]?.textual_variants ?? [],
+      },
     }),
   );
   const guidanceDigest = sha256Canonical(guidanceProjection);

@@ -672,9 +672,20 @@ export async function POST(req: Request) {
           403,
         );
       }
+      // Validate the parsed identity BEFORE any settings write — a request
+      // that will be refused must never leave the chapter in allowed_slugs
+      // (PR #30 review, hole 3).
+      const parsedIdentity = parseSlug(slug);
+      if (
+        !parsedIdentity ||
+        parsedIdentity.book !== "Mark" ||
+        `mark-${parsedIdentity.chapter}` !== slug
+      ) {
+        return refuse(slug, "generate", "blocked — protected chapter identity mismatch", 400);
+      }
       // Studio promises chapter access is automatic. Only after the exact
-      // digest, owner confirmation, and text switch pass may this one chapter
-      // be added; malformed/unconfirmed requests never change settings.
+      // digest, owner confirmation, identity check, and text switch pass may
+      // this one chapter be added; refused requests never change settings.
       if (!settings.allowed_slugs.includes(slug)) {
         const updated = await updateGenerationSettings({
           allowed_slugs: [...settings.allowed_slugs, slug],
@@ -698,10 +709,7 @@ export async function POST(req: Request) {
         );
       }
 
-      const parsed = parseSlug(slug);
-      if (!parsed || parsed.book !== "Mark" || parsed.chapter !== 8) {
-        return refuse(slug, "generate", "invalid protected Mark 8 chapter", 400);
-      }
+      const parsed = parsedIdentity;
 
       let jobId: string;
       try {
