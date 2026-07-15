@@ -4,8 +4,8 @@
 > `studio-workflow.md` for how chapters get made. Keep this file updated at
 > every milestone (publish, system change, model change).
 
-_Last updated: 2026-07-13 (live build still r78; Mark 8–11 preparation is not
-active in production)._
+_Last updated: 2026-07-15 (live build r96; Mark 8 and Mark 7 are published;
+Mark 9–11 remain fail-closed pending their own owner receipts)._
 
 ## What Selah is
 
@@ -26,8 +26,12 @@ through Scripture.** Tagline: *Pause. Reflect. Elevate.* Principle:
 |---|---|---|
 | **Psalm 23** | Published | Original showcase chapter. 3-image set (gpt-image-1). Do not regenerate. |
 | **Mark 6** | Published (2026-07-03) | **First chapter through the full Selah Brain + Selah Studio pipeline.** v6 copy (gpt-5.5), five-image set (gpt-image-2), FAQ, verse notes, Galilee map. The quality benchmark. |
+| **Mark 8** | Published (2026-07-14) | First protected-sprint chapter (fail-closed manifest v3, owner receipts, per-run confirmation). gpt-5.5 copy, 3-image gpt-image-2 set. Took ten runs; the root causes were fixed the same day (PRs #18–#28). |
+| **Mark 7** | Published (2026-07-15) | Second protected chapter — **first-try success on both the text and image runs** via the preload receipts + movement boundaries in the prompt (PRs #32/#34). gpt-5.5 copy, 3-image gpt-image-2 set. No map config yet. |
 
-All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Final.
+All other `/chapter/*` slugs 404 publicly (verified: `mark-9` and alias forms
+like `mark-09` fail closed at both publish and public read). Drafts stay
+hidden until Publish Final.
 
 ## Generation state — CHECK BEFORE ASSUMING
 
@@ -149,11 +153,17 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 
 ## Next up
 
-- **Current release sprint: Mark 8–11**, with Tuesday 2026-07-14 as the stretch
-  target. Selah Brain should author fresh drafts after the safety PR, v1.9,
-  chapter guidance, owner-approved ESV source contract, exact Mark 6 voice
-  exemplar, and fail-closed manifest are reviewed. Each generation and
-  publication still requires explicit owner approval.
+- **Layout spec v1 (#33, draft):** owner-directed newspaper treatment (photo
+  essay / editorial mosaic, no carousels), to be validated on real Mark
+  6/7/8 + an OT chapter before any release. Owner taste-pass gates the merge.
+- **Studio polish + cost ledger:** owner-requested launch progress bar and
+  per-chapter info panel (last launch, build, text/image model versions);
+  key persistence; single confirmations; real gpt-5.5/gpt-image-2 rates.
+- **Mark 9–11:** each is now a fixture entry + owner receipt (~20 lines) via
+  the setup-contract factory; generation/publication still require explicit
+  owner approval per run.
+- **Kelly's 9 approved character fixes** + Herod-family profiles; finish
+  `quality-notes-save-for-review` before the next generation sprint.
 
 ## Cost reference (Mark 6 actuals, logged estimates)
 
