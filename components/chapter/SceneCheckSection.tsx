@@ -41,16 +41,9 @@ function SceneCheckCard({ c, deep }: { c: SceneCheck; deep: boolean }) {
       <p className="text-card-title mt-1 text-primary">{c.title}</p>
       <p className="mt-1.5 text-[13px] leading-relaxed text-secondary">{c.body}</p>
 
-      {deep && c.visualAccuracyNotes && c.visualAccuracyNotes.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
-          {c.visualAccuracyNotes.map((n, j) => (
-            <li key={j} className="flex gap-2 text-[12px] leading-relaxed text-secondary">
-              <span aria-hidden className="text-accent-strong">•</span>
-              <span>{n}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* visualAccuracyNotes are image-generation production guardrails
+          (owner/reviewer-facing). Never render them to readers — owner
+          direction 2026-07-15. */}
 
       {deep && c.relatedVerses && c.relatedVerses.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
