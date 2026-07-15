@@ -264,6 +264,36 @@ function publishLookup(row: JobRow | null | { error: string }): RowLookup {
 }
 
 /**
+ * PR #32 re-review P1: the read boundary applies the same alias-aware
+ * fail-closed identity rule as the publish guard. A row may be served only if
+ * it carries NO protected Mark sprint identity (request slug AND stored
+ * workup slug/book/chapter both checked), or it is exactly a canonical
+ * CONNECTED chapter whose stored workup identifies as itself. Already-stored
+ * alias rows ("mark-09"), innocuously named rows smuggling a protected
+ * workup, and non-connected sprint chapters (mark-9..11) are never served —
+ * even if something marked them "reviewed" out of band.
+ */
+export function protectedChapterServeAllowed(
+  slug: string,
+  workup: ChapterWorkup | null | undefined,
+): boolean {
+  const stored = workup ?? undefined;
+  const sprintIdentity =
+    isProtectedMarkSprintGenerationIdentity({ slug }) ||
+    isProtectedMarkSprintGenerationIdentity({
+      slug: typeof stored?.slug === "string" ? stored.slug : "",
+      ...(typeof stored?.book === "string" ? { book: stored.book } : {}),
+      ...(typeof stored?.chapter === "number" ? { chapter: stored.chapter } : {}),
+    });
+  if (!sprintIdentity) return true;
+  return (
+    isMarkSprintSlug(slug) &&
+    stored?.slug === slug &&
+    isConnectedStudioSlug(slug)
+  );
+}
+
+/**
  * Returns the stored render workup for a chapter when a ready/reviewed row
  * exists, else null (caller falls back to the local source).
  */
@@ -297,7 +327,12 @@ export async function getChapterWorkupBySlug(slug: string): Promise<ChapterWorku
     console.error(`[selah] getChapterWorkupBySlug(${slug}) failed:`, error.message);
     return null;
   }
-  return (data?.workup_json as ChapterWorkup | undefined) ?? null;
+  const workup = (data?.workup_json as ChapterWorkup | undefined) ?? null;
+  if (workup && !protectedChapterServeAllowed(slug, workup)) {
+    console.error(`[selah] getChapterWorkupBySlug(${slug}) refused a protected alias/identity row`);
+    return null;
+  }
+  return workup;
 }
 
 /** Fetch a workup at ANY status (incl. draft) — for admin preview only. */
@@ -315,7 +350,12 @@ export async function getDraftWorkup(
     .eq("slug", slug)
     .maybeSingle();
   if (error || !data?.workup_json) return null;
-  return { workup: data.workup_json as ChapterWorkup, status: (data.status as string) ?? "unknown" };
+  const workup = data.workup_json as ChapterWorkup;
+  if (!protectedChapterServeAllowed(slug, workup)) {
+    console.error(`[selah] getDraftWorkup(${slug}) refused a protected alias/identity row`);
+    return null;
+  }
+  return { workup, status: (data.status as string) ?? "unknown" };
 }
 
 /** Promote a draft to published (status → reviewed). Returns the new status. */

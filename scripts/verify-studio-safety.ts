@@ -310,6 +310,7 @@ import {
   MARK_8_IMAGE_MODEL,
 } from "../lib/server/mark8-image-plan";
 import {
+  protectedChapterServeAllowed,
   safeProtectedMarkFailure,
   validateMark8PublishCandidate,
   validateMarkSprintPublishCandidate,
@@ -2861,6 +2862,73 @@ const realImagePipeline = async () => {
           ok(mismatchRefusal.status === 403, "N5 canonical slug with mismatched workup slug cannot publish");
           ok(store.rows.get("mark-7")!.status === "draft", "N5 mismatched row stays draft");
           store.rows.delete("mark-7");
+        }
+
+        // N6. The READ boundary fails closed too (PR #32 re-review P1): rows
+        // that are ALREADY "reviewed" out of band are still never served when
+        // they carry a protected alias or smuggled identity. This is the
+        // serve-decision both public resolvers (getChapterWorkupBySlug and
+        // getDraftWorkup) now consult before returning a row.
+        {
+          // Already-reviewed protected alias rows are never served.
+          const aliasReviewed = completedSprintWorkup("mark-9");
+          ok(
+            !protectedChapterServeAllowed("mark-09", aliasReviewed),
+            "N6 reviewed alias row mark-09 is never served",
+          );
+          ok(
+            !protectedChapterServeAllowed("mark-007", completedSprintWorkup("mark-7")),
+            "N6 reviewed alias row mark-007 is never served",
+          );
+          // Innocuously named reviewed rows smuggling a protected identity
+          // (by workup slug, or by book/chapter alone) are never served.
+          ok(
+            !protectedChapterServeAllowed("gospel-mark-nine", completedSprintWorkup("mark-9")),
+            "N6 reviewed row smuggling a protected workup slug is never served",
+          );
+          const smuggledIdentity = completedSprintWorkup("mark-10") as unknown as Record<string, unknown>;
+          smuggledIdentity.slug = "study-notes";
+          smuggledIdentity.book = "Mark";
+          smuggledIdentity.chapter = 10;
+          ok(
+            !protectedChapterServeAllowed("study-notes", smuggledIdentity as unknown as ChapterWorkup),
+            "N6 reviewed row smuggling a Mark book/chapter identity is never served",
+          );
+          // Canonical but NON-CONNECTED sprint chapters are never served,
+          // even with a self-consistent reviewed workup.
+          for (const blockedSlug of ["mark-9", "mark-10", "mark-11"]) {
+            ok(
+              !protectedChapterServeAllowed(blockedSlug, completedSprintWorkup(blockedSlug)),
+              `N6 non-connected ${blockedSlug} is never served even when self-consistent`,
+            );
+          }
+          // Canonical connected chapters with matching identity still serve,
+          // and a mismatched workup under a connected slug does not.
+          ok(
+            protectedChapterServeAllowed("mark-7", completedSprintWorkup("mark-7")),
+            "N6 published Mark 7 serves normally",
+          );
+          ok(
+            protectedChapterServeAllowed("mark-8", completedMark8Workup()),
+            "N6 published Mark 8 serves normally",
+          );
+          ok(
+            !protectedChapterServeAllowed("mark-7", completedSprintWorkup("mark-9")),
+            "N6 a mark-9 workup under the mark-7 slug is never served",
+          );
+          // Non-sprint chapters are untouched by the gate.
+          ok(
+            protectedChapterServeAllowed("exodus-27", { slug: "exodus-27" } as unknown as ChapterWorkup),
+            "N6 ordinary chapters serve as before",
+          );
+          ok(
+            protectedChapterServeAllowed("psalm-23", { slug: "psalm-23" } as unknown as ChapterWorkup),
+            "N6 legacy psalm-23 serves as before",
+          );
+          ok(
+            protectedChapterServeAllowed("mark-6", { slug: "mark-6", book: "Mark", chapter: 6 } as unknown as ChapterWorkup),
+            "N6 published Mark 6 serves as before",
+          );
         }
       } finally {
         if (savedSupabaseUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
