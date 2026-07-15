@@ -3,47 +3,42 @@ import { SectionHead } from "@/components/chapter/SectionHead";
 import { ExpandableImage } from "@/components/chapter/ExpandableImage";
 import {
   getImageTitle,
-  getSceneCheckImageKind,
   getSceneChecks,
+  integratedSceneChecks,
   type SceneCheck,
 } from "@/lib/content/chapter-content";
 
-// Visual Chapter Path (layout spec §7/§8/§10): the chapter's scenes in
-// narrative order — a walk through the story, not an equal-card dashboard.
-// Mobile: horizontal snap carousel, one full card with a deliberate partial
-// preview of the next. Desktop: an asymmetric grid that leads with the
-// opening scene. Scene Checks that belong to a scene render with it
-// (short title, tap-to-expand body — never paragraphs over the image).
+// Visual Chapter Path (layout spec §7/§8/§10; owner direction 2026-07-15:
+// NO carousel, no swiping). The chapter's scenes in narrative order, treated
+// the way a web newspaper treats a photo set:
+//   Mobile — a photo essay: every scene full-width, stacked, reader scrolls.
+//   Desktop — a lede image followed by a varied-size editorial mosaic
+//   (never an equal-card dashboard).
+// Scene Checks that belong to a scene render with it (short title on the
+// image, body below as tap-to-expand — never paragraphs over the picture).
 export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
   const scenes = [...data.images].sort((a, b) => a.index - b.index);
   if (scenes.length === 0) return null;
 
   const checks: SceneCheck[] =
     data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
-  const checkByKind = new Map<string, SceneCheck>();
-  for (const check of checks) {
-    const kind = getSceneCheckImageKind(data.slug, check.title);
-    if (kind && !checkByKind.has(kind)) checkByKind.set(kind, check);
-  }
-
-  // Desktop spans on a 12-column grid: the opening scene leads, the rest form
-  // a refined rail beneath it.
-  const spanFor = (position: number): string =>
-    position === 0 ? "md:col-span-7" : position === 1 ? "md:col-span-5" : "md:col-span-4";
+  const checkByKind = integratedSceneChecks(
+    data.slug,
+    checks,
+    new Set(scenes.map((scene) => scene.kind)),
+  );
 
   return (
     <section>
       <SectionHead title={`The Path Through ${data.reference}`} />
-      <div className="flex snap-x snap-mandatory gap-s3 overflow-x-auto pb-s2 no-scrollbar md:grid md:grid-cols-12 md:overflow-visible md:pb-0">
+      <div className="space-y-s4 md:grid md:grid-cols-12 md:gap-s3 md:space-y-0">
         {scenes.map((scene, position) => (
-          <PathCard
+          <PathScene
             key={scene.kind}
             scene={scene}
             position={position}
             title={getImageTitle(data.slug, scene.kind, scene.label)}
             check={checkByKind.get(scene.kind)}
-            className={`w-[78%] shrink-0 snap-start md:w-auto ${spanFor(position)}`}
-            layout={position === 0 ? "lead" : position === 1 ? "fill" : "rail"}
           />
         ))}
       </div>
@@ -51,36 +46,35 @@ export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
   );
 }
 
-// Desktop card behavior: the lead scene sets the first row's height (3/2);
-// its "fill" neighbor stretches to match so the opening row reads as one
-// composed band; rail cards keep the 4/5 portrait rhythm beneath.
-function PathCard({
+// Desktop mosaic rhythm: the opening scene runs the full measure (the lede);
+// the rest alternate wide/narrow in pairs so no two rows read identically.
+function mosaicSpan(position: number): string {
+  if (position === 0) return "md:col-span-12";
+  const beat = (position - 1) % 4;
+  return ["md:col-span-7", "md:col-span-5", "md:col-span-5", "md:col-span-7"][beat];
+}
+
+function mosaicAspect(position: number): string {
+  return position === 0
+    ? "aspect-[4/3] sm:aspect-[16/9] md:aspect-[2/1]"
+    : "aspect-[4/3] md:aspect-[3/2]";
+}
+
+function PathScene({
   scene,
   position,
   title,
   check,
-  className,
-  layout,
 }: {
   scene: ChapterImage;
   position: number;
   title: string;
   check?: SceneCheck;
-  className: string;
-  layout: "lead" | "fill" | "rail";
 }) {
   return (
-    <figure className={`flex flex-col ${className}`}>
-      <div
-        className={`relative overflow-hidden rounded-md border shadow-hair ${
-          layout === "fill" ? "md:min-h-0 md:flex-1" : ""
-        }`}
-      >
-        <div
-          className={`aspect-[4/5] w-full bg-card-soft ${
-            layout === "lead" ? "md:aspect-[3/2]" : layout === "fill" ? "md:aspect-auto md:h-full" : "md:aspect-[4/5]"
-          }`}
-        >
+    <figure className={`flex flex-col ${mosaicSpan(position)}`}>
+      <div className="relative overflow-hidden rounded-md border shadow-hair">
+        <div className={`w-full bg-card-soft ${mosaicAspect(position)}`}>
           <ExpandableImage src={scene.src} alt={scene.alt} className="h-full w-full object-cover" />
         </div>
         <span
@@ -91,7 +85,7 @@ function PathCard({
         </span>
         <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(16,16,20,0.78)] via-[rgba(16,16,20,0.04)] to-transparent" />
         <figcaption className="absolute inset-x-s3 bottom-s3">
-          <span className="block text-[13px] font-semibold leading-snug text-white">{title}</span>
+          <span className="block text-[13px] font-semibold leading-snug text-white sm:text-[14px]">{title}</span>
         </figcaption>
       </div>
 

@@ -3,8 +3,8 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { useReadingMode } from "@/components/ReadingModeProvider";
 import {
-  getSceneCheckImageKind,
   getSceneChecks,
+  integratedSceneChecks,
   type SceneCheck,
 } from "@/lib/content/chapter-content";
 
@@ -16,13 +16,17 @@ export function SceneCheckSection({ data }: { data: ChapterWorkup }) {
   // Prefer generated scene checks; fall back to static config (e.g. Psalm 23).
   const allChecks: SceneCheck[] =
     data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
-  // Checks bound to a scene image already render on the Visual Chapter Path
-  // (layout spec §10) — only unbound checks keep their standalone cards.
-  const imageKinds = new Set(data.images.map((image) => image.kind));
-  const checks = allChecks.filter((check) => {
-    const kind = getSceneCheckImageKind(data.slug, check.title);
-    return !(kind && imageKinds.has(kind));
-  });
+  // EXACTLY the checks rendered on the Visual Chapter Path (one per scene)
+  // are excluded here; every other check — including a second check bound to
+  // the same scene — keeps its standalone card so nothing is ever dropped.
+  const rendered = new Set(
+    integratedSceneChecks(
+      data.slug,
+      allChecks,
+      new Set(data.images.map((image) => image.kind)),
+    ).values(),
+  );
+  const checks = allChecks.filter((check) => !rendered.has(check));
   if (checks.length === 0) return null;
   const deep = mode === "deep";
 

@@ -23,21 +23,42 @@ export function ExpandableImage({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLImageElement | null>(null);
   const expandable = isExpandableSrc(src) && !src.startsWith("/img/placeholder/");
 
   if (!expandable) {
     return <img src={src} alt={alt} className={className} />;
   }
 
+  // Keyboard-reachable trigger; focus returns here when the viewer closes.
   return (
     <>
       <img
+        ref={triggerRef}
         src={src}
         alt={alt}
+        role="button"
+        tabIndex={0}
+        aria-label={`Enlarge image: ${alt}`}
         className={`${className ?? ""} cursor-zoom-in`}
         onClick={() => setOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
       />
-      {open && <ImageViewer src={src} alt={alt} onClose={() => setOpen(false)} />}
+      {open && (
+        <ImageViewer
+          src={src}
+          alt={alt}
+          onClose={() => {
+            setOpen(false);
+            triggerRef.current?.focus();
+          }}
+        />
+      )}
     </>
   );
 }
@@ -58,11 +79,14 @@ function ImageViewer({
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinchStart = useRef<{ dist: number; scale: number } | null>(null);
   const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Enter animation: grow from a slightly smaller state toward full size, so
-  // the image reads as enlarging from its place on the page.
+  // the image reads as enlarging from its place on the page. Keyboard focus
+  // moves to the close button so Escape/Enter work immediately.
   useEffect(() => {
     const id = requestAnimationFrame(() => setEntered(true));
+    closeButtonRef.current?.focus();
     return () => cancelAnimationFrame(id);
   }, []);
 
@@ -181,7 +205,12 @@ function ImageViewer({
         </ViewerButton>
       </div>
 
-      <ViewerButton label="Close image" onClick={close} className="fixed right-4 top-4">
+      <ViewerButton
+        label="Close image"
+        onClick={close}
+        className="fixed right-4 top-4"
+        buttonRef={closeButtonRef}
+      >
         ✕
       </ViewerButton>
     </div>
@@ -193,14 +222,17 @@ function ViewerButton({
   onClick,
   className,
   children,
+  buttonRef,
 }: {
   label: string;
   onClick: () => void;
   className?: string;
   children: React.ReactNode;
+  buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       aria-label={label}
       onClick={onClick}

@@ -25,8 +25,12 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
   const modeBtn = (m: ReadingMode) =>
     `${base} ${mode === m ? "bg-accent-strong text-white shadow-hair" : "border bg-card text-secondary hover:text-primary"}`;
 
+  // The preview labels ONLY what it is actually showing: real ESV words get
+  // the ESV tag (attribution at a glance); anything else is Selah's own
+  // fallback rendering and must never sit under a translation's name.
+  const showingEsv = version === "ESV" && esv.found === true && Boolean(esv.text);
   const previewText = buildPreviewText(
-    version === "ESV" && esv.found ? esv.text : undefined,
+    showingEsv ? esv.text : undefined,
     data.verses?.[0]?.text,
   );
 
@@ -62,7 +66,8 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
             className="block w-full rounded-md border bg-card p-s3 text-left shadow-hair transition hover:border-accent/40"
           >
             <span className="text-eyebrow">
-              {data.reference} · {version}
+              {data.reference}
+              {showingEsv ? " · ESV" : ""}
             </span>
             <p className="mt-1 line-clamp-2 text-scripture text-secondary">{previewText}</p>
           </button>

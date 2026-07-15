@@ -155,6 +155,26 @@ export function getSceneCheckImageKind(slug: string, checkTitle: string): string
   return null;
 }
 
+/**
+ * The single source of truth for which Scene Checks render ON the Visual
+ * Chapter Path: at most ONE check per scene image (the first in reading
+ * order whose hint maps to an existing image kind). EVERY other check —
+ * including a second check bound to the same scene — keeps its standalone
+ * card, so no check is ever dropped (layout review, 2026-07-15).
+ */
+export function integratedSceneChecks<T extends { title: string }>(
+  slug: string,
+  checks: readonly T[],
+  imageKinds: ReadonlySet<string>,
+): Map<string, T> {
+  const byKind = new Map<string, T>();
+  for (const check of checks) {
+    const kind = getSceneCheckImageKind(slug, check.title);
+    if (kind && imageKinds.has(kind) && !byKind.has(kind)) byKind.set(kind, check);
+  }
+  return byKind;
+}
+
 // ---- Verse-by-verse notes --------------------------------------------------
 // Brief, static, Selah-voiced explanations per verse. No generated content.
 export const CHAPTER_VERSE_NOTES: Record<string, Record<number, string>> = {
