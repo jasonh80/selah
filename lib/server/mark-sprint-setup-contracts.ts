@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import guidanceArtifact from "./mark-sprint-guidance.v1.json";
 import acceptanceArtifact from "../ai/quality/mark-sprint-acceptance.v1.json";
 import { sha256Canonical, sha256Text } from "./generation-manifest";
+import { mark8ScopedSetupApprovalApplies } from "./mark8-studio-setup-contract";
 import type { MarkSprintSlug } from "./mark-sprint-manifest-policy";
 
 interface AcceptanceChapters {
@@ -213,3 +214,34 @@ export const MARK_7_STUDIO_SETUP_APPROVAL: MarkSprintStudioSetupApproval | null 
   notes_digest: "8c404ddcfa1cc3ff834a76fbf4f285f2f472d09c62e8c5366fe8d27c9d262c52",
   receipt_digest: "badfb817497fe7329409d8f062ddbe3c8449548051b6e10f49f64470dfd520ff",
 };
+
+// ---- connected-chapter receipt gate ------------------------------------------
+// The single answer to "does this chapter's exact owner receipt apply right
+// now?" — used BEFORE any settings write, job claim, worker trigger, or
+// protected publish validation (PR #32 review, blockers 2 and 3). Mark 8 keeps
+// its frozen literal receipt; chapters approved later use the factory
+// contracts above. Any slug without an exact current receipt answers false.
+const FACTORY_RECEIPTS: ReadonlyArray<{
+  contract: MarkSprintSetupContract;
+  approval: MarkSprintStudioSetupApproval | null;
+}> = [{ contract: MARK_7_SETUP_CONTRACT, approval: MARK_7_STUDIO_SETUP_APPROVAL }];
+
+// TEST SEAM (offline route verification only): simulate a missing or drifted
+// receipt for a slug without editing the version-controlled literals.
+let connectedReceiptOverridesForTesting: Record<string, boolean> | null = null;
+export function __setConnectedReceiptOverridesForTesting(
+  overrides: Record<string, boolean> | null,
+): void {
+  connectedReceiptOverridesForTesting = overrides;
+}
+
+export function connectedChapterReceiptApplies(slug: string): boolean {
+  const override = connectedReceiptOverridesForTesting?.[slug];
+  if (override !== undefined) return override;
+  if (slug === "mark-8") return mark8ScopedSetupApprovalApplies(slug);
+  const factory = FACTORY_RECEIPTS.find((entry) => entry.contract.slug === slug);
+  return Boolean(
+    factory &&
+      markSprintScopedSetupApprovalApplies(slug, factory.contract, factory.approval),
+  );
+}

@@ -100,6 +100,7 @@ import {
   markSprintFactorySetupFor,
   runMarkSprintStudioSetup,
 } from "@/lib/server/mark-sprint-studio-setup";
+import { connectedChapterReceiptApplies } from "@/lib/server/mark-sprint-setup-contracts";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -813,9 +814,22 @@ export async function POST(req: Request) {
       ) {
         return refuse(slug, "generate", "blocked — protected chapter identity mismatch", 400);
       }
+      // The exact per-chapter owner receipt must apply BEFORE any settings
+      // write, job claim, or worker trigger — a connected slug whose receipt
+      // is missing or drifted is refused with nothing mutated (PR #32 review,
+      // blocker 2 / the original PR #30 hole-3 invariant).
+      if (!connectedChapterReceiptApplies(slug)) {
+        return refuse(
+          slug,
+          "generate",
+          `blocked — ${connectedChapterLabel(slug)}'s exact owner setup receipt is missing or changed; nothing was modified`,
+          403,
+        );
+      }
       // Studio promises chapter access is automatic. Only after the exact
-      // digest, owner confirmation, identity check, and text switch pass may
-      // this one chapter be added; refused requests never change settings.
+      // digest, owner confirmation, identity check, receipt, and text switch
+      // pass may this one chapter be added; refused requests never change
+      // settings.
       if (!settings.allowed_slugs.includes(slug)) {
         const updated = await updateGenerationSettings({
           allowed_slugs: [...settings.allowed_slugs, slug],

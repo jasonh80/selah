@@ -26,6 +26,7 @@ import {
   MARK_8_IMAGE_SLUG,
 } from "./mark8-image-plan";
 import { isConnectedStudioSlug } from "../studio-mark8-preflight";
+import { connectedChapterReceiptApplies } from "./mark-sprint-setup-contracts";
 
 // NOTE (issue #8): the generation lifecycle (claim → verify → complete/fail)
 // lives EXCLUSIVELY in generation-jobs.ts with single-use job ids. This module
@@ -156,6 +157,17 @@ export function validateMarkSprintPublishCandidate(
   submittedSourceOverlapReportDigest?: string,
 ): Mark8PublishValidation {
   const label = sprintChapterLabel(slug);
+  // FAIL-CLOSED FIRST (PR #32 review, blocker 3): only an explicitly
+  // connected chapter whose exact owner setup receipt still applies may even
+  // attempt the strict validation. Mark 9–11 (and any future sprint chapter
+  // without a receipt) are unpublishable regardless of how complete an
+  // out-of-band draft's images and digests look.
+  if (!isConnectedStudioSlug(slug) || !connectedChapterReceiptApplies(slug)) {
+    return {
+      ok: false,
+      reason: `${label} is not an owner-approved publishable chapter yet. Nothing was published.`,
+    };
+  }
   const copyReview = sourceOverlapReviewAccepted(
     workup,
     submittedSourceOverlapReportDigest,
