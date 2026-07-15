@@ -21,13 +21,17 @@ import {
   type JobStorePort,
 } from "./generation-jobs";
 import {
-  assertMark8ImagesArePlaceholders,
-  deriveMark8ImagePlan,
+  assertMarkSprintImagesArePlaceholders,
+  deriveMarkSprintImagePlan,
   MARK_8_IMAGE_ESTIMATED_COST_USD,
   MARK_8_IMAGE_MODEL,
-  MARK_8_IMAGE_SLUG,
   type Mark8ImagePlanItem,
 } from "./mark8-image-plan";
+import {
+  CONNECTED_STUDIO_SLUGS,
+  connectedChapterLabel,
+  isConnectedStudioSlug,
+} from "../studio-mark8-preflight";
 
 // Fallback default only — the ACTIVE model comes from Supabase settings
 // (selected_image_model, Studio-controlled). Never silently falls back: the
@@ -55,8 +59,9 @@ export async function checkImageModel(model?: string): Promise<{ ok: boolean; mo
 }
 
 // Slugs with a supported paid-image path. Psalm 23 and Mark 6 keep their
-// hand-authored static plans; Mark 8 derives its plan from the stored draft.
-export const IMAGE_ALLOWED_SLUGS = ["psalm-23", "mark-6", MARK_8_IMAGE_SLUG];
+// hand-authored static plans; connected protected chapters (Mark 8, then
+// Mark 7) derive their plans from the stored draft.
+export const IMAGE_ALLOWED_SLUGS = ["psalm-23", "mark-6", ...CONNECTED_STUDIO_SLUGS];
 
 // TEST SEAM (offline safety gate only): skip env-configured checks and supply
 // a synthetic plan so the verify script can drive the REAL image pipeline —
@@ -92,7 +97,7 @@ function plansFor(slug: string): ImagePlan[] | undefined {
 // defaults OFF). Fail-CLOSED. Still requires an IMAGE_PLAN for the slug.
 export async function imageGenAllowed(slug: string): Promise<boolean> {
   if (!imageConfigBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
-  if (slug !== MARK_8_IMAGE_SLUG && !plansFor(slug)) return false;
+  if (!isConnectedStudioSlug(slug) && !plansFor(slug)) return false;
   const s = await getGenerationSettings();
   return s.image_generation_enabled && s.allowed_slugs.includes(slug);
 }
@@ -172,8 +177,11 @@ interface ImagePlan {
   wide?: boolean; // landscape output (hero-suited); default portrait
 }
 
-function dynamicMark8Plans(workup: ChapterWorkup): readonly Mark8ImagePlanItem[] {
-  return deriveMark8ImagePlan(workup).images;
+function dynamicProtectedPlans(
+  slug: string,
+  workup: ChapterWorkup,
+): readonly Mark8ImagePlanItem[] {
+  return deriveMarkSprintImagePlan(slug, workup).images;
 }
 
 /** Read-only route preflight; claimImageJob re-derives before its atomic write. */
@@ -186,9 +194,10 @@ export async function prepareImageJobBinding(
   slug: string,
   approvedSourceOverlapReportDigest?: string,
 ): Promise<PreparedImageJobBinding | undefined> {
-  if (slug !== MARK_8_IMAGE_SLUG) return undefined;
-  // Mark 8 deliberately uses the project-standard model directly. The Studio
-  // model setting remains a legacy-plan control and cannot downgrade this run.
+  if (!isConnectedStudioSlug(slug)) return undefined;
+  // Protected chapters deliberately use the project-standard model directly.
+  // The Studio model setting remains a legacy-plan control and cannot
+  // downgrade this run.
   const model = MARK_8_IMAGE_MODEL;
   const row = await store.read(slug);
   if (!row || "error" in row) {
@@ -196,7 +205,7 @@ export async function prepareImageJobBinding(
       "REFUSED",
       "prepareImageJobBinding",
       slug,
-      "stored Mark 8 draft is unreadable",
+      `stored ${connectedChapterLabel(slug)} draft is unreadable`,
     );
   }
   try {
@@ -207,8 +216,8 @@ export async function prepareImageJobBinding(
     );
     if (!copyReview.ok) throw new Error(copyReview.reason);
     const copyInspection = inspectSourceOverlapReview(workup);
-    assertMark8ImagesArePlaceholders(workup);
-    const plan = deriveMark8ImagePlan(workup);
+    assertMarkSprintImagesArePlaceholders(slug, workup);
+    const plan = deriveMarkSprintImagePlan(slug, workup);
     return {
       planDigest: plan.digest,
       model,
@@ -398,7 +407,7 @@ export async function generateAndStoreChapterImages(
   jobId: string,
   binding?: ImageJobBinding,
 ): Promise<ImageGenResult> {
-  const deadline = slug === MARK_8_IMAGE_SLUG ? createMark8ImageRunDeadline() : undefined;
+  const deadline = isConnectedStudioSlug(slug) ? createMark8ImageRunDeadline() : undefined;
   try {
     return await generateAndStoreChapterImagesWithinDeadline(slug, jobId, binding, deadline);
   } finally {
@@ -412,7 +421,10 @@ async function generateAndStoreChapterImagesWithinDeadline(
   binding: ImageJobBinding | undefined,
   deadline: ImageRunDeadline | undefined,
 ): Promise<ImageGenResult> {
-  const isDynamicMark8 = slug === MARK_8_IMAGE_SLUG;
+  // Dynamic protected chapters (Mark 8, then Mark 7) derive their paid plan
+  // from the stored draft; every other slug keeps the legacy static-plan path.
+  const isDynamicMark8 = isConnectedStudioSlug(slug);
+  const protectedLabel = isDynamicMark8 ? connectedChapterLabel(slug) : slug;
   const store = requireJobStore(slug, "generateAndStoreChapterImages");
   let model = binding?.model ?? CHAPTER_IMAGE_MODEL;
   let workup: ChapterWorkup | undefined;
@@ -429,9 +441,9 @@ async function generateAndStoreChapterImagesWithinDeadline(
     }
     model = isDynamicMark8 ? MARK_8_IMAGE_MODEL : await activeImageModel();
     if (isDynamicMark8) {
-      if (!binding) throw new Error("Mark 8 image job is missing its exact binding");
+      if (!binding) throw new Error(`${protectedLabel} image job is missing its exact binding`);
       if (model !== MARK_8_IMAGE_MODEL || binding.model !== MARK_8_IMAGE_MODEL) {
-        throw new Error(`Mark 8 requires ${MARK_8_IMAGE_MODEL} exactly`);
+        throw new Error(`${protectedLabel} requires ${MARK_8_IMAGE_MODEL} exactly`);
       }
     }
     db = imageDepsOverride?.db ?? getSupabaseAdmin() ?? undefined;
@@ -452,11 +464,11 @@ async function generateAndStoreChapterImagesWithinDeadline(
     if (recheckedModel !== model) throw new Error("selected image model changed before spend");
 
     if (isDynamicMark8) {
-      const derived = deriveMark8ImagePlan(workup);
+      const derived = deriveMarkSprintImagePlan(slug, workup);
       if (derived.digest !== binding!.planDigest || model !== binding!.model) {
-        throw new Error("stored Mark 8 image plan or model changed before spend");
+        throw new Error(`stored ${protectedLabel} image plan or model changed before spend`);
       }
-      plans = dynamicMark8Plans(workup);
+      plans = dynamicProtectedPlans(slug, workup);
     } else {
       const staticPlans = plansFor(slug);
       if (!staticPlans) throw new Error("approved static image plan is missing");

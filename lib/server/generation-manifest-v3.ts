@@ -50,7 +50,7 @@ export interface GenerationManifestV3Requirements {
   subject: {
     slug: MarkSprintSlug;
     book: "Mark";
-    chapter: 8 | 9 | 10 | 11;
+    chapter: 7 | 8 | 9 | 10 | 11;
     readerVersion: "ESV";
   };
   model: {

@@ -36,11 +36,10 @@ import {
   prepareImageJobBinding,
 } from "@/lib/server/images";
 import {
-  deriveMark8ImagePlan,
-  mark8FinalReviewDigest,
+  deriveMarkSprintImagePlan,
+  markSprintFinalReviewDigest,
   MARK_8_IMAGE_ESTIMATED_COST_USD,
   MARK_8_IMAGE_MODEL,
-  MARK_8_IMAGE_SLUG,
 } from "@/lib/server/mark8-image-plan";
 import {
   chapterMutationDecision,
@@ -79,7 +78,9 @@ import {
   buildMark8StudioPreflightResponse,
   MARK_8_PREFLIGHT_ERROR,
   MARK_8_STUDIO_SLUG,
+  connectedChapterLabel,
   isConnectedStudioSlug,
+  studioPreflightError,
 } from "@/lib/studio-mark8-preflight";
 import {
   mintStudioPreviewAccess,
@@ -92,6 +93,13 @@ import {
   isMark8StudioSetupError,
   runMark8StudioSetup,
 } from "@/lib/server/mark8-studio-setup";
+import {
+  getMarkSprintStudioSetupStatus,
+  isMarkSprintStudioSetupError,
+  markSprintChapterLabel,
+  markSprintFactorySetupFor,
+  runMarkSprintStudioSetup,
+} from "@/lib/server/mark-sprint-studio-setup";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -265,6 +273,124 @@ export async function POST(req: Request) {
     }
   }
 
+  // ---- exact private factory Brain + notes setup (chapters after Mark 8) ----
+  // Same guarantees as mark8_setup: never generates, fetches Scripture,
+  // changes settings, creates images, or publishes. The chapter must have its
+  // own owner receipt in mark-sprint-setup-contracts.ts (fail-closed).
+  if (action === "mark_sprint_setup_status") {
+    const setupSlug = String(body.slug ?? "");
+    if (!markSprintFactorySetupFor(setupSlug)) {
+      return NextResponse.json({ ok: false, error: "Chapter setup is unavailable." }, { status: 400 });
+    }
+    const label = markSprintChapterLabel(setupSlug);
+    try {
+      return NextResponse.json({ ok: true, setup: await getMarkSprintStudioSetupStatus(setupSlug) });
+    } catch {
+      return NextResponse.json({ ok: false, error: `Studio could not check ${label} setup.` }, { status: 503 });
+    }
+  }
+  if (action === "mark_sprint_setup") {
+    const setupSlug = String(body.slug ?? "");
+    if (!markSprintFactorySetupFor(setupSlug)) {
+      return NextResponse.json({ ok: false, error: "Chapter setup is unavailable." }, { status: 400 });
+    }
+    const label = markSprintChapterLabel(setupSlug);
+    const auditSetup = async (
+      status: "started" | "succeeded" | "failed",
+      message: string,
+    ) => {
+      const recorded = await logGenerationAuditVerified({
+        action: "mark_sprint_setup",
+        slug: setupSlug,
+        status,
+        message,
+      });
+      if (!recorded) throw new Error(`${label} setup audit unavailable`);
+    };
+    if (body.confirm !== true) {
+      try {
+        await auditSetup("failed", "refused:invalid_confirmation");
+      } catch {
+        console.error(`[selah] ${label} setup refusal audit unavailable`);
+      }
+      return NextResponse.json({ ok: false, error: `${label} setup confirmation is required.` }, { status: 400 });
+    }
+    const setupDigest = typeof body.setupDigest === "string" ? body.setupDigest : "";
+    if (!LOWERCASE_SHA256.test(setupDigest)) {
+      try {
+        await auditSetup("failed", "refused:invalid_receipt");
+      } catch {
+        console.error(`[selah] ${label} setup refusal audit unavailable`);
+      }
+      return NextResponse.json({ ok: false, error: `The exact ${label} setup receipt is required.` }, { status: 400 });
+    }
+    try {
+      await auditSetup("started", "owner-confirmed private setup");
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: `Studio could not record the ${label} setup start. Nothing changed.` },
+        { status: 500 },
+      );
+    }
+    try {
+      const result = await runMarkSprintStudioSetup(setupSlug, setupDigest);
+      try {
+        await auditSetup(
+          "succeeded",
+          `${result.status.ruleCount} Brain rules + ${result.status.noteCount} ${label} notes verified`,
+        );
+        return NextResponse.json({ ok: true, setup: result.status, result: result.result });
+      } catch {
+        // The verified setup writes are authoritative. Never tell the owner
+        // they failed merely because the later activity record was unavailable.
+        let setup = result.status;
+        try {
+          const reread = await getMarkSprintStudioSetupStatus(setupSlug);
+          if (reread.complete) setup = reread;
+        } catch {
+          // runMarkSprintStudioSetup already performed an exact post-write readback.
+        }
+        return NextResponse.json({
+          ok: true,
+          setup,
+          result: result.result,
+          auditWarning: `${label} setup succeeded, but its activity record is unavailable.`,
+        });
+      }
+    } catch (error) {
+      const refused =
+        isMarkSprintStudioSetupError(error) &&
+        ["UNKNOWN_CHAPTER", "UNAPPROVED", "DIGEST_MISMATCH", "REVIEW_REQUIRED"].includes(error.code);
+      try {
+        await auditSetup(
+          "failed",
+          `${refused ? "refused" : "failed"}:${isMarkSprintStudioSetupError(error) ? error.code : "unknown"}`,
+        );
+      } catch {
+        console.error(`[selah] ${label} setup failure audit unavailable`);
+      }
+      const status = isMarkSprintStudioSetupError(error)
+        ? error.code === "UNAPPROVED" || error.code === "UNKNOWN_CHAPTER"
+          ? 403
+          : error.code === "DIGEST_MISMATCH" || error.code === "REVIEW_REQUIRED"
+            ? 409
+            : 500
+        : 500;
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            status === 403
+              ? `Selah Brain and the exact ${label} notes still need approval.`
+              : status === 409
+                ? `${label} setup changed or needs review. Nothing else was started.`
+                : `Studio could not safely finish ${label} setup.`,
+        },
+        { status },
+      );
+    }
+  }
+
   // ---- read-only Mark 8 owner preparation ----
   // Reads exact live Brain/notes/example evidence plus ESV Mark 7–9. It cannot
   // claim a job, call a model, write Supabase, publish, or authorize a run.
@@ -275,10 +401,13 @@ export async function POST(req: Request) {
     }
     try {
       const preview = await loadMark8RuntimePreview(prepareSlug);
-      return NextResponse.json(buildMark8StudioPreflightResponse(preview));
+      return NextResponse.json(buildMark8StudioPreflightResponse(preview, prepareSlug));
     } catch {
       // Do not reveal which key, service, row, or source check is unavailable.
-      return NextResponse.json({ ok: false, error: MARK_8_PREFLIGHT_ERROR }, { status: 503 });
+      return NextResponse.json(
+        { ok: false, error: studioPreflightError(prepareSlug) },
+        { status: 503 },
+      );
     }
   }
 
@@ -461,7 +590,7 @@ export async function POST(req: Request) {
       return mapMutationError(slug, "generate_images", error);
     }
     if (
-      slug === MARK_8_IMAGE_SLUG &&
+      isConnectedStudioSlug(slug) &&
       (!binding ||
         body.approvedImagePlanDigest !== binding.planDigest ||
         body.approvedImageModel !== binding.model ||
@@ -470,7 +599,7 @@ export async function POST(req: Request) {
       return refuse(
         slug,
         "generate_images",
-        "The Mark 8 image plan changed after you reviewed its count and cost. Check the plan again before spending credit.",
+        `The ${connectedChapterLabel(slug)} image plan changed after you reviewed its count and cost. Check the plan again before spending credit.`,
         409,
       );
     }
@@ -532,24 +661,25 @@ export async function POST(req: Request) {
     const spentCount = Number.isSafeInteger(spentCountValue) && spentCountValue >= 0
       ? Math.min(spentCountValue, imgs.length)
       : 0;
-    const reviewDigest = slug === MARK_8_IMAGE_SLUG
-      ? mark8FinalReviewDigest(workup)
+    const connectedImageSlug = isConnectedStudioSlug(slug);
+    const reviewDigest = connectedImageSlug
+      ? markSprintFinalReviewDigest(slug, workup)
       : null;
     let estimatedCostUsd: number | undefined;
-    let mark8Plan: ReturnType<typeof deriveMark8ImagePlan> | null = null;
-    if (slug === MARK_8_IMAGE_SLUG) {
+    let mark8Plan: ReturnType<typeof deriveMarkSprintImagePlan> | null = null;
+    if (connectedImageSlug) {
       try {
-        mark8Plan = deriveMark8ImagePlan(workup);
+        mark8Plan = deriveMarkSprintImagePlan(slug, workup);
         const exactCount = mark8Plan.images.length;
         estimatedCostUsd = Math.round(exactCount * MARK_8_IMAGE_ESTIMATED_COST_USD * 1000) / 1000;
       } catch {
         return NextResponse.json(
-          { ok: false, error: "Mark 8 image plan is not ready." },
+          { ok: false, error: `${connectedChapterLabel(slug)} image plan is not ready.` },
           { status: 409 },
         );
       }
     }
-    const done = slug === MARK_8_IMAGE_SLUG
+    const done = connectedImageSlug
       ? reviewDigest !== null
       : imgs.length > 0 && stored.length === imgs.length;
     return NextResponse.json({
@@ -655,7 +785,7 @@ export async function POST(req: Request) {
         return refuse(
           slug,
           "generate",
-          "Mark 8 requires the exact prepared manifest digest",
+          `${connectedChapterLabel(slug)} requires the exact prepared manifest digest`,
           400,
         );
       }
@@ -694,7 +824,7 @@ export async function POST(req: Request) {
           return refuse(
             slug,
             "generate",
-            "Studio could not approve Mark 8 for this private draft.",
+            `Studio could not approve ${connectedChapterLabel(slug)} for this private draft.`,
             500,
           );
         }
@@ -704,7 +834,7 @@ export async function POST(req: Request) {
         return refuse(
           slug,
           "generate",
-          "blocked — protected Mark 8 generation is not fully configured",
+          `blocked — protected ${connectedChapterLabel(slug)} generation is not fully configured`,
           403,
         );
       }
@@ -768,7 +898,7 @@ export async function POST(req: Request) {
         slug,
         jobId,
         model: settings.selected_text_model,
-        note: "Creating one private Mark 8 draft. Nothing is published.",
+        note: `Creating one private ${connectedChapterLabel(slug)} draft. Nothing is published.`,
       });
     }
 

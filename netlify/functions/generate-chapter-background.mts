@@ -21,7 +21,6 @@ import {
 import { logGenerationAuditVerified } from "../../lib/server/generation-settings";
 import { runConfiguredProtectedMarkDraftJob } from "../../lib/server/mark-sprint-draft-job";
 
-const MARK_8_SLUG = "mark-8";
 const CONNECTED_PROTECTED_SLUGS = ["mark-8", "mark-7"];
 const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 
@@ -135,7 +134,7 @@ export default async (req: Request) => {
   ) {
     return refuse(
       slug,
-      "Mark 8 requires an exact approved manifest digest",
+      "protected chapters require an exact approved manifest digest",
       400,
     );
   }
@@ -145,7 +144,7 @@ export default async (req: Request) => {
   }
 
   // Protected sprint chapters can never fall through to the generic generator.
-  // Only Mark 8 is connected; Mark 9–11 remain explicitly blocked.
+  // Only Mark 8 and Mark 7 are connected; Mark 9–11 remain explicitly blocked.
   if (isProtectedMarkSprintGenerationIdentity({ slug })) {
     if (!CONNECTED_PROTECTED_SLUGS.includes(slug) || approvedManifestDigest === undefined) {
       return refuse(
@@ -167,7 +166,7 @@ export default async (req: Request) => {
         slug,
         jobId,
         approvedManifestDigest,
-        "protected Mark 8 permission check failed",
+        "protected chapter permission check failed",
         500,
       );
     }
@@ -176,7 +175,7 @@ export default async (req: Request) => {
         slug,
         jobId,
         approvedManifestDigest,
-        "protected Mark 8 generation is OFF or no longer allowed",
+        "protected chapter generation is OFF or no longer allowed",
         403,
       );
     }
@@ -204,7 +203,7 @@ export default async (req: Request) => {
         action: "refused:worker_generate",
         slug,
         status: "failed",
-        message: `protected Mark 8 runner stopped (${result.code})`,
+        message: `protected Mark draft runner stopped (${result.code})`,
       });
       const status =
         result.status === "conflict"
@@ -224,12 +223,12 @@ export default async (req: Request) => {
         { status },
       );
     } catch {
-      console.error("[selah] protected Mark 8 draft runner failed");
+      console.error("[selah] protected Mark draft runner failed");
       return cleanupProtectedMark8Claim(
         slug,
         jobId,
         approvedManifestDigest,
-        "protected Mark 8 draft runner failed",
+        "protected Mark draft runner failed",
         500,
       );
     }

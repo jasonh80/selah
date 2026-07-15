@@ -7,7 +7,25 @@ import {
   MARK_8_CONFIRMATION_MESSAGE,
   MARK_8_PREFLIGHT_ERROR,
   MARK_8_SOURCE_PREPARATION_MESSAGE,
+  studioConfirmationMessage,
+  studioSourcePreparationMessage,
 } from "../lib/studio-mark8-preflight";
+import {
+  buildMarkSprintStudioSetupRequest,
+  decideMarkSprintStudioSetup,
+} from "../lib/studio-mark-sprint-setup";
+import {
+  MARK_7_SETUP_CONTRACT,
+  MARK_7_STUDIO_SETUP_APPROVAL,
+  markSprintScopedSetupApprovalApplies,
+  markSprintSetupApprovalMatches,
+} from "../lib/server/mark-sprint-setup-contracts";
+import {
+  __setMarkSprintStudioSetupStoreForTesting,
+  reconcileMarkSprintStudioSetup,
+  type MarkSprintChapterNoteRow,
+  type MarkSprintStudioSetupStore,
+} from "../lib/server/mark-sprint-studio-setup";
 import {
   buildMark8StudioSetupRequest,
   decideMark8StudioSetup,
@@ -591,9 +609,328 @@ async function main(): Promise<void> {
     generationSettings.__setGenerationTestOverrides(null);
   }
 
+  await verifyMark7Enablement();
+
   console.log(
     "Studio Mark 8 preflight verification passed (read-only route + owner UX logic).",
   );
+}
+
+// ---- Mark 7 (Part 2 of the preload): factory receipt, preflight, seeding ----
+
+class FakeSprintSetupStore implements MarkSprintStudioSetupStore {
+  rules: ExistingLibraryRuleRow[];
+  notes: MarkSprintChapterNoteRow[];
+  upsertCalls = 0;
+
+  constructor(
+    rules: ExistingLibraryRuleRow[],
+    notes: MarkSprintChapterNoteRow[] = [],
+  ) {
+    this.rules = structuredClone(rules);
+    this.notes = structuredClone(notes);
+  }
+
+  async readCanonicalRules() {
+    return structuredClone(this.rules);
+  }
+
+  async readChapterNotes() {
+    return structuredClone(this.notes);
+  }
+
+  async upsertNotes(rows: MarkSprintChapterNoteRow[]) {
+    this.upsertCalls++;
+    for (const row of rows) {
+      const index = this.notes.findIndex((note) => note.id === row.id);
+      if (index >= 0) this.notes[index] = structuredClone(row);
+      else this.notes.push(structuredClone(row));
+    }
+  }
+}
+
+async function verifyMark7Enablement(): Promise<void> {
+  // The recorded owner receipt must match the exact contract, apply only to
+  // mark-7, and never approve any other chapter.
+  assert.equal(
+    markSprintSetupApprovalMatches(MARK_7_SETUP_CONTRACT, MARK_7_STUDIO_SETUP_APPROVAL),
+    true,
+    "the Mark 7 owner receipt must match its setup contract exactly",
+  );
+  assert.equal(
+    markSprintScopedSetupApprovalApplies("mark-7", MARK_7_SETUP_CONTRACT, MARK_7_STUDIO_SETUP_APPROVAL),
+    true,
+  );
+  for (const other of ["mark-8", "mark-9", "mark-10", "mark-11"]) {
+    assert.equal(
+      markSprintScopedSetupApprovalApplies(other, MARK_7_SETUP_CONTRACT, MARK_7_STUDIO_SETUP_APPROVAL),
+      false,
+      `the Mark 7 receipt must not apply to ${other}`,
+    );
+  }
+  assert.equal(MARK_7_SETUP_CONTRACT.notes.length, 10);
+  assert.equal(new Set(MARK_7_SETUP_CONTRACT.notes.map((note) => note.rowId)).size, 10);
+  assert.ok(MARK_7_SETUP_CONTRACT.notes.every((note) => /^M7-/u.test(note.guidanceId)));
+  assert.ok(
+    new Set(MARK_7_SETUP_CONTRACT.notes.map((note) => note.rowId)).isDisjointFrom(
+      new Set(MARK_8_SETUP_NOTES.map((note) => note.rowId)),
+    ),
+    "Mark 7 deterministic rows must never collide with Mark 8 rows",
+  );
+  assert.equal(
+    markSprintSetupApprovalMatches(MARK_7_SETUP_CONTRACT, {
+      ...MARK_7_STUDIO_SETUP_APPROVAL!,
+      notes_digest: "0".repeat(64),
+    }),
+    false,
+  );
+
+  // The manifest policy accepts the receipt for mark-7 alone; the cross-slug
+  // fail-closed behavior for mark-9..11 stays asserted in verify:manifest.
+  const mark7Policy = buildMarkSprintManifestPolicy("mark-7");
+  const mark7Codes = mark7Policy.blockers.map((blocker) => blocker.code);
+  assert.ok(!mark7Codes.includes("guidance_not_approved" as never));
+  assert.ok(!mark7Codes.includes("chapter_note_row_ids_missing" as never));
+
+  // Preflight is slug-exact: a mark-7 runtime preview confirms as mark-7 and
+  // is rejected when Studio expected mark-8 (and vice versa).
+  const confirmableMark7 = { ...confirmablePreview, slug: "mark-7" };
+  const safeMark7 = buildMark8StudioPreflightResponse(confirmableMark7, "mark-7");
+  assert.equal(safeMark7.preview.slug, "mark-7");
+  assert.deepEqual(safeMark7.blockers, []);
+  assert.deepEqual(decideMark8StudioPreflight(safeMark7, "mark-7"), {
+    kind: "confirm",
+    manifestDigest: MANIFEST_DIGEST,
+  });
+  assert.equal(decideMark8StudioPreflight(safeMark7).kind, "blocked");
+  const wrongChapter = buildMark8StudioPreflightResponse(confirmableMark7);
+  assert.ok(wrongChapter.blockers.includes("Studio checked the wrong chapter."));
+  assert.equal(decideMark8StudioPreflight(wrongChapter).kind, "blocked");
+  const lockedMark7 = buildMark8StudioPreflightResponse(
+    {
+      ...lockedPreview,
+      slug: "mark-7",
+      evidenceBlockers: [
+        ...lockedPreview.evidenceBlockers,
+        { code: "LIVE_CHAPTER_NOTES_MISSING", message: "PRIVATE NOTE DETAIL" },
+      ],
+    },
+    "mark-7",
+  );
+  assert.ok(lockedMark7.blockers.includes("Mark 7 study notes are missing."));
+  assert.doesNotMatch(JSON.stringify(lockedMark7), /PRIVATE/u);
+
+  // Owner-facing copy: Mark 7 prepares the ESV Mark 6–8 window.
+  assert.match(studioSourcePreparationMessage("mark-7"), /Mark 6–8/u);
+  assert.match(studioSourcePreparationMessage("mark-7"), /131 verse-instances/u);
+  assert.match(studioConfirmationMessage("mark-7"), /one private Mark 7 draft/u);
+  assert.equal(studioSourcePreparationMessage("mark-8"), MARK_8_SOURCE_PREPARATION_MESSAGE);
+  assert.equal(studioConfirmationMessage("mark-8"), MARK_8_CONFIRMATION_MESSAGE);
+
+  // Generate requests: mark-7 now requires the exact prepared manifest digest.
+  assert.deepEqual(buildStudioGenerateRequest("mark-7", MANIFEST_DIGEST), {
+    action: "generate",
+    slug: "mark-7",
+    confirm: true,
+    approvedManifestDigest: MANIFEST_DIGEST,
+  });
+  assert.throws(() => buildStudioGenerateRequest("mark-7", null));
+  assert.equal(
+    isStudioGenerateEntryDisabled({
+      slug: "mark-7",
+      chapterBusy: false,
+      preflightBusy: false,
+      textGenerationEnabled: false,
+      published: false,
+    }),
+    false,
+    "the read-only Mark 7 check stays available while generation is OFF",
+  );
+
+  // Client setup decisions mirror the Mark 8 shape but carry the mark-7 slug.
+  const mark7SetupDecision = decideMarkSprintStudioSetup("mark-7", {
+    ok: true,
+    setup: {
+      slug: "mark-7",
+      approved: true,
+      complete: false,
+      canSetup: true,
+      setupDigest: MARK_7_SETUP_CONTRACT.setupDigest,
+      ruleCount: 99,
+      noteCount: 10,
+    },
+  });
+  assert.equal(mark7SetupDecision.kind, "setup");
+  assert.deepEqual(buildMarkSprintStudioSetupRequest("mark-7", mark7SetupDecision), {
+    action: "mark_sprint_setup",
+    slug: "mark-7",
+    confirm: true,
+    setupDigest: MARK_7_SETUP_CONTRACT.setupDigest,
+  });
+  assert.equal(
+    decideMarkSprintStudioSetup("mark-8", {
+      ok: true,
+      setup: {
+        slug: "mark-7",
+        approved: true,
+        complete: true,
+        canSetup: false,
+        setupDigest: MARK_7_SETUP_CONTRACT.setupDigest,
+        ruleCount: 99,
+        noteCount: 10,
+      },
+    }).kind,
+    "error",
+    "a mark-7 setup response must never satisfy another chapter's UI",
+  );
+
+  // Offline seeding behavior: ten inserts once, idempotent second run, and a
+  // wrong managed row refuses before any Brain or note write.
+  const sprintStore = new FakeSprintSetupStore(canonicalRuleRows(), []);
+  let sprintSeedCalls = 0;
+  const fakeSprintSeeder = async () => {
+    sprintSeedCalls++;
+    return { inserted: 0, updated: 0, unchanged: SEED_RULES.length, total: SEED_RULES.length };
+  };
+  const firstSprintSetup = await reconcileMarkSprintStudioSetup(
+    MARK_7_SETUP_CONTRACT,
+    sprintStore,
+    fakeSprintSeeder,
+    true,
+  );
+  assert.equal(sprintSeedCalls, 1);
+  assert.equal(firstSprintSetup.insertedNotes, 10);
+  assert.ok(sprintStore.notes.every((note) => note.slug === "mark-7"));
+  const secondSprintSetup = await reconcileMarkSprintStudioSetup(
+    MARK_7_SETUP_CONTRACT,
+    sprintStore,
+    fakeSprintSeeder,
+    true,
+  );
+  assert.equal(secondSprintSetup.insertedNotes, 0);
+  assert.equal(secondSprintSetup.updatedNotes, 0);
+
+  const managedMark7 = MARK_7_SETUP_CONTRACT.notes[0];
+  const wrongSprintRow = new FakeSprintSetupStore(canonicalRuleRows(), [
+    {
+      id: managedMark7.rowId,
+      slug: "mark-9",
+      tags: [...managedMark7.tags],
+      note: managedMark7.text,
+      scope: "chapter",
+    },
+  ]);
+  await assert.rejects(
+    () =>
+      reconcileMarkSprintStudioSetup(
+        MARK_7_SETUP_CONTRACT,
+        wrongSprintRow,
+        fakeSprintSeeder,
+        true,
+      ),
+    /needs review/u,
+  );
+  assert.equal(wrongSprintRow.upsertCalls, 0, "wrong managed row is never overwritten");
+
+  // Route integration: mark_sprint_setup_status/mark_sprint_setup accept only
+  // receipted chapters, require confirmation, and refuse a drifted digest.
+  process.env.DEV_ADMIN_TOKEN = ADMIN_TOKEN;
+  const route = await import("../app/api/admin/generation/route");
+  const generationSettings = await import("../lib/server/generation-settings");
+  const sprintAudit: Array<Record<string, unknown>> = [];
+  generationSettings.__setGenerationTestOverrides({ captureAudit: sprintAudit });
+  __setMarkSprintStudioSetupStoreForTesting(
+    new FakeSprintSetupStore(
+      canonicalRuleRows(),
+      MARK_7_SETUP_CONTRACT.notes.map((note) => ({
+        id: note.rowId,
+        slug: "mark-7",
+        tags: [...note.tags],
+        note: note.text,
+        scope: "chapter",
+      })),
+    ),
+  );
+  try {
+    const unauthorized = await route.POST(
+      adminRequest({ action: "mark_sprint_setup_status", slug: "mark-7" }, "wrong-token"),
+    );
+    assert.equal(unauthorized.status, 401);
+
+    const readyMark7 = await route.POST(
+      adminRequest({ action: "mark_sprint_setup_status", slug: "mark-7" }),
+    );
+    assert.equal(readyMark7.status, 200);
+    assert.deepEqual(decideMarkSprintStudioSetup("mark-7", await readyMark7.json()), {
+      kind: "ready",
+    });
+
+    for (const unknownSlug of ["mark-8", "mark-9", "exodus-27"]) {
+      const refusedStatus = await route.POST(
+        adminRequest({ action: "mark_sprint_setup_status", slug: unknownSlug }),
+      );
+      assert.equal(
+        refusedStatus.status,
+        400,
+        `factory setup status must refuse ${unknownSlug} (mark-8 keeps its own frozen action)`,
+      );
+      const refusedSetup = await route.POST(
+        adminRequest({
+          action: "mark_sprint_setup",
+          slug: unknownSlug,
+          confirm: true,
+          setupDigest: MARK_7_SETUP_CONTRACT.setupDigest,
+        }),
+      );
+      assert.equal(refusedSetup.status, 400);
+    }
+
+    const unconfirmed = await route.POST(
+      adminRequest({
+        action: "mark_sprint_setup",
+        slug: "mark-7",
+        setupDigest: MARK_7_SETUP_CONTRACT.setupDigest,
+      }),
+    );
+    assert.equal(unconfirmed.status, 400);
+
+    const drifted = await route.POST(
+      adminRequest({
+        action: "mark_sprint_setup",
+        slug: "mark-7",
+        confirm: true,
+        setupDigest: "0".repeat(64),
+      }),
+    );
+    assert.equal(drifted.status, 409);
+
+    assert.deepEqual(
+      sprintAudit.map(({ action, slug, status, message }) => ({ action, slug, status, message })),
+      [
+        {
+          action: "mark_sprint_setup",
+          slug: "mark-7",
+          status: "failed",
+          message: "refused:invalid_confirmation",
+        },
+        {
+          action: "mark_sprint_setup",
+          slug: "mark-7",
+          status: "started",
+          message: "owner-confirmed private setup",
+        },
+        {
+          action: "mark_sprint_setup",
+          slug: "mark-7",
+          status: "failed",
+          message: "refused:DIGEST_MISMATCH",
+        },
+      ],
+    );
+  } finally {
+    __setMarkSprintStudioSetupStoreForTesting(null);
+    generationSettings.__setGenerationTestOverrides(null);
+  }
 }
 
 main().catch((error) => {

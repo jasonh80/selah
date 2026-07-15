@@ -197,9 +197,19 @@ export function markSprintScopedSetupApprovalApplies(
 
 export const MARK_7_SETUP_CONTRACT = buildMarkSprintSetupContract("mark-7");
 
-// FAIL-CLOSED: Mark 7 remains blocked until the owner's exact approval of the
-// reviewed movements and ten notes is recorded here (a follow-up commit fills
-// this literal with the receipt digests printed by the setup contract — the
-// same flow Mark 8 used on 2026-07-13).
-export const MARK_7_STUDIO_SETUP_APPROVAL: MarkSprintStudioSetupApproval | null =
-  null;
+// Exact owner approval after Claude's independent read-only review of the ten
+// Mark 7 notes and the bound acceptance contract (37 ESV verses, five
+// movements M7-M01..M7-M05, Mark 7:16 handled as an omitted textual variant).
+// These literal digests must be updated by a new review if any bound input
+// changes.
+export const MARK_7_STUDIO_SETUP_APPROVAL: MarkSprintStudioSetupApproval | null = {
+  scope: "private_studio_mark7_guidance_and_notes",
+  slug: "mark-7",
+  approved_by: "Jason Hales (owner)",
+  approved_at: "2026-07-15T17:07:48Z",
+  evidence:
+    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7.",
+  guidance_digest: "d17ab079fcfc99ab7b6d855a0e1c05c0500b059f716f9e8d9ab595be31e57611",
+  notes_digest: "8c404ddcfa1cc3ff834a76fbf4f285f2f472d09c62e8c5366fe8d27c9d262c52",
+  receipt_digest: "badfb817497fe7329409d8f062ddbe3c8449548051b6e10f49f64470dfd520ff",
+};

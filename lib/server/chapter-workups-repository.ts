@@ -21,10 +21,11 @@ import {
   type JobRow,
 } from "./generation-jobs";
 import {
-  isStoredMark8ImageUrl,
-  mark8FinalReviewDigest,
+  isStoredMarkSprintImageUrl,
+  markSprintFinalReviewDigest,
   MARK_8_IMAGE_SLUG,
 } from "./mark8-image-plan";
+import { isConnectedStudioSlug } from "../studio-mark8-preflight";
 
 // NOTE (issue #8): the generation lifecycle (claim → verify → complete/fail)
 // lives EXCLUSIVELY in generation-jobs.ts with single-use job ids. This module
@@ -136,17 +137,25 @@ export type Mark8PublishValidation =
   | { ok: true; reviewDigest: string }
   | { ok: false; reason: string };
 
+function sprintChapterLabel(slug: string): string {
+  const match = /^mark-(\d+)$/u.exec(slug);
+  return match ? `Mark ${match[1]}` : slug;
+}
+
 /**
- * Pure final Mark 8 publication check. The browser supplies only the digest it
- * approved; this function recomputes the identity from the complete current
- * workup and independently verifies the finished image run and storage origin.
+ * Pure final protected-sprint publication check. The browser supplies only the
+ * digest it approved; this function recomputes the identity from the complete
+ * current workup and independently verifies the finished image run and
+ * storage origin.
  */
-export function validateMark8PublishCandidate(
+export function validateMarkSprintPublishCandidate(
+  slug: string,
   workup: ChapterWorkup,
   submittedReviewDigest: string | undefined,
   configuredSupabaseUrl: string | undefined,
   submittedSourceOverlapReportDigest?: string,
 ): Mark8PublishValidation {
+  const label = sprintChapterLabel(slug);
   const copyReview = sourceOverlapReviewAccepted(
     workup,
     submittedSourceOverlapReportDigest,
@@ -157,7 +166,7 @@ export function validateMark8PublishCandidate(
   if (!submittedReviewDigest || !LOWERCASE_SHA256.test(submittedReviewDigest)) {
     return {
       ok: false,
-      reason: "Review the final Mark 8 chapter and images again before publishing.",
+      reason: `Review the final ${label} chapter and images again before publishing.`,
     };
   }
 
@@ -165,19 +174,19 @@ export function validateMark8PublishCandidate(
   if (MARK_8_IMAGE_JOB_KEYS.some((key) => Object.prototype.hasOwnProperty.call(raw, key))) {
     return {
       ok: false,
-      reason: "Mark 8 images are still being prepared or need attention. Finish that step before publishing.",
+      reason: `${label} images are still being prepared or need attention. Finish that step before publishing.`,
     };
   }
 
-  const freshReviewDigest = mark8FinalReviewDigest(workup);
+  const freshReviewDigest = markSprintFinalReviewDigest(slug, workup);
   if (
     freshReviewDigest === null ||
     !Array.isArray(workup.images) ||
-    !workup.images.every(isStoredMark8ImageUrl)
+    !workup.images.every((image) => isStoredMarkSprintImageUrl(slug, image))
   ) {
     return {
       ok: false,
-      reason: "Mark 8 needs exactly 3 or 5 finished images from one completed image run before publishing.",
+      reason: `${label} needs exactly 3 or 5 finished images from one completed image run before publishing.`,
     };
   }
 
@@ -203,17 +212,33 @@ export function validateMark8PublishCandidate(
   if (!exactOrigin) {
     return {
       ok: false,
-      reason: "One or more Mark 8 images are outside Selah's chapter image storage. Nothing was published.",
+      reason: `One or more ${label} images are outside Selah's chapter image storage. Nothing was published.`,
     };
   }
 
   if (submittedReviewDigest !== freshReviewDigest) {
     return {
       ok: false,
-      reason: "Mark 8 changed after you reviewed it. Preview and approve the final chapter again.",
+      reason: `${label} changed after you reviewed it. Preview and approve the final chapter again.`,
     };
   }
   return { ok: true, reviewDigest: freshReviewDigest };
+}
+
+/** Frozen Mark 8 entry point (offline verifiers exercise this signature). */
+export function validateMark8PublishCandidate(
+  workup: ChapterWorkup,
+  submittedReviewDigest: string | undefined,
+  configuredSupabaseUrl: string | undefined,
+  submittedSourceOverlapReportDigest?: string,
+): Mark8PublishValidation {
+  return validateMarkSprintPublishCandidate(
+    MARK_8_IMAGE_SLUG,
+    workup,
+    submittedReviewDigest,
+    configuredSupabaseUrl,
+    submittedSourceOverlapReportDigest,
+  );
 }
 
 function publishLookup(row: JobRow | null | { error: string }): RowLookup {
@@ -300,7 +325,8 @@ export async function publishChapter(
   // generic publish action while its owner receipt/reviews are unmet
   // (PR #30 review, hole 2).
   if (isMarkSprintSlug(slug)) {
-    const validation = validateMark8PublishCandidate(
+    const validation = validateMarkSprintPublishCandidate(
+      slug,
       row.workupJson as unknown as ChapterWorkup,
       options.reviewDigest,
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -370,7 +396,7 @@ export async function getStudioChapterStatus(slug: string): Promise<StudioChapte
   if (error) return { status: null };
   const status = (data?.status as string | undefined) ?? null;
   const safeFailure =
-    slug === MARK_8_IMAGE_SLUG && status === "failed"
+    isConnectedStudioSlug(slug) && status === "failed"
       ? safeProtectedMarkFailure(data?.generation_error)
       : null;
   const copyInspection = inspectSourceOverlapReview(data?.workup_json);
