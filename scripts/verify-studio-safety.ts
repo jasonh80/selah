@@ -377,6 +377,8 @@ const WORKUP = { slug: "mark-8", title: "Mark 8" } as unknown as ChapterWorkup;
 const MARK8_IMAGE_WORKUP = {
   slug: "mark-8",
   title: "Mark 8",
+  book: "Mark",
+  chapter: 8,
   heroKind: "peter-confession",
   images: [
     {
@@ -426,6 +428,8 @@ function makeSprintImageWorkup(slug: string): ChapterWorkup {
   return {
     slug,
     title: `Mark ${chapter}`,
+    book: "Mark",
+    chapter,
     heroKind: "scene-two",
     images: [
       {
@@ -2915,6 +2919,28 @@ const realImagePipeline = async () => {
           ok(
             !protectedChapterServeAllowed("mark-7", completedSprintWorkup("mark-9")),
             "N6 a mark-9 workup under the mark-7 slug is never served",
+          );
+          // A self-labeling workup whose required book/chapter fields disagree
+          // with the canonical slug is never served (final re-review): slug
+          // and workup slug can both say "mark-7" while the body is Mark 9.
+          const conflictingChapter = completedSprintWorkup("mark-7") as unknown as Record<string, unknown>;
+          conflictingChapter.chapter = 9;
+          ok(
+            !protectedChapterServeAllowed("mark-7", conflictingChapter as unknown as ChapterWorkup),
+            "N6 a mark-7-labeled workup with chapter 9 is never served",
+          );
+          const conflictingBook = completedSprintWorkup("mark-7") as unknown as Record<string, unknown>;
+          conflictingBook.book = "Matthew";
+          ok(
+            !protectedChapterServeAllowed("mark-7", conflictingBook as unknown as ChapterWorkup),
+            "N6 a mark-7-labeled workup from another book is never served",
+          );
+          const missingIdentityFields = completedSprintWorkup("mark-7") as unknown as Record<string, unknown>;
+          delete missingIdentityFields.book;
+          delete missingIdentityFields.chapter;
+          ok(
+            !protectedChapterServeAllowed("mark-7", missingIdentityFields as unknown as ChapterWorkup),
+            "N6 a protected workup missing its required book/chapter fields fails closed",
           );
           // Non-sprint chapters are untouched by the gate.
           ok(

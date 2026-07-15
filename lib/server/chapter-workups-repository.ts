@@ -286,10 +286,17 @@ export function protectedChapterServeAllowed(
       ...(typeof stored?.chapter === "number" ? { chapter: stored.chapter } : {}),
     });
   if (!sprintIdentity) return true;
+  if (!isMarkSprintSlug(slug) || stored?.slug !== slug || !isConnectedStudioSlug(slug)) {
+    return false;
+  }
+  // The stored workup must identify as the SAME chapter in every field a
+  // workup is required to carry — a "mark-7"-labeled row whose body says
+  // Mark 9 (or another book) must never serve at the Mark 7 URL.
+  const expectedChapter = Number(slug.split("-")[1]);
   return (
-    isMarkSprintSlug(slug) &&
-    stored?.slug === slug &&
-    isConnectedStudioSlug(slug)
+    typeof stored.book === "string" &&
+    stored.book.trim().toLowerCase() === "mark" &&
+    stored.chapter === expectedChapter
   );
 }
 
