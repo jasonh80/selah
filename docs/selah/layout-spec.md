@@ -54,8 +54,8 @@ preview · walking-on-water key image · visible start of the Visual Chapter Pat
     secondary nav — an undistracted study state. (Builds on the existing
     ReadingModeProvider.)
 17. **Single-column, mobile-first stays.** No sidebars.
-18. **Remove public build/transparency info before launch.** (ESV copyright
-    attribution must remain — licensing.)
+18. **Remove public build/transparency info before launch.** ESV copyright
+    attribution remains — owner-confirmed 2026-07-15 (licensing requirement).
 
 ## Sequencing
 
