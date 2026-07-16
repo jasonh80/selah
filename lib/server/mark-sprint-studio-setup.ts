@@ -16,6 +16,8 @@ import {
   MARK_7_SETUP_CONTRACT,
   MARK_7_STUDIO_SETUP_APPROVAL,
   markSprintSetupApprovalMatches,
+  markSprintStoredApprovalApplies,
+  setupContractForApproval,
   type MarkSprintSetupContract,
   type MarkSprintStudioSetupApproval,
 } from "./mark-sprint-setup-contracts";
@@ -125,8 +127,31 @@ function approvalsReady(
   return (
     librarySeedApproved() &&
     (markSprintSetupApprovalMatches(setup.contract, setup.approval) ||
-      markSprintSetupApprovalMatches(setup.contract, storedApproval))
+      // Packet-aware (PR #40 review, item 6): a stored approval carrying an
+      // owner-edited packet is verified against a contract rebuilt from that
+      // exact packet.
+      markSprintStoredApprovalApplies(setup.contract.slug, storedApproval))
   );
+}
+
+/**
+ * The contract this chapter's setup actually operates on: the artifact
+ * contract for code-literal approvals and unedited rows, or the contract
+ * rebuilt from a receipt-verified owner-edited packet. Seeding, inspection,
+ * and the reviewed digest all follow this — the EXACT texts the owner
+ * approved are what reach chapter_review_notes.
+ */
+function effectiveSetupContract(
+  setup: MarkSprintFactorySetup,
+  storedApproval: MarkSprintStudioSetupApproval | null,
+): MarkSprintSetupContract {
+  if (
+    storedApproval?.packet_notes &&
+    markSprintStoredApprovalApplies(setup.contract.slug, storedApproval)
+  ) {
+    return setupContractForApproval(setup.contract.slug, storedApproval);
+  }
+  return setup.contract;
 }
 
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
@@ -383,8 +408,8 @@ export async function getMarkSprintStudioSetupStatus(
   slug: string,
 ): Promise<MarkSprintStudioSetupStatus> {
   const setup = requireFactorySetup(slug);
-  const { contract } = setup;
   const storedApproval = await readStoredSetupApproval(slug);
+  const contract = effectiveSetupContract(setup, storedApproval);
   if (!approvalsReady(setup, storedApproval)) {
     return {
       slug: contract.slug,
@@ -421,9 +446,9 @@ export async function runMarkSprintStudioSetup(
   result: MarkSprintStudioSetupResult;
 }> {
   const setup = requireFactorySetup(slug);
-  const { contract } = setup;
-  const label = markSprintChapterLabel(contract.slug);
   const storedApproval = await readStoredSetupApproval(slug);
+  const contract = effectiveSetupContract(setup, storedApproval);
+  const label = markSprintChapterLabel(contract.slug);
   if (!approvalsReady(setup, storedApproval)) {
     throw new MarkSprintStudioSetupError(
       "UNAPPROVED",

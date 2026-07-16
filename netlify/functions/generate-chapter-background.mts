@@ -8,6 +8,7 @@
 // (queued → running) — a duplicated delivery loses at that conditional write,
 // before any paid model call. Refusals are durably audited, not just logged.
 import {
+  CONNECTED_PROTECTED_TEXT_SLUGS,
   generateAndStoreChapter,
   generationAllowed,
   isProtectedMarkSprintGenerationIdentity,
@@ -21,7 +22,9 @@ import {
 import { logGenerationAuditVerified } from "../../lib/server/generation-settings";
 import { runConfiguredProtectedMarkDraftJob } from "../../lib/server/mark-sprint-draft-job";
 
-const CONNECTED_PROTECTED_SLUGS = ["mark-8", "mark-7"];
+// ONE source of truth with the route/runtime (PR #40 review, blocker 1) —
+// the worker's connected set can never drift from the server's again.
+const CONNECTED_PROTECTED_SLUGS: readonly string[] = CONNECTED_PROTECTED_TEXT_SLUGS;
 const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 
 type ProtectedMarkDraftRunner = typeof runConfiguredProtectedMarkDraftJob;
@@ -144,7 +147,8 @@ export default async (req: Request) => {
   }
 
   // Protected sprint chapters can never fall through to the generic generator.
-  // Only Mark 8 and Mark 7 are connected; Mark 9–11 remain explicitly blocked.
+  // The connected set is shared with the route (CONNECTED_PROTECTED_TEXT_SLUGS);
+  // chapters outside it (Mark 10–11) remain explicitly blocked here.
   if (isProtectedMarkSprintGenerationIdentity({ slug })) {
     if (!CONNECTED_PROTECTED_SLUGS.includes(slug) || approvedManifestDigest === undefined) {
       return refuse(

@@ -26,7 +26,10 @@ import {
 } from "@/lib/studio-mark-sprint-setup";
 import {
   buildPrepareChapterApproveRequest,
+  buildPrepareChapterPreviewRequest,
   decidePrepareChapterStatus,
+  prepareNotesEdited,
+  readPrepareChapterPreview,
   type PrepareChapterViewModel,
 } from "@/lib/studio-prepare-chapter";
 import { PrepareChapterScreen } from "./PrepareChapterScreen";
@@ -436,6 +439,8 @@ export default function SelahStudioPage() {
     setMark8SetupDecision(null);
     setMark8SetupBusy(false);
     setMark8SetupMsg("");
+    setPrepareMsg("");
+    setPreparedMsg("");
     mark8SetupRequest.current++;
     mark8PreflightRequest.current++;
     resetReview();
@@ -647,17 +652,52 @@ export default function SelahStudioPage() {
         setPrepareMsg("Studio could not load this chapter's preparation.");
       }
     } finally {
-      if (activeSlug.current === target) setPrepareBusy(false);
+      // Always release the flow — a chapter switch mid-load must never
+      // soft-lock the prepare button until a reload (adversarial review).
+      setPrepareBusy(false);
     }
   }
 
-  async function approvePrepareChapter() {
+  async function approvePrepareChapter(editedTexts: Readonly<Record<string, string>>) {
     const proposal = prepareScreen;
     if (!proposal || prepareBusy) return;
     setPrepareBusy(true);
     setPrepareMsg("");
+    // One owner action. For edited notes, the digest is recomputed
+    // server-side for EXACTLY the texts this request submits (read-only
+    // preview). The preview gets its own failure handling: nothing has been
+    // submitted yet, so its errors must never read as "approval unclear".
+    let setupDigest = proposal.setupDigest;
+    if (prepareNotesEdited(proposal, editedTexts)) {
+      try {
+        const preview = await api(
+          "POST",
+          buildPrepareChapterPreviewRequest(proposal, editedTexts),
+        );
+        const previewDigest = readPrepareChapterPreview(preview);
+        if (!previewDigest) {
+          setPrepareMsg(
+            typeof preview.error === "string"
+              ? preview.error
+              : "Studio could not verify the edited notes. Nothing was submitted — check them and try again.",
+          );
+          setPrepareBusy(false);
+          return;
+        }
+        setupDigest = previewDigest;
+      } catch {
+        setPrepareMsg(
+          "Studio could not check the edited notes. Nothing was submitted — try again.",
+        );
+        setPrepareBusy(false);
+        return;
+      }
+    }
     try {
-      const response = await api("POST", buildPrepareChapterApproveRequest(proposal));
+      const response = await api(
+        "POST",
+        buildPrepareChapterApproveRequest(proposal, editedTexts, setupDigest),
+      );
       if (response.ok === true && response.prepared === true) {
         setPrepareScreen(null);
         setPreparedMsg(
@@ -668,15 +708,17 @@ export default function SelahStudioPage() {
         void loadMark8Setup(proposal.slug);
       } else {
         // Failure preserves the proposal on screen; retry is an owner click.
+        // Only the SERVER may claim the approval was saved (PR #40 review,
+        // blocker 4) — the fallback stays neutral about what was recorded.
         setPrepareMsg(
           typeof response.error === "string"
             ? response.error
-            : `Studio could not safely finish preparing ${proposal.label}. Your approval is saved; try again.`,
+            : `Studio could not safely finish preparing ${proposal.label}. Check and try again.`,
         );
       }
     } catch {
       setPrepareMsg(
-        `Studio could not safely finish preparing ${proposal.label}. Your approval is saved; try again.`,
+        `Studio lost its connection while preparing ${proposal.label}. It is unclear whether your approval was recorded — reload and check before approving again.`,
       );
     } finally {
       setPrepareBusy(false);
@@ -1340,7 +1382,7 @@ export default function SelahStudioPage() {
           proposal={prepareScreen}
           busy={prepareBusy}
           error={prepareMsg}
-          onApprove={() => void approvePrepareChapter()}
+          onApprove={(editedTexts) => void approvePrepareChapter(editedTexts)}
           onBack={() => {
             if (prepareBusy) return;
             setPrepareScreen(null);

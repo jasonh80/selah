@@ -28,9 +28,8 @@ import {
 } from "./mark8-image-plan";
 import { isConnectedStudioSlug } from "../studio-mark8-preflight";
 import {
-  buildMarkSprintSetupContract,
   connectedChapterReceiptApplies,
-  markSprintScopedSetupApprovalApplies,
+  markSprintStoredApprovalApplies,
   type MarkSprintStudioSetupApproval,
 } from "./mark-sprint-setup-contracts";
 import { readStoredSetupApproval } from "./chapter-setup-approvals";
@@ -181,11 +180,9 @@ export function validateMarkSprintPublishCandidate(
   // out-of-band draft's images and digests look.
   const storedReceiptApplies =
     isMarkSprintSlug(slug) &&
-    markSprintScopedSetupApprovalApplies(
-      slug,
-      buildMarkSprintSetupContract(slug),
-      storedReceiptApproval ?? null,
-    );
+    // Packet-aware (PR #40 review, item 6): an owner-edited approval is
+    // verified against a contract rebuilt from its own exact packet.
+    markSprintStoredApprovalApplies(slug, storedReceiptApproval ?? null);
   if (
     !isConnectedStudioSlug(slug) ||
     (!connectedChapterReceiptApplies(slug) && !storedReceiptApplies)
@@ -321,11 +318,8 @@ export function protectedChapterServeAllowed(
   }
   const receipted =
     connectedChapterReceiptApplies(slug) ||
-    markSprintScopedSetupApprovalApplies(
-      slug,
-      buildMarkSprintSetupContract(slug),
-      storedReceiptApproval ?? null,
-    );
+    // Packet-aware (PR #40 review, item 6): see markSprintStoredApprovalApplies.
+    markSprintStoredApprovalApplies(slug, storedReceiptApproval ?? null);
   if (!receipted) return false;
   // The stored workup must identify as the SAME chapter in every field a
   // workup is required to carry — a "mark-7"-labeled row whose body says

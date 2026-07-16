@@ -17,8 +17,20 @@ interface AcceptanceChapters {
     string,
     {
       expected_verse_count: number;
-      required_movements: Array<{ id: string; startVerse: number; endVerse: number }>;
+      required_movements: Array<{
+        id: string;
+        startVerse: number;
+        endVerse: number;
+        // Owner-facing movement name/reason (PR #40 review, item 7) — ride
+        // the projection verbatim, so they are digest-bound where present.
+        name?: string;
+        reason?: string;
+      }>;
+      manual_guardrails?: string[];
       textual_variants: string[];
+      // Honest location entries (PR #40 review, item 8): certainty is the
+      // approved model — "known" point, "debated" area, or "none" (no pin).
+      locations?: Array<{ name: string; certainty: string; display: string }>;
     }
   >;
 }
@@ -70,6 +82,16 @@ export interface MarkSprintSetupNote {
   readonly tags: readonly string[];
 }
 
+/** One owner-editable packet note: same id set/order as the reviewed
+ * artifact, text possibly edited on the Prepare screen (PR #40 review,
+ * item 6). */
+export interface MarkSprintPacketNote {
+  readonly id: string;
+  readonly text: string;
+}
+
+export const PACKET_NOTE_MAX_CHARS = 4000;
+
 export interface MarkSprintStudioSetupApproval {
   readonly scope: string;
   readonly slug: MarkSprintSlug;
@@ -79,6 +101,13 @@ export interface MarkSprintStudioSetupApproval {
   readonly guidance_digest: string;
   readonly notes_digest: string;
   readonly receipt_digest: string;
+  /**
+   * The exact owner-edited note texts this approval binds (null/absent =
+   * the unedited version-controlled artifact notes). Digest verification
+   * always recomputes the contract FROM this packet, so a stored row can
+   * only ever approve the exact texts the owner read and approved.
+   */
+  readonly packet_notes?: readonly MarkSprintPacketNote[] | null;
 }
 
 export interface MarkSprintSetupContract {
@@ -92,12 +121,49 @@ export interface MarkSprintSetupContract {
   readonly expectedNoteCount: number;
 }
 
+/**
+ * Whether an owner-edited packet is structurally acceptable for this chapter:
+ * the exact artifact note ids in the exact artifact order, every text a
+ * non-empty string within the size cap. Semantic review stays with the owner
+ * and Codex; this only rejects malformed shapes.
+ */
+export function packetNotesValidFor(
+  slug: MarkSprintSlug,
+  packetNotes: readonly MarkSprintPacketNote[],
+): boolean {
+  const baseNotes = guidance.chapters[slug]?.notes ?? [];
+  return (
+    baseNotes.length > 0 &&
+    packetNotes.length === baseNotes.length &&
+    packetNotes.every(
+      (note, index) =>
+        Boolean(note) &&
+        note.id === baseNotes[index].id &&
+        typeof note.text === "string" &&
+        note.text.trim() !== "" &&
+        note.text.length <= PACKET_NOTE_MAX_CHARS,
+    )
+  );
+}
+
 export function buildMarkSprintSetupContract(
   slug: MarkSprintSlug,
+  packetNotes?: readonly MarkSprintPacketNote[],
 ): MarkSprintSetupContract {
   const compact = slug.replace(/-/g, "");
   const scope = `private_studio_${compact}_guidance_and_notes`;
-  const chapterNotes = guidance.chapters[slug]?.notes ?? [];
+  // An owner-edited packet replaces the note TEXTS only — ids, order, and
+  // count are pinned to the reviewed artifact, and every digest below
+  // (guidance, notes, setup, deterministic row ids) derives from the exact
+  // edited text, so the receipt binds precisely what the owner approved
+  // (PR #40 review, item 6). A malformed packet is a server bug here — the
+  // route and the stored-row reader both validate before calling.
+  if (packetNotes && !packetNotesValidFor(slug, packetNotes)) {
+    throw new Error(`edited ${slug} packet does not match the reviewed note structure`);
+  }
+  const chapterNotes = packetNotes
+    ? packetNotes.map((note) => ({ id: note.id, text: note.text }))
+    : guidance.chapters[slug]?.notes ?? [];
   // Bind the approval to every shared setting that can affect this chapter's
   // draft while deliberately excluding the other chapters' notes — a
   // note-only receipt must never approve the wider packet.
@@ -115,12 +181,17 @@ export function buildMarkSprintSetupContract(
       requiredVoiceExample: guidance.required_voice_example,
       chapter: { slug, notes: chapterNotes },
       // The owner's receipt binds the FULL chapter contract — exact verse
-      // count, the five movement ranges, and the omitted-verse policy — not
-      // only the notes (PR #30 review, hole 4).
+      // count, every movement range (with any owner-facing name/reason the
+      // fixture carries), the omitted-verse policy, the displayed watch-outs
+      // (PR #40 review, blocker 3), and the honest location entries — not
+      // only the notes (PR #30 review, hole 4). Editing ANY of these
+      // invalidates every existing receipt for the chapter.
       acceptance: {
         expectedVerseCount: acceptance.chapters[slug]?.expected_verse_count ?? null,
         requiredMovements: acceptance.chapters[slug]?.required_movements ?? [],
+        manualGuardrails: acceptance.chapters[slug]?.manual_guardrails ?? [],
         textualVariants: acceptance.chapters[slug]?.textual_variants ?? [],
+        locations: acceptance.chapters[slug]?.locations ?? [],
       },
     }),
   );
@@ -196,6 +267,41 @@ export function markSprintScopedSetupApprovalApplies(
   );
 }
 
+/**
+ * The packet-aware contract an approval must be verified against: built from
+ * the approval's own edited packet when it carries one, else the artifact.
+ * Every consumer of a STORED approval must verify through this — comparing an
+ * edited approval against the artifact contract fails closed (safe), but
+ * would wrongly reject legitimately edited packets.
+ */
+export function setupContractForApproval(
+  slug: MarkSprintSlug,
+  approval: MarkSprintStudioSetupApproval | null,
+): MarkSprintSetupContract {
+  const packet = approval?.packet_notes ?? undefined;
+  if (packet && !packetNotesValidFor(slug, packet)) {
+    // A malformed stored packet can never mint a matching contract — verify
+    // against the artifact contract instead, which its digests cannot match.
+    return buildMarkSprintSetupContract(slug);
+  }
+  return buildMarkSprintSetupContract(slug, packet);
+}
+
+/** Stored-approval verification in one step, always packet-aware. */
+export function markSprintStoredApprovalApplies(
+  slug: string,
+  approval: MarkSprintStudioSetupApproval | null,
+): boolean {
+  if (!approval) return false;
+  const contractSlug = approval.slug;
+  if (slug !== contractSlug) return false;
+  return markSprintScopedSetupApprovalApplies(
+    slug,
+    setupContractForApproval(contractSlug, approval),
+    approval,
+  );
+}
+
 export const MARK_7_SETUP_CONTRACT = buildMarkSprintSetupContract("mark-7");
 
 // Exact owner approval after Claude's independent read-only review of the ten
@@ -203,16 +309,25 @@ export const MARK_7_SETUP_CONTRACT = buildMarkSprintSetupContract("mark-7");
 // movements M7-M01..M7-M05, Mark 7:16 handled as an omitted textual variant).
 // These literal digests must be updated by a new review if any bound input
 // changes.
+//
+// RE-MINTED 2026-07-16 (PR #40 review, blocker 3): the guidance/setup digests
+// were recomputed after the projection began binding the fixture's
+// manual_guardrails and location entries. NO bound content changed — the
+// exact notes (notes_digest is byte-identical), movements, verse count, and
+// variants the owner approved are unchanged; the projection now additionally
+// freezes the watch-outs it always displayed. This re-mint ships inside PR
+// #40 for Codex re-review and the owner's merge, which is the human approval
+// of the strengthened binding.
 export const MARK_7_STUDIO_SETUP_APPROVAL: MarkSprintStudioSetupApproval | null = {
   scope: "private_studio_mark7_guidance_and_notes",
   slug: "mark-7",
   approved_by: "Jason Hales (owner)",
   approved_at: "2026-07-15T17:07:48Z",
   evidence:
-    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7.",
-  guidance_digest: "d17ab079fcfc99ab7b6d855a0e1c05c0500b059f716f9e8d9ab595be31e57611",
+    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged).",
+  guidance_digest: "db23ddec78f4b960ab0bc13b47b61d3b2ad959c3987eb9ab0c2bce732a1dd865",
   notes_digest: "8c404ddcfa1cc3ff834a76fbf4f285f2f472d09c62e8c5366fe8d27c9d262c52",
-  receipt_digest: "badfb817497fe7329409d8f062ddbe3c8449548051b6e10f49f64470dfd520ff",
+  receipt_digest: "895e4c6738ab7c0b19ae1cb2578903608579d53ff014db9b942d6ed0bef2c4e9",
 };
 
 // ---- connected-chapter receipt gate ------------------------------------------

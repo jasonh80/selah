@@ -13,10 +13,11 @@
 // code literals; this store serves chapters approved in-screen (Mark 9+).
 import { getSupabaseAdmin } from "./supabase";
 import {
-  buildMarkSprintSetupContract,
   connectedChapterReceiptApplies,
   connectedReceiptOverrideForTesting,
-  markSprintScopedSetupApprovalApplies,
+  markSprintStoredApprovalApplies,
+  packetNotesValidFor,
+  type MarkSprintPacketNote,
   type MarkSprintStudioSetupApproval,
 } from "./mark-sprint-setup-contracts";
 import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
@@ -47,7 +48,7 @@ function productionStore(): StoredSetupApprovalStore | null {
       const { data, error } = await db
         .from(TABLE)
         .select(
-          "slug,scope,approved_by,approved_at,evidence,guidance_digest,notes_digest,receipt_digest",
+          "slug,scope,approved_by,approved_at,evidence,guidance_digest,notes_digest,receipt_digest,packet_notes",
         )
         .eq("slug", slug)
         .maybeSingle();
@@ -82,6 +83,22 @@ export async function readStoredSetupApproval(
   if (!raw) return null;
   const text = (key: string): string =>
     typeof raw[key] === "string" ? (raw[key] as string) : "";
+  // The optional owner-edited packet (PR #40 review, item 6): absent/null is
+  // the unedited artifact; anything present must be the exact artifact note
+  // structure with non-empty texts, or the whole row answers "no receipt".
+  let packetNotes: readonly MarkSprintPacketNote[] | null = null;
+  if (raw.packet_notes !== undefined && raw.packet_notes !== null) {
+    if (!Array.isArray(raw.packet_notes)) return null;
+    const candidate = raw.packet_notes.map((note) => ({
+      id: typeof (note as { id?: unknown })?.id === "string" ? (note as { id: string }).id : "",
+      text:
+        typeof (note as { text?: unknown })?.text === "string"
+          ? (note as { text: string }).text
+          : "",
+    }));
+    if (!packetNotesValidFor(slug, candidate)) return null;
+    packetNotes = candidate;
+  }
   const approval: MarkSprintStudioSetupApproval = {
     scope: text("scope"),
     slug,
@@ -91,6 +108,7 @@ export async function readStoredSetupApproval(
     guidance_digest: text("guidance_digest"),
     notes_digest: text("notes_digest"),
     receipt_digest: text("receipt_digest"),
+    packet_notes: packetNotes,
   };
   if (
     raw.slug !== slug ||
@@ -124,6 +142,9 @@ export async function recordStoredSetupApproval(
     guidance_digest: approval.guidance_digest,
     notes_digest: approval.notes_digest,
     receipt_digest: approval.receipt_digest,
+    packet_notes: approval.packet_notes
+      ? approval.packet_notes.map((note) => ({ id: note.id, text: note.text }))
+      : null,
   });
 }
 
@@ -142,9 +163,7 @@ export async function connectedChapterReceiptAppliesIncludingStored(
   if (!isMarkSprintSlug(slug)) return false;
   const stored = await readStoredSetupApproval(slug);
   if (!stored) return false;
-  return markSprintScopedSetupApprovalApplies(
-    slug,
-    buildMarkSprintSetupContract(slug),
-    stored,
-  );
+  // Packet-aware: the digests are verified against a contract rebuilt from
+  // the approval's own (possibly owner-edited) packet.
+  return markSprintStoredApprovalApplies(slug, stored);
 }

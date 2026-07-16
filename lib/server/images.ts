@@ -33,6 +33,8 @@ import {
   connectedChapterLabel,
   isConnectedStudioSlug,
 } from "../studio-mark8-preflight";
+import { connectedChapterReceiptAppliesIncludingStored } from "./chapter-setup-approvals";
+import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
 
 // Fallback default only — the ACTIVE model comes from Supabase settings
 // (selected_image_model, Studio-controlled). Never silently falls back: the
@@ -460,6 +462,18 @@ async function generateAndStoreChapterImagesWithinDeadline(
     // immediately before the storage/model envelope begins.
     if (!(await withinImageRunDeadline(deadline, () => imageGenAllowed(slug)))) {
       throw new Error("image generation was disabled before spend");
+    }
+    // The owner setup receipt is freshly recomputed again IMMEDIATELY before
+    // model spend (PR #40 review, blocker 2): a receipt deleted or drifted
+    // between the route's claim-time check and this worker run releases the
+    // claim with zero credit used.
+    if (
+      isMarkSprintSlug(slug) &&
+      !(await withinImageRunDeadline(deadline, () =>
+        connectedChapterReceiptAppliesIncludingStored(slug),
+      ))
+    ) {
+      throw new Error("owner setup receipt missing or changed before spend");
     }
     const recheckedModel = isDynamicMark8 ? MARK_8_IMAGE_MODEL : await activeImageModel();
     if (recheckedModel !== model) throw new Error("selected image model changed before spend");

@@ -21,6 +21,7 @@ import { getGenerationSettings, logGenerationAudit } from "./generation-settings
 import { selectRulesForGeneration, getChapterReviewNoteTexts } from "./selah-brain";
 import { getRelevantExamples, TEXT_EXAMPLE_TYPES } from "./selah-examples";
 import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
+import { CONNECTED_STUDIO_SLUGS } from "../studio-mark8-preflight";
 
 // TEST SEAM (offline safety gate only): skip the env-configured checks so the
 // verify script can drive the REAL route/worker with fake settings + store —
@@ -40,14 +41,29 @@ export async function generationAllowed(slug: string): Promise<boolean> {
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);
 }
 
-// Protected sprint chapters connected to paid work. Each entered only with
-// its own owner-approved setup receipt; Mark 9-11 remain fail-closed until
-// their own launch work is connected.
-export const CONNECTED_PROTECTED_TEXT_SLUGS = ["mark-8", "mark-7"] as const;
+// Protected sprint chapters connected to paid work. ONE source of truth with
+// the Studio connection list (PR #40 review, blocker 1: mark-9 was connected
+// for Studio but missing here, so its refusal landed only AFTER the route's
+// allowlist write). A chapter still runs nothing without its own owner
+// receipt, manifest digest, and kill switch; Mark 10-11 remain fail-closed
+// until they are connected in CONNECTED_STUDIO_SLUGS.
+export const CONNECTED_PROTECTED_TEXT_SLUGS = CONNECTED_STUDIO_SLUGS;
+
+/** Membership in the runnable protected set — pure, safe to check BEFORE any
+ * settings write. */
+export function protectedTextRunConnected(slug: string): boolean {
+  return (CONNECTED_PROTECTED_TEXT_SLUGS as readonly string[]).includes(slug);
+}
+
+/** Environment prerequisites of any paid text run — no settings dependency,
+ * safe to check BEFORE any settings write. */
+export function protectedTextRunConfigured(): boolean {
+  return configCheckBypassForTesting || (isOpenAIConfigured() && isSupabaseConfigured());
+}
 
 export async function mark8GenerationAllowed(slug: string): Promise<boolean> {
-  if (!(CONNECTED_PROTECTED_TEXT_SLUGS as readonly string[]).includes(slug)) return false;
-  if (!configCheckBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
+  if (!protectedTextRunConnected(slug)) return false;
+  if (!protectedTextRunConfigured()) return false;
   const s = await getGenerationSettings();
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);
 }

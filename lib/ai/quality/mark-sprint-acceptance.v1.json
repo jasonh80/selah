@@ -115,42 +115,58 @@
         {
           "id": "M9-M01",
           "startVerse": 1,
-          "endVerse": 1
+          "endVerse": 1,
+          "name": "The hinge saying",
+          "reason": "Verse 1 bridges 8:38 and the mountain: some standing here will see the kingdom having come with power."
         },
         {
           "id": "M9-M02",
           "startVerse": 2,
-          "endVerse": 8
+          "endVerse": 8,
+          "name": "The Transfiguration",
+          "reason": "Jesus transfigured with Moses and Elijah; the Father's voice — 'listen to him' — closes the scene."
         },
         {
           "id": "M9-M03",
           "startVerse": 9,
-          "endVerse": 13
+          "endVerse": 13,
+          "name": "Coming down: the Elijah question",
+          "reason": "Silence until the rising, and the disciples' Elijah question answered on the descent."
         },
         {
           "id": "M9-M04",
           "startVerse": 14,
-          "endVerse": 29
+          "endVerse": 29,
+          "name": "The suffering boy and his father",
+          "reason": "The failed disciples, the father's honest 'I believe; help my unbelief,' and prayer-dependence belong to one scene."
         },
         {
           "id": "M9-M05",
           "startVerse": 30,
-          "endVerse": 32
+          "endVerse": 32,
+          "name": "The second passion prediction",
+          "reason": "A private teaching passage: delivered, killed, rising — and they did not understand."
         },
         {
           "id": "M9-M06",
           "startVerse": 33,
-          "endVerse": 37
+          "endVerse": 37,
+          "name": "Greatness and the child",
+          "reason": "The Capernaum argument about who is greatest is answered with a servant's place and a child."
         },
         {
           "id": "M9-M07",
           "startVerse": 38,
-          "endVerse": 41
+          "endVerse": 41,
+          "name": "The outsider in Jesus' name",
+          "reason": "John's gatekeeping is corrected: whoever is not against us is for us."
         },
         {
           "id": "M9-M08",
           "startVerse": 42,
-          "endVerse": 50
+          "endVerse": 50,
+          "name": "Stumbling, salt, and peace",
+          "reason": "The severe hyperbole against causing stumbling runs into salt and peace as one closing charge."
         }
       ],
       "manual_guardrails": [
@@ -164,6 +180,23 @@
         "Mark 9:29: some manuscripts add fasting.",
         "Mark 9:44 and 9:46: later-manuscript additions affect numbering in some editions.",
         "Mark 9:49: wording and interpretation require edition-aware review."
+      ],
+      "locations": [
+        {
+          "name": "Capernaum",
+          "certainty": "known",
+          "display": "Known site on the north shore of the Sea of Galilee (9:33); shown as a point."
+        },
+        {
+          "name": "High mountain of the Transfiguration",
+          "certainty": "none",
+          "display": "Mark leaves the high mountain unnamed (9:2). Tabor is traditional and a Hermon-area setting is argued from the preceding chapter's geography — no pin; the uncertainty is stated plainly."
+        },
+        {
+          "name": "Passage through Galilee",
+          "certainty": "none",
+          "display": "They passed through Galilee (9:30) by an unrecorded route — no pin and no invented line."
+        }
       ]
     },
     "mark-10": {

@@ -24,7 +24,7 @@ import {
   type Mark8StudioSetupApproval,
 } from "./mark8-studio-setup-contract";
 import {
-  buildMarkSprintSetupContract,
+  setupContractForApproval,
   MARK_7_SETUP_CONTRACT,
   MARK_7_STUDIO_SETUP_APPROVAL,
   markSprintScopedSetupApprovalApplies,
@@ -256,8 +256,14 @@ export function buildMarkSprintManifestPolicy(
   // A Prepare-Chapter approval row (Mark 9+) counts ONLY when it matches this
   // slug's freshly recomputed contract — the same strictness as the frozen
   // Mark 7/8 literals, with the approval read from the database instead.
+  // Packet-aware (PR #40 review, item 6): when the stored approval carries
+  // owner-edited note texts, the contract is rebuilt FROM that exact packet,
+  // so its digests, deterministic row ids, and the note requirements below
+  // all bind the edited texts the owner actually approved.
   const factoryContract =
-    slug !== "mark-8" && slug !== "mark-7" ? buildMarkSprintSetupContract(slug) : null;
+    slug !== "mark-8" && slug !== "mark-7"
+      ? setupContractForApproval(slug, options.storedGuidanceApproval ?? null)
+      : null;
   const exactStoredGuidanceApproved = Boolean(
     factoryContract &&
       markSprintScopedSetupApprovalApplies(
@@ -316,11 +322,21 @@ export function buildMarkSprintManifestPolicy(
       liveMatchRequired: true,
       liveMatchEvidence: null,
     },
-    chapterNotes: guidance.chapters[slug].notes.map((note) => ({
-      id: note.id,
-      textDigest: sha256Text(note.text),
-      expectedStoredRowId: storedNoteIds?.get(note.id) ?? null,
-    })),
+    // For a receipt-verified stored packet, the note requirements bind the
+    // OWNER-EDITED texts (digests and deterministic row ids from the packet);
+    // otherwise the version-controlled artifact texts bind, exactly as before.
+    chapterNotes:
+      factoryContract && exactStoredGuidanceApproved
+        ? factoryContract.notes.map((note) => ({
+            id: note.guidanceId,
+            textDigest: note.textDigest,
+            expectedStoredRowId: note.rowId,
+          }))
+        : guidance.chapters[slug].notes.map((note) => ({
+            id: note.id,
+            textDigest: sha256Text(note.text),
+            expectedStoredRowId: storedNoteIds?.get(note.id) ?? null,
+          })),
     source: (() => {
       const chapter = Number(slug.split("-")[1]);
       const radius = guidance.source_requirement.context_chapters_each_side;

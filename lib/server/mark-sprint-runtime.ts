@@ -344,6 +344,7 @@ function approvalBlockers(
 
 function staticEvidence(
   policy: MarkSprintManifestPolicy,
+  storedPacketNotes: readonly { id: string; text: string }[] | null = null,
 ): {
   blockers: MarkSprintRuntimeEvidenceBlocker[];
   rules: Array<{ id: string; text: string }>;
@@ -365,20 +366,31 @@ function staticEvidence(
     }
     return [{ id: rule.id, text: rule.text }];
   });
-  const notes = guidance.chapters[policy.requirements.slug]?.notes ?? [];
+  // The expected note TEXTS come from whichever source the policy's digests
+  // bind: the version-controlled artifact, or (PR #40 review, item 6) the
+  // receipt-verified owner-edited packet the policy was built from. The
+  // digest equality below is the sole authority — a packet whose digests do
+  // not match the policy can never substitute for the artifact, and the
+  // artifact-level identity checks (packet id/version/content digest) always
+  // apply regardless of which note source is in effect.
+  const artifactNotes = guidance.chapters[policy.requirements.slug]?.notes ?? [];
   const expectedNotes = policy.requirements.chapterNotes;
+  const digestsOf = (source: readonly { id: string; text: string }[]) =>
+    canonicalJson(source.map((note) => ({ id: note.id, textDigest: sha256Text(note.text) })));
+  const policyNoteDigests = canonicalJson(
+    expectedNotes.map((note) => ({ id: note.id, textDigest: note.textDigest })),
+  );
+  const notes: GuidanceNote[] =
+    storedPacketNotes && digestsOf(storedPacketNotes) === policyNoteDigests
+      ? storedPacketNotes.map((note) => ({ id: note.id, text: note.text }))
+      : artifactNotes;
   if (
     guidance.packet_id !== policy.requirements.guidance.packetId ||
     guidance.version !== policy.requirements.guidance.packetVersion ||
     guidance.library_version !== policy.requirements.brain.libraryVersion ||
     sha256Canonical(guidanceArtifact) !==
       policy.requirements.guidance.contentDigest ||
-    canonicalJson(
-      notes.map((note) => ({ id: note.id, textDigest: sha256Text(note.text) })),
-    ) !==
-      canonicalJson(
-        expectedNotes.map((note) => ({ id: note.id, textDigest: note.textDigest })),
-      )
+    digestsOf(notes) !== policyNoteDigests
   ) {
     blockers.push(
       evidenceBlocker(
@@ -673,10 +685,11 @@ export async function prepareMarkSprintRuntime(
   // Prepare-Chapter chapters (Mark 9+) carry their owner approval as a
   // digest-bound database row instead of a code literal — fetch it here so
   // the policy can validate it against the freshly built contract.
+  const storedGuidanceApproval = await readStoredSetupApproval(slug);
   const policy = buildMarkSprintManifestPolicy(slug, {
-    storedGuidanceApproval: await readStoredSetupApproval(slug),
+    storedGuidanceApproval,
   });
-  const versioned = staticEvidence(policy);
+  const versioned = staticEvidence(policy, storedGuidanceApproval?.packet_notes ?? null);
   if (versioned.blockers.length) {
     return runtimePreparationResult(
       blockedPreview(slug, policy, versioned.blockers, input.ownerAuthorized),
