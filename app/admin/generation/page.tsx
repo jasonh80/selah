@@ -651,13 +651,16 @@ export default function SelahStudioPage() {
     }
   }
 
-  async function approvePrepareChapter() {
+  async function approvePrepareChapter(editedNoteTexts: Record<string, string>) {
     const proposal = prepareScreen;
     if (!proposal || prepareBusy) return;
     setPrepareBusy(true);
     setPrepareMsg("");
     try {
-      const response = await api("POST", buildPrepareChapterApproveRequest(proposal));
+      const response = await api(
+        "POST",
+        buildPrepareChapterApproveRequest(proposal, editedNoteTexts),
+      );
       if (response.ok === true && response.prepared === true) {
         setPrepareScreen(null);
         setPreparedMsg(
@@ -1340,7 +1343,7 @@ export default function SelahStudioPage() {
           proposal={prepareScreen}
           busy={prepareBusy}
           error={prepareMsg}
-          onApprove={() => void approvePrepareChapter()}
+          onApprove={(editedNoteTexts) => void approvePrepareChapter(editedNoteTexts)}
           onBack={() => {
             if (prepareBusy) return;
             setPrepareScreen(null);

@@ -168,6 +168,110 @@ export function buildMarkSprintSetupContract(
   });
 }
 
+// ---- Prepare Chapter packet contracts (owner decision A5 + PR #40 review) --
+// A prepared chapter's receipt binds the PACKET the owner actually read and
+// approved on screen — movements WITH their names/reasons, the (possibly
+// owner-edited) notes, the watch-outs, textual variants, and locations. The
+// shared policy projection still pins the version-controlled packet policy,
+// so a packet can never smuggle a different model/source/rule set. Mark 7/8
+// keep their frozen legacy projections (their literal digests must not move).
+export interface PreparedMovement {
+  readonly id: string;
+  readonly startVerse: number;
+  readonly endVerse: number;
+  readonly name: string;
+  readonly reason: string;
+}
+
+export interface PreparedLocation {
+  readonly name: string;
+  readonly certainty: "known" | "debated" | "uncertain";
+  readonly display: string;
+}
+
+export interface PreparedChapterPacket {
+  readonly movements: readonly PreparedMovement[];
+  readonly notes: ReadonlyArray<{ readonly id: string; readonly text: string }>;
+  readonly watchouts: readonly string[];
+  readonly textualVariants: readonly string[];
+  readonly locations: readonly PreparedLocation[];
+}
+
+export function buildPreparedSetupContract(
+  slug: MarkSprintSlug,
+  packet: PreparedChapterPacket,
+): MarkSprintSetupContract {
+  const compact = slug.replace(/-/g, "");
+  const scope = `private_studio_${compact}_guidance_and_notes`;
+  const guidanceProjection = deepFreeze(
+    structuredClone({
+      packetId: guidance.packet_id,
+      packetVersion: guidance.version,
+      packetStatusAtReview: guidance.status,
+      libraryVersion: guidance.library_version,
+      authoringPolicy: guidance.authoring_policy,
+      ownerSourceDecision: guidance.owner_source_decision,
+      sourceRequirement: guidance.source_requirement,
+      expectedModel: guidance.expected_model,
+      requiredRuleIds: guidance.required_rule_ids,
+      requiredVoiceExample: guidance.required_voice_example,
+      chapter: { slug, notes: packet.notes },
+      // The FULL displayed packet is digest-bound (PR #40 review, blocker 3):
+      // editing any movement, watch-out, variant, or location — not only a
+      // note — invalidates the receipt.
+      acceptance: {
+        expectedVerseCount: acceptance.chapters[slug]?.expected_verse_count ?? null,
+        requiredMovements: packet.movements,
+        textualVariants: packet.textualVariants,
+        manualGuardrails: packet.watchouts,
+        locations: packet.locations,
+      },
+    }),
+  );
+  const guidanceDigest = sha256Canonical(guidanceProjection);
+  const notes = deepFreeze(
+    packet.notes.map((note) => {
+      const textDigest = sha256Text(note.text);
+      return {
+        guidanceId: note.id,
+        rowId: deterministicNoteUuid(scope, note.id, textDigest),
+        text: note.text,
+        textDigest,
+        tags: [
+          "selah-managed",
+          `${compact}-studio-setup`,
+          note.id,
+          `sha256:${textDigest}`,
+        ] as const,
+      };
+    }),
+  );
+  const notesDigest = sha256Canonical(
+    notes.map(({ guidanceId, rowId, textDigest }) => ({
+      guidanceId,
+      rowId,
+      textDigest,
+    })),
+  );
+  const setupDigest = sha256Canonical({
+    scope,
+    slug,
+    guidanceDigest,
+    noteCount: notes.length,
+    notesDigest,
+  });
+  return deepFreeze({
+    slug,
+    scope,
+    guidanceProjection,
+    guidanceDigest,
+    notes,
+    notesDigest,
+    setupDigest,
+    expectedNoteCount: 10,
+  });
+}
+
 export function markSprintSetupApprovalMatches(
   contract: MarkSprintSetupContract,
   approval: MarkSprintStudioSetupApproval | null,

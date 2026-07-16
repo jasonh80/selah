@@ -21,7 +21,9 @@ import {
 import { logGenerationAuditVerified } from "../../lib/server/generation-settings";
 import { runConfiguredProtectedMarkDraftJob } from "../../lib/server/mark-sprint-draft-job";
 
-const CONNECTED_PROTECTED_SLUGS = ["mark-8", "mark-7"];
+// Mirrors CONNECTED_PROTECTED_TEXT_SLUGS (generate-chapter-workup.ts) — the
+// worker and server allowlists must never diverge (PR #40 review, blocker 1).
+const CONNECTED_PROTECTED_SLUGS = ["mark-8", "mark-7", "mark-9"];
 const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/u;
 
 type ProtectedMarkDraftRunner = typeof runConfiguredProtectedMarkDraftJob;

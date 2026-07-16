@@ -1,28 +1,37 @@
 // SERVER-ONLY. Owner setup approvals recorded from the Prepare Chapter screen
 // (owner decision A5, board #29, 2026-07-16: "preparation is no longer a PR").
 //
-// The CONTENT a receipt authorizes still lives in version-controlled artifacts
-// (mark-sprint-guidance.v1.json + mark-sprint-acceptance.v1.json) and every
-// digest is recomputed from those artifacts at read time — a stored row can
-// only ever approve the exact reviewed packet, never arbitrary content. Only
-// the APPROVAL itself (who/when/evidence + the bound digests) moves from a
-// code literal to a database row written by the authenticated Studio owner.
+// Each row stores the owner's approval AND the exact packet he approved
+// (movements, possibly owner-edited notes, watch-outs, variants, locations).
+// At every read the contract is REBUILT from the stored packet and the
+// approval's digests must match it — so a row is tamper-evident end to end,
+// and the shared policy projection (model, source policy, rule set) is always
+// pinned to the version-controlled artifacts, never to the row.
 //
-// Fail-closed everywhere: no Supabase, missing row, malformed row, or any
-// digest drift all answer "no receipt". Mark 7 and Mark 8 keep their frozen
-// code literals; this store serves chapters approved in-screen (Mark 9+).
+// Fail-closed everywhere: no Supabase, missing row, malformed row or packet,
+// or any digest drift all answer "no receipt". Mark 7 and Mark 8 keep their
+// frozen code literals; this store serves chapters approved in-screen.
 import { getSupabaseAdmin } from "./supabase";
 import {
-  buildMarkSprintSetupContract,
+  buildPreparedSetupContract,
   connectedChapterReceiptApplies,
   connectedReceiptOverrideForTesting,
   markSprintScopedSetupApprovalApplies,
+  type MarkSprintSetupContract,
   type MarkSprintStudioSetupApproval,
+  type PreparedChapterPacket,
 } from "./mark-sprint-setup-contracts";
-import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
+import { validPreparedPacketShape } from "./prepare-chapter-proposal";
+import { isMarkSprintSlug, type MarkSprintSlug } from "./mark-sprint-manifest-policy";
 
 const TABLE = "chapter_setup_approvals";
 const SHA256 = /^[a-f0-9]{64}$/u;
+
+export interface StoredSetupReceipt {
+  readonly approval: MarkSprintStudioSetupApproval;
+  readonly packet: PreparedChapterPacket;
+  readonly contract: MarkSprintSetupContract;
+}
 
 export interface StoredSetupApprovalStore {
   read(slug: string): Promise<Record<string, unknown> | null>;
@@ -47,7 +56,7 @@ function productionStore(): StoredSetupApprovalStore | null {
       const { data, error } = await db
         .from(TABLE)
         .select(
-          "slug,scope,approved_by,approved_at,evidence,guidance_digest,notes_digest,receipt_digest",
+          "slug,scope,approved_by,approved_at,evidence,guidance_digest,notes_digest,receipt_digest,packet",
         )
         .eq("slug", slug)
         .maybeSingle();
@@ -68,13 +77,13 @@ function productionStore(): StoredSetupApprovalStore | null {
 }
 
 /**
- * Read one stored approval, validated STRICTLY into the exact shape the
- * receipt matcher expects. Anything unexpected — wrong slug, non-sha256
- * digests, blank strings, unparseable date — answers null (no receipt).
+ * Read one stored approval and validate it COMPLETELY: strict field shapes,
+ * strict packet shape, then the contract rebuilt from the stored packet must
+ * match every recorded digest. Anything unexpected answers null (no receipt).
  */
-export async function readStoredSetupApproval(
+export async function readValidStoredSetupReceipt(
   slug: string,
-): Promise<MarkSprintStudioSetupApproval | null> {
+): Promise<StoredSetupReceipt | null> {
   if (!isMarkSprintSlug(slug)) return null;
   const store = productionStore();
   if (!store) return null;
@@ -84,7 +93,7 @@ export async function readStoredSetupApproval(
     typeof raw[key] === "string" ? (raw[key] as string) : "";
   const approval: MarkSprintStudioSetupApproval = {
     scope: text("scope"),
-    slug,
+    slug: slug as MarkSprintSlug,
     approved_by: text("approved_by"),
     approved_at: text("approved_at"),
     evidence: text("evidence"),
@@ -92,6 +101,10 @@ export async function readStoredSetupApproval(
     notes_digest: text("notes_digest"),
     receipt_digest: text("receipt_digest"),
   };
+  const packet =
+    typeof raw.packet === "string"
+      ? safeParse(raw.packet)
+      : (raw.packet as unknown);
   if (
     raw.slug !== slug ||
     !approval.approved_by.trim() ||
@@ -99,17 +112,30 @@ export async function readStoredSetupApproval(
     Number.isNaN(Date.parse(approval.approved_at)) ||
     !SHA256.test(approval.guidance_digest) ||
     !SHA256.test(approval.notes_digest) ||
-    !SHA256.test(approval.receipt_digest)
+    !SHA256.test(approval.receipt_digest) ||
+    !validPreparedPacketShape(packet)
   ) {
     return null;
   }
-  return approval;
+  const contract = buildPreparedSetupContract(slug as MarkSprintSlug, packet);
+  if (!markSprintScopedSetupApprovalApplies(slug, contract, approval)) return null;
+  return { approval, packet, contract };
 }
 
-/** Persist one owner approval (Studio-authenticated caller only). Throws on
- * storage failure so the route can refuse instead of pretending. */
+function safeParse(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+/** Persist one owner approval + its exact packet (Studio-authenticated caller
+ * only). Throws on storage failure so the route can refuse instead of
+ * pretending. */
 export async function recordStoredSetupApproval(
   approval: MarkSprintStudioSetupApproval,
+  packet: PreparedChapterPacket,
 ): Promise<void> {
   const store = productionStore();
   if (!store) {
@@ -124,14 +150,15 @@ export async function recordStoredSetupApproval(
     guidance_digest: approval.guidance_digest,
     notes_digest: approval.notes_digest,
     receipt_digest: approval.receipt_digest,
+    packet,
   });
 }
 
 /**
  * The stored-approval-aware answer to "does this chapter's exact owner
- * receipt apply right now?" — code literals first (Mark 7/8), then a stored
- * approval validated against the freshly recomputed contract. Honors the same
- * test overrides as the sync gate so offline verifiers stay deterministic.
+ * receipt apply right now?" — code literals first (Mark 7/8), then a fully
+ * validated stored receipt. Honors the same test overrides as the sync gate
+ * so offline verifiers stay deterministic.
  */
 export async function connectedChapterReceiptAppliesIncludingStored(
   slug: string,
@@ -139,12 +166,5 @@ export async function connectedChapterReceiptAppliesIncludingStored(
   const override = connectedReceiptOverrideForTesting(slug);
   if (override !== undefined) return override;
   if (connectedChapterReceiptApplies(slug)) return true;
-  if (!isMarkSprintSlug(slug)) return false;
-  const stored = await readStoredSetupApproval(slug);
-  if (!stored) return false;
-  return markSprintScopedSetupApprovalApplies(
-    slug,
-    buildMarkSprintSetupContract(slug),
-    stored,
-  );
+  return Boolean(await readValidStoredSetupReceipt(slug));
 }

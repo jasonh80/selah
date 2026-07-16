@@ -41,13 +41,24 @@ export async function generationAllowed(slug: string): Promise<boolean> {
 }
 
 // Protected sprint chapters connected to paid work. Each entered only with
-// its own owner-approved setup receipt; Mark 9-11 remain fail-closed until
-// their own launch work is connected.
-export const CONNECTED_PROTECTED_TEXT_SLUGS = ["mark-8", "mark-7"] as const;
+// its own owner-approved setup receipt — Mark 9's receipt is the Prepare
+// Chapter approval row (owner decision A5); Mark 10-11 remain fail-closed
+// until their own launch work is connected.
+export const CONNECTED_PROTECTED_TEXT_SLUGS = ["mark-8", "mark-7", "mark-9"] as const;
+
+/**
+ * The refusal-capable runnable check with NO settings dependency — the route
+ * MUST pass this BEFORE its allowed_slugs write so a request that will be
+ * refused never mutates settings (PR #40 review, blocker 1; the recurring
+ * PR #30 hole-3 invariant).
+ */
+export function protectedTextRunnable(slug: string): boolean {
+  if (!(CONNECTED_PROTECTED_TEXT_SLUGS as readonly string[]).includes(slug)) return false;
+  return configCheckBypassForTesting || (isOpenAIConfigured() && isSupabaseConfigured());
+}
 
 export async function mark8GenerationAllowed(slug: string): Promise<boolean> {
-  if (!(CONNECTED_PROTECTED_TEXT_SLUGS as readonly string[]).includes(slug)) return false;
-  if (!configCheckBypassForTesting && (!isOpenAIConfigured() || !isSupabaseConfigured())) return false;
+  if (!protectedTextRunnable(slug)) return false;
   const s = await getGenerationSettings();
   return s.text_generation_enabled && s.allowed_slugs.includes(slug);
 }

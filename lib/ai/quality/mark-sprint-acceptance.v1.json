@@ -115,42 +115,58 @@
         {
           "id": "M9-M01",
           "startVerse": 1,
-          "endVerse": 1
+          "endVerse": 1,
+          "name": "The hinge saying",
+          "reason": "Verse 1 stands alone: the kingdom-with-power promise that the Transfiguration most likely previews — kept separate so it reads as interpretation, not certainty."
         },
         {
           "id": "M9-M02",
           "startVerse": 2,
-          "endVerse": 8
+          "endVerse": 8,
+          "name": "The Transfiguration",
+          "reason": "Jesus transfigured with Moses and Elijah and the Father's voice — an unnamed mountain, glory held together with the road to the cross."
         },
         {
           "id": "M9-M03",
           "startVerse": 9,
-          "endVerse": 13
+          "endVerse": 13,
+          "name": "Coming down: Elijah and rising",
+          "reason": "The descent conversation about resurrection and Elijah keeps the mountain tied to the suffering ahead."
         },
         {
           "id": "M9-M04",
           "startVerse": 14,
-          "endVerse": 29
+          "endVerse": 29,
+          "name": "The suffering boy and his father",
+          "reason": "One continuous scene: seizure-like symptoms and an unclean spirit named by Mark, the father's mixed faith, and prayer as dependence."
         },
         {
           "id": "M9-M05",
           "startVerse": 30,
-          "endVerse": 32
+          "endVerse": 32,
+          "name": "The second passion prediction",
+          "reason": "Passing privately through Galilee, Jesus repeats what is coming; the disciples do not understand and are afraid to ask."
         },
         {
           "id": "M9-M06",
           "startVerse": 33,
-          "endVerse": 37
+          "endVerse": 37,
+          "name": "Who is the greatest?",
+          "reason": "In Capernaum Jesus answers a status argument with a child in their midst — dignity, not a prop."
         },
         {
           "id": "M9-M07",
           "startVerse": 38,
-          "endVerse": 41
+          "endVerse": 41,
+          "name": "The outsider in Jesus' name",
+          "reason": "John's report and Jesus' correction of possessive gatekeeping, without erasing discernment."
         },
         {
           "id": "M9-M08",
           "startVerse": 42,
-          "endVerse": 50
+          "endVerse": 50,
+          "name": "Millstones, hyperbole, and salt",
+          "reason": "The hard sayings held as one contiguous unit (ESV omits 44 and 46): terrifying weight without graphic violence, hyperbole never read as instruction."
         }
       ],
       "manual_guardrails": [

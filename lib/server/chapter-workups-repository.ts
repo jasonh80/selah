@@ -28,12 +28,34 @@ import {
 } from "./mark8-image-plan";
 import { isConnectedStudioSlug } from "../studio-mark8-preflight";
 import {
-  buildMarkSprintSetupContract,
+  buildPreparedSetupContract,
   connectedChapterReceiptApplies,
   markSprintScopedSetupApprovalApplies,
   type MarkSprintStudioSetupApproval,
+  type PreparedChapterPacket,
 } from "./mark-sprint-setup-contracts";
-import { readStoredSetupApproval } from "./chapter-setup-approvals";
+import { readValidStoredSetupReceipt } from "./chapter-setup-approvals";
+import type { MarkSprintSlug } from "./mark-sprint-manifest-policy";
+
+/** The stored Prepare-Chapter receipt as this module's PURE functions accept
+ * it: they re-validate it themselves against a contract rebuilt from the
+ * packet, trusting no caller boolean. */
+export type StoredReceiptInput = {
+  approval: MarkSprintStudioSetupApproval;
+  packet: PreparedChapterPacket;
+} | null;
+
+function storedReceiptAppliesTo(slug: string, stored: StoredReceiptInput): boolean {
+  return Boolean(
+    stored &&
+      isMarkSprintSlug(slug) &&
+      markSprintScopedSetupApprovalApplies(
+        slug,
+        buildPreparedSetupContract(slug as MarkSprintSlug, stored.packet),
+        stored.approval,
+      ),
+  );
+}
 
 // NOTE (issue #8): the generation lifecycle (claim → verify → complete/fail)
 // lives EXCLUSIVELY in generation-jobs.ts with single-use job ids. This module
@@ -168,27 +190,21 @@ export function validateMarkSprintPublishCandidate(
   submittedReviewDigest: string | undefined,
   configuredSupabaseUrl: string | undefined,
   submittedSourceOverlapReportDigest?: string,
-  storedReceiptApproval?: MarkSprintStudioSetupApproval | null,
+  storedReceipt?: StoredReceiptInput,
 ): Mark8PublishValidation {
   const label = sprintChapterLabel(slug);
   // FAIL-CLOSED FIRST (PR #32 review, blocker 3): only an explicitly
   // connected chapter whose exact owner setup receipt still applies may even
-  // attempt the strict validation. A Prepare-Chapter approval row (Mark 9+)
-  // counts only when the async caller fetched it AND it matches this slug's
-  // freshly recomputed contract — the function stays pure by validating the
-  // supplied row itself rather than trusting a caller boolean. Chapters
-  // without any receipt are unpublishable regardless of how complete an
-  // out-of-band draft's images and digests look.
-  const storedReceiptApplies =
-    isMarkSprintSlug(slug) &&
-    markSprintScopedSetupApprovalApplies(
-      slug,
-      buildMarkSprintSetupContract(slug),
-      storedReceiptApproval ?? null,
-    );
+  // attempt the strict validation. A Prepare-Chapter receipt (Mark 9+)
+  // counts only when the async caller fetched it AND it matches the contract
+  // rebuilt from its own stored packet — the function stays pure by
+  // validating the supplied receipt itself rather than trusting a caller
+  // boolean. Chapters without any receipt are unpublishable regardless of
+  // how complete an out-of-band draft's images and digests look.
   if (
     !isConnectedStudioSlug(slug) ||
-    (!connectedChapterReceiptApplies(slug) && !storedReceiptApplies)
+    (!connectedChapterReceiptApplies(slug) &&
+      !storedReceiptAppliesTo(slug, storedReceipt ?? null))
   ) {
     return {
       ok: false,
@@ -305,7 +321,7 @@ function publishLookup(row: JobRow | null | { error: string }): RowLookup {
 export function protectedChapterServeAllowed(
   slug: string,
   workup: ChapterWorkup | null | undefined,
-  storedReceiptApproval?: MarkSprintStudioSetupApproval | null,
+  storedReceipt?: StoredReceiptInput,
 ): boolean {
   const stored = workup ?? undefined;
   const sprintIdentity =
@@ -321,11 +337,7 @@ export function protectedChapterServeAllowed(
   }
   const receipted =
     connectedChapterReceiptApplies(slug) ||
-    markSprintScopedSetupApprovalApplies(
-      slug,
-      buildMarkSprintSetupContract(slug),
-      storedReceiptApproval ?? null,
-    );
+    storedReceiptAppliesTo(slug, storedReceipt ?? null);
   if (!receipted) return false;
   // The stored workup must identify as the SAME chapter in every field a
   // workup is required to carry — a "mark-7"-labeled row whose body says
@@ -376,11 +388,11 @@ export async function getChapterWorkupBySlug(slug: string): Promise<ChapterWorku
   // Fetch the Prepare-Chapter approval only when the sync receipts don't
   // already answer (sprint slug without a code literal) — public reads of
   // ordinary chapters never touch the approvals table.
-  const storedApproval =
+  const storedReceipt =
     workup && isMarkSprintSlug(slug) && !connectedChapterReceiptApplies(slug)
-      ? await readStoredSetupApproval(slug)
+      ? await readValidStoredSetupReceipt(slug)
       : null;
-  if (workup && !protectedChapterServeAllowed(slug, workup, storedApproval)) {
+  if (workup && !protectedChapterServeAllowed(slug, workup, storedReceipt)) {
     console.error(`[selah] getChapterWorkupBySlug(${slug}) refused a protected alias/identity row`);
     return null;
   }
@@ -403,11 +415,11 @@ export async function getDraftWorkup(
     .maybeSingle();
   if (error || !data?.workup_json) return null;
   const workup = data.workup_json as ChapterWorkup;
-  const storedApproval =
+  const storedReceipt =
     isMarkSprintSlug(slug) && !connectedChapterReceiptApplies(slug)
-      ? await readStoredSetupApproval(slug)
+      ? await readValidStoredSetupReceipt(slug)
       : null;
-  if (!protectedChapterServeAllowed(slug, workup, storedApproval)) {
+  if (!protectedChapterServeAllowed(slug, workup, storedReceipt)) {
     console.error(`[selah] getDraftWorkup(${slug}) refused a protected alias/identity row`);
     return null;
   }
@@ -460,7 +472,7 @@ export async function publishChapter(
       options.reviewDigest,
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       options.sourceOverlapReportDigest,
-      await readStoredSetupApproval(slug),
+      await readValidStoredSetupReceipt(slug),
     );
     if (!validation.ok) {
       throw new ChapterMutationError("REFUSED", "publishChapter", slug, validation.reason);

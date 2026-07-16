@@ -12,6 +12,7 @@ import { ChapterMutationError, isChapterMutationError } from "./protected-chapte
 import { recordCostEvent, recordCostEventStrict } from "./cost-events-repository";
 import { estimateImageCostUsd } from "../ai/costs";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
+import { connectedChapterReceiptAppliesIncludingStored } from "./chapter-setup-approvals";
 import {
   consumeImageClaim,
   completeImageJob,
@@ -460,6 +461,14 @@ async function generateAndStoreChapterImagesWithinDeadline(
     // immediately before the storage/model envelope begins.
     if (!(await withinImageRunDeadline(deadline, () => imageGenAllowed(slug)))) {
       throw new Error("image generation was disabled before spend");
+    }
+    // The owner's setup receipt is recomputed IMMEDIATELY before spend (PR
+    // #40 review, blocker 2): a receipt deleted or drifted between the
+    // route's pre-claim check and this moment releases the claim unspent.
+    if (isDynamicMark8 && !(await connectedChapterReceiptAppliesIncludingStored(slug))) {
+      throw new Error(
+        `${protectedLabel} owner setup receipt is missing or changed — refused before spend`,
+      );
     }
     const recheckedModel = isDynamicMark8 ? MARK_8_IMAGE_MODEL : await activeImageModel();
     if (recheckedModel !== model) throw new Error("selected image model changed before spend");

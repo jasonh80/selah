@@ -9,16 +9,23 @@ published.
 
 ## What moved, and what did not
 
-- **Moved to the database:** only the *approval itself* (who, when, evidence,
-  and the three digests). Table: `chapter_setup_approvals`, one row per slug.
-- **Still version-controlled code:** all the *content* the approval binds —
-  `mark-sprint-guidance.v1.json` and `mark-sprint-acceptance.v1.json`. Every
-  digest is recomputed from those artifacts at read time, so a stored row can
-  only ever approve the exact reviewed packet. Mark 7 and Mark 8 keep their
-  frozen code-literal receipts unchanged.
+- **Moved to the database:** the *approval* (who, when, evidence, three
+  digests) **plus the exact packet the owner approved** — movements with
+  names/reasons, his possibly-edited notes, watch-outs, textual variants,
+  and locations. Table: `chapter_setup_approvals`, one row per slug. At every
+  read the contract is rebuilt from the stored packet and must match the
+  recorded digests, so the row is tamper-evident end to end; the shared
+  policy projection (model, source policy, rule set) stays pinned to the
+  version-controlled artifacts and can never be smuggled through a packet.
+- **Editing:** the ten guidance notes are editable inline before the one
+  approval; everything else on the screen is pinned — a submission whose
+  movements, watch-outs, variants, locations, or note IDs differ from the
+  Brain's current default is refused with a plain reload message.
 - **Unchanged gates:** confirm-before-spend, manifest binding, kill switches,
   publish review digests, and the alias-aware serve boundary (which now also
-  requires the receipt, so connecting a chapter never loosens serving).
+  requires the receipt, so connecting a chapter never loosens serving). The
+  receipt is also rechecked before any image claim AND again immediately
+  before image spend.
 
 ## One-time table creation (Supabase SQL editor)
 
@@ -32,6 +39,7 @@ create table if not exists chapter_setup_approvals (
   guidance_digest text not null,
   notes_digest text not null,
   receipt_digest text not null,
+  packet jsonb not null,
   created_at timestamptz not null default now()
 );
 alter table chapter_setup_approvals enable row level security;

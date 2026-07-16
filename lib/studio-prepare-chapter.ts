@@ -1,22 +1,36 @@
 // Client-safe decisions for the Prepare Chapter screen (owner decision A5,
 // board #29, 2026-07-16). The API response is treated as UNTRUSTED: the
 // screen renders only a strictly validated proposal, and the approve request
-// echoes back exactly the digest the owner read.
+// carries the exact packet the owner read (with any inline note edits) plus
+// the base digest of the default he was shown.
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 export const PREPARE_NOTE_GROUPS = ["Teaching", "Caution", "Image", "Map"] as const;
 export type PrepareNoteGroupName = (typeof PREPARE_NOTE_GROUPS)[number];
+
+const CERTAINTIES = ["known", "debated", "uncertain"] as const;
+export type PrepareLocationCertainty = (typeof CERTAINTIES)[number];
 
 export interface PrepareChapterViewModel {
   slug: string;
   label: string;
   setupDigest: string;
   expectedVerseCount: number;
-  movements: Array<{ id: string; startVerse: number; endVerse: number }>;
+  movements: Array<{
+    id: string;
+    startVerse: number;
+    endVerse: number;
+    name: string;
+    reason: string;
+  }>;
   notes: Array<{ id: string; text: string; group: PrepareNoteGroupName }>;
   watchouts: string[];
   textualVariants: string[];
-  locations: Array<{ name: string; certainty: string; display: string }>;
+  locations: Array<{
+    name: string;
+    certainty: PrepareLocationCertainty;
+    display: string;
+  }>;
 }
 
 export type PrepareChapterDecision =
@@ -45,11 +59,13 @@ export function decidePrepareChapterStatus(
   if (p.approved === true && p.setupComplete === true) return { kind: "already-prepared" };
   const movements = Array.isArray(p.movements)
     ? p.movements.filter(
-        (m): m is { id: string; startVerse: number; endVerse: number } =>
+        (m): m is PrepareChapterViewModel["movements"][number] =>
           Boolean(m) &&
           typeof (m as { id?: unknown }).id === "string" &&
           Number.isInteger((m as { startVerse?: unknown }).startVerse) &&
-          Number.isInteger((m as { endVerse?: unknown }).endVerse),
+          Number.isInteger((m as { endVerse?: unknown }).endVerse) &&
+          typeof (m as { name?: unknown }).name === "string" &&
+          typeof (m as { reason?: unknown }).reason === "string",
       )
     : [];
   const notes = Array.isArray(p.notes)
@@ -65,10 +81,12 @@ export function decidePrepareChapterStatus(
     : [];
   const locations = Array.isArray(p.locations)
     ? p.locations.filter(
-        (l): l is { name: string; certainty: string; display: string } =>
+        (l): l is PrepareChapterViewModel["locations"][number] =>
           Boolean(l) &&
           typeof (l as { name?: unknown }).name === "string" &&
-          typeof (l as { certainty?: unknown }).certainty === "string" &&
+          (CERTAINTIES as readonly string[]).includes(
+            String((l as { certainty?: unknown }).certainty),
+          ) &&
           typeof (l as { display?: unknown }).display === "string",
       )
     : [];
@@ -83,7 +101,8 @@ export function decidePrepareChapterStatus(
     !validStrings(p.watchouts) ||
     !validStrings(p.textualVariants) ||
     (Array.isArray(p.movements) && movements.length !== p.movements.length) ||
-    (Array.isArray(p.notes) && notes.length !== p.notes.length)
+    (Array.isArray(p.notes) && notes.length !== p.notes.length) ||
+    (Array.isArray(p.locations) && locations.length !== p.locations.length)
   ) {
     return fallback;
   }
@@ -103,8 +122,12 @@ export function decidePrepareChapterStatus(
   };
 }
 
+/** The approve request carries the FULL packet the owner is approving: the
+ * server re-validates its shape, requires everything except note text to
+ * equal the current default, and recomputes every digest from it. */
 export function buildPrepareChapterApproveRequest(
   proposal: PrepareChapterViewModel,
+  editedNoteTexts: Record<string, string>,
 ): Record<string, unknown> {
   if (!SHA256.test(proposal.setupDigest)) {
     throw new Error("Prepare Chapter requires the exact reviewed packet digest");
@@ -113,18 +136,30 @@ export function buildPrepareChapterApproveRequest(
     action: "prepare_chapter_approve",
     slug: proposal.slug,
     confirm: true,
-    setupDigest: proposal.setupDigest,
+    baseSetupDigest: proposal.setupDigest,
+    packet: {
+      movements: proposal.movements,
+      notes: proposal.notes.map((note) => ({
+        id: note.id,
+        text: (editedNoteTexts[note.id] ?? note.text).trim() || note.text,
+      })),
+      watchouts: proposal.watchouts,
+      textualVariants: proposal.textualVariants,
+      locations: proposal.locations,
+    },
   };
 }
 
-// "8 movements · 10 notes · 0 locations · 3 uncertainties" (spec's sticky
-// finish row). Uncertainties = textual variants needing edition-aware care.
+// "8 movements · 10 notes · 3 locations · 3 uncertainties" (spec's sticky
+// finish row). Uncertainties = textual variants plus uncertain locations.
 export function prepareSummaryLine(proposal: PrepareChapterViewModel): string {
-  const parts = [
+  const uncertainties =
+    proposal.textualVariants.length +
+    proposal.locations.filter((location) => location.certainty === "uncertain").length;
+  return [
     `${proposal.movements.length} movements`,
     `${proposal.notes.length} notes`,
     `${proposal.locations.length} locations`,
-    `${proposal.textualVariants.length} uncertainties`,
-  ];
-  return parts.join(" · ");
+    `${uncertainties} uncertainties`,
+  ].join(" · ");
 }

@@ -1,0 +1,24 @@
+{
+  "artifact": "prepare-chapter-locations",
+  "version": "1.0",
+  "certainty_model": "known = solid dot; debated = shaded area, no center dot; uncertain = no pin, label only (Codex proposal 2026-07-16, board #29 — final map rendering awaits the owner's certainty-model approval)",
+  "chapters": {
+    "mark-9": [
+      {
+        "name": "High mountain (Transfiguration)",
+        "certainty": "uncertain",
+        "display": "No pin. Mark leaves the mountain unnamed; Tabor is traditional and a Hermon-region setting is argued — never present either as fact."
+      },
+      {
+        "name": "Galilee (passing through)",
+        "certainty": "debated",
+        "display": "Broad shaded region for the private journey of 9:30 — no invented route or stops."
+      },
+      {
+        "name": "Capernaum",
+        "certainty": "known",
+        "display": "Solid ancient-town dot for the house conversation of 9:33."
+      }
+    ]
+  }
+}

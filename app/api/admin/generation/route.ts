@@ -10,6 +10,7 @@ import {
   isProtectedMarkSprintGenerationIdentity,
   mark8GenerationAllowed,
   parseSlug,
+  protectedTextRunnable,
 } from "@/lib/server/generate-chapter-workup";
 import {
   getChapterReviewedAt,
@@ -107,9 +108,16 @@ import {
 } from "@/lib/server/mark-sprint-studio-setup";
 import {
   connectedChapterReceiptAppliesIncludingStored,
+  readValidStoredSetupReceipt,
   recordStoredSetupApproval,
 } from "@/lib/server/chapter-setup-approvals";
-import { buildPrepareChapterProposal } from "@/lib/server/prepare-chapter-proposal";
+import {
+  buildPrepareChapterProposal,
+  defaultPreparedChapterPacket,
+  packetMatchesDefaultExceptNoteText,
+  validPreparedPacketShape,
+} from "@/lib/server/prepare-chapter-proposal";
+import { buildPreparedSetupContract } from "@/lib/server/mark-sprint-setup-contracts";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -408,15 +416,20 @@ export async function POST(req: Request) {
   // change settings, create images, or publish.
   if (action === "prepare_chapter_status") {
     const prepareSlug = String(body.slug ?? "");
-    const proposal = buildPrepareChapterProposal(prepareSlug);
-    if (!proposal || !markSprintFactorySetupFor(prepareSlug)) {
+    if (!buildPrepareChapterProposal(prepareSlug) || !markSprintFactorySetupFor(prepareSlug)) {
       return NextResponse.json(
         { ok: false, error: "This chapter cannot be prepared on-screen yet." },
         { status: 400 },
       );
     }
     try {
-      const approved = await connectedChapterReceiptAppliesIncludingStored(prepareSlug);
+      // An already-approved chapter shows the EXACT packet the owner
+      // approved (possibly with his edited notes), never a drifted default.
+      const receipt = await readValidStoredSetupReceipt(prepareSlug);
+      const proposal = buildPrepareChapterProposal(prepareSlug, receipt?.packet)!;
+      const approved =
+        Boolean(receipt) ||
+        (await connectedChapterReceiptAppliesIncludingStored(prepareSlug));
       let setupComplete = false;
       if (approved) {
         try {
@@ -431,7 +444,7 @@ export async function POST(req: Request) {
       });
     } catch {
       return NextResponse.json(
-        { ok: false, error: `Studio could not check ${proposal.label} preparation.` },
+        { ok: false, error: "Studio could not check this chapter's preparation." },
         { status: 503 },
       );
     }
@@ -443,15 +456,16 @@ export async function POST(req: Request) {
   // confirm-before-spend flow still guards every credit.
   if (action === "prepare_chapter_approve") {
     const prepareSlug = String(body.slug ?? "");
-    const proposal = buildPrepareChapterProposal(prepareSlug);
+    const defaultPacket = defaultPreparedChapterPacket(prepareSlug);
+    const defaultProposal = buildPrepareChapterProposal(prepareSlug);
     const factory = markSprintFactorySetupFor(prepareSlug);
-    if (!proposal || !factory) {
+    if (!defaultPacket || !defaultProposal || !factory) {
       return NextResponse.json(
         { ok: false, error: "This chapter cannot be prepared on-screen yet." },
         { status: 400 },
       );
     }
-    const label = proposal.label;
+    const label = defaultProposal.label;
     const auditPrepare = async (
       status: "started" | "succeeded" | "failed",
       message: string,
@@ -475,10 +489,21 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const approvedDigest = typeof body.setupDigest === "string" ? body.setupDigest : "";
-    if (approvedDigest !== proposal.setupDigest) {
+    // The owner approves an exact PACKET. Editing is scoped to note text
+    // (Codex spec: "ten editable notes"): everything else must equal the
+    // Brain's current default — a stale screen or tampered submission is
+    // refused with a plain reload message. The echoed base digest proves the
+    // default he read is still the current default.
+    const submittedPacket: unknown = body.packet;
+    const baseDigest =
+      typeof body.baseSetupDigest === "string" ? body.baseSetupDigest : "";
+    if (
+      !validPreparedPacketShape(submittedPacket) ||
+      !packetMatchesDefaultExceptNoteText(defaultPacket, submittedPacket) ||
+      baseDigest !== defaultProposal.setupDigest
+    ) {
       try {
-        await auditPrepare("failed", "refused:digest_mismatch");
+        await auditPrepare("failed", "refused:packet_mismatch");
       } catch {
         console.error(`[selah] ${label} preparation refusal audit unavailable`);
       }
@@ -487,6 +512,10 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
+    const approvedContract = buildPreparedSetupContract(
+      factory.contract.slug,
+      submittedPacket,
+    );
     try {
       await auditPrepare("started", "owner approved the on-screen packet");
     } catch {
@@ -495,21 +524,45 @@ export async function POST(req: Request) {
         { status: 500 },
       );
     }
+    // The approval row binds the exact SUBMITTED packet (digests recomputed
+    // server-side from it); recording it is what makes the seeding runner's
+    // receipt check pass. Its failure is reported as ITS OWN failure —
+    // "approval saved" is only ever said when the row write succeeded (PR
+    // #40 review, blocker 4).
     try {
-      // The approval row binds the exact reviewed contract; recording it is
-      // what makes the seeding runner's receipt check pass.
-      await recordStoredSetupApproval({
-        scope: factory.contract.scope,
-        slug: factory.contract.slug,
-        approved_by: "Jason Hales (owner)",
-        approved_at: new Date().toISOString(),
-        evidence:
-          "Owner reviewed the on-screen Prepare Chapter packet (movements, guidance notes, watch-outs, textual variants) in Studio and approved it in one action; digests bound at approval time.",
-        guidance_digest: factory.contract.guidanceDigest,
-        notes_digest: factory.contract.notesDigest,
-        receipt_digest: factory.contract.setupDigest,
-      });
-      const result = await runMarkSprintStudioSetup(prepareSlug, approvedDigest);
+      await recordStoredSetupApproval(
+        {
+          scope: approvedContract.scope,
+          slug: approvedContract.slug,
+          approved_by: "Jason Hales (owner)",
+          approved_at: new Date().toISOString(),
+          evidence:
+            "Owner reviewed the on-screen Prepare Chapter packet (movements, guidance notes with any inline edits, watch-outs, textual variants, locations) in Studio and approved it in one action; digests bound to the exact submitted packet at approval time.",
+          guidance_digest: approvedContract.guidanceDigest,
+          notes_digest: approvedContract.notesDigest,
+          receipt_digest: approvedContract.setupDigest,
+        },
+        submittedPacket,
+      );
+    } catch {
+      try {
+        await auditPrepare("failed", "failed:APPROVAL_WRITE_FAILED");
+      } catch {
+        console.error(`[selah] ${label} preparation failure audit unavailable`);
+      }
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Studio could not record your ${label} approval — nothing was saved. Try again.`,
+        },
+        { status: 500 },
+      );
+    }
+    try {
+      const result = await runMarkSprintStudioSetup(
+        prepareSlug,
+        approvedContract.setupDigest,
+      );
       try {
         await auditPrepare(
           "succeeded",
@@ -760,6 +813,22 @@ export async function POST(req: Request) {
     const slug = String(body.slug ?? "");
     const blocked = await guardOrRefuse(slug, "generate_images", "updateChapterWorkupJson");
     if (blocked) return blocked;
+    // The owner's setup receipt gates paid image work exactly like paid text
+    // work — checked BEFORE any claim, and recomputed again by the worker
+    // immediately before spend (PR #40 review, blocker 2). Any protected
+    // sprint identity without a current receipt is refused with nothing
+    // claimed.
+    if (
+      isProtectedMarkSprintGenerationIdentity({ slug }) &&
+      !(await connectedChapterReceiptAppliesIncludingStored(slug))
+    ) {
+      return refuse(
+        slug,
+        "generate_images",
+        `blocked — this protected chapter's exact owner setup receipt is missing or changed; no image claim was made`,
+        403,
+      );
+    }
     if (!(await imageGenAllowed(slug))) {
       return refuse(
         slug,
@@ -1024,10 +1093,22 @@ export async function POST(req: Request) {
           403,
         );
       }
+      // Every remaining refusal-capable requirement runs BEFORE the settings
+      // write (PR #40 review, blocker 1): a chapter that is not connected to
+      // paid text work, or whose model/storage configuration is incomplete,
+      // must never be left behind in allowed_slugs by its own refusal.
+      if (!protectedTextRunnable(slug)) {
+        return refuse(
+          slug,
+          "generate",
+          `blocked — protected ${connectedChapterLabel(slug)} generation is not fully configured; nothing was modified`,
+          403,
+        );
+      }
       // Studio promises chapter access is automatic. Only after the exact
-      // digest, owner confirmation, identity check, receipt, and text switch
-      // pass may this one chapter be added; refused requests never change
-      // settings.
+      // digest, owner confirmation, identity check, receipt, runnable check,
+      // and text switch pass may this one chapter be added; refused requests
+      // never change settings.
       if (!settings.allowed_slugs.includes(slug)) {
         const updated = await updateGenerationSettings({
           allowed_slugs: [...settings.allowed_slugs, slug],

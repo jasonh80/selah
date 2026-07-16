@@ -316,7 +316,7 @@ import {
   validateMarkSprintPublishCandidate,
 } from "../lib/server/chapter-workups-repository";
 import {
-  buildMarkSprintSetupContract,
+  buildPreparedSetupContract,
   connectedChapterReceiptApplies,
   __setConnectedReceiptOverridesForTesting,
 } from "../lib/server/mark-sprint-setup-contracts";
@@ -324,6 +324,7 @@ import {
   connectedChapterReceiptAppliesIncludingStored,
   __setStoredSetupApprovalStoreForTesting,
 } from "../lib/server/chapter-setup-approvals";
+import { defaultPreparedChapterPacket } from "../lib/server/prepare-chapter-proposal";
 import { POST as adminPost } from "../app/api/admin/generation/route";
 import textWorker, {
   __setMark8PermissionCheckerForTesting,
@@ -1510,15 +1511,26 @@ const realRouteAndWorkers = async () => {
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
-    // R2e. Prepare Chapter (owner decision A5, 2026-07-16): the owner's
-    // digest-bound approval ROW — recorded from the screen, never code —
-    // unlocks Mark 9 with exactly the strictness of the frozen literals.
+    // R2e. Prepare Chapter (owner decision A5 + PR #40 corrections): the
+    // owner's digest-bound receipt ROW binds the exact PACKET he approved —
+    // movements with names, his (possibly edited) notes, watch-outs,
+    // variants, locations — with exactly the strictness of the frozen
+    // literals. Editing is scoped to note text; everything else pins.
     {
-      const contract = buildMarkSprintSetupContract("mark-9");
+      const packet = defaultPreparedChapterPacket("mark-9")!;
+      const contract = buildPreparedSetupContract("mark-9", packet);
       const approvalRows = new Map<string, Record<string, unknown>>();
       __setStoredSetupApprovalStoreForTesting({
         async read(slug) { return approvalRows.get(slug) ?? null; },
         async upsert(row) { approvalRows.set(String(row.slug), row); },
+      });
+      const approveBody = (overrides: Record<string, unknown> = {}) => ({
+        action: "prepare_chapter_approve",
+        slug: "mark-9",
+        confirm: true,
+        baseSetupDigest: contract.setupDigest,
+        packet,
+        ...overrides,
       });
       try {
         // The proposal is read-only, exact, and only for factory chapters.
@@ -1532,66 +1544,149 @@ const realRouteAndWorkers = async () => {
         ok(statusRes.status === 200, "R2e Mark 9 proposal is served");
         const proposal = ((await statusRes.json()) as { prepare: Record<string, unknown> }).prepare;
         ok(proposal.approved === false, "R2e Mark 9 starts unapproved");
-        ok(proposal.setupDigest === contract.setupDigest, "R2e the proposal carries the exact contract digest");
+        ok(proposal.setupDigest === contract.setupDigest, "R2e the proposal carries the exact packet-contract digest");
         ok(Array.isArray(proposal.notes) && proposal.notes.length === 10, "R2e the proposal shows all 10 notes");
-        ok(Array.isArray(proposal.movements) && proposal.movements.length === 8, "R2e the proposal shows all 8 movements");
+        ok(
+          Array.isArray(proposal.movements) &&
+            proposal.movements.length === 8 &&
+            (proposal.movements as Array<{ name?: unknown; reason?: unknown }>).every(
+              (movement) => String(movement.name ?? "").length > 0 && String(movement.reason ?? "").length > 0,
+            ),
+          "R2e every movement carries its name and reason",
+        );
         ok(Array.isArray(proposal.watchouts) && proposal.watchouts.length >= 3, "R2e the proposal surfaces the watch-outs");
+        ok(
+          Array.isArray(proposal.locations) &&
+            proposal.locations.length >= 3 &&
+            (proposal.locations as Array<{ certainty?: unknown }>).some((location) => location.certainty === "uncertain"),
+          "R2e locations follow the honest certainty model (the mountain stays unpinned)",
+        );
 
-        // Refusals record nothing.
-        const unconfirmed = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", setupDigest: contract.setupDigest }));
+        // Refusals record nothing — including any tamper of the PINNED
+        // packet parts (movements, watch-outs, variants, locations, note
+        // ids) and a stale base digest.
+        const unconfirmed = await adminPost(adminReq(approveBody({ confirm: undefined })));
         ok(unconfirmed.status === 400, "R2e approve without confirmation → 400");
-        const drifted = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: "0".repeat(64) }));
-        ok(drifted.status === 409, "R2e approve with a drifted digest → 409");
+        const tamperedWatchouts = await adminPost(adminReq(approveBody({
+          packet: { ...packet, watchouts: [...packet.watchouts.slice(0, -1), "softened watch-out"] },
+        })));
+        ok(tamperedWatchouts.status === 409, "R2e a changed watch-out refuses the approval (digest-bound)");
+        const tamperedMovements = await adminPost(adminReq(approveBody({
+          packet: { ...packet, movements: packet.movements.map((movement, index) => index === 0 ? { ...movement, endVerse: 2 } : movement) },
+        })));
+        ok(tamperedMovements.status === 409, "R2e a changed movement range refuses the approval");
+        const staleBase = await adminPost(adminReq(approveBody({ baseSetupDigest: "0".repeat(64) })));
+        ok(staleBase.status === 409, "R2e a stale base digest refuses the approval");
         ok(approvalRows.size === 0, "R2e refused approvals record NO approval row");
         ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e Mark 9 stays unreceipted after refusals");
 
-        // The real approval records the row even when offline seeding fails
-        // closed afterward — the owner's decision is never silently lost.
-        const approved = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: contract.setupDigest }));
+        // The real approval — WITH an inline note edit — records the row
+        // even when offline seeding fails closed afterward. The recorded
+        // digests bind the EDITED packet, not the default.
+        const editedPacket = {
+          ...packet,
+          notes: packet.notes.map((note, index) =>
+            index === 0 ? { id: note.id, text: `${note.text} Owner emphasis: lead with mercy.` } : note,
+          ),
+        };
+        const editedContract = buildPreparedSetupContract("mark-9", editedPacket);
+        ok(editedContract.setupDigest !== contract.setupDigest, "R2e an edited note produces a different bound digest");
+        const approved = await adminPost(adminReq(approveBody({ packet: editedPacket })));
         ok(approved.status === 500, "R2e offline seeding after approval fails closed with a plain refusal");
-        ok(approvalRows.has("mark-9"), "R2e the owner approval row was recorded");
-        ok(await connectedChapterReceiptAppliesIncludingStored("mark-9"), "R2e the recorded approval row IS the Mark 9 receipt");
+        const row = approvalRows.get("mark-9");
+        ok(Boolean(row), "R2e the owner approval row was recorded");
+        ok(row!.receipt_digest === editedContract.setupDigest, "R2e the recorded receipt binds the EDITED packet");
+        ok(await connectedChapterReceiptAppliesIncludingStored("mark-9"), "R2e the recorded receipt row IS the Mark 9 receipt");
         ok(!connectedChapterReceiptApplies("mark-9"), "R2e the sync code-literal gate is unchanged by a stored row");
         ok(
           audit.some((entry) => entry.action === "prepare_chapter_approve" && entry.slug === "mark-9" && entry.status === "started") &&
             audit.some((entry) => entry.action === "prepare_chapter_approve" && entry.slug === "mark-9" && entry.status === "failed"),
           "R2e the approval and its failed seeding are both durably audited",
         );
+        // The status screen now shows the owner's EDITED packet back.
+        const statusAfter = await adminPost(adminReq({ action: "prepare_chapter_status", slug: "mark-9" }));
+        const prepareAfter = ((await statusAfter.json()) as { prepare: { notes: Array<{ text: string }>; approved: boolean } }).prepare;
+        ok(
+          prepareAfter.approved === true && prepareAfter.notes[0].text.includes("Owner emphasis"),
+          "R2e the approved screen shows the exact edited packet, never a drifted default",
+        );
 
         // The serve boundary honors the stored receipt with the same
-        // tamper-evidence as everything else.
-        const validApproval = {
-          scope: contract.scope,
-          slug: "mark-9" as const,
-          approved_by: "Jason Hales (owner)",
-          approved_at: "2026-07-16T12:00:00Z",
-          evidence: "offline verification fixture",
-          guidance_digest: contract.guidanceDigest,
-          notes_digest: contract.notesDigest,
-          receipt_digest: contract.setupDigest,
+        // tamper-evidence as everything else — including the watch-outs
+        // (PR #40 blocker 3) and the edited note text.
+        const validReceipt = {
+          approval: {
+            scope: editedContract.scope,
+            slug: "mark-9" as const,
+            approved_by: "Jason Hales (owner)",
+            approved_at: "2026-07-16T21:00:00Z",
+            evidence: "offline verification fixture",
+            guidance_digest: editedContract.guidanceDigest,
+            notes_digest: editedContract.notesDigest,
+            receipt_digest: editedContract.setupDigest,
+          },
+          packet: editedPacket,
         };
         ok(
-          protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), validApproval),
+          protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), validReceipt),
           "R2e a receipted, self-consistent Mark 9 may serve",
+        );
+        ok(
+          !protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), {
+            ...validReceipt,
+            packet: { ...editedPacket, watchouts: [...editedPacket.watchouts.slice(0, -1), "softened"] },
+          }),
+          "R2e a tampered watch-out invalidates the receipt at the serve boundary",
+        );
+        ok(
+          !protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), {
+            ...validReceipt,
+            packet: {
+              ...editedPacket,
+              notes: editedPacket.notes.map((note, index) => (index === 1 ? { ...note, text: "tampered" } : note)),
+            },
+          }),
+          "R2e a tampered note text invalidates the receipt at the serve boundary",
         );
         for (const tamperedKey of ["guidance_digest", "notes_digest", "receipt_digest"] as const) {
           ok(
             !protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), {
-              ...validApproval,
-              [tamperedKey]: "f".repeat(64),
+              ...validReceipt,
+              approval: { ...validReceipt.approval, [tamperedKey]: "f".repeat(64) },
             }),
             `R2e a tampered ${tamperedKey} never serves Mark 9`,
           );
         }
         ok(
-          !protectedChapterServeAllowed("mark-10", completedSprintWorkup("mark-10"), { ...validApproval, slug: "mark-10" as never }),
-          "R2e a Mark 9 approval can never serve another chapter",
+          !protectedChapterServeAllowed("mark-10", completedSprintWorkup("mark-10"), {
+            approval: { ...validReceipt.approval, slug: "mark-10" as const },
+            packet: editedPacket,
+          }),
+          "R2e a Mark 9 receipt can never serve another chapter",
         );
 
         // Tampered STORED rows collapse to "no receipt" at the async gate.
         approvalRows.set("mark-9", { ...approvalRows.get("mark-9")!, notes_digest: "f".repeat(64) });
         ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e a tampered stored row is not a receipt");
-        approvalRows.set("mark-9", { ...validApproval });
+        approvalRows.set("mark-9", {
+          slug: "mark-9",
+          scope: validReceipt.approval.scope,
+          approved_by: validReceipt.approval.approved_by,
+          approved_at: validReceipt.approval.approved_at,
+          evidence: validReceipt.approval.evidence,
+          guidance_digest: validReceipt.approval.guidance_digest,
+          notes_digest: validReceipt.approval.notes_digest,
+          receipt_digest: validReceipt.approval.receipt_digest,
+          packet: editedPacket,
+        });
+        ok(await connectedChapterReceiptAppliesIncludingStored("mark-9"), "R2e the restored valid row applies again");
+        // A stored PACKET tamper (row digests untouched) also collapses.
+        approvalRows.set("mark-9", {
+          ...approvalRows.get("mark-9")!,
+          packet: { ...editedPacket, watchouts: [] },
+        });
+        ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e a stored-packet tamper is not a receipt");
+        approvalRows.set("mark-9", { ...approvalRows.get("mark-9")!, packet: editedPacket });
 
         // With the stored receipt in place, the generate route's refusal (if
         // any) is no longer the receipt gate — receipts moved to the DB
@@ -1930,11 +2025,30 @@ const realRouteAndWorkers = async () => {
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
-    // R5d. The actual worker refuses Mark 9–11 before either generator runs.
+    // R5d. The actual worker refuses non-connected sprint chapters before
+    // either generator runs. mark-9 is runnable since the Prepare Chapter
+    // screen (owner decision A5) — but with no route-made claim in the store
+    // it still refuses without reaching any generator.
     {
       const callsBefore = textGeneratorCalls;
       const protectedBefore = protectedRunnerCalls;
-      for (const blockedSlug of ["mark-9", "mark-10", "mark-11"]) {
+      {
+        const job = "offline-mark-9-unclaimed-job";
+        const token = signJobToken("text", "mark-9", job, undefined, MANIFEST_DIGEST_A).token;
+        const response = await textWorker(workerReq("generate-chapter-background", {
+          slug: "mark-9",
+          job,
+          token,
+          approvedManifestDigest: MANIFEST_DIGEST_A,
+        }));
+        ok(response.status !== 200, "R5d runnable mark-9 still refuses without a claimed job");
+        ok(
+          textGeneratorCalls === callsBefore && protectedRunnerCalls === protectedBefore,
+          "R5d unclaimed mark-9 never reached a generator",
+        );
+        store.rows.delete("mark-9");
+      }
+      for (const blockedSlug of ["mark-10", "mark-11"]) {
         const job = `offline-${blockedSlug}-job`;
         const token = signJobToken(
           "text",
@@ -1951,8 +2065,8 @@ const realRouteAndWorkers = async () => {
         }));
         ok(response.status === 403, `R5d worker keeps ${blockedSlug} blocked`);
       }
-      ok(textGeneratorCalls === callsBefore, "R5d Mark 9–11 never reached generic generation");
-      ok(protectedRunnerCalls === protectedBefore, "R5d Mark 9–11 never reached the Mark 8 runner");
+      ok(textGeneratorCalls === callsBefore, "R5d Mark 10–11 never reached generic generation");
+      ok(protectedRunnerCalls === protectedBefore, "R5d Mark 10–11 never reached the protected runner");
     }
 
     // R5e. An outer catch may clean only a queued claim. Once a runner consumed

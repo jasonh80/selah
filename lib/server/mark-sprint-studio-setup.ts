@@ -19,7 +19,10 @@ import {
   type MarkSprintSetupContract,
   type MarkSprintStudioSetupApproval,
 } from "./mark-sprint-setup-contracts";
-import { readStoredSetupApproval } from "./chapter-setup-approvals";
+import {
+  readValidStoredSetupReceipt,
+  type StoredSetupReceipt,
+} from "./chapter-setup-approvals";
 import { SEED_RULES } from "./selah-brain-library";
 
 export interface MarkSprintFactorySetup {
@@ -32,7 +35,7 @@ export interface MarkSprintFactorySetup {
 // Mark 7 carries its frozen code literal; chapters listed with approval null
 // (Mark 9) stay fail-closed until the owner approves them on the Prepare
 // Chapter screen, which records a digest-bound row read back by
-// readStoredSetupApproval (owner decision A5, 2026-07-16).
+// readValidStoredSetupReceipt (owner decision A5, 2026-07-16).
 const FACTORY_SETUPS: readonly MarkSprintFactorySetup[] = [
   { contract: MARK_7_SETUP_CONTRACT, approval: MARK_7_STUDIO_SETUP_APPROVAL },
   { contract: buildMarkSprintSetupContract("mark-9"), approval: null },
@@ -118,15 +121,19 @@ export interface MarkSprintStudioSetupResult {
   totalNotes: number;
 }
 
-function approvalsReady(
+// A chapter is ready via EITHER its frozen code-literal receipt (Mark 7) or
+// a fully validated Prepare-Chapter receipt (Mark 9+); the stored receipt
+// also decides WHICH contract governs — the owner-approved packet's, which
+// may carry his edited note texts (PR #40 review, blocker 6).
+function resolveApprovedContract(
   setup: MarkSprintFactorySetup,
-  storedApproval: MarkSprintStudioSetupApproval | null = null,
-): boolean {
-  return (
-    librarySeedApproved() &&
-    (markSprintSetupApprovalMatches(setup.contract, setup.approval) ||
-      markSprintSetupApprovalMatches(setup.contract, storedApproval))
-  );
+  receipt: StoredSetupReceipt | null,
+): MarkSprintSetupContract | null {
+  if (!librarySeedApproved()) return null;
+  if (markSprintSetupApprovalMatches(setup.contract, setup.approval)) {
+    return setup.contract;
+  }
+  return receipt ? receipt.contract : null;
 }
 
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
@@ -383,9 +390,9 @@ export async function getMarkSprintStudioSetupStatus(
   slug: string,
 ): Promise<MarkSprintStudioSetupStatus> {
   const setup = requireFactorySetup(slug);
-  const { contract } = setup;
-  const storedApproval = await readStoredSetupApproval(slug);
-  if (!approvalsReady(setup, storedApproval)) {
+  const receipt = await readValidStoredSetupReceipt(slug);
+  const contract = resolveApprovedContract(setup, receipt) ?? setup.contract;
+  if (!resolveApprovedContract(setup, receipt)) {
     return {
       slug: contract.slug,
       approved: false,
@@ -421,10 +428,10 @@ export async function runMarkSprintStudioSetup(
   result: MarkSprintStudioSetupResult;
 }> {
   const setup = requireFactorySetup(slug);
-  const { contract } = setup;
-  const label = markSprintChapterLabel(contract.slug);
-  const storedApproval = await readStoredSetupApproval(slug);
-  if (!approvalsReady(setup, storedApproval)) {
+  const label = markSprintChapterLabel(setup.contract.slug);
+  const receipt = await readValidStoredSetupReceipt(slug);
+  const contract = resolveApprovedContract(setup, receipt);
+  if (!contract) {
     throw new MarkSprintStudioSetupError(
       "UNAPPROVED",
       `The Brain and exact ${label} notes still need owner approval.`,

@@ -6,7 +6,7 @@
 // API-key, and prompt bytes are deliberately discarded after v3 evaluation.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import guidanceArtifact from "./mark-sprint-guidance.v1.json";
-import { readStoredSetupApproval } from "./chapter-setup-approvals";
+import { readValidStoredSetupReceipt } from "./chapter-setup-approvals";
 import {
   assertGenerationManifestV3PreflightCapability,
   createGenerationManifestV3PreflightCapability,
@@ -367,18 +367,27 @@ function staticEvidence(
   });
   const notes = guidance.chapters[policy.requirements.slug]?.notes ?? [];
   const expectedNotes = policy.requirements.chapterNotes;
+  // For code-receipted chapters the ARTIFACT notes must equal the policy's
+  // note requirements byte-for-byte. For a Prepare-Chapter receipt the
+  // owner-approved packet IS the versioned note truth (its digests were
+  // already validated against the stored receipt), and the live-row check
+  // below still binds the database to it — so the artifact comparison is
+  // scoped to artifact-sourced requirements only.
+  const artifactNotesMustMatch =
+    policy.requirements.chapterNotesSource === "artifact";
   if (
     guidance.packet_id !== policy.requirements.guidance.packetId ||
     guidance.version !== policy.requirements.guidance.packetVersion ||
     guidance.library_version !== policy.requirements.brain.libraryVersion ||
     sha256Canonical(guidanceArtifact) !==
       policy.requirements.guidance.contentDigest ||
-    canonicalJson(
-      notes.map((note) => ({ id: note.id, textDigest: sha256Text(note.text) })),
-    ) !==
+    (artifactNotesMustMatch &&
       canonicalJson(
-        expectedNotes.map((note) => ({ id: note.id, textDigest: note.textDigest })),
-      )
+        notes.map((note) => ({ id: note.id, textDigest: sha256Text(note.text) })),
+      ) !==
+        canonicalJson(
+          expectedNotes.map((note) => ({ id: note.id, textDigest: note.textDigest })),
+        ))
   ) {
     blockers.push(
       evidenceBlocker(
@@ -670,11 +679,15 @@ export async function prepareMarkSprintRuntime(
     throw new Error("Mark sprint runtime only accepts Mark 8–11");
   }
   const slug = input.slug;
-  // Prepare-Chapter chapters (Mark 9+) carry their owner approval as a
-  // digest-bound database row instead of a code literal — fetch it here so
-  // the policy can validate it against the freshly built contract.
+  // Prepare-Chapter chapters (Mark 9+) carry their owner receipt (approval +
+  // the exact approved packet) as a digest-bound database row instead of a
+  // code literal — fetch it here so the policy can validate it against the
+  // contract rebuilt from its own packet.
+  const storedReceipt = await readValidStoredSetupReceipt(slug);
   const policy = buildMarkSprintManifestPolicy(slug, {
-    storedGuidanceApproval: await readStoredSetupApproval(slug),
+    storedGuidanceReceipt: storedReceipt
+      ? { approval: storedReceipt.approval, packet: storedReceipt.packet }
+      : null,
   });
   const versioned = staticEvidence(policy);
   if (versioned.blockers.length) {

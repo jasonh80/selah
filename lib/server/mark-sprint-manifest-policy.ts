@@ -24,11 +24,12 @@ import {
   type Mark8StudioSetupApproval,
 } from "./mark8-studio-setup-contract";
 import {
-  buildMarkSprintSetupContract,
+  buildPreparedSetupContract,
   MARK_7_SETUP_CONTRACT,
   MARK_7_STUDIO_SETUP_APPROVAL,
   markSprintScopedSetupApprovalApplies,
   type MarkSprintStudioSetupApproval,
+  type PreparedChapterPacket,
 } from "./mark-sprint-setup-contracts";
 
 export const MARK_SPRINT_SLUGS = [
@@ -150,6 +151,10 @@ export interface MarkSprintManifestRequirements {
     liveMatchRequired: true;
     liveMatchEvidence: null;
   };
+  /** Which versioned truth the note requirements came from: the reviewed
+   * artifact (code-receipted chapters) or the owner-approved Prepare-Chapter
+   * packet (its digests were validated against the stored receipt). */
+  chapterNotesSource: "artifact" | "owner-approved-packet";
   chapterNotes: {
     id: string;
     textDigest: string;
@@ -216,10 +221,15 @@ export function buildMarkSprintManifestPolicy(
   options: {
     mark8GuidanceApproval?: Mark8StudioSetupApproval | null;
     mark7GuidanceApproval?: MarkSprintStudioSetupApproval | null;
-    /** Owner approval recorded from the Prepare Chapter screen (Mark 9+),
-     * fetched by the async caller and validated here against THIS slug's
-     * freshly built contract. Absent/null keeps the chapter fail-closed. */
-    storedGuidanceApproval?: MarkSprintStudioSetupApproval | null;
+    /** Owner receipt recorded from the Prepare Chapter screen (Mark 9+),
+     * fetched by the async caller. Validated HERE against a contract rebuilt
+     * from its own stored packet — which may carry owner-edited note texts —
+     * so nothing trusts the row as-is. Absent/null keeps the chapter
+     * fail-closed. */
+    storedGuidanceReceipt?: {
+      approval: MarkSprintStudioSetupApproval;
+      packet: PreparedChapterPacket;
+    } | null;
   } = {},
 ): MarkSprintManifestPolicy {
   const requiredCoreRuleIds = [...INJECTION_POLICY.always_on_rule_ids].sort();
@@ -253,17 +263,21 @@ export function buildMarkSprintManifestPolicy(
       ? options.mark7GuidanceApproval ?? null
       : MARK_7_STUDIO_SETUP_APPROVAL,
   );
-  // A Prepare-Chapter approval row (Mark 9+) counts ONLY when it matches this
-  // slug's freshly recomputed contract — the same strictness as the frozen
-  // Mark 7/8 literals, with the approval read from the database instead.
-  const factoryContract =
-    slug !== "mark-8" && slug !== "mark-7" ? buildMarkSprintSetupContract(slug) : null;
+  // A Prepare-Chapter receipt (Mark 9+) counts ONLY when it matches the
+  // contract rebuilt from its own stored packet — the same digest strictness
+  // as the frozen Mark 7/8 literals, with the owner's approval (and possibly
+  // his edited note texts) read from the database instead of code.
+  const preparedContract =
+    slug !== "mark-8" && slug !== "mark-7" && options.storedGuidanceReceipt
+      ? buildPreparedSetupContract(slug, options.storedGuidanceReceipt.packet)
+      : null;
   const exactStoredGuidanceApproved = Boolean(
-    factoryContract &&
+    preparedContract &&
+      options.storedGuidanceReceipt &&
       markSprintScopedSetupApprovalApplies(
         slug,
-        factoryContract,
-        options.storedGuidanceApproval ?? null,
+        preparedContract,
+        options.storedGuidanceReceipt.approval,
       ),
   );
   const exactChapterGuidanceApproved =
@@ -283,9 +297,9 @@ export function buildMarkSprintManifestPolicy(
               note.rowId,
             ]),
           )
-        : factoryContract && exactStoredGuidanceApproved
+        : preparedContract && exactStoredGuidanceApproved
           ? new Map(
-              factoryContract.notes.map((note) => [note.guidanceId, note.rowId]),
+              preparedContract.notes.map((note) => [note.guidanceId, note.rowId]),
             )
           : null;
 
@@ -316,11 +330,26 @@ export function buildMarkSprintManifestPolicy(
       liveMatchRequired: true,
       liveMatchEvidence: null,
     },
-    chapterNotes: guidance.chapters[slug].notes.map((note) => ({
-      id: note.id,
-      textDigest: sha256Text(note.text),
-      expectedStoredRowId: storedNoteIds?.get(note.id) ?? null,
-    })),
+    // For a Prepare-Chapter receipt the OWNER-APPROVED PACKET is the
+    // versioned truth for note text (it may carry his edits); the artifact
+    // stays authoritative for every code-receipted chapter. The source is
+    // recorded so live-evidence checks compare against the right one.
+    chapterNotesSource:
+      exactStoredGuidanceApproved && preparedContract
+        ? ("owner-approved-packet" as const)
+        : ("artifact" as const),
+    chapterNotes:
+      exactStoredGuidanceApproved && preparedContract
+        ? preparedContract.notes.map((note) => ({
+            id: note.guidanceId,
+            textDigest: note.textDigest,
+            expectedStoredRowId: note.rowId,
+          }))
+        : guidance.chapters[slug].notes.map((note) => ({
+            id: note.id,
+            textDigest: sha256Text(note.text),
+            expectedStoredRowId: storedNoteIds?.get(note.id) ?? null,
+          })),
     source: (() => {
       const chapter = Number(slug.split("-")[1]);
       const radius = guidance.source_requirement.context_chapters_each_side;
