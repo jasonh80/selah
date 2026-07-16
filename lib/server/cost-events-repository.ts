@@ -42,6 +42,12 @@ export interface CostEventRow {
   created_at: string;
 }
 
+/** Read-only spend-history row for Selah Studio (issue #29 cost ledger). */
+export interface CostHistoryRow extends CostEventRow {
+  image_count: number | null;
+  metadata: Record<string, unknown> | null;
+}
+
 // TEST SEAM (offline safety gate only): capture cost events in memory so the
 // verify script can assert failed/conflicted spend is recorded. Never set in
 // production code paths.
@@ -122,6 +128,39 @@ export async function recordCostEventStrict(input: CostEventInput): Promise<void
         : "cost event write failed",
     );
   }
+}
+
+// TEST SEAM (offline verify only): feed fake spend-history rows so the
+// read-only Studio ledger shaping can be asserted without Supabase.
+let costHistoryForTesting: CostHistoryRow[] | null = null;
+export function __setCostHistoryForTesting(rows: CostHistoryRow[] | null): void {
+  costHistoryForTesting = rows;
+}
+
+/**
+ * Most-recent-first spend history for the Studio ledger. Read-only; empty
+ * when Supabase isn't configured. Callers must NOT expose raw metadata to the
+ * browser — it can hold error text and digests. Pick allowlisted fields only.
+ */
+export async function listRecentCostEvents(limit = 50): Promise<CostHistoryRow[]> {
+  if (costHistoryForTesting) return costHistoryForTesting.slice(0, limit);
+  const db = getSupabaseAdmin();
+  if (!db) {
+    warnSupabaseMissing("listRecentCostEvents");
+    return [];
+  }
+
+  const { data, error } = await db
+    .from(TABLE)
+    .select("id,request_type,provider,model,image_count,estimated_cost_usd,actual_cost_usd,created_at,metadata")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("[selah] listRecentCostEvents failed:", error.message);
+    return [];
+  }
+  return (data ?? []) as CostHistoryRow[];
 }
 
 export async function listCostEventsForChapter(chapterWorkupId: string): Promise<CostEventRow[]> {

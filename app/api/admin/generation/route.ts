@@ -12,10 +12,15 @@ import {
   parseSlug,
 } from "@/lib/server/generate-chapter-workup";
 import {
+  getChapterReviewedAt,
   getChapterStatus,
   getStudioChapterStatus,
   publishChapter,
 } from "@/lib/server/chapter-workups-repository";
+import { listRecentCostEvents } from "@/lib/server/cost-events-repository";
+import { buildStudioChapterInfoResponse } from "@/lib/studio-chapter-info";
+import { shapeStudioCostHistory } from "@/lib/studio-cost-history";
+import { BUILD_ID } from "@/lib/build";
 import {
   claimGenerationJob,
   claimImageJob,
@@ -471,6 +476,35 @@ export async function POST(req: Request) {
       }
       return refuse(slug, "publish", "Studio could not safely publish this chapter.", 500);
     }
+  }
+
+  // ---- read-only per-chapter launch info (issue #29 Studio polish) ----
+  // Last publish time, the Selah build serving Studio, and the models a
+  // launch would use. Reads only; cannot generate, write, or publish.
+  if (action === "chapter_info") {
+    const slug = String(body.slug ?? "");
+    if (!slug) return NextResponse.json({ ok: false, error: "slug required" }, { status: 400 });
+    const settings = await getGenerationSettings();
+    const reviewedAt = await getChapterReviewedAt(slug);
+    return NextResponse.json(
+      buildStudioChapterInfoResponse(slug, {
+        reviewedAt,
+        buildId: BUILD_ID,
+        textModel: settings.selected_text_model,
+        // Protected chapters pin gpt-image-2 via their exact image binding.
+        imageModel: isConnectedStudioSlug(slug)
+          ? MARK_8_IMAGE_MODEL
+          : settings.selected_image_model,
+      }),
+    );
+  }
+
+  // ---- read-only spend history (issue #29 cost-ledger groundwork) ----
+  // Allowlisted fields only; raw metadata (errors, digests, job ids) never
+  // reaches the browser. Reads only; records nothing and spends nothing.
+  if (action === "cost_history") {
+    const events = await listRecentCostEvents(50);
+    return NextResponse.json({ ok: true, events: shapeStudioCostHistory(events) });
   }
 
   // ---- poll a chapter's status (for the Generate Draft progress UI) ----

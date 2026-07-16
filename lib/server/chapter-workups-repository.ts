@@ -445,6 +445,34 @@ export async function publishChapter(
  * touching the (already-reviewed) text. Never creates a row.
  */
 
+// TEST SEAM (offline verify only): feed a reviewed_at answer so the read-only
+// Studio chapter-info action can be asserted without Supabase.
+let reviewedAtForTesting: Map<string, string | null> | null = null;
+export function __setReviewedAtForTesting(rows: Map<string, string | null> | null): void {
+  reviewedAtForTesting = rows;
+}
+
+/**
+ * When the chapter was last published (reviewed_at), or null. Read-only —
+ * feeds the Studio per-chapter info panel (issue #29).
+ */
+export async function getChapterReviewedAt(slug: string): Promise<string | null> {
+  if (reviewedAtForTesting) return reviewedAtForTesting.get(slug) ?? null;
+  const db = getSupabaseAdmin();
+  if (!db) {
+    warnSupabaseMissing("getChapterReviewedAt");
+    return null;
+  }
+  const { data, error } = await db
+    .from(TABLE)
+    .select("reviewed_at")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) return null;
+  const reviewedAt = data?.reviewed_at;
+  return typeof reviewedAt === "string" && reviewedAt ? reviewedAt : null;
+}
+
 /** Raw status of a chapter row (any status), or null. */
 export async function getChapterStatus(slug: string): Promise<string | null> {
   const db = getSupabaseAdmin();
