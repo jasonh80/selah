@@ -35,8 +35,10 @@ hidden until Publish Final.
 
 ## Generation state — CHECK BEFORE ASSUMING
 
-- **Text Generation: OFF** (kill switch in Supabase `generation_settings`)
-- **Image Generation: OFF** (separate kill switch, same table)
+- **Last owner-observed (2026-07-15, during the Mark 7 launch): Text
+  Generation ON and Image Generation ON** (kill switches in Supabase
+  `generation_settings`). **Verify in Studio before relying on this status**
+  — this document cannot track the live switches.
 - **NEVER generate, regenerate, or publish anything without the owner's
   explicit approval in that conversation.** Public page loads never trigger
   generation (fail-closed by design).
@@ -119,7 +121,8 @@ hidden until Publish Final.
   ordered bundle digest-bound without storing text in the repo, manifest, logs,
   or workup. See `docs/selah/scripture-source-policy.md`.
 - Generation Manifest v2 remains frozen historical groundwork. Manifest v3 now
-  binds the richer protected ESV response evidence for the Mark 8 pilot,
+  binds the richer protected ESV response evidence for the protected
+  chapters (Mark 7 and Mark 8),
   exact frozen OpenAI Chat Completions request (`store: false`), Brain rules,
   chapter notes, exemplar, source-overlap result, and owner-approved manifest
   digest without persisting private text. V3 capabilities are process-local
@@ -136,7 +139,7 @@ hidden until Publish Final.
 - The `mark-sprint-copy-review-v1.0` authoring contract verifies the
   Mark 8–11 structural floor (full passage movements, FAQ, content modules,
   placeholder image shape, and no embedded verse array). It runs inside the
-  protected Mark 8 draft pipeline but does not prove semantic accuracy, rendered
+  protected Mark 7/Mark 8 draft pipeline but does not prove semantic accuracy, rendered
   map/image completion, or owner approval. Those remain fail-closed manifest,
   source-aware comparison, completion, and human-review gates.
 - A local `selah-benchmark-rubric-v2` candidate now turns the refined Mark 6
