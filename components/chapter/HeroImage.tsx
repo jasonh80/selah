@@ -25,7 +25,9 @@ export function HeroImage({ data }: { data: ChapterWorkup }) {
   if (!hero) return null;
   return (
     <section className="overflow-hidden rounded-lg border shadow-soft">
-      <div className="aspect-[16/10] w-full bg-card-soft lg:aspect-[16/9]">
+      {/* Owner decision A1 (2026-07-16): every chapter image is uniform 3:2,
+          full column width — the hero included. */}
+      <div className="aspect-[3/2] w-full bg-card-soft">
         <ExpandableImage src={hero.src} alt={hero.alt} className="h-full w-full object-cover" />
       </div>
     </section>

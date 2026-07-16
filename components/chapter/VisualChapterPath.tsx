@@ -10,11 +10,10 @@ import {
 } from "@/lib/content/chapter-content";
 
 // Visual Chapter Path (layout spec §7/§8/§10; owner direction 2026-07-15:
-// NO carousel, no swiping). The chapter's scenes in narrative order, treated
-// the way a web newspaper treats a photo set:
-//   Mobile — a photo essay: every scene full-width, stacked, reader scrolls.
-//   Desktop — a lede image followed by a varied-size editorial mosaic
-//   (never an equal-card dashboard).
+// NO carousel, no swiping; owner decision A1, 2026-07-16: ONE uniform image
+// treatment). The chapter's scenes in narrative order as a photo essay on
+// every breakpoint: each scene 3:2, full column width, one per row — the
+// varied-size desktop mosaic is retired ("mixed sizes feel weird").
 // Scene Checks that belong to a scene render with it (short title on the
 // image, body below as tap-to-expand — never paragraphs over the picture).
 export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
@@ -34,7 +33,7 @@ export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
   return (
     <section>
       <SectionHead title={`The Path Through ${data.reference}`} />
-      <div className="space-y-s4 md:grid md:grid-cols-12 md:gap-s3 md:space-y-0">
+      <div className="space-y-s4">
         {scenes.map((scene, position) => (
           <PathScene
             key={scene.kind}
@@ -49,20 +48,6 @@ export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
   );
 }
 
-// Desktop mosaic rhythm: the opening scene runs the full measure (the lede);
-// the rest alternate wide/narrow in pairs so no two rows read identically.
-function mosaicSpan(position: number): string {
-  if (position === 0) return "md:col-span-12";
-  const beat = (position - 1) % 4;
-  return ["md:col-span-7", "md:col-span-5", "md:col-span-5", "md:col-span-7"][beat];
-}
-
-function mosaicAspect(position: number): string {
-  return position === 0
-    ? "aspect-[4/3] sm:aspect-[16/9] md:aspect-[2/1]"
-    : "aspect-[4/3] md:aspect-[3/2]";
-}
-
 function PathScene({
   scene,
   position,
@@ -75,9 +60,9 @@ function PathScene({
   check?: SceneCheck;
 }) {
   return (
-    <figure className={`flex flex-col ${mosaicSpan(position)}`}>
+    <figure className="flex flex-col">
       <div className="relative overflow-hidden rounded-md border shadow-hair">
-        <div className={`w-full bg-card-soft ${mosaicAspect(position)}`}>
+        <div className="aspect-[3/2] w-full bg-card-soft">
           <ExpandableImage src={scene.src} alt={scene.alt} className="h-full w-full object-cover" />
         </div>
         <span

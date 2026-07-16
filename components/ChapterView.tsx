@@ -1,5 +1,4 @@
 import type { ChapterWorkup } from "@/lib/types";
-import { ChapterHero } from "@/components/chapter/ChapterHero";
 import { HeroImage } from "@/components/chapter/HeroImage";
 import { MetadataChips } from "@/components/chapter/MetadataChips";
 import { VisualDashboardGrid } from "@/components/chapter/VisualDashboardGrid";
@@ -36,9 +35,9 @@ export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) 
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
       <main className="min-w-0 space-y-s6 pb-s12 pt-s2 lg:pt-s4">
-        {/* Above the fold: title, controls + inline Scripture, key image */}
+        {/* Above the fold: title + controls on one header row (owner decision
+            A2), subtitle below, inline Scripture, key image. */}
         <div className="space-y-s3">
-          <ChapterHero data={data} />
           <ChapterTopControls data={data} />
         </div>
 

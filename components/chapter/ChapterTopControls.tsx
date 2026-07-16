@@ -7,12 +7,15 @@ import { useVersion } from "@/components/VersionProvider";
 import { useEsvText } from "@/components/chapter/useEsvText";
 import { ScriptureReader } from "@/components/chapter/ScriptureReader";
 
-// The top control cluster (layout spec §2/§3; owner direction 2026-07-15):
-//   [ Read Mark 6 ]  [ Quick Dive ]  [ Deep Dive ]  — centered, one row
-// plus a collapsed Scripture preview (first words of the selected translation).
-// "Read Mark 6" expands the FULL chapter inline right here — content pushes
-// down, no jump to a lower section. Expanded, the control reads "Hide Mark 6".
-// Selah Focus lives in the app header beside the version/theme controls.
+// The chapter header (layout spec §2/§3; owner decision A2, 2026-07-16):
+// title left with the control row — [ Read Mark 6 ] [ Quick Dive ]
+// [ Deep Dive ] — on the SAME row at md+ (wrapping below when the title
+// needs the width), and a tight controls row directly below the title on
+// phones. Below that, a collapsed Scripture preview (first words of the
+// selected translation). "Read Mark 6" expands the FULL chapter inline right
+// here — content pushes down, no jump to a lower section. Expanded, the
+// control reads "Hide Mark 6". Selah Focus lives in the app header beside
+// the version/theme controls.
 export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
   const { mode, setMode } = useReadingMode();
   const { version } = useVersion();
@@ -36,23 +39,29 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
 
   return (
     <div id="chapter" className="scroll-mt-20 space-y-s3">
-      <div className="flex flex-nowrap items-center justify-center gap-s2">
-        <button
-          onClick={() => setScriptureOpen((open) => !open)}
-          aria-expanded={scriptureOpen}
-          className={`${base} border bg-card text-primary hover:border-accent/40`}
-        >
-          {scriptureOpen ? `Hide ${data.reference}` : `Read ${data.reference}`}
-          <span aria-hidden className={`text-secondary transition-transform ${scriptureOpen ? "rotate-180" : ""}`}>
-            ⌄
-          </span>
-        </button>
-        <button onClick={() => setMode("quick")} aria-pressed={mode === "quick"} className={modeBtn("quick")}>
-          Quick Dive
-        </button>
-        <button onClick={() => setMode("deep")} aria-pressed={mode === "deep"} className={modeBtn("deep")}>
-          Deep Dive
-        </button>
+      <div className="pt-2">
+        <div className="flex flex-col gap-s3 md:flex-row md:flex-wrap md:items-center md:justify-between">
+          <h1 className="text-title text-primary lg:text-[48px]">{data.title}</h1>
+          <div className="flex flex-nowrap items-center gap-s2">
+            <button
+              onClick={() => setScriptureOpen((open) => !open)}
+              aria-expanded={scriptureOpen}
+              className={`${base} border bg-card text-primary hover:border-accent/40`}
+            >
+              {scriptureOpen ? `Hide ${data.reference}` : `Read ${data.reference}`}
+              <span aria-hidden className={`text-secondary transition-transform ${scriptureOpen ? "rotate-180" : ""}`}>
+                ⌄
+              </span>
+            </button>
+            <button onClick={() => setMode("quick")} aria-pressed={mode === "quick"} className={modeBtn("quick")}>
+              Quick Dive
+            </button>
+            <button onClick={() => setMode("deep")} aria-pressed={mode === "deep"} className={modeBtn("deep")}>
+              Deep Dive
+            </button>
+          </div>
+        </div>
+        <p className="text-subtitle mt-2.5 text-primary">{data.subtitle}</p>
       </div>
 
       {scriptureOpen ? (
