@@ -25,6 +25,12 @@ import {
   decideMarkSprintStudioSetup,
 } from "@/lib/studio-mark-sprint-setup";
 import {
+  buildPrepareChapterApproveRequest,
+  decidePrepareChapterStatus,
+  type PrepareChapterViewModel,
+} from "@/lib/studio-prepare-chapter";
+import { PrepareChapterScreen } from "./PrepareChapterScreen";
+import {
   deriveLaunchProgress,
   type LaunchStep,
 } from "@/lib/studio-launch-progress";
@@ -176,6 +182,12 @@ export default function SelahStudioPage() {
   const [mark8SetupDecision, setMark8SetupDecision] = useState<Mark8StudioSetupDecision | null>(null);
   const [mark8SetupBusy, setMark8SetupBusy] = useState(false);
   const [mark8SetupMsg, setMark8SetupMsg] = useState("");
+  // Prepare Chapter screen (owner decision A5): the Brain's proposal the
+  // owner reads once and approves once. Open = proposal loaded.
+  const [prepareScreen, setPrepareScreen] = useState<PrepareChapterViewModel | null>(null);
+  const [prepareBusy, setPrepareBusy] = useState(false);
+  const [prepareMsg, setPrepareMsg] = useState("");
+  const [preparedMsg, setPreparedMsg] = useState("");
 
   const [previewed, setPreviewed] = useState(false);
   const [verdict, setVerdict] = useState<Verdict>("");
@@ -606,6 +618,68 @@ export default function SelahStudioPage() {
       if (activeSlug.current === target && mark8SetupRequest.current === requestId) {
         setMark8SetupBusy(false);
       }
+    }
+  }
+
+  // Prepare Chapter screen (owner decision A5). Opening it is READ-ONLY;
+  // approving records the digest-bound owner receipt and seeds preparation —
+  // it never generates, fetches Scripture, or publishes.
+  async function openPrepareChapter() {
+    const target = slug;
+    if (!isConnectedStudioSlug(target)) return;
+    setPrepareBusy(true);
+    setPrepareMsg("");
+    setPreparedMsg("");
+    try {
+      const response = await api("POST", { action: "prepare_chapter_status", slug: target });
+      if (activeSlug.current !== target) return;
+      const decision = decidePrepareChapterStatus(target, response);
+      if (decision.kind === "proposal") {
+        setPrepareScreen(decision.proposal);
+      } else if (decision.kind === "already-prepared") {
+        setPreparedMsg(`${connectedChapterLabel(target)} is already prepared.`);
+        void loadMark8Setup(target);
+      } else {
+        setPrepareMsg(decision.message);
+      }
+    } catch {
+      if (activeSlug.current === target) {
+        setPrepareMsg("Studio could not load this chapter's preparation.");
+      }
+    } finally {
+      if (activeSlug.current === target) setPrepareBusy(false);
+    }
+  }
+
+  async function approvePrepareChapter() {
+    const proposal = prepareScreen;
+    if (!proposal || prepareBusy) return;
+    setPrepareBusy(true);
+    setPrepareMsg("");
+    try {
+      const response = await api("POST", buildPrepareChapterApproveRequest(proposal));
+      if (response.ok === true && response.prepared === true) {
+        setPrepareScreen(null);
+        setPreparedMsg(
+          typeof response.message === "string"
+            ? response.message
+            : `${proposal.label} is prepared. Create the text draft when you're ready.`,
+        );
+        void loadMark8Setup(proposal.slug);
+      } else {
+        // Failure preserves the proposal on screen; retry is an owner click.
+        setPrepareMsg(
+          typeof response.error === "string"
+            ? response.error
+            : `Studio could not safely finish preparing ${proposal.label}. Your approval is saved; try again.`,
+        );
+      }
+    } catch {
+      setPrepareMsg(
+        `Studio could not safely finish preparing ${proposal.label}. Your approval is saved; try again.`,
+      );
+    } finally {
+      setPrepareBusy(false);
     }
   }
 
@@ -1261,6 +1335,19 @@ export default function SelahStudioPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-3 px-4 py-12">
+      {prepareScreen && (
+        <PrepareChapterScreen
+          proposal={prepareScreen}
+          busy={prepareBusy}
+          error={prepareMsg}
+          onApprove={() => void approvePrepareChapter()}
+          onBack={() => {
+            if (prepareBusy) return;
+            setPrepareScreen(null);
+            setPrepareMsg("");
+          }}
+        />
+      )}
       <header className="mb-2">
         <p className="text-eyebrow">SELAH STUDIO</p>
         <h1 className="mt-1 text-title text-primary">Launch a Chapter</h1>
@@ -1336,11 +1423,26 @@ export default function SelahStudioPage() {
         )}
         {isProtectedChapter && mark8SetupDecision?.kind === "locked" && (
           <div className="rounded-lg border bg-card-soft p-3">
-            <p className="text-[13px] font-semibold text-primary">{chapterLabel} setup is locked</p>
+            <p className="text-[13px] font-semibold text-primary">{chapterLabel} needs one preparation review</p>
             <p className="mt-1 text-[13px] text-secondary">
-              The exact Selah Brain and 10 {chapterLabel} notes still need your approval.
+              Read the Brain&apos;s proposal — movements, notes, and watch-outs — and
+              approve it once. Nothing is generated or published from that screen.
             </p>
+            <button
+              type="button"
+              onClick={() => void openPrepareChapter()}
+              disabled={prepareBusy}
+              className={`${primary} mt-2.5`}
+            >
+              {prepareBusy ? "Loading proposal…" : `Review & prepare ${chapterLabel}`}
+            </button>
+            {prepareMsg && !prepareScreen && (
+              <p className="mt-2 text-[13px] text-jesus-red">{prepareMsg}</p>
+            )}
           </div>
+        )}
+        {isProtectedChapter && preparedMsg && (
+          <p className="mb-2.5 text-[13px] font-medium text-accent-strong">{preparedMsg}</p>
         )}
         {isProtectedChapter && mark8SetupDecision?.kind === "setup" && (
           <div className="rounded-lg border bg-card-soft p-3">

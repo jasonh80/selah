@@ -316,9 +316,14 @@ import {
   validateMarkSprintPublishCandidate,
 } from "../lib/server/chapter-workups-repository";
 import {
+  buildMarkSprintSetupContract,
   connectedChapterReceiptApplies,
   __setConnectedReceiptOverridesForTesting,
 } from "../lib/server/mark-sprint-setup-contracts";
+import {
+  connectedChapterReceiptAppliesIncludingStored,
+  __setStoredSetupApprovalStoreForTesting,
+} from "../lib/server/chapter-setup-approvals";
 import { POST as adminPost } from "../app/api/admin/generation/route";
 import textWorker, {
   __setMark8PermissionCheckerForTesting,
@@ -1503,6 +1508,111 @@ const realRouteAndWorkers = async () => {
       store.rows.delete("mark-7");
       lastTrigger = null;
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+    }
+
+    // R2e. Prepare Chapter (owner decision A5, 2026-07-16): the owner's
+    // digest-bound approval ROW — recorded from the screen, never code —
+    // unlocks Mark 9 with exactly the strictness of the frozen literals.
+    {
+      const contract = buildMarkSprintSetupContract("mark-9");
+      const approvalRows = new Map<string, Record<string, unknown>>();
+      __setStoredSetupApprovalStoreForTesting({
+        async read(slug) { return approvalRows.get(slug) ?? null; },
+        async upsert(row) { approvalRows.set(String(row.slug), row); },
+      });
+      try {
+        // The proposal is read-only, exact, and only for factory chapters.
+        const unauth = await adminPost(adminReq({ action: "prepare_chapter_status", slug: "mark-9" }, "wrong-token"));
+        ok(unauth.status === 401, "R2e prepare status requires the studio key");
+        for (const refusedSlug of ["mark-10", "mark-11", "exodus-27", "mark-09"]) {
+          const res = await adminPost(adminReq({ action: "prepare_chapter_status", slug: refusedSlug }));
+          ok(res.status === 400, `R2e ${refusedSlug} has no on-screen preparation`);
+        }
+        const statusRes = await adminPost(adminReq({ action: "prepare_chapter_status", slug: "mark-9" }));
+        ok(statusRes.status === 200, "R2e Mark 9 proposal is served");
+        const proposal = ((await statusRes.json()) as { prepare: Record<string, unknown> }).prepare;
+        ok(proposal.approved === false, "R2e Mark 9 starts unapproved");
+        ok(proposal.setupDigest === contract.setupDigest, "R2e the proposal carries the exact contract digest");
+        ok(Array.isArray(proposal.notes) && proposal.notes.length === 10, "R2e the proposal shows all 10 notes");
+        ok(Array.isArray(proposal.movements) && proposal.movements.length === 8, "R2e the proposal shows all 8 movements");
+        ok(Array.isArray(proposal.watchouts) && proposal.watchouts.length >= 3, "R2e the proposal surfaces the watch-outs");
+
+        // Refusals record nothing.
+        const unconfirmed = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", setupDigest: contract.setupDigest }));
+        ok(unconfirmed.status === 400, "R2e approve without confirmation → 400");
+        const drifted = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: "0".repeat(64) }));
+        ok(drifted.status === 409, "R2e approve with a drifted digest → 409");
+        ok(approvalRows.size === 0, "R2e refused approvals record NO approval row");
+        ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e Mark 9 stays unreceipted after refusals");
+
+        // The real approval records the row even when offline seeding fails
+        // closed afterward — the owner's decision is never silently lost.
+        const approved = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: contract.setupDigest }));
+        ok(approved.status === 500, "R2e offline seeding after approval fails closed with a plain refusal");
+        ok(approvalRows.has("mark-9"), "R2e the owner approval row was recorded");
+        ok(await connectedChapterReceiptAppliesIncludingStored("mark-9"), "R2e the recorded approval row IS the Mark 9 receipt");
+        ok(!connectedChapterReceiptApplies("mark-9"), "R2e the sync code-literal gate is unchanged by a stored row");
+        ok(
+          audit.some((entry) => entry.action === "prepare_chapter_approve" && entry.slug === "mark-9" && entry.status === "started") &&
+            audit.some((entry) => entry.action === "prepare_chapter_approve" && entry.slug === "mark-9" && entry.status === "failed"),
+          "R2e the approval and its failed seeding are both durably audited",
+        );
+
+        // The serve boundary honors the stored receipt with the same
+        // tamper-evidence as everything else.
+        const validApproval = {
+          scope: contract.scope,
+          slug: "mark-9" as const,
+          approved_by: "Jason Hales (owner)",
+          approved_at: "2026-07-16T12:00:00Z",
+          evidence: "offline verification fixture",
+          guidance_digest: contract.guidanceDigest,
+          notes_digest: contract.notesDigest,
+          receipt_digest: contract.setupDigest,
+        };
+        ok(
+          protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), validApproval),
+          "R2e a receipted, self-consistent Mark 9 may serve",
+        );
+        for (const tamperedKey of ["guidance_digest", "notes_digest", "receipt_digest"] as const) {
+          ok(
+            !protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), {
+              ...validApproval,
+              [tamperedKey]: "f".repeat(64),
+            }),
+            `R2e a tampered ${tamperedKey} never serves Mark 9`,
+          );
+        }
+        ok(
+          !protectedChapterServeAllowed("mark-10", completedSprintWorkup("mark-10"), { ...validApproval, slug: "mark-10" as never }),
+          "R2e a Mark 9 approval can never serve another chapter",
+        );
+
+        // Tampered STORED rows collapse to "no receipt" at the async gate.
+        approvalRows.set("mark-9", { ...approvalRows.get("mark-9")!, notes_digest: "f".repeat(64) });
+        ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e a tampered stored row is not a receipt");
+        approvalRows.set("mark-9", { ...validApproval });
+
+        // With the stored receipt in place, the generate route's refusal (if
+        // any) is no longer the receipt gate — receipts moved to the DB
+        // without weakening the later manifest/settings/confirmation gates.
+        const receiptAudits = audit.filter(
+          (entry) => entry.action === "refused:generate" && entry.slug === "mark-9" && String(entry.message ?? "").includes("receipt"),
+        ).length;
+        await adminPost(adminReq({ action: "generate", slug: "mark-9", confirm: true, approvedManifestDigest: MANIFEST_DIGEST_A }));
+        ok(
+          audit.filter(
+            (entry) => entry.action === "refused:generate" && entry.slug === "mark-9" && String(entry.message ?? "").includes("receipt"),
+          ).length === receiptAudits,
+          "R2e a stored-receipted Mark 9 is never refused FOR the receipt",
+        );
+        store.rows.delete("mark-9");
+        lastTrigger = null;
+        __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+      } finally {
+        __setStoredSetupApprovalStoreForTesting(null);
+      }
+      ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e without any store, Mark 9 fails closed again");
     }
 
     // R3. Kill switch OFF through the REAL route: refused before any claim.

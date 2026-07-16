@@ -12,12 +12,14 @@ import {
   type ExistingLibraryRuleRow,
 } from "./selah-brain";
 import {
+  buildMarkSprintSetupContract,
   MARK_7_SETUP_CONTRACT,
   MARK_7_STUDIO_SETUP_APPROVAL,
   markSprintSetupApprovalMatches,
   type MarkSprintSetupContract,
   type MarkSprintStudioSetupApproval,
 } from "./mark-sprint-setup-contracts";
+import { readStoredSetupApproval } from "./chapter-setup-approvals";
 import { SEED_RULES } from "./selah-brain-library";
 
 export interface MarkSprintFactorySetup {
@@ -26,10 +28,14 @@ export interface MarkSprintFactorySetup {
 }
 
 // Chapters served by the factory runner. Mark 8's literal contract is
-// deliberately absent; adding a chapter here requires its own owner receipt
-// in mark-sprint-setup-contracts.ts (fail-closed until then).
+// deliberately absent. A chapter needs an owner receipt to do ANYTHING here:
+// Mark 7 carries its frozen code literal; chapters listed with approval null
+// (Mark 9) stay fail-closed until the owner approves them on the Prepare
+// Chapter screen, which records a digest-bound row read back by
+// readStoredSetupApproval (owner decision A5, 2026-07-16).
 const FACTORY_SETUPS: readonly MarkSprintFactorySetup[] = [
   { contract: MARK_7_SETUP_CONTRACT, approval: MARK_7_STUDIO_SETUP_APPROVAL },
+  { contract: buildMarkSprintSetupContract("mark-9"), approval: null },
 ];
 
 export function markSprintFactorySetupFor(
@@ -112,10 +118,14 @@ export interface MarkSprintStudioSetupResult {
   totalNotes: number;
 }
 
-function approvalsReady(setup: MarkSprintFactorySetup): boolean {
+function approvalsReady(
+  setup: MarkSprintFactorySetup,
+  storedApproval: MarkSprintStudioSetupApproval | null = null,
+): boolean {
   return (
     librarySeedApproved() &&
-    markSprintSetupApprovalMatches(setup.contract, setup.approval)
+    (markSprintSetupApprovalMatches(setup.contract, setup.approval) ||
+      markSprintSetupApprovalMatches(setup.contract, storedApproval))
   );
 }
 
@@ -374,7 +384,8 @@ export async function getMarkSprintStudioSetupStatus(
 ): Promise<MarkSprintStudioSetupStatus> {
   const setup = requireFactorySetup(slug);
   const { contract } = setup;
-  if (!approvalsReady(setup)) {
+  const storedApproval = await readStoredSetupApproval(slug);
+  if (!approvalsReady(setup, storedApproval)) {
     return {
       slug: contract.slug,
       approved: false,
@@ -412,7 +423,8 @@ export async function runMarkSprintStudioSetup(
   const setup = requireFactorySetup(slug);
   const { contract } = setup;
   const label = markSprintChapterLabel(contract.slug);
-  if (!approvalsReady(setup)) {
+  const storedApproval = await readStoredSetupApproval(slug);
+  if (!approvalsReady(setup, storedApproval)) {
     throw new MarkSprintStudioSetupError(
       "UNAPPROVED",
       `The Brain and exact ${label} notes still need owner approval.`,
