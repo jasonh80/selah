@@ -36,6 +36,10 @@ import {
   readStudioCostHistory,
   type StudioCostHistory,
 } from "@/lib/studio-cost-history";
+import {
+  readStudioDraftRevision,
+  restoredReviewStillValid,
+} from "@/lib/studio-review-memory";
 
 // Selah Studio — a calm, guided publishing flow (not a developer console).
 // Choose Chapter → Generate Draft → Preview Text → Create & Review Images →
@@ -117,11 +121,14 @@ type StudioCopyReview =
 const TOKEN_STORAGE_KEY = "selah-studio-key";
 
 // Review/checklist state that may safely carry across a chapter switch in
-// this tab. Every approval here is digest-bound: when the chapter's fresh
-// status or image review digest differs from the remembered one,
-// applyCopyReview/applyImageStatus clear the restored approval, and the
+// this tab. Every restored approval is bound to the exact stored draft: the
+// server's draft revision (updated_at) must match on return — any drift,
+// including out-of-band writes from another tab or a version restore, clears
+// previewed/verdict (applyDraftRevision). Wording and image approvals are
+// additionally digest-bound (applyCopyReview/applyImageStatus), and the
 // server independently re-verifies every digest at publish time.
 type SlugReviewMemory = {
+  draftRevision: string;
   previewed: boolean;
   verdict: Verdict;
   note: string;
@@ -194,7 +201,8 @@ export default function SelahStudioPage() {
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
   const [rules, setRules] = useState<Rule[] | null>(null);
   const [examples, setExamples] = useState<Example[] | null>(null);
-  const [chapterInfo, setChapterInfo] = useState<StudioChapterInfo | null>(null);
+  // undefined = loading · null = read failed (never shown as real facts)
+  const [chapterInfo, setChapterInfo] = useState<StudioChapterInfo | null | undefined>(undefined);
   // undefined = not loaded yet · null = load failed · value = loaded
   const [costHistory, setCostHistory] = useState<StudioCostHistory | null | undefined>(undefined);
 
@@ -202,6 +210,7 @@ export default function SelahStudioPage() {
   const tokenRef = useRef("");
   const chapterInfoRequest = useRef(0);
   const reviewMemory = useRef(new Map<string, SlugReviewMemory>());
+  const currentDraftRevision = useRef("");
   const mark8SetupRequest = useRef(0);
   const mark8PreflightRequest = useRef(0);
   const imageStatusRequest = useRef(0);
@@ -278,10 +287,12 @@ export default function SelahStudioPage() {
 
   async function loadChapterInfo(target: string) {
     const requestId = ++chapterInfoRequest.current;
-    setChapterInfo(null);
+    setChapterInfo(undefined);
     try {
       const response = await api("POST", { action: "chapter_info", slug: target });
       if (activeSlug.current !== target || chapterInfoRequest.current !== requestId) return;
+      // A failed or malformed read becomes null — rendered as "unavailable",
+      // never as reassuring facts like "Not published yet" (P1-2).
       setChapterInfo(readStudioChapterInfo(response));
     } catch {
       if (activeSlug.current === target && chapterInfoRequest.current === requestId) {
@@ -319,11 +330,30 @@ export default function SelahStudioPage() {
     setShowFeedback(false);
     setReviewMsg("");
     currentCopyReviewDigest.current = "";
+    currentDraftRevision.current = "";
     setCopyReview(null);
     setApprovedCopyReviewDigest(null);
     resetImageReview();
     setPublished(false);
     setPublishMsg("");
+  }
+
+  // P1-1 (PR #36 review): remembered text approvals are bound to the EXACT
+  // stored draft via the server's draft revision. Any drift — or a revision
+  // that can't be proven — clears previewed/verdict so the text must be
+  // re-read. This runs on the first fresh status after a chapter switch,
+  // before any image status exists, so a stale approval can never reach the
+  // image-spend confirmation or the publish button.
+  function applyDraftRevision(response: unknown) {
+    const fresh = readStudioDraftRevision(response);
+    if (!restoredReviewStillValid(currentDraftRevision.current, fresh)) {
+      setPreviewed(false);
+      setVerdict("");
+      setApprovedCopyReviewDigest(null);
+      setImagesPreviewed(false);
+      setApprovedReviewDigest(null);
+    }
+    currentDraftRevision.current = fresh ?? "";
   }
 
   function applyCopyReview(value: unknown) {
@@ -343,6 +373,7 @@ export default function SelahStudioPage() {
   function snapshotReviewMemory(forSlug: string) {
     if (!forSlug) return;
     reviewMemory.current.set(forSlug, {
+      draftRevision: currentDraftRevision.current,
       previewed,
       verdict,
       note,
@@ -361,6 +392,7 @@ export default function SelahStudioPage() {
   function restoreReviewMemory(forSlug: string) {
     const saved = reviewMemory.current.get(forSlug);
     if (!saved) return;
+    currentDraftRevision.current = saved.draftRevision;
     setPreviewed(saved.previewed);
     setVerdict(saved.verdict);
     setNote(saved.note);
@@ -431,6 +463,7 @@ export default function SelahStudioPage() {
 
     const status = j.status as string | null;
     applyCopyReview(j.copyReview);
+    applyDraftRevision(j);
     setStatusProblem(false);
     if (status === "reviewed") {
       setPhase("ready");
@@ -490,6 +523,7 @@ export default function SelahStudioPage() {
     }
     const st = j.status as string | null;
     applyCopyReview(j.copyReview);
+    applyDraftRevision(j);
     if (st === "draft" || st === "ready" || st === "reviewed") {
       setPhase("ready");
       setPublished(st === "reviewed");
@@ -1261,31 +1295,38 @@ export default function SelahStudioPage() {
         <p className="mt-2 text-[13px] text-secondary">
           You&rsquo;re working on <span className="font-semibold text-primary">{book} {chapter}</span>.
         </p>
-        {/* Read-only chapter facts (issue #29): last launch, build, models. */}
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-lg border bg-card-soft p-3 text-[12px]">
-          <div>
-            <dt className="text-secondary">Last launch</dt>
-            <dd className="font-medium text-primary">
-              {chapterInfo === null
-                ? "—"
-                : chapterInfo.reviewedAt
-                  ? chapterInfo.reviewedAt.slice(0, 16).replace("T", " ")
-                  : "Not published yet"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-secondary">Selah build</dt>
-            <dd className="font-medium text-primary">{chapterInfo?.buildId ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-secondary">Text model</dt>
-            <dd className="font-medium text-primary">{chapterInfo?.textModel ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-secondary">Image model</dt>
-            <dd className="font-medium text-primary">{chapterInfo?.imageModel ?? "—"}</dd>
-          </div>
-        </dl>
+        {/* Read-only chapter facts (issue #29): last launch, build, models.
+            A failed read says so — it never renders as "Not published yet". */}
+        {chapterInfo === null ? (
+          <p className="mt-3 rounded-lg border bg-card-soft p-3 text-[12px] text-secondary">
+            Chapter details are unavailable right now.
+          </p>
+        ) : (
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-lg border bg-card-soft p-3 text-[12px]">
+            <div>
+              <dt className="text-secondary">Last launch</dt>
+              <dd className="font-medium text-primary">
+                {chapterInfo === undefined
+                  ? "—"
+                  : chapterInfo.reviewedAt
+                    ? chapterInfo.reviewedAt.slice(0, 16).replace("T", " ")
+                    : "Not published yet"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-secondary">Selah build</dt>
+              <dd className="font-medium text-primary">{chapterInfo?.buildId ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-secondary">Text model</dt>
+              <dd className="font-medium text-primary">{chapterInfo?.textModel ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-secondary">Image model</dt>
+              <dd className="font-medium text-primary">{chapterInfo?.imageModel ?? "—"}</dd>
+            </div>
+          </dl>
+        )}
       </Step>
 
       {/* Step 2 — Generate Draft */}

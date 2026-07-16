@@ -59,6 +59,12 @@ export interface StudioChapterStatus {
   copyReview?:
     | { status: "warning"; reportDigest: string; findingCount: number }
     | { status: "invalid" };
+  /**
+   * Opaque revision of the stored draft (updated_at). Studio binds remembered
+   * review approvals to this exact value: any drift — including out-of-band
+   * writes while the owner works elsewhere — re-requires a fresh read.
+   */
+  draftRevision?: string;
 }
 
 const PRE_MODEL_FAILURES = new Set([
@@ -445,32 +451,50 @@ export async function publishChapter(
  * touching the (already-reviewed) text. Never creates a row.
  */
 
-// TEST SEAM (offline verify only): feed a reviewed_at answer so the read-only
-// Studio chapter-info action can be asserted without Supabase.
-let reviewedAtForTesting: Map<string, string | null> | null = null;
-export function __setReviewedAtForTesting(rows: Map<string, string | null> | null): void {
+/**
+ * A failed read must never masquerade as the true fact "never published"
+ * (PR #36 review, P1-2) — the two outcomes are distinct types.
+ */
+export type ChapterReviewedAtLookup =
+  | { kind: "ok"; reviewedAt: string | null }
+  | { kind: "unavailable" };
+
+// TEST SEAM (offline verify only): feed a reviewed_at answer (or a simulated
+// outage) so the read-only Studio chapter-info action can be asserted
+// without Supabase.
+let reviewedAtForTesting: Map<string, string | null> | "unavailable" | null = null;
+export function __setReviewedAtForTesting(
+  rows: Map<string, string | null> | "unavailable" | null,
+): void {
   reviewedAtForTesting = rows;
 }
 
 /**
- * When the chapter was last published (reviewed_at), or null. Read-only —
- * feeds the Studio per-chapter info panel (issue #29).
+ * When the chapter was last published (reviewed_at). Read-only — feeds the
+ * Studio per-chapter info panel (issue #29). reviewedAt null means the truth
+ * "never published"; a read failure is reported as unavailable instead.
  */
-export async function getChapterReviewedAt(slug: string): Promise<string | null> {
-  if (reviewedAtForTesting) return reviewedAtForTesting.get(slug) ?? null;
+export async function getChapterReviewedAt(slug: string): Promise<ChapterReviewedAtLookup> {
+  if (reviewedAtForTesting === "unavailable") return { kind: "unavailable" };
+  if (reviewedAtForTesting) {
+    return { kind: "ok", reviewedAt: reviewedAtForTesting.get(slug) ?? null };
+  }
   const db = getSupabaseAdmin();
   if (!db) {
     warnSupabaseMissing("getChapterReviewedAt");
-    return null;
+    return { kind: "unavailable" };
   }
   const { data, error } = await db
     .from(TABLE)
     .select("reviewed_at")
     .eq("slug", slug)
     .maybeSingle();
-  if (error) return null;
+  if (error) return { kind: "unavailable" };
   const reviewedAt = data?.reviewed_at;
-  return typeof reviewedAt === "string" && reviewedAt ? reviewedAt : null;
+  return {
+    kind: "ok",
+    reviewedAt: typeof reviewedAt === "string" && reviewedAt ? reviewedAt : null,
+  };
 }
 
 /** Raw status of a chapter row (any status), or null. */
@@ -498,11 +522,13 @@ export async function getStudioChapterStatus(slug: string): Promise<StudioChapte
   }
   const { data, error } = await db
     .from(TABLE)
-    .select("status,generation_error,workup_json")
+    .select("status,generation_error,workup_json,updated_at")
     .eq("slug", slug)
     .maybeSingle();
   if (error) return { status: null };
   const status = (data?.status as string | undefined) ?? null;
+  const draftRevision =
+    typeof data?.updated_at === "string" && data.updated_at ? data.updated_at : undefined;
   const safeFailure =
     isConnectedStudioSlug(slug) && status === "failed"
       ? safeProtectedMarkFailure(data?.generation_error)
@@ -518,7 +544,12 @@ export async function getStudioChapterStatus(slug: string): Promise<StudioChapte
       : copyInspection.kind === "invalid" && data?.workup_json
         ? { status: "invalid" as const }
         : undefined;
-  return { status, ...(safeFailure ?? {}), ...(copyReview ? { copyReview } : {}) };
+  return {
+    status,
+    ...(safeFailure ?? {}),
+    ...(copyReview ? { copyReview } : {}),
+    ...(draftRevision ? { draftRevision } : {}),
+  };
 }
 
 

@@ -130,24 +130,30 @@ export async function recordCostEventStrict(input: CostEventInput): Promise<void
   }
 }
 
-// TEST SEAM (offline verify only): feed fake spend-history rows so the
-// read-only Studio ledger shaping can be asserted without Supabase.
-let costHistoryForTesting: CostHistoryRow[] | null = null;
-export function __setCostHistoryForTesting(rows: CostHistoryRow[] | null): void {
+// TEST SEAM (offline verify only): feed fake spend-history rows (or a
+// simulated outage) so the read-only Studio ledger can be asserted without
+// Supabase.
+let costHistoryForTesting: CostHistoryRow[] | "unavailable" | null = null;
+export function __setCostHistoryForTesting(
+  rows: CostHistoryRow[] | "unavailable" | null,
+): void {
   costHistoryForTesting = rows;
 }
 
 /**
- * Most-recent-first spend history for the Studio ledger. Read-only; empty
- * when Supabase isn't configured. Callers must NOT expose raw metadata to the
- * browser — it can hold error text and digests. Pick allowlisted fields only.
+ * Most-recent-first spend history for the Studio ledger. Read-only. Returns
+ * null when the read fails or Supabase isn't configured — a failed read must
+ * never look like the true fact "$0 spent" (PR #36 review, P1-2). Callers
+ * must NOT expose raw metadata to the browser — it can hold error text and
+ * digests. Pick allowlisted fields only.
  */
-export async function listRecentCostEvents(limit = 50): Promise<CostHistoryRow[]> {
+export async function listRecentCostEvents(limit = 50): Promise<CostHistoryRow[] | null> {
+  if (costHistoryForTesting === "unavailable") return null;
   if (costHistoryForTesting) return costHistoryForTesting.slice(0, limit);
   const db = getSupabaseAdmin();
   if (!db) {
     warnSupabaseMissing("listRecentCostEvents");
-    return [];
+    return null;
   }
 
   const { data, error } = await db
@@ -158,7 +164,7 @@ export async function listRecentCostEvents(limit = 50): Promise<CostHistoryRow[]
 
   if (error) {
     console.error("[selah] listRecentCostEvents failed:", error.message);
-    return [];
+    return null;
   }
   return (data ?? []) as CostHistoryRow[];
 }

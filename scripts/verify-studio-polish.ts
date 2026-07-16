@@ -36,6 +36,10 @@ import {
   shapeStudioCostHistory,
 } from "../lib/studio-cost-history";
 import {
+  readStudioDraftRevision,
+  restoredReviewStillValid,
+} from "../lib/studio-review-memory";
+import {
   __setCostCaptureForTesting,
   __setCostHistoryForTesting,
   type CostEventInput,
@@ -274,6 +278,34 @@ eq(
 }
 
 // =====================================================================
+// 2b. Remembered-review draft binding (PR #36 review, P1-1)
+// =====================================================================
+// The regression Codex asked for: a CLEAN draft (no wording-review digest)
+// changes out-of-band while the owner is on another chapter. The remembered
+// approval was captured at revision A; the fresh status reports revision B —
+// the approval must NOT stand.
+ok(
+  !restoredReviewStillValid("2026-07-15T09:00:00Z", "2026-07-15T09:05:00Z"),
+  "P1-1 regression: out-of-band clean-draft change invalidates the remembered approval",
+);
+ok(
+  restoredReviewStillValid("2026-07-15T09:00:00Z", "2026-07-15T09:00:00Z"),
+  "unchanged draft revision lets the remembered approval stand",
+);
+ok(!restoredReviewStillValid("2026-07-15T09:00:00Z", null), "unproven fresh revision fails closed");
+ok(!restoredReviewStillValid("", "2026-07-15T09:00:00Z"), "unremembered revision fails closed");
+ok(!restoredReviewStillValid("", null), "no revision on either side fails closed");
+
+eq(
+  readStudioDraftRevision({ ok: true, status: "draft", draftRevision: "2026-07-15T09:00:00Z" }),
+  "2026-07-15T09:00:00Z",
+  "draft revision reads from the status response",
+);
+eq(readStudioDraftRevision({ ok: true, status: "draft" }), null, "missing revision reads as unproven");
+eq(readStudioDraftRevision({ ok: true, draftRevision: "  " }), null, "blank revision reads as unproven");
+eq(readStudioDraftRevision(null), null, "malformed status reads as unproven");
+
+// =====================================================================
 // 3. Chapter info shaping + strict client parse
 // =====================================================================
 {
@@ -461,6 +493,65 @@ const routeSuite = async () => {
     // and generation stays exactly as configured (both switches OFF).
     eq(auditCapture.length, 0, "R4 read-only actions write no audit rows");
     eq(costCapture.length, 0, "R4 read-only actions record no cost events");
+
+    // R5. P1-2 regression: a failed read is a distinct safe error — never a
+    // reassuring empty fact — and leaks no database detail.
+    __setCostHistoryForTesting("unavailable");
+    {
+      const res = await adminPost(adminReq({ action: "cost_history" }));
+      ok(res.status === 503, "R5 failed spend read → 503, not an empty list");
+      const body = (await res.json()) as Record<string, unknown>;
+      ok(body.ok === false, "R5 failed spend read reports ok:false");
+      ok(
+        readStudioCostHistory(body) === null,
+        "R5 client reader treats the failure as failed, not as $0 spent",
+      );
+      ok(
+        !JSON.stringify(body).match(/supabase|postgres|insert|select|column/iu),
+        "R5 failure reveals no database detail",
+      );
+    }
+    __setCostHistoryForTesting([]);
+    {
+      const res = await adminPost(adminReq({ action: "cost_history" }));
+      const body = (await res.json()) as Record<string, unknown>;
+      const parsed = readStudioCostHistory(body);
+      ok(
+        res.status === 200 && parsed !== null && parsed.events.length === 0,
+        "R5b TRUE-empty history still reads as a real, empty ledger",
+      );
+    }
+    __setReviewedAtForTesting("unavailable");
+    {
+      const res = await adminPost(adminReq({ action: "chapter_info", slug: "mark-7" }));
+      ok(res.status === 503, "R5c failed chapter-info read → 503");
+      const body = (await res.json()) as Record<string, unknown>;
+      ok(
+        body.ok === false && readStudioChapterInfo(body) === null,
+        "R5c failure never parses into 'Not published yet' facts",
+      );
+    }
+    __setReviewedAtForTesting(new Map([["mark-7", null]]));
+    {
+      const res = await adminPost(adminReq({ action: "chapter_info", slug: "mark-7" }));
+      const parsed = readStudioChapterInfo(await res.json());
+      ok(
+        res.status === 200 && parsed !== null && parsed.reviewedAt === null,
+        "R5d TRUE never-published still reads as real facts with no launch",
+      );
+    }
+
+    // R6. The status action carries no draft revision when the store is
+    // unreachable — the client guard then fails closed (P1-1).
+    {
+      const res = await adminPost(adminReq({ action: "status", slug: "mark-7" }));
+      const body = (await res.json()) as Record<string, unknown>;
+      const revision = readStudioDraftRevision(body);
+      ok(
+        revision === null && !restoredReviewStillValid("anything", revision),
+        "R6 unproven store → no revision → remembered approvals fail closed",
+      );
+    }
   } finally {
     __setGenerationTestOverrides(null);
     __setCostCaptureForTesting(null);

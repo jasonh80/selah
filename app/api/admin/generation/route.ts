@@ -485,10 +485,18 @@ export async function POST(req: Request) {
     const slug = String(body.slug ?? "");
     if (!slug) return NextResponse.json({ ok: false, error: "slug required" }, { status: 400 });
     const settings = await getGenerationSettings();
-    const reviewedAt = await getChapterReviewedAt(slug);
+    const lookup = await getChapterReviewedAt(slug);
+    // A failed read must never render as "Not published yet" (P1-2). No
+    // database detail is revealed — only that the facts are unavailable.
+    if (lookup.kind === "unavailable") {
+      return NextResponse.json(
+        { ok: false, error: "Chapter details are unavailable right now." },
+        { status: 503 },
+      );
+    }
     return NextResponse.json(
       buildStudioChapterInfoResponse(slug, {
-        reviewedAt,
+        reviewedAt: lookup.reviewedAt,
         buildId: BUILD_ID,
         textModel: settings.selected_text_model,
         // Protected chapters pin gpt-image-2 via their exact image binding.
@@ -504,6 +512,13 @@ export async function POST(req: Request) {
   // reaches the browser. Reads only; records nothing and spends nothing.
   if (action === "cost_history") {
     const events = await listRecentCostEvents(50);
+    // A failed read must never render as "$0 spent / no history" (P1-2).
+    if (events === null) {
+      return NextResponse.json(
+        { ok: false, error: "Spend history is unavailable right now." },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ ok: true, events: shapeStudioCostHistory(events) });
   }
 
