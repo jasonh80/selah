@@ -21,6 +21,18 @@
   --jesus-red: #8d3942;
   --jesus-red-soft: #f6e7e9;
 
+  /* Spacing scale (owner layout spec 2026-07-15): 4/8/12/16/24/32/48.
+     Mobile rhythm lives mostly at 12–24; 32/48 are reserved for major
+     transitions. Chapter templates use these tokens so future chapters
+     inherit the scale automatically. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
   /* Shared radius + shadow scale */
   --radius-lg: 24px;
   --radius-md: 18px;
@@ -108,6 +120,25 @@
   --line: #eed0b4;
 }
 
+/* Wilderness — the Judean desert as a coffee collection: deep roasted browns,
+   sand, clay. Owner concept 2026-07-15: dark brown key color, shades of brown
+   representing the desert and wilderness of the Middle East. */
+[data-theme="wilderness"] {
+  --background: #1d150f;
+  --card: #29201a;
+  --card-soft: #342a22;
+  --text-primary: #f3ece3;
+  --text-secondary: #c2ac97;
+  --line: #40332a;
+  --accent: #c89f7c;
+  --accent-strong: #a9754a;
+  --tint: #33271d;
+  --purple-soft: #33271d;
+  --purple-muted: #c89f7c;
+  --jesus-red: #d98a6a;
+  --jesus-red-soft: #3a2a22;
+}
+
 /* Starlight — sacred night, warm dark purple */
 [data-theme="starlight"] {
   --background: #0d0b14;
@@ -184,6 +215,16 @@ body {
   background-repeat: no-repeat;
 }
 
+/* Wilderness — low desert sun over dunes: a warm sand glow from the horizon
+   and a faint roasted-clay wash, kept dim so the browns stay rich. */
+[data-theme="wilderness"] body {
+  background-image: radial-gradient(1100px 560px at 50% 110%, rgba(200, 159, 124, 0.2), transparent 60%),
+    radial-gradient(820px 440px at 85% -6%, rgba(169, 117, 74, 0.14), transparent 62%),
+    radial-gradient(700px 380px at 10% 0%, rgba(120, 84, 56, 0.16), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
 /* Starlight — a soft purple starglow at the top, so it feels like night sky
    rather than a flat inverted dark mode. */
 [data-theme="starlight"] body {
@@ -251,4 +292,18 @@ body {
   .text-section {
     @apply font-display text-[20px] font-semibold tracking-[-0.02em];
   }
+}
+
+/* ============================================================
+   SELAH FOCUS — an undistracted study state (layout spec §16).
+   The chapter column stays; app chrome (header nav, bottom nav,
+   theme switcher) fades back and stops inviting taps.
+   ============================================================ */
+[data-focus="on"] .selah-chrome {
+  opacity: 0.18;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.selah-chrome {
+  transition: opacity 0.35s ease;
 }

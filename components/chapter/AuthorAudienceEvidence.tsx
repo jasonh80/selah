@@ -35,7 +35,7 @@ export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
 
 function Card({ card, deep }: { card: AAECard; deep: boolean }) {
   return (
-    <div className="flex flex-col rounded-md border bg-card p-4 shadow-hair">
+    <div className="flex flex-col rounded-md border bg-card p-3.5 shadow-hair">
       <p className="text-eyebrow">{card.category}</p>
       <p className="text-card-title mt-1 text-primary">{card.title}</p>
 

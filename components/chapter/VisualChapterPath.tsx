@@ -1,0 +1,120 @@
+import type { ChapterWorkup, ChapterImage } from "@/lib/types";
+import { SectionHead } from "@/components/chapter/SectionHead";
+import { ExpandableImage } from "@/components/chapter/ExpandableImage";
+import { supportingImagesFor } from "@/components/chapter/HeroImage";
+import {
+  getImageTitle,
+  getSceneChecks,
+  integratedSceneChecks,
+  type SceneCheck,
+} from "@/lib/content/chapter-content";
+
+// Visual Chapter Path (layout spec §7/§8/§10; owner direction 2026-07-15:
+// NO carousel, no swiping). The chapter's scenes in narrative order, treated
+// the way a web newspaper treats a photo set:
+//   Mobile — a photo essay: every scene full-width, stacked, reader scrolls.
+//   Desktop — a lede image followed by a varied-size editorial mosaic
+//   (never an equal-card dashboard).
+// Scene Checks that belong to a scene render with it (short title on the
+// image, body below as tap-to-expand — never paragraphs over the picture).
+export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
+  // The hero already anchors the top of the page — the path carries the
+  // REMAINING scenes in narrative order, so no image ever appears twice.
+  const scenes = [...supportingImagesFor(data)].sort((a, b) => a.index - b.index);
+  if (scenes.length === 0) return null;
+
+  const checks: SceneCheck[] =
+    data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
+  const checkByKind = integratedSceneChecks(
+    data.slug,
+    checks,
+    new Set(scenes.map((scene) => scene.kind)),
+  );
+
+  return (
+    <section>
+      <SectionHead title={`The Path Through ${data.reference}`} />
+      <div className="space-y-s4 md:grid md:grid-cols-12 md:gap-s3 md:space-y-0">
+        {scenes.map((scene, position) => (
+          <PathScene
+            key={scene.kind}
+            scene={scene}
+            position={position}
+            title={getImageTitle(data.slug, scene.kind, scene.label)}
+            check={checkByKind.get(scene.kind)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Desktop mosaic rhythm: the opening scene runs the full measure (the lede);
+// the rest alternate wide/narrow in pairs so no two rows read identically.
+function mosaicSpan(position: number): string {
+  if (position === 0) return "md:col-span-12";
+  const beat = (position - 1) % 4;
+  return ["md:col-span-7", "md:col-span-5", "md:col-span-5", "md:col-span-7"][beat];
+}
+
+function mosaicAspect(position: number): string {
+  return position === 0
+    ? "aspect-[4/3] sm:aspect-[16/9] md:aspect-[2/1]"
+    : "aspect-[4/3] md:aspect-[3/2]";
+}
+
+function PathScene({
+  scene,
+  position,
+  title,
+  check,
+}: {
+  scene: ChapterImage;
+  position: number;
+  title: string;
+  check?: SceneCheck;
+}) {
+  return (
+    <figure className={`flex flex-col ${mosaicSpan(position)}`}>
+      <div className="relative overflow-hidden rounded-md border shadow-hair">
+        <div className={`w-full bg-card-soft ${mosaicAspect(position)}`}>
+          <ExpandableImage src={scene.src} alt={scene.alt} className="h-full w-full object-cover" />
+        </div>
+        <span
+          aria-hidden
+          className="absolute left-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(16,16,20,0.55)] text-[11px] font-semibold text-white backdrop-blur"
+        >
+          {position + 1}
+        </span>
+        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(16,16,20,0.78)] via-[rgba(16,16,20,0.04)] to-transparent" />
+        <figcaption className="absolute inset-x-s3 bottom-s3">
+          <span className="block text-[13px] font-semibold leading-snug text-white sm:text-[14px]">{title}</span>
+        </figcaption>
+      </div>
+
+      {check && (
+        <details className="group mt-s2 rounded-md border bg-card shadow-hair" style={{ borderLeft: "3px solid var(--accent-strong)" }}>
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 px-s3 py-s2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5 shrink-0 text-accent-strong"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="2.5" />
+            </svg>
+            <span className="flex-1 text-[12px] font-semibold leading-snug text-primary">{check.title}</span>
+            <span aria-hidden className="text-secondary transition group-open:rotate-180">⌄</span>
+          </summary>
+          {/* visualAccuracyNotes are production guardrails — never rendered. */}
+          <p className="border-t px-s3 py-s2 text-[13px] leading-relaxed text-secondary">{check.body}</p>
+        </details>
+      )}
+    </figure>
+  );
+}

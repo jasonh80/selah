@@ -2,7 +2,12 @@
 
 import type { ChapterWorkup } from "@/lib/types";
 import { useReadingMode } from "@/components/ReadingModeProvider";
-import { getSceneChecks, type SceneCheck } from "@/lib/content/chapter-content";
+import {
+  getSceneChecks,
+  integratedSceneChecks,
+  type SceneCheck,
+} from "@/lib/content/chapter-content";
+import { supportingImagesFor } from "@/components/chapter/HeroImage";
 
 // Recurring "Scene Check" callouts — warm, visual nudges that correct common
 // mental-image mistakes. Quick Dive: compact (label + title + body). Deep Dive:
@@ -10,8 +15,21 @@ import { getSceneChecks, type SceneCheck } from "@/lib/content/chapter-content";
 export function SceneCheckSection({ data }: { data: ChapterWorkup }) {
   const { mode } = useReadingMode();
   // Prefer generated scene checks; fall back to static config (e.g. Psalm 23).
-  const checks: SceneCheck[] =
+  const allChecks: SceneCheck[] =
     data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
+  // EXACTLY the checks rendered on the Visual Chapter Path are excluded here
+  // — computed over the SAME scene set the path renders (supporting images
+  // only; the hero is not on the path). A check bound to the hero scene, or
+  // a second check bound to an already-integrated scene, keeps its standalone
+  // card so nothing is ever dropped.
+  const rendered = new Set(
+    integratedSceneChecks(
+      data.slug,
+      allChecks,
+      new Set(supportingImagesFor(data).map((image) => image.kind)),
+    ).values(),
+  );
+  const checks = allChecks.filter((check) => !rendered.has(check));
   if (checks.length === 0) return null;
   const deep = mode === "deep";
 
@@ -27,7 +45,7 @@ export function SceneCheckSection({ data }: { data: ChapterWorkup }) {
 function SceneCheckCard({ c, deep }: { c: SceneCheck; deep: boolean }) {
   return (
     <div
-      className="rounded-md border bg-card p-4 shadow-hair"
+      className="rounded-md border bg-card p-3.5 shadow-hair"
       style={{ borderLeft: "3px solid var(--accent-strong)" }}
     >
       <div className="flex items-center gap-1.5">

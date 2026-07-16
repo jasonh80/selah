@@ -107,6 +107,74 @@ export function getImageTitle(slug: string, kind: string, fallback: string): str
   return CHAPTER_IMAGE_TITLES[slug]?.[kind] ?? fallback;
 }
 
+// ---- Hero overrides (render-level) ------------------------------------------
+// Published protected chapters cannot change their stored heroKind, so the
+// owner's hero choice lands here as presentation config (layout spec §1:
+// walking-on-water anchors Mark 6; Nazareth joins the scene sequence).
+export const CHAPTER_HERO_OVERRIDES: Record<string, string> = {
+  "mark-6": "walking-water",
+};
+
+export function getHeroKindOverride(slug: string): string | null {
+  return CHAPTER_HERO_OVERRIDES[slug] ?? null;
+}
+
+// ---- Scene Check ↔ image hints (render-level) -------------------------------
+// Layout spec §10: a Scene Check whose title matches one of these lowercase
+// hints renders WITH its scene image on the Visual Chapter Path; unmatched
+// checks keep their standalone cards. Hints are per-slug so generated scene
+// checks (stored in the workup) can be bound without touching the data.
+export const CHAPTER_SCENE_CHECK_IMAGE_HINTS: Record<string, Record<string, string>> = {
+  "mark-6": {
+    nazareth: "nazareth",
+    synagogue: "nazareth",
+    hometown: "nazareth",
+    "two by two": "sending",
+    sandals: "sending",
+    feast: "herods-feast",
+    banquet: "herods-feast",
+    herod: "herods-feast",
+    feeding: "feeding",
+    "five thousand": "feeding",
+    picnic: "feeding",
+    loaves: "feeding",
+    lake: "walking-water",
+    galilee: "walking-water",
+    storm: "walking-water",
+    boat: "walking-water",
+  },
+};
+
+export function getSceneCheckImageKind(slug: string, checkTitle: string): string | null {
+  const hints = CHAPTER_SCENE_CHECK_IMAGE_HINTS[slug];
+  if (!hints) return null;
+  const title = checkTitle.toLowerCase();
+  for (const [hint, kind] of Object.entries(hints)) {
+    if (title.includes(hint)) return kind;
+  }
+  return null;
+}
+
+/**
+ * The single source of truth for which Scene Checks render ON the Visual
+ * Chapter Path: at most ONE check per scene image (the first in reading
+ * order whose hint maps to an existing image kind). EVERY other check —
+ * including a second check bound to the same scene — keeps its standalone
+ * card, so no check is ever dropped (layout review, 2026-07-15).
+ */
+export function integratedSceneChecks<T extends { title: string }>(
+  slug: string,
+  checks: readonly T[],
+  imageKinds: ReadonlySet<string>,
+): Map<string, T> {
+  const byKind = new Map<string, T>();
+  for (const check of checks) {
+    const kind = getSceneCheckImageKind(slug, check.title);
+    if (kind && imageKinds.has(kind) && !byKind.has(kind)) byKind.set(kind, check);
+  }
+  return byKind;
+}
+
 // ---- Verse-by-verse notes --------------------------------------------------
 // Brief, static, Selah-voiced explanations per verse. No generated content.
 export const CHAPTER_VERSE_NOTES: Record<string, Record<number, string>> = {

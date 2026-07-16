@@ -19,7 +19,7 @@ export function VisualDashboardGrid({ data }: { data: ChapterWorkup }) {
 
 function FactCard({ card }: { card: NavCard }) {
   return (
-    <div className="rounded-md border bg-card p-4 shadow-hair">
+    <div className="rounded-md border bg-card p-3.5 shadow-hair">
       <p className="text-eyebrow">{card.label}</p>
       <p className="text-card-title mt-1 text-primary">{card.support}</p>
     </div>
@@ -28,7 +28,7 @@ function FactCard({ card }: { card: NavCard }) {
 
 function JesusCard({ card }: { card: NavCard }) {
   return (
-    <div className="col-span-2 rounded-md border bg-card p-4 shadow-hair ring-1 ring-[rgba(178,58,58,0.18)]">
+    <div className="col-span-2 rounded-md border bg-card p-3.5 shadow-hair ring-1 ring-[rgba(178,58,58,0.18)]">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-jesus-red-soft text-jesus-red">
           ✝

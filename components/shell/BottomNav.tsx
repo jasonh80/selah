@@ -8,7 +8,7 @@ export function BottomNav() {
   const pathname = usePathname() ?? "/";
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 backdrop-blur-xl lg:hidden">
+    <nav className="selah-chrome fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 backdrop-blur-xl lg:hidden">
       <div className="mx-auto flex max-w-[480px] items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {NAV.map((item) => {
           const active = isActive(pathname, item.href);

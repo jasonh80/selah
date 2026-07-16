@@ -68,7 +68,7 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
   const headline = getTimelineNote(data.slug) ?? rangeText;
 
   return (
-    <section id="timeline" className="scroll-mt-20 rounded-md border bg-card p-4 shadow-hair">
+    <section id="timeline" className="scroll-mt-20 rounded-md border bg-card p-3.5 shadow-hair">
       <h2 className="text-section text-primary">Where It Fits</h2>
 
       <div className="no-scrollbar -mx-1 mt-3 overflow-x-auto px-1">
