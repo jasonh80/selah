@@ -5,12 +5,13 @@
 // unchanged by this generalization.
 import type { ChapterImage, ChapterWorkup, ImageKind } from "../types";
 import { sha256Canonical } from "./generation-manifest";
+import { GPT_IMAGE_2_ESTIMATED_USD_EACH } from "../ai/costs";
 
 export const MARK_8_IMAGE_SLUG = "mark-8";
 export const MARK_8_IMAGE_MODEL = "gpt-image-2";
 // Documented high-quality 1024x1536 / 1536x1024 output estimate. Text-input
 // tokens are additional, so Studio labels this as an estimate rather than a cap.
-export const MARK_8_IMAGE_ESTIMATED_COST_USD = 0.165;
+export const MARK_8_IMAGE_ESTIMATED_COST_USD = GPT_IMAGE_2_ESTIMATED_USD_EACH;
 
 const SAFE_KIND = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 

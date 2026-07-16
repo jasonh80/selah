@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BIBLE_BOOKS, chapterCount, slugFor } from "@/lib/bible/books";
 import {
   buildStudioGenerateRequest,
@@ -24,6 +24,22 @@ import {
   buildMarkSprintStudioSetupRequest,
   decideMarkSprintStudioSetup,
 } from "@/lib/studio-mark-sprint-setup";
+import {
+  deriveLaunchProgress,
+  type LaunchStep,
+} from "@/lib/studio-launch-progress";
+import {
+  readStudioChapterInfo,
+  type StudioChapterInfo,
+} from "@/lib/studio-chapter-info";
+import {
+  readStudioCostHistory,
+  type StudioCostHistory,
+} from "@/lib/studio-cost-history";
+import {
+  readStudioDraftRevision,
+  restoredReviewStillValid,
+} from "@/lib/studio-review-memory";
 
 // Selah Studio — a calm, guided publishing flow (not a developer console).
 // Choose Chapter → Generate Draft → Preview Text → Create & Review Images →
@@ -99,6 +115,34 @@ type StudioCopyReview =
   | { status: "warning"; reportDigest: string; findingCount: number }
   | { status: "invalid" };
 
+// The studio key is sensitive. sessionStorage only — per-tab, cleared when
+// the tab closes, unreadable by other origins. Never localStorage (shared
+// across tabs and persistent on disk) and never a cookie.
+const TOKEN_STORAGE_KEY = "selah-studio-key";
+
+// Review/checklist state that may safely carry across a chapter switch in
+// this tab. Every restored approval is bound to the exact stored draft: the
+// server's draft revision (updated_at) must match on return — any drift,
+// including out-of-band writes from another tab or a version restore, clears
+// previewed/verdict (applyDraftRevision). Wording and image approvals are
+// additionally digest-bound (applyCopyReview/applyImageStatus), and the
+// server independently re-verifies every digest at publish time.
+type SlugReviewMemory = {
+  draftRevision: string;
+  previewed: boolean;
+  verdict: Verdict;
+  note: string;
+  scope: Scope;
+  tags: string[];
+  noteSaved: boolean;
+  showFeedback: boolean;
+  copyDigest: string;
+  approvedCopyReviewDigest: string | null;
+  imageDigest: string;
+  imagesPreviewed: boolean;
+  approvedReviewDigest: string | null;
+};
+
 const QUICK_TAGS = [
   "Too academic",
   "Too generic",
@@ -124,7 +168,6 @@ export default function SelahStudioPage() {
   const [draftTakingLonger, setDraftTakingLonger] = useState(false);
   const [statusProblem, setStatusProblem] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [confirmingMark8Source, setConfirmingMark8Source] = useState(false);
   const [confirmingImageDiscard, setConfirmingImageDiscard] = useState(false);
   const [approvedImageDiscard, setApprovedImageDiscard] = useState(false);
   const [preparingMark8, setPreparingMark8] = useState(false);
@@ -158,8 +201,16 @@ export default function SelahStudioPage() {
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
   const [rules, setRules] = useState<Rule[] | null>(null);
   const [examples, setExamples] = useState<Example[] | null>(null);
+  // undefined = loading · null = read failed (never shown as real facts)
+  const [chapterInfo, setChapterInfo] = useState<StudioChapterInfo | null | undefined>(undefined);
+  // undefined = not loaded yet · null = load failed · value = loaded
+  const [costHistory, setCostHistory] = useState<StudioCostHistory | null | undefined>(undefined);
 
   const activeSlug = useRef("");
+  const tokenRef = useRef("");
+  const chapterInfoRequest = useRef(0);
+  const reviewMemory = useRef(new Map<string, SlugReviewMemory>());
+  const currentDraftRevision = useRef("");
   const mark8SetupRequest = useRef(0);
   const mark8PreflightRequest = useRef(0);
   const imageStatusRequest = useRef(0);
@@ -171,11 +222,32 @@ export default function SelahStudioPage() {
   async function api(method: "GET" | "POST", body?: unknown) {
     const r = await fetch("/api/admin/generation", {
       method,
-      headers: { "x-admin-token": token, "content-type": "application/json" },
+      headers: { "x-admin-token": tokenRef.current, "content-type": "application/json" },
       body: body ? JSON.stringify(body) : undefined,
     });
     return r.json();
   }
+
+  function updateToken(value: string) {
+    tokenRef.current = value;
+    setToken(value);
+  }
+
+  // Reconnect automatically after a reload in the same tab. sessionStorage is
+  // the only persistence used for the key — see TOKEN_STORAGE_KEY.
+  useEffect(() => {
+    let saved = "";
+    try {
+      saved = window.sessionStorage.getItem(TOKEN_STORAGE_KEY) ?? "";
+    } catch {
+      saved = "";
+    }
+    if (saved) {
+      updateToken(saved);
+      void connect();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function connect() {
     setBusy(true);
@@ -183,6 +255,11 @@ export default function SelahStudioPage() {
     try {
       const j = await api("GET");
       if (j.ok) {
+        try {
+          window.sessionStorage.setItem(TOKEN_STORAGE_KEY, tokenRef.current);
+        } catch {
+          // Private-mode storage failures only cost the reload convenience.
+        }
         const next = j.settings as GenSettings;
         confirmedSettings.current = next;
         setSettings(next);
@@ -191,8 +268,14 @@ export default function SelahStudioPage() {
         if (target) {
           setPhase("checking");
           void loadChapterStatus(target);
+          void loadChapterInfo(target);
         }
       } else {
+        try {
+          window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+        } catch {
+          // Nothing sensitive was stored if removal fails here.
+        }
         setLoginMsg(j.error || "That key didn't work — try again.");
       }
     } catch {
@@ -200,6 +283,27 @@ export default function SelahStudioPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function loadChapterInfo(target: string) {
+    const requestId = ++chapterInfoRequest.current;
+    setChapterInfo(undefined);
+    try {
+      const response = await api("POST", { action: "chapter_info", slug: target });
+      if (activeSlug.current !== target || chapterInfoRequest.current !== requestId) return;
+      // A failed or malformed read becomes null — rendered as "unavailable",
+      // never as reassuring facts like "Not published yet" (P1-2).
+      setChapterInfo(readStudioChapterInfo(response));
+    } catch {
+      if (activeSlug.current === target && chapterInfoRequest.current === requestId) {
+        setChapterInfo(null);
+      }
+    }
+  }
+
+  async function loadCostHistory() {
+    const response = await api("POST", { action: "cost_history" }).catch(() => null);
+    setCostHistory(response ? readStudioCostHistory(response) : null);
   }
 
   function resetImageReview() {
@@ -226,11 +330,30 @@ export default function SelahStudioPage() {
     setShowFeedback(false);
     setReviewMsg("");
     currentCopyReviewDigest.current = "";
+    currentDraftRevision.current = "";
     setCopyReview(null);
     setApprovedCopyReviewDigest(null);
     resetImageReview();
     setPublished(false);
     setPublishMsg("");
+  }
+
+  // P1-1 (PR #36 review): remembered text approvals are bound to the EXACT
+  // stored draft via the server's draft revision. Any drift — or a revision
+  // that can't be proven — clears previewed/verdict so the text must be
+  // re-read. This runs on the first fresh status after a chapter switch,
+  // before any image status exists, so a stale approval can never reach the
+  // image-spend confirmation or the publish button.
+  function applyDraftRevision(response: unknown) {
+    const fresh = readStudioDraftRevision(response);
+    if (!restoredReviewStillValid(currentDraftRevision.current, fresh)) {
+      setPreviewed(false);
+      setVerdict("");
+      setApprovedCopyReviewDigest(null);
+      setImagesPreviewed(false);
+      setApprovedReviewDigest(null);
+    }
+    currentDraftRevision.current = fresh ?? "";
   }
 
   function applyCopyReview(value: unknown) {
@@ -244,7 +367,48 @@ export default function SelahStudioPage() {
     setCopyReview(next);
   }
 
+  // Carry the current chapter's review state across the switch. Restored
+  // approvals stay digest-bound: a changed draft or image set clears them the
+  // moment the fresh status arrives, and the server re-verifies at publish.
+  function snapshotReviewMemory(forSlug: string) {
+    if (!forSlug) return;
+    reviewMemory.current.set(forSlug, {
+      draftRevision: currentDraftRevision.current,
+      previewed,
+      verdict,
+      note,
+      scope,
+      tags,
+      noteSaved,
+      showFeedback,
+      copyDigest: currentCopyReviewDigest.current,
+      approvedCopyReviewDigest,
+      imageDigest: currentImageReviewDigest.current,
+      imagesPreviewed,
+      approvedReviewDigest,
+    });
+  }
+
+  function restoreReviewMemory(forSlug: string) {
+    const saved = reviewMemory.current.get(forSlug);
+    if (!saved) return;
+    currentDraftRevision.current = saved.draftRevision;
+    setPreviewed(saved.previewed);
+    setVerdict(saved.verdict);
+    setNote(saved.note);
+    setScope(saved.scope);
+    setTags(saved.tags);
+    setNoteSaved(saved.noteSaved);
+    setShowFeedback(saved.showFeedback);
+    currentCopyReviewDigest.current = saved.copyDigest;
+    setApprovedCopyReviewDigest(saved.approvedCopyReviewDigest);
+    currentImageReviewDigest.current = saved.imageDigest;
+    setImagesPreviewed(saved.imagesPreviewed);
+    setApprovedReviewDigest(saved.approvedReviewDigest);
+  }
+
   function onPickChapter(nextBook: string, nextChapter: number) {
+    snapshotReviewMemory(activeSlug.current);
     setBook(nextBook);
     setChapter(nextChapter);
     setPhase("checking");
@@ -252,7 +416,6 @@ export default function SelahStudioPage() {
     setDraftTakingLonger(false);
     setStatusProblem(false);
     setConfirming(false);
-    setConfirmingMark8Source(false);
     setConfirmingImageDiscard(false);
     setApprovedImageDiscard(false);
     setPreparingMark8(false);
@@ -266,7 +429,11 @@ export default function SelahStudioPage() {
     resetReview();
     const target = slugFor(nextBook, nextChapter) ?? "";
     activeSlug.current = target;
-    if (target) void loadChapterStatus(target);
+    restoreReviewMemory(target);
+    if (target) {
+      void loadChapterStatus(target);
+      void loadChapterInfo(target);
+    }
   }
 
   async function loadChapterStatus(target: string) {
@@ -296,6 +463,7 @@ export default function SelahStudioPage() {
 
     const status = j.status as string | null;
     applyCopyReview(j.copyReview);
+    applyDraftRevision(j);
     setStatusProblem(false);
     if (status === "reviewed") {
       setPhase("ready");
@@ -355,6 +523,7 @@ export default function SelahStudioPage() {
     }
     const st = j.status as string | null;
     applyCopyReview(j.copyReview);
+    applyDraftRevision(j);
     if (st === "draft" || st === "ready" || st === "reviewed") {
       setPhase("ready");
       setPublished(st === "reviewed");
@@ -458,13 +627,15 @@ export default function SelahStudioPage() {
     if (isConnectedStudioSlug(slug)) {
       if ((imageStatus?.stored ?? 0) > 0 && !approvedImageDiscard) {
         setConfirming(false);
-        setConfirmingMark8Source(false);
         setConfirmingImageDiscard(true);
         return;
       }
+      // One confirmation total (issue #29): the read-only ESV preparation
+      // runs straight from the Prepare button; the single owner confirmation
+      // remains the manifest-bound "Create draft" spend decision.
       setConfirming(false);
       setConfirmingImageDiscard(false);
-      setConfirmingMark8Source(true);
+      void prepareMark8ForConfirmation();
       return;
     }
     if (
@@ -485,7 +656,6 @@ export default function SelahStudioPage() {
     const target = slug;
     if (!isConnectedStudioSlug(target)) return;
     const requestId = ++mark8PreflightRequest.current;
-    setConfirmingMark8Source(false);
     setPreparingMark8(true);
     setConfirming(false);
     setMark8ManifestDigest(null);
@@ -535,6 +705,8 @@ export default function SelahStudioPage() {
     setMark8Blockers([]);
     setStatusProblem(false);
     resetReview();
+    // A fresh draft invalidates every remembered review for this chapter.
+    reviewMemory.current.delete(target);
     activeSlug.current = target;
     let j: Record<string, unknown>;
     try {
@@ -1008,7 +1180,7 @@ export default function SelahStudioPage() {
         <input
           type="password"
           value={token}
-          onChange={(e) => setToken(e.target.value)}
+          onChange={(e) => updateToken(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && token && connect()}
           placeholder="Studio key"
           className={`${field} mt-5`}
@@ -1062,6 +1234,24 @@ export default function SelahStudioPage() {
     !published &&
     (!isProtectedChapter || imagesApproved);
 
+  // Launch progress strip (issue #29) — a read-only mirror of the state the
+  // guided flow already holds. It gates nothing.
+  const launchSteps: LaunchStep[] = deriveLaunchProgress({
+    isProtected: isProtectedChapter,
+    setupState: isProtectedChapter ? (mark8SetupDecision?.kind ?? "unknown") : "ready",
+    preparing: preparingMark8,
+    hasManifest: mark8ManifestDigest !== null,
+    blocked: mark8Blockers.length > 0,
+    phase,
+    copyReview: copyReview?.status ?? "none",
+    previewed,
+    verdict,
+    wordingApproved: wordingReviewed,
+    imagePhase,
+    imagesApproved,
+    published,
+  });
+
   const step1: StepState = phase === "idle" && !published ? "current" : "done";
   const step2: StepState =
     published ? "done" : phase === "idle" ? "todo" : phase === "ready" ? "done" : "current";
@@ -1078,6 +1268,9 @@ export default function SelahStudioPage() {
           Choose a chapter, review one fresh draft, then decide when it goes live.
         </p>
       </header>
+
+      {/* Launch progress — where this chapter is in the pipeline. Read-only. */}
+      <LaunchProgressStrip steps={launchSteps} />
 
       {/* Step 1 — Choose Chapter */}
       <Step n={1} title="Choose Chapter" state={step1}>
@@ -1102,6 +1295,38 @@ export default function SelahStudioPage() {
         <p className="mt-2 text-[13px] text-secondary">
           You&rsquo;re working on <span className="font-semibold text-primary">{book} {chapter}</span>.
         </p>
+        {/* Read-only chapter facts (issue #29): last launch, build, models.
+            A failed read says so — it never renders as "Not published yet". */}
+        {chapterInfo === null ? (
+          <p className="mt-3 rounded-lg border bg-card-soft p-3 text-[12px] text-secondary">
+            Chapter details are unavailable right now.
+          </p>
+        ) : (
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-lg border bg-card-soft p-3 text-[12px]">
+            <div>
+              <dt className="text-secondary">Last launch</dt>
+              <dd className="font-medium text-primary">
+                {chapterInfo === undefined
+                  ? "—"
+                  : chapterInfo.reviewedAt
+                    ? chapterInfo.reviewedAt.slice(0, 16).replace("T", " ")
+                    : "Not published yet"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-secondary">Selah build</dt>
+              <dd className="font-medium text-primary">{chapterInfo?.buildId ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-secondary">Text model</dt>
+              <dd className="font-medium text-primary">{chapterInfo?.textModel ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-secondary">Image model</dt>
+              <dd className="font-medium text-primary">{chapterInfo?.imageModel ?? "—"}</dd>
+            </div>
+          </dl>
+        )}
       </Step>
 
       {/* Step 2 — Generate Draft */}
@@ -1163,7 +1388,7 @@ export default function SelahStudioPage() {
                 onClick={() => {
                   setConfirmingImageDiscard(false);
                   setApprovedImageDiscard(true);
-                  setConfirmingMark8Source(true);
+                  void prepareMark8ForConfirmation();
                 }}
                 className={primary}
               >
@@ -1174,58 +1399,42 @@ export default function SelahStudioPage() {
               </button>
             </div>
           </div>
-        ) : confirmingMark8Source && connectedSlug ? (
-          <div className="rounded-lg border bg-card-soft p-3">
-            <p className="text-[13px] text-primary">{studioSourcePreparationMessage(connectedSlug)}</p>
-            <div className="mt-2.5 flex gap-2">
-              <button
-                type="button"
-                onClick={() => void prepareMark8ForConfirmation()}
-                className={primary}
-              >
-                Prepare {chapterLabel}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmingMark8Source(false);
-                  setApprovedImageDiscard(false);
-                }}
-                className={ghost}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
         ) : !confirming ? (
-          <button
-            type="button"
-            onClick={onGenerateClick}
-            disabled={isStudioGenerateEntryDisabled({
-              slug,
-              chapterBusy: phase === "checking" || phase === "generating" || mark8ImageWorkLocked,
-              preflightBusy: preparingMark8,
-              textGenerationEnabled: !textOff,
-              published,
-            })}
-            className={primary}
-          >
-            {published
-              ? "Already Published"
-              : mark8ImageWorkLocked
-                ? "Finish Current Images"
-              : phase === "checking"
-                ? "Checking…"
-                : preparingMark8
-                  ? "Checking readiness…"
-                : phase === "generating"
-                  ? "Generating…"
-                  : draftReady
-                    ? "Generate Again"
-                    : isProtectedChapter
-                      ? `Prepare ${chapterLabel}`
-                      : "Generate Draft"}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onGenerateClick}
+              disabled={isStudioGenerateEntryDisabled({
+                slug,
+                chapterBusy: phase === "checking" || phase === "generating" || mark8ImageWorkLocked,
+                preflightBusy: preparingMark8,
+                textGenerationEnabled: !textOff,
+                published,
+              })}
+              className={primary}
+            >
+              {published
+                ? "Already Published"
+                : mark8ImageWorkLocked
+                  ? "Finish Current Images"
+                : phase === "checking"
+                  ? "Checking…"
+                  : preparingMark8
+                    ? "Checking readiness…"
+                  : phase === "generating"
+                    ? "Generating…"
+                    : draftReady
+                      ? "Generate Again"
+                      : isProtectedChapter
+                        ? `Prepare ${chapterLabel}`
+                        : "Generate Draft"}
+            </button>
+            {connectedSlug && !published && phase !== "generating" && !preparingMark8 && (
+              <p className="mt-2 text-[12px] text-secondary">
+                {studioSourcePreparationMessage(connectedSlug)}
+              </p>
+            )}
+          </>
         ) : (
           <div className="rounded-lg border bg-card-soft p-3">
             <p className="text-[13px] text-primary">
@@ -1590,6 +1799,7 @@ export default function SelahStudioPage() {
             if (!audit) void loadAudit();
             if (!rules) void loadRules();
             if (!examples) void loadExamples();
+            if (costHistory === undefined) void loadCostHistory();
           }}
           className="flex w-full items-center justify-between px-4 py-3 text-[14px] font-medium text-primary"
         >
@@ -1696,6 +1906,59 @@ export default function SelahStudioPage() {
               </div>
             </details>
 
+            {/* Spend history — read-only view of cost_events (issue #29). */}
+            <details className="border-t pt-3">
+              <summary className="cursor-pointer text-[13px] font-medium text-primary">Spend history</summary>
+              <div className="mt-1.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => void loadCostHistory()}
+                    className="text-[12px] text-secondary underline"
+                  >
+                    Refresh spend
+                  </button>
+                  {costHistory && costHistory.events.length > 0 && (
+                    <p className="text-[12px] text-secondary">
+                      Last {costHistory.events.length}:{" "}
+                      <span className="font-medium text-primary">{formatUsd(costHistory.totalUsd)}</span>
+                    </p>
+                  )}
+                </div>
+                {costHistory === undefined ? (
+                  <p className="text-[12px] text-secondary">Loading…</p>
+                ) : costHistory === null ? (
+                  <p className="text-[12px] text-jesus-red">
+                    Studio could not load the spend history. Try Refresh spend.
+                  </p>
+                ) : costHistory.events.length === 0 ? (
+                  <p className="text-[12px] text-secondary">No spend recorded yet.</p>
+                ) : (
+                  costHistory.events.map((event, i) => (
+                    <p key={i} className="text-[12px] text-secondary">
+                      {event.createdAt.slice(0, 16).replace("T", " ")}
+                      {event.slug ? ` · ${event.slug}` : ""} ·{" "}
+                      <span className="text-primary">{event.requestType.replace(/_/gu, " ")}</span>
+                      {" · "}
+                      {event.model}
+                      {event.imageCount !== null && event.imageCount > 0 ? ` · ${event.imageCount} img` : ""}
+                      {" · "}
+                      <span className="font-medium text-primary">
+                        {event.actualCostUsd !== null
+                          ? formatUsd(event.actualCostUsd)
+                          : event.estimatedCostUsd !== null
+                            ? `~${formatUsd(event.estimatedCostUsd)}`
+                            : "—"}
+                      </span>
+                    </p>
+                  ))
+                )}
+                <p className="text-[11px] text-secondary">
+                  Estimates (~) use the real gpt-5.5 / gpt-image-2 rates; the OpenAI dashboard stays the billing source of truth.
+                </p>
+              </div>
+            </details>
+
             <details className="border-t pt-3">
               <summary className="cursor-pointer text-[13px] font-medium text-primary">Recent activity</summary>
               <div className="mt-1.5 space-y-1">
@@ -1757,6 +2020,58 @@ export default function SelahStudioPage() {
 }
 
 // ---------------- small presentational helpers ----------------
+function LaunchProgressStrip({ steps }: { steps: LaunchStep[] }) {
+  return (
+    <div
+      role="list"
+      aria-label="Launch progress"
+      className="flex items-start rounded-xl border bg-card px-3 py-3 shadow-hair"
+    >
+      {steps.map((step, i) => {
+        const dot =
+          step.state === "done"
+            ? "bg-accent-strong text-white"
+            : step.state === "active"
+              ? "bg-accent-strong/20 text-primary ring-1 ring-accent-strong"
+              : step.state === "attention"
+                ? "bg-jesus-red/15 text-jesus-red ring-1 ring-jesus-red/60"
+                : "bg-card-soft text-secondary";
+        return (
+          <div key={step.key} role="listitem" className="flex min-w-0 flex-1 flex-col items-center">
+            <div className="flex w-full items-center">
+              <span
+                aria-hidden="true"
+                className={`h-px flex-1 ${i === 0 ? "opacity-0" : steps[i - 1].state === "done" ? "bg-accent-strong/50" : "bg-card-soft"}`}
+              />
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${dot}`}
+              >
+                {step.state === "done" ? "✓" : step.state === "attention" ? "!" : i + 1}
+              </span>
+              <span
+                aria-hidden="true"
+                className={`h-px flex-1 ${i === steps.length - 1 ? "opacity-0" : step.state === "done" ? "bg-accent-strong/50" : "bg-card-soft"}`}
+              />
+            </div>
+            <p
+              className={`mt-1 w-full truncate text-center text-[10px] ${
+                step.state === "attention"
+                  ? "font-medium text-jesus-red"
+                  : step.state === "todo"
+                    ? "text-secondary"
+                    : "font-medium text-primary"
+              }`}
+              title={step.label}
+            >
+              {step.label}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Step({ n, title, state, children }: { n: number; title: string; state: StepState; children: ReactNode }) {
   const badge = state === "todo" ? "bg-card-soft text-secondary" : "bg-accent-strong text-white";
   return (

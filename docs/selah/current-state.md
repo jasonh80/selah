@@ -4,8 +4,8 @@
 > `studio-workflow.md` for how chapters get made. Keep this file updated at
 > every milestone (publish, system change, model change).
 
-_Last updated: 2026-07-13 (live build still r78; Mark 8–11 preparation is not
-active in production)._
+_Last updated: 2026-07-15 (live build r96; Mark 8 and Mark 7 are published;
+Mark 9–11 remain fail-closed pending their own owner receipts)._
 
 ## What Selah is
 
@@ -26,13 +26,19 @@ through Scripture.** Tagline: *Pause. Reflect. Elevate.* Principle:
 |---|---|---|
 | **Psalm 23** | Published | Original showcase chapter. 3-image set (gpt-image-1). Do not regenerate. |
 | **Mark 6** | Published (2026-07-03) | **First chapter through the full Selah Brain + Selah Studio pipeline.** v6 copy (gpt-5.5), five-image set (gpt-image-2), FAQ, verse notes, Galilee map. The quality benchmark. |
+| **Mark 8** | Published (2026-07-14) | First protected-sprint chapter (fail-closed manifest v3, owner receipts, per-run confirmation). gpt-5.5 copy, 3-image gpt-image-2 set. Took ten runs; the root causes were fixed the same day (PRs #18–#28). |
+| **Mark 7** | Published (2026-07-15) | Second protected chapter — **first-try success on both the text and image runs** via the preload receipts + movement boundaries in the prompt (PRs #32/#34). gpt-5.5 copy, 3-image gpt-image-2 set. No map config yet. |
 
-All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Final.
+All other `/chapter/*` slugs 404 publicly (verified: `mark-9` and alias forms
+like `mark-09` fail closed at both publish and public read). Drafts stay
+hidden until Publish Final.
 
 ## Generation state — CHECK BEFORE ASSUMING
 
-- **Text Generation: OFF** (kill switch in Supabase `generation_settings`)
-- **Image Generation: OFF** (separate kill switch, same table)
+- **Last owner-observed (2026-07-15, during the Mark 7 launch): Text
+  Generation ON and Image Generation ON** (kill switches in Supabase
+  `generation_settings`). **Verify in Studio before relying on this status**
+  — this document cannot track the live switches.
 - **NEVER generate, regenerate, or publish anything without the owner's
   explicit approval in that conversation.** Public page loads never trigger
   generation (fail-closed by design).
@@ -48,15 +54,16 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 
 ## Selah Brain (the quality system)
 
-- **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 is the last
-  verified live library). The version-controlled v1.9 candidate has 99 rules
-  and exact owner approval following Claude's independent review. Its artifact
-  status is `approved_for_seed`, but it has not been seeded. The recorded
-  approval binds the owner, timestamp, review evidence, version, and exact
-  content digest. `npm run build` runs the Brain verifier first. Supabase
-  remains the live source of truth: a merged JSON
-  change is not active until the owner separately approves seeding and a
-  post-seed manifest proves the live IDs, wording, stages, and provenance.
+- **Rules live in Supabase** (`selah_brain_rules`). The owner-approved **v1.9
+  library (99 rules) is the live, verified state**: it was seeded through the
+  receipted Mark 8 Studio setup (2026-07-13) and re-verified by the Mark 7
+  setup's exact post-write readback (2026-07-15) — both setups fail closed
+  unless the live rules match the version-controlled artifact exactly. The
+  recorded approval binds the owner, timestamp, review evidence, version, and
+  exact content digest. `npm run build` runs the Brain verifier first.
+  Supabase remains the live source of truth: a merged JSON change is not
+  active until the owner separately approves seeding and a post-seed readback
+  proves the live IDs, wording, stages, and provenance.
 - Layers: core (always-on) · contextual (max 12 for copy and 18 for image
   stages, selected by genre/stage) ·
   qa (review only) · governance (never in prose prompts).
@@ -97,9 +104,11 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   no Street View ("Standing There" shows a roadmap placeholder by design).
 - Budget limit field in settings is stored but **not enforced**.
 - Ordinary generation still treats some missing context as soft failures. The
-  protected Mark 8 pilot now fails closed on exact Brain rules, chapter notes,
-  exemplar, source evidence, manifest approval, and per-run owner authorization.
-  Mark 9–11 remain disconnected and blocked.
+  protected pipeline — now covering **Mark 7 and Mark 8** — fails closed on
+  exact Brain rules, chapter notes, exemplar, source evidence, per-chapter
+  owner receipts (checked BEFORE any settings write or job claim), manifest
+  approval, and per-run owner authorization. Mark 9–11 remain disconnected
+  and blocked at setup, generation, publish, and public read (aliases too).
 - The Mark 8–11 guidance packet is versioned in
   `lib/server/mark-sprint-guidance.v1.json`. Its exact Mark 8 projection and ten
   notes are owner-approved for private Studio setup; Mark 9–11 remain
@@ -112,7 +121,8 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   ordered bundle digest-bound without storing text in the repo, manifest, logs,
   or workup. See `docs/selah/scripture-source-policy.md`.
 - Generation Manifest v2 remains frozen historical groundwork. Manifest v3 now
-  binds the richer protected ESV response evidence for the Mark 8 pilot,
+  binds the richer protected ESV response evidence for the protected
+  chapters (Mark 7 and Mark 8),
   exact frozen OpenAI Chat Completions request (`store: false`), Brain rules,
   chapter notes, exemplar, source-overlap result, and owner-approved manifest
   digest without persisting private text. V3 capabilities are process-local
@@ -120,7 +130,7 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
   exact owner-confirmed manifest and a single-use job. It is not connected for
   Mark 9–11; see `docs/selah/generation-manifest.md`.
 - The protected ESV source assembler and overlap gate are synthetic-tested and
-  connected only to the authenticated Mark 8 worker.
+  connected only to the authenticated protected worker (Mark 7 and Mark 8).
   They validate the ESV's omitted disputed verse numbers in these Mark windows,
   reject partial/oversized/mismatched responses, retain cancellation through
   body reads, keep source text non-enumerable, and block copied wording hidden
@@ -129,7 +139,7 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 - The `mark-sprint-copy-review-v1.0` authoring contract verifies the
   Mark 8–11 structural floor (full passage movements, FAQ, content modules,
   placeholder image shape, and no embedded verse array). It runs inside the
-  protected Mark 8 draft pipeline but does not prove semantic accuracy, rendered
+  protected Mark 7/Mark 8 draft pipeline but does not prove semantic accuracy, rendered
   map/image completion, or owner approval. Those remain fail-closed manifest,
   source-aware comparison, completion, and human-review gates.
 - A local `selah-benchmark-rubric-v2` candidate now turns the refined Mark 6
@@ -149,11 +159,19 @@ All other `/chapter/*` slugs 404 publicly. Drafts stay hidden until Publish Fina
 
 ## Next up
 
-- **Current release sprint: Mark 8–11**, with Tuesday 2026-07-14 as the stretch
-  target. Selah Brain should author fresh drafts after the safety PR, v1.9,
-  chapter guidance, owner-approved ESV source contract, exact Mark 6 voice
-  exemplar, and fail-closed manifest are reviewed. Each generation and
-  publication still requires explicit owner approval.
+- **Layout spec v1 (#33, draft):** owner-directed newspaper treatment (photo
+  essay / editorial mosaic, no carousels), to be validated on real Mark
+  6/7/8 + an OT chapter before any release. Owner taste-pass gates the merge.
+- **Studio polish + cost ledger:** owner-requested launch progress bar and
+  per-chapter info panel (last launch, build, text/image model versions);
+  key persistence; single confirmations; real gpt-5.5/gpt-image-2 rates.
+- **Mark 9–11:** NO owner receipts exist yet — they remain fail-closed
+  (unsetupable, ungeneratable, unpublishable, unservable). When the owner is
+  ready, each becomes a small change: guidance/acceptance fixture entries +
+  his exact receipt via the setup-contract factory, then per-run approvals as
+  always.
+- **Kelly's 9 approved character fixes** + Herod-family profiles; finish
+  `quality-notes-save-for-review` before the next generation sprint.
 
 ## Cost reference (Mark 6 actuals, logged estimates)
 
