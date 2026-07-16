@@ -27,7 +27,13 @@ import {
   MARK_8_IMAGE_SLUG,
 } from "./mark8-image-plan";
 import { isConnectedStudioSlug } from "../studio-mark8-preflight";
-import { connectedChapterReceiptApplies } from "./mark-sprint-setup-contracts";
+import {
+  buildMarkSprintSetupContract,
+  connectedChapterReceiptApplies,
+  markSprintScopedSetupApprovalApplies,
+  type MarkSprintStudioSetupApproval,
+} from "./mark-sprint-setup-contracts";
+import { readStoredSetupApproval } from "./chapter-setup-approvals";
 
 // NOTE (issue #8): the generation lifecycle (claim → verify → complete/fail)
 // lives EXCLUSIVELY in generation-jobs.ts with single-use job ids. This module
@@ -162,14 +168,28 @@ export function validateMarkSprintPublishCandidate(
   submittedReviewDigest: string | undefined,
   configuredSupabaseUrl: string | undefined,
   submittedSourceOverlapReportDigest?: string,
+  storedReceiptApproval?: MarkSprintStudioSetupApproval | null,
 ): Mark8PublishValidation {
   const label = sprintChapterLabel(slug);
   // FAIL-CLOSED FIRST (PR #32 review, blocker 3): only an explicitly
   // connected chapter whose exact owner setup receipt still applies may even
-  // attempt the strict validation. Mark 9–11 (and any future sprint chapter
-  // without a receipt) are unpublishable regardless of how complete an
+  // attempt the strict validation. A Prepare-Chapter approval row (Mark 9+)
+  // counts only when the async caller fetched it AND it matches this slug's
+  // freshly recomputed contract — the function stays pure by validating the
+  // supplied row itself rather than trusting a caller boolean. Chapters
+  // without any receipt are unpublishable regardless of how complete an
   // out-of-band draft's images and digests look.
-  if (!isConnectedStudioSlug(slug) || !connectedChapterReceiptApplies(slug)) {
+  const storedReceiptApplies =
+    isMarkSprintSlug(slug) &&
+    markSprintScopedSetupApprovalApplies(
+      slug,
+      buildMarkSprintSetupContract(slug),
+      storedReceiptApproval ?? null,
+    );
+  if (
+    !isConnectedStudioSlug(slug) ||
+    (!connectedChapterReceiptApplies(slug) && !storedReceiptApplies)
+  ) {
     return {
       ok: false,
       reason: `${label} is not an owner-approved publishable chapter yet. Nothing was published.`,
@@ -274,14 +294,18 @@ function publishLookup(row: JobRow | null | { error: string }): RowLookup {
  * fail-closed identity rule as the publish guard. A row may be served only if
  * it carries NO protected Mark sprint identity (request slug AND stored
  * workup slug/book/chapter both checked), or it is exactly a canonical
- * CONNECTED chapter whose stored workup identifies as itself. Already-stored
- * alias rows ("mark-09"), innocuously named rows smuggling a protected
- * workup, and non-connected sprint chapters (mark-9..11) are never served —
- * even if something marked them "reviewed" out of band.
+ * CONNECTED chapter whose stored workup identifies as itself AND whose owner
+ * receipt applies (code literal, or a Prepare-Chapter approval row supplied
+ * by the async caller and validated here). Already-stored alias rows
+ * ("mark-09"), innocuously named rows smuggling a protected workup, and
+ * unreceipted sprint chapters are never served — even if something marked
+ * them "reviewed" out of band. Connecting a chapter to Studio (Mark 9) does
+ * NOT loosen this boundary.
  */
 export function protectedChapterServeAllowed(
   slug: string,
   workup: ChapterWorkup | null | undefined,
+  storedReceiptApproval?: MarkSprintStudioSetupApproval | null,
 ): boolean {
   const stored = workup ?? undefined;
   const sprintIdentity =
@@ -295,6 +319,14 @@ export function protectedChapterServeAllowed(
   if (!isMarkSprintSlug(slug) || stored?.slug !== slug || !isConnectedStudioSlug(slug)) {
     return false;
   }
+  const receipted =
+    connectedChapterReceiptApplies(slug) ||
+    markSprintScopedSetupApprovalApplies(
+      slug,
+      buildMarkSprintSetupContract(slug),
+      storedReceiptApproval ?? null,
+    );
+  if (!receipted) return false;
   // The stored workup must identify as the SAME chapter in every field a
   // workup is required to carry — a "mark-7"-labeled row whose body says
   // Mark 9 (or another book) must never serve at the Mark 7 URL.
@@ -341,7 +373,14 @@ export async function getChapterWorkupBySlug(slug: string): Promise<ChapterWorku
     return null;
   }
   const workup = (data?.workup_json as ChapterWorkup | undefined) ?? null;
-  if (workup && !protectedChapterServeAllowed(slug, workup)) {
+  // Fetch the Prepare-Chapter approval only when the sync receipts don't
+  // already answer (sprint slug without a code literal) — public reads of
+  // ordinary chapters never touch the approvals table.
+  const storedApproval =
+    workup && isMarkSprintSlug(slug) && !connectedChapterReceiptApplies(slug)
+      ? await readStoredSetupApproval(slug)
+      : null;
+  if (workup && !protectedChapterServeAllowed(slug, workup, storedApproval)) {
     console.error(`[selah] getChapterWorkupBySlug(${slug}) refused a protected alias/identity row`);
     return null;
   }
@@ -364,7 +403,11 @@ export async function getDraftWorkup(
     .maybeSingle();
   if (error || !data?.workup_json) return null;
   const workup = data.workup_json as ChapterWorkup;
-  if (!protectedChapterServeAllowed(slug, workup)) {
+  const storedApproval =
+    isMarkSprintSlug(slug) && !connectedChapterReceiptApplies(slug)
+      ? await readStoredSetupApproval(slug)
+      : null;
+  if (!protectedChapterServeAllowed(slug, workup, storedApproval)) {
     console.error(`[selah] getDraftWorkup(${slug}) refused a protected alias/identity row`);
     return null;
   }
@@ -417,6 +460,7 @@ export async function publishChapter(
       options.reviewDigest,
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       options.sourceOverlapReportDigest,
+      await readStoredSetupApproval(slug),
     );
     if (!validation.ok) {
       throw new ChapterMutationError("REFUSED", "publishChapter", slug, validation.reason);

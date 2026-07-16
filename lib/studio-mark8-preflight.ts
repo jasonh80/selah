@@ -2,7 +2,11 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 
 export const MARK_8_STUDIO_SLUG = "mark-8" as const;
 // Chapters connected to the protected Studio flow. Order = launch order.
-export const CONNECTED_STUDIO_SLUGS = ["mark-8", "mark-7"] as const;
+// Mark 9 is connected for the Prepare Chapter screen (owner decision A5,
+// 2026-07-16) — connection alone authorizes NOTHING: every write still needs
+// the owner's digest-bound receipt, and Mark 9's receipt only exists after he
+// approves the on-screen packet.
+export const CONNECTED_STUDIO_SLUGS = ["mark-8", "mark-7", "mark-9"] as const;
 export type ConnectedStudioSlug = (typeof CONNECTED_STUDIO_SLUGS)[number];
 export function isConnectedStudioSlug(value: string): value is ConnectedStudioSlug {
   return (CONNECTED_STUDIO_SLUGS as readonly string[]).includes(value);
@@ -11,6 +15,7 @@ export function isConnectedStudioSlug(value: string): value is ConnectedStudioSl
 const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
   "mark-8": 8,
   "mark-7": 7,
+  "mark-9": 9,
 };
 
 // Verse-instance totals for each chapter's protected ESV window (the chapter
@@ -19,9 +24,15 @@ const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
 // 7:16 from its critical-text numbering), Mark 8 = 38 → 130. Mark 8's 125 is
 // the owner-approved frozen wording from its 2026-07 launch (nominal counts)
 // and must stay byte-identical.
+// Mark 9's window (Mark 8–10) counts what the ESV actually returns: Mark 8 =
+// 38, Mark 9 = 48 (the ESV omits the disputed 9:44 and 9:46), Mark 10 = 52 →
+// 138. UNVERIFIED against the live ESV API (no key offline) — the source-load
+// preflight validates the real count before any credit is spent, so a wrong
+// number here fails closed with a plain blocker, never a bad draft.
 const WINDOW_VERSE_INSTANCES: Record<ConnectedStudioSlug, number> = {
   "mark-8": 125,
   "mark-7": 130,
+  "mark-9": 138,
 };
 
 export function connectedChapterLabel(slug: ConnectedStudioSlug): string {

@@ -6,6 +6,7 @@
 // API-key, and prompt bytes are deliberately discarded after v3 evaluation.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import guidanceArtifact from "./mark-sprint-guidance.v1.json";
+import { readStoredSetupApproval } from "./chapter-setup-approvals";
 import {
   assertGenerationManifestV3PreflightCapability,
   createGenerationManifestV3PreflightCapability,
@@ -669,7 +670,12 @@ export async function prepareMarkSprintRuntime(
     throw new Error("Mark sprint runtime only accepts Mark 8–11");
   }
   const slug = input.slug;
-  const policy = buildMarkSprintManifestPolicy(slug);
+  // Prepare-Chapter chapters (Mark 9+) carry their owner approval as a
+  // digest-bound database row instead of a code literal — fetch it here so
+  // the policy can validate it against the freshly built contract.
+  const policy = buildMarkSprintManifestPolicy(slug, {
+    storedGuidanceApproval: await readStoredSetupApproval(slug),
+  });
   const versioned = staticEvidence(policy);
   if (versioned.blockers.length) {
     return runtimePreparationResult(

@@ -105,7 +105,11 @@ import {
   markSprintFactorySetupFor,
   runMarkSprintStudioSetup,
 } from "@/lib/server/mark-sprint-studio-setup";
-import { connectedChapterReceiptApplies } from "@/lib/server/mark-sprint-setup-contracts";
+import {
+  connectedChapterReceiptAppliesIncludingStored,
+  recordStoredSetupApproval,
+} from "@/lib/server/chapter-setup-approvals";
+import { buildPrepareChapterProposal } from "@/lib/server/prepare-chapter-proposal";
 
 // Admin generation control API. Auth = DEV_ADMIN_TOKEN (header x-admin-token).
 // The Supabase service-role key never reaches the browser; all checks run here.
@@ -394,6 +398,149 @@ export async function POST(req: Request) {
         },
         { status },
       );
+    }
+  }
+
+  // ---- Prepare Chapter screen (owner decision A5, board #29, 2026-07-16) ----
+  // prepare_chapter_status is READ-ONLY: it returns the Brain's proposal built
+  // entirely from the reviewed version-controlled artifacts plus whether the
+  // owner's approval already applies. It cannot generate, fetch Scripture,
+  // change settings, create images, or publish.
+  if (action === "prepare_chapter_status") {
+    const prepareSlug = String(body.slug ?? "");
+    const proposal = buildPrepareChapterProposal(prepareSlug);
+    if (!proposal || !markSprintFactorySetupFor(prepareSlug)) {
+      return NextResponse.json(
+        { ok: false, error: "This chapter cannot be prepared on-screen yet." },
+        { status: 400 },
+      );
+    }
+    try {
+      const approved = await connectedChapterReceiptAppliesIncludingStored(prepareSlug);
+      let setupComplete = false;
+      if (approved) {
+        try {
+          setupComplete = (await getMarkSprintStudioSetupStatus(prepareSlug)).complete;
+        } catch {
+          setupComplete = false;
+        }
+      }
+      return NextResponse.json({
+        ok: true,
+        prepare: { ...proposal, approved, setupComplete },
+      });
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: `Studio could not check ${proposal.label} preparation.` },
+        { status: 503 },
+      );
+    }
+  }
+  // prepare_chapter_approve records the owner's ONE approval of the exact
+  // on-screen packet (digest-bound, audited), then runs the same reconciling
+  // note seeder the code-receipted chapters use. It never generates text or
+  // images, never fetches Scripture, and never publishes — the existing
+  // confirm-before-spend flow still guards every credit.
+  if (action === "prepare_chapter_approve") {
+    const prepareSlug = String(body.slug ?? "");
+    const proposal = buildPrepareChapterProposal(prepareSlug);
+    const factory = markSprintFactorySetupFor(prepareSlug);
+    if (!proposal || !factory) {
+      return NextResponse.json(
+        { ok: false, error: "This chapter cannot be prepared on-screen yet." },
+        { status: 400 },
+      );
+    }
+    const label = proposal.label;
+    const auditPrepare = async (
+      status: "started" | "succeeded" | "failed",
+      message: string,
+    ) => {
+      const recorded = await logGenerationAuditVerified({
+        action: "prepare_chapter_approve",
+        slug: prepareSlug,
+        status,
+        message,
+      });
+      if (!recorded) throw new Error(`${label} preparation audit unavailable`);
+    };
+    if (body.confirm !== true) {
+      try {
+        await auditPrepare("failed", "refused:invalid_confirmation");
+      } catch {
+        console.error(`[selah] ${label} preparation refusal audit unavailable`);
+      }
+      return NextResponse.json(
+        { ok: false, error: `${label} preparation confirmation is required.` },
+        { status: 400 },
+      );
+    }
+    const approvedDigest = typeof body.setupDigest === "string" ? body.setupDigest : "";
+    if (approvedDigest !== proposal.setupDigest) {
+      try {
+        await auditPrepare("failed", "refused:digest_mismatch");
+      } catch {
+        console.error(`[selah] ${label} preparation refusal audit unavailable`);
+      }
+      return NextResponse.json(
+        { ok: false, error: `The ${label} proposal changed after you read it. Reload and review it again.` },
+        { status: 409 },
+      );
+    }
+    try {
+      await auditPrepare("started", "owner approved the on-screen packet");
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: `Studio could not record the ${label} preparation start. Nothing changed.` },
+        { status: 500 },
+      );
+    }
+    try {
+      // The approval row binds the exact reviewed contract; recording it is
+      // what makes the seeding runner's receipt check pass.
+      await recordStoredSetupApproval({
+        scope: factory.contract.scope,
+        slug: factory.contract.slug,
+        approved_by: "Jason Hales (owner)",
+        approved_at: new Date().toISOString(),
+        evidence:
+          "Owner reviewed the on-screen Prepare Chapter packet (movements, guidance notes, watch-outs, textual variants) in Studio and approved it in one action; digests bound at approval time.",
+        guidance_digest: factory.contract.guidanceDigest,
+        notes_digest: factory.contract.notesDigest,
+        receipt_digest: factory.contract.setupDigest,
+      });
+      const result = await runMarkSprintStudioSetup(prepareSlug, approvedDigest);
+      try {
+        await auditPrepare(
+          "succeeded",
+          `${result.status.ruleCount} Brain rules + ${result.status.noteCount} ${label} notes verified`,
+        );
+      } catch {
+        console.error(`[selah] ${label} preparation success audit unavailable`);
+      }
+      return NextResponse.json({
+        ok: true,
+        prepared: true,
+        setup: result.status,
+        message: `${label} is prepared. Create the text draft when you're ready.`,
+      });
+    } catch (error) {
+      try {
+        await auditPrepare(
+          "failed",
+          `failed:${isMarkSprintStudioSetupError(error) ? error.code : "unknown"}`,
+        );
+      } catch {
+        console.error(`[selah] ${label} preparation failure audit unavailable`);
+      }
+      const message = isMarkSprintStudioSetupError(error)
+        ? error.code === "REVIEW_REQUIRED"
+          ? `An existing ${label} note needs review before preparation. Nothing else was changed.`
+          : error.code === "UNAPPROVED"
+            ? `Selah Brain and the exact ${label} notes still need approval.`
+            : `Studio could not safely finish preparing ${label}. Your approval is saved; try again.`
+        : `Studio could not safely finish preparing ${label}. Your approval is saved; try again.`;
+      return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
   }
 
@@ -866,8 +1013,10 @@ export async function POST(req: Request) {
       // The exact per-chapter owner receipt must apply BEFORE any settings
       // write, job claim, or worker trigger — a connected slug whose receipt
       // is missing or drifted is refused with nothing mutated (PR #32 review,
-      // blocker 2 / the original PR #30 hole-3 invariant).
-      if (!connectedChapterReceiptApplies(slug)) {
+      // blocker 2 / the original PR #30 hole-3 invariant). Prepare-Chapter
+      // approvals (Mark 9+) live as digest-bound rows, so the stored-aware
+      // gate is consulted here.
+      if (!(await connectedChapterReceiptAppliesIncludingStored(slug))) {
         return refuse(
           slug,
           "generate",

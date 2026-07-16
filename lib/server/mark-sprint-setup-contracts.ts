@@ -235,6 +235,14 @@ export function __setConnectedReceiptOverridesForTesting(
   connectedReceiptOverridesForTesting = overrides;
 }
 
+/** Read-only view of the test override so the stored-approval gate
+ * (chapter-setup-approvals.ts) honors the exact same seam. */
+export function connectedReceiptOverrideForTesting(
+  slug: string,
+): boolean | undefined {
+  return connectedReceiptOverridesForTesting?.[slug];
+}
+
 export function connectedChapterReceiptApplies(slug: string): boolean {
   const override = connectedReceiptOverridesForTesting?.[slug];
   if (override !== undefined) return override;
