@@ -61,21 +61,30 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
         </div>
       ) : (
         previewText && (
-          <button
-            onClick={() => setScriptureOpen(true)}
-            className="block w-full rounded-md border bg-card p-s3 text-left shadow-hair transition hover:border-accent/40"
-          >
-            <span className="text-eyebrow">
-              {data.reference}
-              {showingEsv ? " · ESV" : ""}
-            </span>
-            <p className="mt-1 line-clamp-2 text-scripture text-secondary">{previewText}</p>
+          <div className="rounded-md border bg-card shadow-hair transition hover:border-accent/40">
+            <button
+              onClick={() => setScriptureOpen(true)}
+              className="block w-full p-s3 text-left"
+            >
+              <span className="text-eyebrow">
+                {data.reference}
+                {showingEsv ? " · ESV" : ""}
+              </span>
+              <p className="mt-1 line-clamp-2 text-scripture text-secondary">{previewText}</p>
+            </button>
             {showingEsv && (
-              <p className="mt-1 text-[10px] leading-relaxed text-secondary">
-                Scripture from the ESV® Bible © Crossway. Used by permission.
+              // Required Crossway notice wherever ESV text appears — a sibling
+              // of the expand button (a link may not live inside a button).
+              <p className="px-s3 pb-s2 text-[10px] leading-relaxed text-secondary">
+                Scripture quotations are from the{" "}
+                <a href="https://www.esv.org" target="_blank" rel="noreferrer" className="underline">
+                  ESV® Bible
+                </a>{" "}
+                (The Holy Bible, English Standard Version®), © Crossway. Used by
+                permission. All rights reserved.
               </p>
             )}
-          </button>
+          </div>
         )
       )}
     </div>

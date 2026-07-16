@@ -7,6 +7,7 @@ import {
   integratedSceneChecks,
   type SceneCheck,
 } from "@/lib/content/chapter-content";
+import { supportingImagesFor } from "@/components/chapter/HeroImage";
 
 // Recurring "Scene Check" callouts — warm, visual nudges that correct common
 // mental-image mistakes. Quick Dive: compact (label + title + body). Deep Dive:
@@ -16,14 +17,16 @@ export function SceneCheckSection({ data }: { data: ChapterWorkup }) {
   // Prefer generated scene checks; fall back to static config (e.g. Psalm 23).
   const allChecks: SceneCheck[] =
     data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
-  // EXACTLY the checks rendered on the Visual Chapter Path (one per scene)
-  // are excluded here; every other check — including a second check bound to
-  // the same scene — keeps its standalone card so nothing is ever dropped.
+  // EXACTLY the checks rendered on the Visual Chapter Path are excluded here
+  // — computed over the SAME scene set the path renders (supporting images
+  // only; the hero is not on the path). A check bound to the hero scene, or
+  // a second check bound to an already-integrated scene, keeps its standalone
+  // card so nothing is ever dropped.
   const rendered = new Set(
     integratedSceneChecks(
       data.slug,
       allChecks,
-      new Set(data.images.map((image) => image.kind)),
+      new Set(supportingImagesFor(data).map((image) => image.kind)),
     ).values(),
   );
   const checks = allChecks.filter((check) => !rendered.has(check));

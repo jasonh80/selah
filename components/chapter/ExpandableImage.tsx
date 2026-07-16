@@ -212,7 +212,9 @@ function ImageViewer({
     >
       <div
         className={`transition-transform duration-200 ease-out ${entered ? "scale-100" : "scale-90"}`}
-        style={{ transform: `translate(${tx}px, ${ty}px) scale(${entered ? scale : scale * 0.9})` }}
+        // touch-action none: without it, mobile browsers claim pinch/drag for
+        // page zoom/scroll and the viewer's pointer handlers never fire.
+        style={{ transform: `translate(${tx}px, ${ty}px) scale(${entered ? scale : scale * 0.9})`, touchAction: "none" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
