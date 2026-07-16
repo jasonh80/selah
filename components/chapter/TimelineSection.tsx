@@ -71,8 +71,10 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
     <section id="timeline" className="scroll-mt-20 rounded-md border bg-card p-3.5 shadow-hair">
       <h2 className="text-section text-primary">Where It Fits</h2>
 
-      <div className="no-scrollbar -mx-1 mt-3 overflow-x-auto px-1">
-        <div className="relative h-[78px] min-w-[360px]">
+      {/* Owner decision A3 (2026-07-16): no horizontal swipe anywhere — the
+          rail fits the container on every phone width. */}
+      <div className="mt-3">
+        <div className="relative h-[78px]">
           <div className="absolute inset-x-0 top-[40px] h-0.5 bg-line" />
 
           {MARKERS.map((m, i) => (
