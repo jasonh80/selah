@@ -20,8 +20,9 @@ const TOPICS: Topic[] = [
 ];
 
 export function InsightCardGrid({ data }: { data: ChapterWorkup }) {
-  // Only advertise sections that actually have content for this chapter.
-  const hasMap = Boolean(getChapterMap(data.slug)) || Boolean(data.modernMap ?? data.historicMap);
+  // Only advertise sections that actually RENDER for this chapter — the Maps
+  // pill mirrors MapsSection's own config condition, never a dead link.
+  const hasMap = Boolean(getChapterMap(data.slug));
   const topics = TOPICS.filter((topic) => {
     if (topic.label === "Maps & Places") return hasMap;
     if (topic.label === "What Most People Miss") return Boolean(data.modernReadersMiss?.trim());

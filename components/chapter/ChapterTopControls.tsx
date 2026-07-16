@@ -70,6 +70,11 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
               {showingEsv ? " · ESV" : ""}
             </span>
             <p className="mt-1 line-clamp-2 text-scripture text-secondary">{previewText}</p>
+            {showingEsv && (
+              <p className="mt-1 text-[10px] leading-relaxed text-secondary">
+                Scripture from the ESV® Bible © Crossway. Used by permission.
+              </p>
+            )}
           </button>
         )
       )}

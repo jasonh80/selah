@@ -80,6 +80,8 @@ function ImageViewer({
   const pinchStart = useRef<{ dist: number; scale: number } | null>(null);
   const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
 
   // Enter animation: grow from a slightly smaller state toward full size, so
   // the image reads as enlarging from its place on the page. Keyboard focus
@@ -96,8 +98,24 @@ function ImageViewer({
   }, [onClose]);
 
   useEffect(() => {
+    // Escape closes; Tab is TRAPPED inside the dialog (cycles its buttons) so
+    // keyboard focus can never wander into the dimmed page behind it.
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") {
+        close();
+        return;
+      }
+      if (event.key === "Tab") {
+        const focusables = dialogRef.current?.querySelectorAll<HTMLButtonElement>("button");
+        if (!focusables || focusables.length === 0) return;
+        const list = [...focusables];
+        const index = list.indexOf(document.activeElement as HTMLButtonElement);
+        event.preventDefault();
+        const next = event.shiftKey
+          ? list[(index - 1 + list.length) % list.length]
+          : list[(index + 1) % list.length];
+        next.focus();
+      }
     }
     document.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
@@ -154,6 +172,21 @@ function ImageViewer({
     pointers.current.delete(event.pointerId);
     if (pointers.current.size < 2) pinchStart.current = null;
     if (pointers.current.size === 0) drag.current = null;
+    // Mobile double-tap toggles zoom (dblclick doesn't fire on many touch
+    // browsers): two taps within 300ms and ~24px of each other.
+    if (event.pointerType === "touch" && pointers.current.size === 0) {
+      const now = performance.now();
+      const prior = lastTap.current;
+      lastTap.current = { time: now, x: event.clientX, y: event.clientY };
+      if (
+        prior &&
+        now - prior.time < 300 &&
+        Math.hypot(event.clientX - prior.x, event.clientY - prior.y) < 24
+      ) {
+        lastTap.current = null;
+        applyScale(scale > MIN_SCALE ? MIN_SCALE : 2);
+      }
+    }
   }
 
   function onWheel(event: React.WheelEvent) {
@@ -166,6 +199,7 @@ function ImageViewer({
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={alt}

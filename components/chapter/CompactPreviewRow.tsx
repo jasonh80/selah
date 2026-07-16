@@ -28,26 +28,28 @@ export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
     previews.push({ icon: "🕰", label: "Where It Fits", value: timelineValue, href: "#timeline" });
   }
 
-  const map = getChapterMap(data.slug);
-  const mapCaption = data.modernMap?.caption ?? data.historicMap?.caption;
-  if (map || mapCaption) {
+  // The Maps preview exists ONLY when MapsSection itself will render (same
+  // condition: a real per-slug map config) — never a dead #maps link.
+  if (getChapterMap(data.slug)) {
     previews.push({
       icon: "🗺",
       label: "Maps & Places",
-      value: mapCaption ?? "See where this chapter happens",
+      value: data.modernMap?.caption ?? "See where this chapter happens",
       href: "#maps",
     });
   }
 
   if (previews.length === 0) return null;
 
+  // No swipe strips anywhere (owner direction): stacked on mobile, a row on
+  // small screens and up.
   return (
-    <div className="flex snap-x gap-s2 overflow-x-auto no-scrollbar sm:grid sm:grid-cols-3">
+    <div className="grid gap-s2 sm:grid-cols-3">
       {previews.map((preview) => (
         <a
           key={preview.label}
           href={preview.href}
-          className="flex w-[70%] shrink-0 snap-start flex-col gap-1 rounded-md border bg-card p-s3 shadow-hair transition hover:border-accent/40 sm:w-auto"
+          className="flex flex-col gap-1 rounded-md border bg-card p-s3 shadow-hair transition hover:border-accent/40"
         >
           <span className="flex items-center gap-1.5 text-eyebrow">
             <span aria-hidden>{preview.icon}</span>

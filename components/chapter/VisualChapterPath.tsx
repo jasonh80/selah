@@ -1,6 +1,7 @@
 import type { ChapterWorkup, ChapterImage } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
 import { ExpandableImage } from "@/components/chapter/ExpandableImage";
+import { supportingImagesFor } from "@/components/chapter/HeroImage";
 import {
   getImageTitle,
   getSceneChecks,
@@ -17,7 +18,9 @@ import {
 // Scene Checks that belong to a scene render with it (short title on the
 // image, body below as tap-to-expand — never paragraphs over the picture).
 export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
-  const scenes = [...data.images].sort((a, b) => a.index - b.index);
+  // The hero already anchors the top of the page — the path carries the
+  // REMAINING scenes in narrative order, so no image ever appears twice.
+  const scenes = [...supportingImagesFor(data)].sort((a, b) => a.index - b.index);
   if (scenes.length === 0) return null;
 
   const checks: SceneCheck[] =
