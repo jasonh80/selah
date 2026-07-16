@@ -1,11 +1,14 @@
 // Offline gate for the ONE shared ESV/Crossway attribution (owner direction,
-// PR #33, 2026-07-16). Enforces:
+// PR #33 + slimmed per the actual Crossway terms, 2026-07-16). The terms
+// require: the FULL notice once, on a copyright page; the letters "ESV" with
+// each quotation; and one esv.org link per page using the text. Enforces:
 //   1. The shared notice matches Crossway's official ESV API terms VERBATIM.
-//   2. The shared module is client-safe (no server/secret imports).
-//   3. Both ESV display paths — the collapsed preview and the full reader
-//      (read + verse-by-verse) — render the shared component with the
-//      required esv.org link.
-//   4. No competing or abridged Crossway notice exists anywhere else in the
+//   2. The shared modules are client-safe (no server/secret imports).
+//   3. The full notice + esv.org link render exactly ONCE per chapter page
+//      (the ChapterView footer) — and nowhere else.
+//   4. Every ESV display path carries the short "ESV" quotation label: the
+//      collapsed preview (gated on real ESV words) and both reader modes.
+//   5. No competing or abridged Crossway notice exists anywhere else in the
 //      source tree: this script FAILS if one is ever added.
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -46,20 +49,34 @@ const component = read("components/chapter/EsvAttribution.tsx");
 assert.ok(component.includes("ESV_ATTRIBUTION_NOTICE"), "component renders the shared notice");
 assert.ok(component.includes("ESV_ORG_URL"), "component renders the required esv.org link");
 
-// 3. Both ESV display paths use the shared component; neither carries an
-// inline notice of its own.
+// 3. The full notice renders exactly ONCE per chapter page — in the
+// ChapterView footer — and nowhere else in the app.
+const chapterView = read("components/ChapterView.tsx");
+assert.equal(
+  (chapterView.match(/<EsvAttribution/gu) ?? []).length,
+  1,
+  "ChapterView's footer renders the full notice exactly once",
+);
 const reader = read("components/chapter/ScriptureReader.tsx");
 const preview = read("components/chapter/ChapterTopControls.tsx");
-assert.ok(reader.includes("EsvAttribution"), "the full reader renders the shared attribution");
-assert.equal(
-  (reader.match(/<EsvAttribution/gu) ?? []).length >= 2,
-  true,
-  "both reader paths (read + verse-by-verse) render the shared attribution",
-);
-assert.ok(preview.includes("EsvAttribution"), "the collapsed preview renders the shared attribution");
 assert.ok(
-  preview.includes("showingEsv &&"),
-  "the collapsed preview attaches attribution ONLY to real ESV words (never Selah fallback text)",
+  !reader.includes("<EsvAttribution") && !preview.includes("<EsvAttribution"),
+  "quotation paths must NOT repeat the full notice (Crossway requires it once, on a copyright page)",
+);
+
+// 4. Every ESV display path carries the short "ESV" quotation label.
+assert.equal(
+  (reader.match(/<EsvQuoteLabel/gu) ?? []).length >= 2,
+  true,
+  "both reader paths (read + verse-by-verse) carry the short ESV quotation label",
+);
+assert.ok(
+  reader.includes("ESV_SHORT_LABEL"),
+  "the reader's quotation label uses the shared ESV_SHORT_LABEL constant",
+);
+assert.ok(
+  preview.includes(`showingEsv ? " · ESV" : ""`),
+  "the collapsed preview tags ONLY real ESV words with the ESV label (never Selah fallback text)",
 );
 
 // 4. No competing Crossway notice anywhere else in the source tree.
@@ -98,4 +115,4 @@ assert.deepEqual(
   `competing Crossway notices found — use lib/esv-attribution.ts instead: ${offenders.join(", ")}`,
 );
 
-console.log("ESV attribution verification passed (one verbatim official source, both paths, no competitors).");
+console.log("ESV attribution verification passed (verbatim notice once per page, ESV label at every quotation, no competitors).");
