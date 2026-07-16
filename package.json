@@ -5,7 +5,7 @@
   "description": "Selah \u2014 your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run verify:studio-safety && npm run verify:studio-preview-access && npm run verify:studio-mark8-preflight && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark && npm run verify:diagnostics-display",
+    "prebuild": "npm run verify:studio-safety && npm run verify:studio-preview-access && npm run verify:studio-mark8-preflight && npm run verify:studio-polish && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark && npm run verify:diagnostics-display",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -24,6 +24,7 @@
     "verify:studio-safety": "node --import tsx scripts/verify-studio-safety.ts",
     "verify:studio-mark8-preflight": "node --import tsx scripts/verify-studio-mark8-preflight.ts",
     "verify:studio-preview-access": "node --import tsx scripts/verify-studio-preview-access.ts",
+    "verify:studio-polish": "node --import tsx scripts/verify-studio-polish.ts",
     "verify:diagnostics-display": "node --import tsx scripts/verify-overlap-diagnostics-display.ts"
   },
   "dependencies": {

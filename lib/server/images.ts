@@ -10,6 +10,7 @@ import { getOpenAI, isOpenAIConfigured } from "./openai";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { ChapterMutationError, isChapterMutationError } from "./protected-chapters";
 import { recordCostEvent, recordCostEventStrict } from "./cost-events-repository";
+import { estimateImageCostUsd } from "../ai/costs";
 import { getGenerationSettings, logGenerationAudit } from "./generation-settings";
 import {
   consumeImageClaim,
@@ -605,7 +606,7 @@ async function generateAndStoreChapterImagesWithinDeadline(
         provider: "openai",
         model,
         imageCount: generatedCount,
-        estimatedCostUsd: generatedCount * 0.04,
+        estimatedCostUsd: estimateImageCostUsd(model, generatedCount),
         metadata: {
           slug,
           jobId,
@@ -727,7 +728,7 @@ async function generateAndStoreChapterImagesWithinDeadline(
         provider: "openai",
         model,
         imageCount: generatedCount,
-        estimatedCostUsd: generatedCount * 0.04,
+        estimatedCostUsd: estimateImageCostUsd(model, generatedCount),
         metadata: { slug, jobId, conflict: true, error: msg, generated: generatedCount, uploaded: stored.length },
       });
     } else {
@@ -765,7 +766,7 @@ async function generateAndStoreChapterImagesWithinDeadline(
       provider: "openai",
       model,
       imageCount: generatedCount,
-      estimatedCostUsd: generatedCount * 0.04,
+      estimatedCostUsd: estimateImageCostUsd(model, generatedCount),
       metadata: { slug, jobId, imageTypes: plans.map((p) => p.kind) },
     });
   }
