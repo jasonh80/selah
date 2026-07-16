@@ -52,15 +52,16 @@ hidden until Publish Final.
 
 ## Selah Brain (the quality system)
 
-- **Rules live in Supabase** (`selah_brain_rules`, ~96 active; v1.4 is the last
-  verified live library). The version-controlled v1.9 candidate has 99 rules
-  and exact owner approval following Claude's independent review. Its artifact
-  status is `approved_for_seed`, but it has not been seeded. The recorded
-  approval binds the owner, timestamp, review evidence, version, and exact
-  content digest. `npm run build` runs the Brain verifier first. Supabase
-  remains the live source of truth: a merged JSON
-  change is not active until the owner separately approves seeding and a
-  post-seed manifest proves the live IDs, wording, stages, and provenance.
+- **Rules live in Supabase** (`selah_brain_rules`). The owner-approved **v1.9
+  library (99 rules) is the live, verified state**: it was seeded through the
+  receipted Mark 8 Studio setup (2026-07-13) and re-verified by the Mark 7
+  setup's exact post-write readback (2026-07-15) — both setups fail closed
+  unless the live rules match the version-controlled artifact exactly. The
+  recorded approval binds the owner, timestamp, review evidence, version, and
+  exact content digest. `npm run build` runs the Brain verifier first.
+  Supabase remains the live source of truth: a merged JSON change is not
+  active until the owner separately approves seeding and a post-seed readback
+  proves the live IDs, wording, stages, and provenance.
 - Layers: core (always-on) · contextual (max 12 for copy and 18 for image
   stages, selected by genre/stage) ·
   qa (review only) · governance (never in prose prompts).
@@ -101,9 +102,11 @@ hidden until Publish Final.
   no Street View ("Standing There" shows a roadmap placeholder by design).
 - Budget limit field in settings is stored but **not enforced**.
 - Ordinary generation still treats some missing context as soft failures. The
-  protected Mark 8 pilot now fails closed on exact Brain rules, chapter notes,
-  exemplar, source evidence, manifest approval, and per-run owner authorization.
-  Mark 9–11 remain disconnected and blocked.
+  protected pipeline — now covering **Mark 7 and Mark 8** — fails closed on
+  exact Brain rules, chapter notes, exemplar, source evidence, per-chapter
+  owner receipts (checked BEFORE any settings write or job claim), manifest
+  approval, and per-run owner authorization. Mark 9–11 remain disconnected
+  and blocked at setup, generation, publish, and public read (aliases too).
 - The Mark 8–11 guidance packet is versioned in
   `lib/server/mark-sprint-guidance.v1.json`. Its exact Mark 8 projection and ten
   notes are owner-approved for private Studio setup; Mark 9–11 remain
@@ -124,7 +127,7 @@ hidden until Publish Final.
   exact owner-confirmed manifest and a single-use job. It is not connected for
   Mark 9–11; see `docs/selah/generation-manifest.md`.
 - The protected ESV source assembler and overlap gate are synthetic-tested and
-  connected only to the authenticated Mark 8 worker.
+  connected only to the authenticated protected worker (Mark 7 and Mark 8).
   They validate the ESV's omitted disputed verse numbers in these Mark windows,
   reject partial/oversized/mismatched responses, retain cancellation through
   body reads, keep source text non-enumerable, and block copied wording hidden
@@ -159,9 +162,11 @@ hidden until Publish Final.
 - **Studio polish + cost ledger:** owner-requested launch progress bar and
   per-chapter info panel (last launch, build, text/image model versions);
   key persistence; single confirmations; real gpt-5.5/gpt-image-2 rates.
-- **Mark 9–11:** each is now a fixture entry + owner receipt (~20 lines) via
-  the setup-contract factory; generation/publication still require explicit
-  owner approval per run.
+- **Mark 9–11:** NO owner receipts exist yet — they remain fail-closed
+  (unsetupable, ungeneratable, unpublishable, unservable). When the owner is
+  ready, each becomes a small change: guidance/acceptance fixture entries +
+  his exact receipt via the setup-contract factory, then per-run approvals as
+  always.
 - **Kelly's 9 approved character fixes** + Herod-family profiles; finish
   `quality-notes-save-for-review` before the next generation sprint.
 
