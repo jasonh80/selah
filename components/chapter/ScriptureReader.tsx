@@ -6,6 +6,7 @@ import { VersionSelect } from "@/components/chapter/VersionSelect";
 import { VERSIONS, useVersion } from "@/components/VersionProvider";
 import { getVerseNotes } from "@/lib/content/chapter-content";
 import { useEsvText, type EsvState } from "@/components/chapter/useEsvText";
+import { EsvAttribution } from "@/components/chapter/EsvAttribution";
 
 type Mode = "read" | "verse";
 
@@ -64,11 +65,11 @@ export function ScriptureReader({
         {version === "ESV" && (esv.loading || esv.found === undefined) ? (
           <p className="py-6 text-center text-sm text-secondary">Loading ESV text…</p>
         ) : mode === "verse" && showEsv ? (
-          <VerseByVerse text={esv.text!} notes={verseNotes} copyright={esv.copyright} />
+          <VerseByVerse text={esv.text!} notes={verseNotes} />
         ) : showEsv ? (
           <div>
             <div className="text-scripture whitespace-pre-line text-primary">{esv.text}</div>
-            <p className="mt-4 border-t pt-3 text-[11px] leading-relaxed text-secondary">{esv.copyright}</p>
+            <EsvAttribution className="mt-4 border-t pt-3" />
           </div>
         ) : mode === "verse" ? (
           <div className="space-y-4">
@@ -109,11 +110,9 @@ function parseEsvVerses(text: string): { num: number; text: string }[] {
 function VerseByVerse({
   text,
   notes,
-  copyright,
 }: {
   text: string;
   notes: Record<number, string> | null;
-  copyright?: string;
 }) {
   const heading = text.split(/\[\d+\]/)[0].trim();
   const verses = parseEsvVerses(text);
@@ -132,7 +131,9 @@ function VerseByVerse({
           )}
         </div>
       ))}
-      {copyright && <p className="border-t pt-3 text-[11px] leading-relaxed text-secondary">{copyright}</p>}
+      {/* Verse-by-verse shows ESV text, so the shared official notice is
+          unconditional here (owner direction, PR #33). */}
+      <EsvAttribution className="border-t pt-3" />
     </div>
   );
 }

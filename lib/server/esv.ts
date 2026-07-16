@@ -10,8 +10,10 @@ export interface EsvPassage {
   copyright: string;
 }
 
-const ESV_COPYRIGHT =
-  "Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © Crossway. Used by permission. All rights reserved.";
+// The notice comes from the ONE shared client-safe attribution source —
+// never define a local or abridged Crossway notice here (owner direction,
+// PR #33; enforced by verify:esv-attribution).
+import { ESV_ATTRIBUTION_NOTICE } from "../esv-attribution";
 
 const cache = new Map<string, EsvPassage>();
 
@@ -51,7 +53,7 @@ export async function getEsvPassage(reference: string): Promise<EsvPassage | nul
     const passage: EsvPassage = {
       reference: json.canonical ?? reference,
       text,
-      copyright: ESV_COPYRIGHT,
+      copyright: ESV_ATTRIBUTION_NOTICE,
     };
     cache.set(cacheKey, passage);
     return passage;

@@ -6,6 +6,7 @@ import { useReadingMode, type ReadingMode } from "@/components/ReadingModeProvid
 import { useVersion } from "@/components/VersionProvider";
 import { useEsvText } from "@/components/chapter/useEsvText";
 import { ScriptureReader } from "@/components/chapter/ScriptureReader";
+import { EsvAttribution } from "@/components/chapter/EsvAttribution";
 
 // The top control cluster (layout spec §2/§3; owner direction 2026-07-15):
 //   [ Read Mark 6 ]  [ Quick Dive ]  [ Deep Dive ]  — centered, one row
@@ -73,16 +74,10 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
               <p className="mt-1 line-clamp-2 text-scripture text-secondary">{previewText}</p>
             </button>
             {showingEsv && (
-              // Required Crossway notice wherever ESV text appears — a sibling
-              // of the expand button (a link may not live inside a button).
-              <p className="px-s3 pb-s2 text-[10px] leading-relaxed text-secondary">
-                Scripture quotations are from the{" "}
-                <a href="https://www.esv.org" target="_blank" rel="noreferrer" className="underline">
-                  ESV® Bible
-                </a>{" "}
-                (The Holy Bible, English Standard Version®), © Crossway. Used by
-                permission. All rights reserved.
-              </p>
+              // The ONE shared official notice — a sibling of the expand
+              // button (a link may not live inside a button). Never rendered
+              // for Selah's fallback text.
+              <EsvAttribution className="px-s3 pb-s2" />
             )}
           </div>
         )
