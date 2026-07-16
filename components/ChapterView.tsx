@@ -15,6 +15,7 @@ import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSectio
 import { SceneCheckSection } from "@/components/chapter/SceneCheckSection";
 import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
 import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection";
+import { EsvAttribution } from "@/components/chapter/EsvAttribution";
 
 /**
  * Reusable chapter template (layout spec v1, Mark 6 pilot). Renders any global
@@ -26,8 +27,10 @@ import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection"
  * 4/8/12/16/24/32/48 token scale; 24px carries the section rhythm. Single
  * intentional column on every breakpoint.
  *
- * Provenance/build info is intentionally NOT public (spec §18); the required
- * ESV attribution renders with the Scripture text itself.
+ * Provenance/build info is intentionally NOT public (spec §18). ESV
+ * attribution follows Crossway's terms exactly: the short "ESV" label with
+ * each quotation, and the full official notice + esv.org link ONCE per page,
+ * here in the footer (its copyright page).
  */
 export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) {
   return (
@@ -71,6 +74,7 @@ export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) 
         <footer className="flex flex-col items-center gap-s2 pt-s2 text-center">
           <span className="wordmark text-xs text-secondary">Selah</span>
           <p className="text-[11px] text-secondary">Pause. Reflect. Elevate.</p>
+          <EsvAttribution className="max-w-[60ch] opacity-80" />
         </footer>
       </main>
     </div>

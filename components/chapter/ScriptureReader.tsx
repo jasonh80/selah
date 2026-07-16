@@ -6,7 +6,18 @@ import { VersionSelect } from "@/components/chapter/VersionSelect";
 import { VERSIONS, useVersion } from "@/components/VersionProvider";
 import { getVerseNotes } from "@/lib/content/chapter-content";
 import { useEsvText, type EsvState } from "@/components/chapter/useEsvText";
-import { EsvAttribution } from "@/components/chapter/EsvAttribution";
+import { ESV_SHORT_LABEL } from "@/lib/esv-attribution";
+
+// Crossway's terms require only the letters "ESV" with each quotation; the
+// full official notice renders ONCE per page in the chapter footer
+// (components/ChapterView.tsx via EsvAttribution).
+function EsvQuoteLabel() {
+  return (
+    <p className="mt-3 text-right text-[10px] font-medium tracking-wide text-secondary">
+      {ESV_SHORT_LABEL}
+    </p>
+  );
+}
 
 type Mode = "read" | "verse";
 
@@ -69,7 +80,7 @@ export function ScriptureReader({
         ) : showEsv ? (
           <div>
             <div className="text-scripture whitespace-pre-line text-primary">{esv.text}</div>
-            <EsvAttribution className="mt-4 border-t pt-3" />
+            <EsvQuoteLabel />
           </div>
         ) : mode === "verse" ? (
           <div className="space-y-4">
@@ -131,9 +142,9 @@ function VerseByVerse({
           )}
         </div>
       ))}
-      {/* Verse-by-verse shows ESV text, so the shared official notice is
-          unconditional here (owner direction, PR #33). */}
-      <EsvAttribution className="border-t pt-3" />
+      {/* Verse-by-verse shows ESV text — the short quotation label is all the
+          terms require here; the full notice lives once in the page footer. */}
+      <EsvQuoteLabel />
     </div>
   );
 }
