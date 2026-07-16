@@ -45,7 +45,10 @@ import {
   type CostEventInput,
   type CostHistoryRow,
 } from "../lib/server/cost-events-repository";
-import { __setReviewedAtForTesting } from "../lib/server/chapter-workups-repository";
+import {
+  __setReviewedAtForTesting,
+  __setStudioStatusUnavailableForTesting,
+} from "../lib/server/chapter-workups-repository";
 import {
   __setGenerationTestOverrides,
 } from "../lib/server/generation-settings";
@@ -542,15 +545,23 @@ const routeSuite = async () => {
     }
 
     // R6. The status action carries no draft revision when the store is
-    // unreachable — the client guard then fails closed (P1-1).
+    // unreachable — the client guard then fails closed (P1-1). The outage is
+    // forced through a seam: this test must NOT depend on Supabase env being
+    // absent (in the production build the real keys exist, and an unseamed
+    // call queried the LIVE database mid-build — the 2026-07-16 deploy break).
     {
-      const res = await adminPost(adminReq({ action: "status", slug: "mark-7" }));
-      const body = (await res.json()) as Record<string, unknown>;
-      const revision = readStudioDraftRevision(body);
-      ok(
-        revision === null && !restoredReviewStillValid("anything", revision),
-        "R6 unproven store → no revision → remembered approvals fail closed",
-      );
+      __setStudioStatusUnavailableForTesting(true);
+      try {
+        const res = await adminPost(adminReq({ action: "status", slug: "mark-7" }));
+        const body = (await res.json()) as Record<string, unknown>;
+        const revision = readStudioDraftRevision(body);
+        ok(
+          revision === null && !restoredReviewStillValid("anything", revision),
+          "R6 unproven store → no revision → remembered approvals fail closed",
+        );
+      } finally {
+        __setStudioStatusUnavailableForTesting(false);
+      }
     }
   } finally {
     __setGenerationTestOverrides(null);

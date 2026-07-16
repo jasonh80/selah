@@ -513,8 +513,19 @@ export async function getChapterStatus(slug: string): Promise<string | null> {
   return (data?.status as string | undefined) ?? null;
 }
 
+// TEST SEAM (offline verify only): force the unreachable-store outcome
+// deterministically. Verifiers must NEVER depend on Supabase env being
+// absent — in the production BUILD environment the real keys exist, so an
+// unseamed call would query the live database mid-build (this broke the
+// production deploys of 2026-07-16).
+let studioStatusUnavailableForTesting = false;
+export function __setStudioStatusUnavailableForTesting(on: boolean): void {
+  studioStatusUnavailableForTesting = on;
+}
+
 /** Status plus a small, allowlisted failure explanation for Selah Studio. */
 export async function getStudioChapterStatus(slug: string): Promise<StudioChapterStatus> {
+  if (studioStatusUnavailableForTesting) return { status: null };
   const db = getSupabaseAdmin();
   if (!db) {
     warnSupabaseMissing("getStudioChapterStatus");
