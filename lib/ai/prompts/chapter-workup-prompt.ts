@@ -107,8 +107,27 @@ matching rangeLabel: ${requiredMovements.map(movementLabel).join(", ")}.
 Do not merge, split, extend, or renumber any of these ranges — the draft is
 rejected automatically if a listed range is missing or altered. Put finer
 sub-scene observations inside the "sections" prose, never as extra spine
-entries.`
+entries.
+A movement may span a SINGLE verse; it still receives full, distinct
+treatment — never leave it thin and never reuse another movement's wording.`
     : "";
+  // The machine checker rejects the whole (paid) draft on any of these, so
+  // state them plainly instead of letting the model discover them by dying.
+  const completenessBlock = `
+
+MACHINE-CHECKED COMPLETENESS (the draft is REJECTED automatically if any line fails)
+- No field may be empty or a placeholder. Minimum lengths (characters):
+  summary 80 · sceneSetter 80 · historicalContext 120 · whatHappens 120 ·
+  whatPeopleMiss 100 · jesusConnection.short 8 · jesusConnection.full 120 ·
+  theologyPrinciple.name 3 · theologyPrinciple.explanation 100 ·
+  application 100 · prayer 80 · estimatedDate 4 · estimatedLocation 4.
+- jesusConnection.relatedPassages: at least 1 real reference.
+- primaryCharacters: 1-8 entries, every label unique and substantive.
+- keyObjects: 2-6 entries, unique titles (3+ chars), descriptions 20+ chars.
+- keyPeople: 2-6 entries, unique names (2+ chars), roles 8+ chars.
+- Never repeat an identical label, title, or name anywhere a list requires
+  distinct entries — near-misses like "Moses" and "Moses " count as
+  duplicates.`;
   const rulesBlock =
     globalRules && globalRules.length
       ? `\n\nWHAT SELAH HAS LEARNED (active rules — apply to EVERY section)\n${globalRules
@@ -373,7 +392,7 @@ RULES
 - Mark the timeline item for THIS chapter with "active": true.
 - "bibleText.version" records the reader-display version only. Generation
   provenance is server-owned and bound separately even when both use ESV.
-- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${movementsBlock}${rulesBlock}${chapterBlock}${examplesBlock}${
+- Be honest about uncertainty for dates/locations; do not overreach historically or theologically.${movementsBlock}${completenessBlock}${rulesBlock}${chapterBlock}${examplesBlock}${
     generationSourceBlock
   }`;
 }

@@ -110,6 +110,80 @@ export function safeModelExecutionDiagnostic(error: unknown): string {
   return "MODEL:UNKNOWN";
 }
 
+/**
+ * ONE-REPAIR AMENDMENT to the one-call contract (owner + Codex directive,
+ * board #29, 2026-07-17): when a finished draft fails quality ONLY on the
+ * structural-completeness codes below, the pipeline makes exactly ONE bounded
+ * repair call — "return the same draft with only these deficiencies fixed" —
+ * then re-runs the FULL gate chain (schema, overlap, quality) on the repaired
+ * draft. Never more than one repair; never for theology/voice/coverage or any
+ * overlap code; both calls' tokens are cost-logged; the owner sees
+ * REPAIR-001 STRUCTURAL_REPAIR_APPLIED as a review warning.
+ */
+export const REPAIRABLE_QUALITY_CODES: ReadonlySet<string> = new Set([
+  "STR-004 EMPTY_REQUIRED_CONTENT",
+  "STR-010 EXACT_DUPLICATE_CONTENT",
+]);
+
+export function repairableQualityBlockers(
+  blockers: readonly { code: string }[],
+): boolean {
+  return (
+    blockers.length > 0 &&
+    blockers.every((finding) => REPAIRABLE_QUALITY_CODES.has(finding.code))
+  );
+}
+
+/**
+ * Deterministic repair request derived ONLY from already-authorized material:
+ * the frozen approved request's model/params, the model's own draft, and the
+ * machine checker's findings (checker-authored messages + structural paths —
+ * never ESV text, never new sources). The derivation is pure so the audit can
+ * reproduce exactly what was sent.
+ */
+export function buildMarkSprintRepairRequest(
+  base: GenerationModelRequestV3,
+  rawDraftJson: string,
+  blockers: readonly {
+    code: string;
+    message: string;
+    evidencePaths: readonly string[];
+    expected?: unknown;
+    actual?: unknown;
+  }[],
+): GenerationModelRequestV3 {
+  const findingLines = blockers
+    .map(
+      (finding) =>
+        `- ${finding.code} at ${finding.evidencePaths.join(", ") || "(document)"}: ${finding.message}` +
+        (finding.expected !== undefined
+          ? ` (expected: ${String(finding.expected)}; actual: ${String(finding.actual)})`
+          : ""),
+    )
+    .join("\n");
+  return Object.freeze({
+    model: base.model,
+    messages: Object.freeze([
+      {
+        role: "system",
+        content:
+          "You are repairing a single JSON chapter workup you already wrote. " +
+          "Return the COMPLETE corrected JSON object. Fix ONLY the deficiencies listed by the machine checker; " +
+          "keep every other field byte-identical. Stay faithful to the chapter; never quote Bible translation text verbatim; " +
+          "no placeholders; duplicated labels must become genuinely distinct entries.",
+      } as const,
+      {
+        role: "user",
+        content: `MACHINE CHECKER DEFICIENCIES (fix exactly these, nothing else):\n${findingLines}\n\nDRAFT JSON TO REPAIR:\n${rawDraftJson}`,
+      } as const,
+    ]) as unknown as GenerationModelRequestV3["messages"],
+    response_format: base.response_format,
+    max_completion_tokens: base.max_completion_tokens,
+    reasoning_effort: base.reasoning_effort,
+    store: base.store,
+  });
+}
+
 /** Compact, excerpt-free diagnostic line for one overlap finding. */
 export function safeOverlapDiagnostic(finding: {
   code: string;
@@ -253,115 +327,233 @@ export async function runProtectedMarkSprintDraft(
     );
   }
 
-  let generated;
-  try {
-    generated = parseChapterWorkupJson(execution.rawDraftJson);
-  } catch {
-    throw new MarkSprintDraftPipelineError(
-      "MODEL_RESPONSE_INVALID",
-      [],
-      tokenUsage,
-    );
+  interface CandidateEvaluation {
+    generated: ReturnType<typeof parseChapterWorkupJson>;
+    overlapReport: ReturnType<typeof evaluateGenerationManifestV3Overlap>;
+    overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability | null;
+    sourceOverlapReview: SourceOverlapReviewWarning | null;
+    quality: ReturnType<typeof evaluateMarkSprintDraft>;
+    rawDraftJson: string;
   }
 
-  let overlapReport: ReturnType<typeof evaluateGenerationManifestV3Overlap>;
-  try {
-    overlapReport = evaluateGenerationManifestV3Overlap(
-      input.preflight,
-      preparation,
-      execution.rawDraftJson,
-    );
-    assertGenerationManifestV3OverlapReportIntegrity(
-      input.preflight,
-      preparation,
-      overlapReport,
-      execution.rawDraftJson,
-    );
-  } catch {
-    throw new MarkSprintDraftPipelineError(
-      "SOURCE_OVERLAP_BLOCKED",
-      [],
-      tokenUsage,
-    );
-  }
-  let overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability | null = null;
-  let sourceOverlapReview: SourceOverlapReviewWarning | null = null;
-  if (overlapReport.verdict === "pass") {
+  // The FULL gate chain over one candidate draft: schema parse, overlap
+  // evaluation + integrity, acceptance-or-review, quality. Used for the
+  // original draft and, when the one-repair amendment applies, ONCE more for
+  // the repaired draft — the repaired candidate passes the exact same gates
+  // or the run fails terminally.
+  const evaluateCandidateDraft = (
+    rawDraftJson: string,
+    usageForErrors: Readonly<MarkSprintDraftTokenUsage>,
+    repairDiagnostics: readonly string[],
+  ): CandidateEvaluation => {
+    let generated: ReturnType<typeof parseChapterWorkupJson>;
     try {
-      overlapAcceptance =
-        createGenerationManifestV3OverlapAcceptanceCapability(
-          input.preflight,
-          preparation,
-          overlapReport,
-          execution.rawDraftJson,
-        );
-      assertGenerationManifestV3OverlapAcceptanceCapability(
-        overlapAcceptance,
+      generated = parseChapterWorkupJson(rawDraftJson);
+    } catch {
+      throw new MarkSprintDraftPipelineError(
+        "MODEL_RESPONSE_INVALID",
+        [],
+        usageForErrors,
+        repairDiagnostics,
+      );
+    }
+    let overlapReport: ReturnType<typeof evaluateGenerationManifestV3Overlap>;
+    try {
+      overlapReport = evaluateGenerationManifestV3Overlap(
         input.preflight,
         preparation,
-        execution.rawDraftJson,
+        rawDraftJson,
+      );
+      assertGenerationManifestV3OverlapReportIntegrity(
+        input.preflight,
+        preparation,
+        overlapReport,
+        rawDraftJson,
       );
     } catch {
       throw new MarkSprintDraftPipelineError(
         "SOURCE_OVERLAP_BLOCKED",
         [],
-        tokenUsage,
+        usageForErrors,
+        repairDiagnostics,
       );
     }
-  } else {
-    try {
-      sourceOverlapReview = createSourceOverlapReviewWarning({
-        manifestDigest: input.preflight.manifestDigest,
-        reportDigest: overlapReport.reportDigest,
-        canonicalDraftDigest: overlapReport.canonicalDraftDigest,
-        blockerCodes: overlapReport.findings
-          .filter((finding) => finding.severity === "block")
-          .map((finding) => finding.code),
-        findingCount: overlapReport.findingCount,
-        blockFindingCount: overlapReport.blockFindingCount,
-        reviewFindingCount: overlapReport.reviewFindingCount,
-      });
-    } catch {
-      throw new MarkSprintDraftPipelineError(
-        "SOURCE_OVERLAP_BLOCKED",
-        [],
-        tokenUsage,
-      );
+    let overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability | null =
+      null;
+    let sourceOverlapReview: SourceOverlapReviewWarning | null = null;
+    if (overlapReport.verdict === "pass") {
+      try {
+        overlapAcceptance =
+          createGenerationManifestV3OverlapAcceptanceCapability(
+            input.preflight,
+            preparation,
+            overlapReport,
+            rawDraftJson,
+          );
+        assertGenerationManifestV3OverlapAcceptanceCapability(
+          overlapAcceptance,
+          input.preflight,
+          preparation,
+          rawDraftJson,
+        );
+      } catch {
+        throw new MarkSprintDraftPipelineError(
+          "SOURCE_OVERLAP_BLOCKED",
+          [],
+          usageForErrors,
+          repairDiagnostics,
+        );
+      }
+    } else {
+      try {
+        sourceOverlapReview = createSourceOverlapReviewWarning({
+          manifestDigest: input.preflight.manifestDigest,
+          reportDigest: overlapReport.reportDigest,
+          canonicalDraftDigest: overlapReport.canonicalDraftDigest,
+          blockerCodes: overlapReport.findings
+            .filter((finding) => finding.severity === "block")
+            .map((finding) => finding.code),
+          findingCount: overlapReport.findingCount,
+          blockFindingCount: overlapReport.blockFindingCount,
+          reviewFindingCount: overlapReport.reviewFindingCount,
+        });
+      } catch {
+        throw new MarkSprintDraftPipelineError(
+          "SOURCE_OVERLAP_BLOCKED",
+          [],
+          usageForErrors,
+          repairDiagnostics,
+        );
+      }
     }
-  }
+    const quality = evaluateMarkSprintDraft(generated, input.sourceBundle.slug);
+    return {
+      generated,
+      overlapReport,
+      overlapAcceptance,
+      sourceOverlapReview,
+      quality,
+      rawDraftJson,
+    };
+  };
 
-  const quality = evaluateMarkSprintDraft(generated, input.sourceBundle.slug);
-  if (quality.machineVerdict !== "pass" || quality.blockers.length > 0) {
-    // Persist WHY (issue #17, third diagnostic gap): quality blocker codes are
-    // short safe enums — carry them as safeDiagnostics so the durable audit
-    // and Studio can show them. Never draft text, never excerpts.
-    throw new MarkSprintDraftPipelineError(
-      "MARK_QUALITY_BLOCKED",
-      quality.blockers.map((finding) => finding.code),
-      tokenUsage,
-      quality.blockers.map((finding) => safeQualityDiagnostic(finding.code)),
+  let candidate = evaluateCandidateDraft(
+    execution.rawDraftJson,
+    tokenUsage,
+    [],
+  );
+  let combinedUsage: MarkSprintDraftTokenUsage = tokenUsage;
+  let repairApplied = false;
+
+  if (
+    candidate.quality.machineVerdict !== "pass" ||
+    candidate.quality.blockers.length > 0
+  ) {
+    if (!repairableQualityBlockers(candidate.quality.blockers)) {
+      // Non-repairable blockers (theology, coverage, voice, …): terminal,
+      // exactly as before the one-repair amendment.
+      throw new MarkSprintDraftPipelineError(
+        "MARK_QUALITY_BLOCKED",
+        candidate.quality.blockers.map((finding) => finding.code),
+        combinedUsage,
+        candidate.quality.blockers.map((finding) =>
+          safeQualityDiagnostic(finding.code),
+        ),
+      );
+    }
+    // ONE bounded repair call (board #29 directive): same model/params, the
+    // model's own draft plus the machine findings, nothing else. Exactly one;
+    // the repaired draft re-runs the FULL gate chain above.
+    const repairedCodeDiagnostics = candidate.quality.blockers.map((finding) =>
+      safeQualityDiagnostic(finding.code),
     );
+    let repairExecution: MarkSprintModelExecutionResult;
+    try {
+      repairExecution = await input.executor.executeExactRequest(
+        buildMarkSprintRepairRequest(
+          input.modelRequest,
+          candidate.rawDraftJson,
+          candidate.quality.blockers,
+        ),
+      );
+    } catch (error) {
+      throw new MarkSprintDraftPipelineError(
+        "MODEL_EXECUTION_FAILED",
+        [],
+        combinedUsage,
+        ["REPAIR:EXECUTION_FAILED", safeModelExecutionDiagnostic(error), ...repairedCodeDiagnostics],
+      );
+    }
+    const repairUsage = safeTokenUsage(repairExecution);
+    if (
+      !repairExecution ||
+      typeof repairExecution.rawDraftJson !== "string" ||
+      !repairExecution.rawDraftJson.trim() ||
+      repairUsage === null
+    ) {
+      throw new MarkSprintDraftPipelineError(
+        "MODEL_RESPONSE_INVALID",
+        [],
+        combinedUsage,
+        ["REPAIR:RESPONSE_INVALID", ...repairedCodeDiagnostics],
+      );
+    }
+    combinedUsage = {
+      inputTokens: combinedUsage.inputTokens + repairUsage.inputTokens,
+      outputTokens: combinedUsage.outputTokens + repairUsage.outputTokens,
+    };
+    const repaired = evaluateCandidateDraft(
+      repairExecution.rawDraftJson,
+      combinedUsage,
+      ["REPAIR:APPLIED", ...repairedCodeDiagnostics],
+    );
+    if (
+      repaired.quality.machineVerdict !== "pass" ||
+      repaired.quality.blockers.length > 0
+    ) {
+      // The single repair did not clear the bar: terminal. Never a second
+      // repair, never a loop.
+      throw new MarkSprintDraftPipelineError(
+        "MARK_QUALITY_BLOCKED",
+        repaired.quality.blockers.map((finding) => finding.code),
+        combinedUsage,
+        [
+          "REPAIR:STILL_BLOCKED",
+          ...repaired.quality.blockers.map((finding) =>
+            safeQualityDiagnostic(finding.code),
+          ),
+        ],
+      );
+    }
+    candidate = repaired;
+    repairApplied = true;
   }
 
-  const renderWorkup = generatedToRenderWorkup(generated);
+  const renderWorkup = generatedToRenderWorkup(candidate.generated);
   return deepFreeze({
     slug: input.sourceBundle.slug,
     manifestDigest: input.preflight.manifestDigest,
     sourceBundleDigest: input.sourceBundle.bundleDigest,
-    rawDraftDigest: overlapReport.rawDraftDigest,
-    canonicalDraftDigest: overlapReport.canonicalDraftDigest,
-    overlapReportDigest: overlapReport.reportDigest,
-    overlapVerdict: overlapReport.verdict,
-    overlapDiagnostics: overlapReport.findings.map(safeOverlapDiagnostic),
-    sourceOverlapReview,
-    tokenUsage,
-    overlapAcceptance,
+    rawDraftDigest: candidate.overlapReport.rawDraftDigest,
+    canonicalDraftDigest: candidate.overlapReport.canonicalDraftDigest,
+    overlapReportDigest: candidate.overlapReport.reportDigest,
+    overlapVerdict: candidate.overlapReport.verdict,
+    overlapDiagnostics: candidate.overlapReport.findings.map(safeOverlapDiagnostic),
+    sourceOverlapReview: candidate.sourceOverlapReview,
+    tokenUsage: combinedUsage,
+    overlapAcceptance: candidate.overlapAcceptance,
     quality: {
       machineVerdict: "pass" as const,
       overallStatus: "needs_owner_review" as const,
-      warningCodes: quality.warnings.map((finding) => finding.code),
-      manualGuardrails: quality.manualChecks.guardrails,
-      textualVariants: quality.manualChecks.textualVariants,
+      // REPAIR-001 leads the warning list when the one-repair amendment ran,
+      // so the owner review screen states plainly that a structural repair
+      // call happened (transparency requirement of the amendment).
+      warningCodes: [
+        ...(repairApplied ? ["REPAIR-001 STRUCTURAL_REPAIR_APPLIED"] : []),
+        ...candidate.quality.warnings.map((finding) => finding.code),
+      ],
+      manualGuardrails: candidate.quality.manualChecks.guardrails,
+      textualVariants: candidate.quality.manualChecks.textualVariants,
     },
     renderWorkup,
   });

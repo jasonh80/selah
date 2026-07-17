@@ -19,6 +19,7 @@ import {
 } from "../lib/server/generation-manifest-v3";
 import {
   MarkSprintDraftPipelineError,
+  repairableQualityBlockers,
   runProtectedMarkSprintDraft,
   type MarkSprintModelExecutorPort,
 } from "../lib/server/mark-sprint-draft-pipeline";
@@ -358,8 +359,158 @@ async function main(): Promise<void> {
   assert.ok(!String(executionError).includes(SOURCE_PHRASE));
   assert.ok(!JSON.stringify(executionError).includes(PRIVATE_RULE));
 
+  // ---- ONE-REPAIR AMENDMENT (board #29 directive, 2026-07-17) --------------
+  // When the ONLY quality blockers are the repairable structural codes
+  // (STR-004/STR-010), the pipeline may make exactly ONE repair call, then
+  // must re-run the full gate chain. These cases prove: repair fires only
+  // then, never loops, sums cost, stays private, and cannot bypass overlap.
+  function sequencedExecutor(responses: readonly string[]): {
+    port: MarkSprintModelExecutorPort;
+    calls: () => number;
+    requests: () => unknown[];
+  } {
+    let callCount = 0;
+    const received: unknown[] = [];
+    return {
+      port: {
+        async executeExactRequest(request) {
+          const body = responses[Math.min(callCount, responses.length - 1)];
+          callCount++;
+          received.push(request);
+          return { rawDraftJson: body, inputTokens: 321, outputTokens: 654 };
+        },
+      },
+      calls: () => callCount,
+      requests: () => received,
+    };
+  }
+  function structurallyBroken(): ReturnType<typeof passingDraft> {
+    const draft = passingDraft("mark-8");
+    draft.application = "Too short.";
+    draft.primaryCharacters = ["Jesus", "Jesus", "Peter"];
+    return draft;
+  }
+
+  // 1. Repairable blockers → ONE repair call → full pass, transparent + summed.
+  {
+    const seq = sequencedExecutor([
+      JSON.stringify(structurallyBroken()),
+      JSON.stringify(passingDraft("mark-8")),
+    ]);
+    const auth = await authorization();
+    const repairedResult = await runProtectedMarkSprintDraft({
+      sourceBundle,
+      modelRequest,
+      preflight,
+      ...auth,
+      executor: seq.port,
+    });
+    assert.equal(seq.calls(), 2, "repairable block must trigger exactly one repair call");
+    assert.equal(seq.requests()[0], modelRequest, "first call must be the exact approved request");
+    const repairRequest = seq.requests()[1] as {
+      model: string;
+      messages: readonly { role: string; content: string }[];
+    };
+    assert.equal(repairRequest.model, modelRequest.model, "repair must reuse the approved model");
+    assert.ok(
+      repairRequest.messages[0].content.includes("repairing a single JSON chapter workup"),
+      "repair call must use the repair system prompt, not the original",
+    );
+    assert.ok(
+      repairRequest.messages[1].content.includes("STR-004 EMPTY_REQUIRED_CONTENT") &&
+        repairRequest.messages[1].content.includes("STR-010 EXACT_DUPLICATE_CONTENT"),
+      "repair call must name the machine findings",
+    );
+    assert.ok(
+      !repairRequest.messages[0].content.includes(SOURCE_PHRASE) &&
+        !repairRequest.messages[1].content.includes(SOURCE_PHRASE),
+      "repair call must never carry ESV source text",
+    );
+    assert.ok(
+      !JSON.stringify(repairRequest).includes(PRIVATE_RULE),
+      "repair call must never carry private guidance",
+    );
+    assert.deepEqual(
+      repairedResult.tokenUsage,
+      { inputTokens: 642, outputTokens: 1308 },
+      "both calls' tokens must be cost-visible",
+    );
+    assert.ok(
+      repairedResult.quality.warningCodes.includes("REPAIR-001 STRUCTURAL_REPAIR_APPLIED"),
+      "owner review must see that a repair happened",
+    );
+  }
+
+  // 2. Repair still blocked → terminal, exactly two calls, never a loop.
+  {
+    const seq = sequencedExecutor([
+      JSON.stringify(structurallyBroken()),
+      JSON.stringify(structurallyBroken()),
+    ]);
+    const auth = await authorization();
+    const stillBlocked = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MARK_QUALITY_BLOCKED",
+    );
+    assert.equal(seq.calls(), 2, "one repair only — never a retry loop");
+    assert.ok(
+      stillBlocked.safeDiagnostics.includes("REPAIR:STILL_BLOCKED"),
+      "terminal failure must say the repair ran and did not clear the bar",
+    );
+    assert.deepEqual(stillBlocked.tokenUsage, { inputTokens: 642, outputTokens: 1308 });
+  }
+
+  // 3. A repaired draft cannot bypass the overlap firewall: source-copying
+  // wording in the REPAIRED draft still lands in the block-verdict wording
+  // review state (no acceptance capability, owner must review), with the
+  // repair disclosed.
+  {
+    const seq = sequencedExecutor([
+      JSON.stringify(structurallyBroken()),
+      JSON.stringify(copiedSource),
+    ]);
+    const auth = await authorization();
+    const reviewAfterRepair = await runProtectedMarkSprintDraft({
+      sourceBundle,
+      modelRequest,
+      preflight,
+      ...auth,
+      executor: seq.port,
+    });
+    assert.equal(seq.calls(), 2);
+    assert.equal(reviewAfterRepair.overlapVerdict, "block");
+    assert.equal(reviewAfterRepair.overlapAcceptance, null);
+    assert.ok(reviewAfterRepair.sourceOverlapReview, "repaired copy still requires wording review");
+    assert.ok(
+      reviewAfterRepair.quality.warningCodes.includes("REPAIR-001 STRUCTURAL_REPAIR_APPLIED"),
+      "the repair must stay disclosed through the review state",
+    );
+  }
+
+  // 4. Non-repairable codes never trigger a repair call (covered above by the
+  // STR-002 case asserting calls === 1); repairableQualityBlockers itself:
+  assert.equal(
+    repairableQualityBlockers([{ code: "STR-004 EMPTY_REQUIRED_CONTENT" }]),
+    true,
+  );
+  assert.equal(
+    repairableQualityBlockers([
+      { code: "STR-004 EMPTY_REQUIRED_CONTENT" },
+      { code: "STR-002 OUTPUT_IDENTITY_MISMATCH" },
+    ]),
+    false,
+    "a single non-repairable code must disable repair entirely",
+  );
+  assert.equal(repairableQualityBlockers([]), false);
+
   console.log(
-    "Mark sprint draft pipeline verification passed (schema/overlap/quality/one-call/privacy).",
+    "Mark sprint draft pipeline verification passed (schema/overlap/quality/one-call+one-repair/privacy).",
   );
 }
 
