@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { __setStoredSetupApprovalStoreForTesting } from "../lib/server/chapter-setup-approvals";
 import {
   buildMark8StudioPreflightResponse,
   buildStudioGenerateRequest,
@@ -855,6 +856,17 @@ async function verifyMark7Enablement(): Promise<void> {
       })),
     ),
   );
+  // HERMETIC APPROVAL STORE (board 2026-07-17, second leak of the same class
+  // as verify-studio-safety): without this seam, production builds read the
+  // LIVE chapter_setup_approvals table — the moment a real mark-9 approval
+  // row exists, "locked" flips to "setup" and every deploy fails. An empty
+  // store makes the gate environment- and data-independent.
+  __setStoredSetupApprovalStoreForTesting({
+    async read() { return null; },
+    async upsert(): Promise<void> {
+      throw new Error("offline preflight gate: approval store is read-only");
+    },
+  });
   try {
     const unauthorized = await route.POST(
       adminRequest({ action: "mark_sprint_setup_status", slug: "mark-7" }, "wrong-token"),
@@ -943,6 +955,7 @@ async function verifyMark7Enablement(): Promise<void> {
       ],
     );
   } finally {
+    __setStoredSetupApprovalStoreForTesting(null);
     __setMarkSprintStudioSetupStoreForTesting(null);
     generationSettings.__setGenerationTestOverrides(null);
   }

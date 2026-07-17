@@ -1,3 +1,4 @@
+import { __setStoredSetupApprovalStoreForTesting } from "../lib/server/chapter-setup-approvals";
 import assert from "node:assert/strict";
 import {
   mintStudioPreviewAccess,
@@ -28,6 +29,13 @@ function adminRequest(
 
 async function main(): Promise<void> {
   process.env.DEV_ADMIN_TOKEN = ADMIN;
+  // Hermetic approval store (2026-07-17): production builds must never read
+  // the live chapter_setup_approvals table from a gate.
+  __setStoredSetupApprovalStoreForTesting({
+    async read() { return null; },
+    async upsert(): Promise<void> { throw new Error("offline gate: approval store is read-only"); },
+  });
+  try {
   const pass = mintStudioPreviewAccess("mark-8", NOW);
   assert.ok(pass);
   assert.equal(verifyStudioPreviewAccess(pass, "mark-8", NOW), true);
@@ -137,6 +145,9 @@ async function main(): Promise<void> {
   console.log(
     "Studio preview access verification passed (short-lived cookie + locked dev routes).",
   );
+  } finally {
+    __setStoredSetupApprovalStoreForTesting(null);
+  }
 }
 
 main().catch((error) => {
