@@ -393,18 +393,45 @@ export function evaluateMarkSprintDraft(
     const seenSectionBodies = new Map<string, string>();
     sections.forEach((section, index) => {
       const basePath = `workup:/sections/${index}`;
+      // Per-field findings (PR #46 review): evidence paths double as the
+      // repair scope, so each finding names ONLY the field that failed —
+      // a short cardSummary must never authorize rewriting a valid title.
+      if (isPlaceholder(section.id)) {
+        add(
+          "STR-004 EMPTY_REQUIRED_CONTENT",
+          "Every authored section needs a real id.",
+          [`${basePath}/id`],
+        );
+      }
+      if (isPlaceholder(section.title)) {
+        add(
+          "STR-004 EMPTY_REQUIRED_CONTENT",
+          "Every authored section needs a useful title.",
+          [`${basePath}/title`],
+        );
+      }
       if (
-        isPlaceholder(section.id) ||
-        isPlaceholder(section.title) ||
         isPlaceholder(section.cardSummary) ||
+        section.cardSummary.trim().length < MARK_SPRINT_PROMPT_MINIMA.sectionCardSummaryMin
+      ) {
+        add(
+          "STR-004 EMPTY_REQUIRED_CONTENT",
+          "Every authored section needs a substantive card summary.",
+          [`${basePath}/cardSummary`],
+          `at least ${MARK_SPRINT_PROMPT_MINIMA.sectionCardSummaryMin} characters`,
+          section.cardSummary.trim().length,
+        );
+      }
+      if (
         isPlaceholder(section.fullContent) ||
-        section.cardSummary.trim().length < MARK_SPRINT_PROMPT_MINIMA.sectionCardSummaryMin ||
         section.fullContent.trim().length < MARK_SPRINT_PROMPT_MINIMA.sectionFullContentMin
       ) {
         add(
           "STR-004 EMPTY_REQUIRED_CONTENT",
-          "Every authored section needs a useful title, card summary, and substantive body.",
-          [`${basePath}/title`, `${basePath}/cardSummary`, `${basePath}/fullContent`],
+          "Every authored section needs a substantive body.",
+          [`${basePath}/fullContent`],
+          `at least ${MARK_SPRINT_PROMPT_MINIMA.sectionFullContentMin} characters`,
+          section.fullContent.trim().length,
         );
       }
       const bodyKey = normalized(section.fullContent);
