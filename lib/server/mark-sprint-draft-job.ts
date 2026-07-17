@@ -691,6 +691,14 @@ export async function runProtectedMarkDraftJob(
               diagnostics: boundedDiagnostics(result.overlapDiagnostics),
             }
           : {}),
+        // One-repair amendment (PR #46, correction 2): a successful repair is
+        // persisted in the durable audit, not only the review warnings.
+        ...(result.repair
+          ? {
+              repairRequestDigest: result.repair.requestDigest,
+              repairedCodes: boundedDiagnostics(result.repair.repairedCodes),
+            }
+          : {}),
       },
     ),
   });

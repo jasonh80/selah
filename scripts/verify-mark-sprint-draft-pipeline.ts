@@ -391,11 +391,23 @@ async function main(): Promise<void> {
     return draft;
   }
 
-  // 1. Repairable blockers → ONE repair call → full pass, transparent + summed.
+  // A targeted repair: the SAME broken draft with ONLY the flagged fields
+  // fixed (PR #46, correction 1 — a wholesale replacement draft must fail).
+  function targetedRepairOf(broken: ReturnType<typeof passingDraft>): ReturnType<typeof passingDraft> {
+    const clean = passingDraft("mark-8");
+    const repaired = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
+    repaired.application = clean.application;
+    repaired.primaryCharacters = clean.primaryCharacters;
+    return repaired;
+  }
+
+  // 1. Repairable blockers → ONE targeted repair call → full pass,
+  // transparent + summed + audited.
   {
+    const broken = structurallyBroken();
     const seq = sequencedExecutor([
-      JSON.stringify(structurallyBroken()),
-      JSON.stringify(passingDraft("mark-8")),
+      JSON.stringify(broken),
+      JSON.stringify(targetedRepairOf(broken)),
     ]);
     const auth = await authorization();
     const repairedResult = await runProtectedMarkSprintDraft({
@@ -439,13 +451,94 @@ async function main(): Promise<void> {
       repairedResult.quality.warningCodes.includes("REPAIR-001 STRUCTURAL_REPAIR_APPLIED"),
       "owner review must see that a repair happened",
     );
+    assert.ok(repairedResult.repair, "the repair record must persist on the result");
+    assert.match(repairedResult.repair!.requestDigest, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(
+      [...repairedResult.repair!.repairedCodes].sort(),
+      ["STR-004 EMPTY_REQUIRED_CONTENT", "STR-010 EXACT_DUPLICATE_CONTENT"],
+    );
+  }
+
+  // 1b. A "repair" that swaps in a wholesale different draft (unflagged
+  // fields changed) is REFUSED — the exact hole the review named.
+  {
+    const seq = sequencedExecutor([
+      JSON.stringify(structurallyBroken()),
+      JSON.stringify(passingDraft("mark-9")),
+    ]);
+    const auth = await authorization();
+    const scope = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MODEL_RESPONSE_INVALID",
+    );
+    assert.equal(seq.calls(), 2);
+    assert.ok(
+      scope.safeDiagnostics.includes("REPAIR:SCOPE_VIOLATION"),
+      "out-of-scope repair must be named",
+    );
+    assert.deepEqual(scope.tokenUsage, { inputTokens: 642, outputTokens: 1308 });
+  }
+
+  // 1c. Repair cost is counted even when the repair response is unusable
+  // (PR #46, correction 3).
+  {
+    const seq = sequencedExecutor([JSON.stringify(structurallyBroken()), "   "]);
+    const auth = await authorization();
+    const emptyRepair = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MODEL_RESPONSE_INVALID",
+    );
+    assert.equal(seq.calls(), 2);
+    assert.ok(emptyRepair.safeDiagnostics.includes("REPAIR:RESPONSE_INVALID"));
+    assert.deepEqual(
+      emptyRepair.tokenUsage,
+      { inputTokens: 642, outputTokens: 1308 },
+      "an empty repair response still cost both calls' tokens",
+    );
+  }
+
+  // 1d. A block-verdict (wording review) candidate is NEVER repaired
+  // (PR #46, correction 2) — even when its quality codes are repairable.
+  {
+    const overlapAndBroken = structurallyBroken();
+    overlapAndBroken.summary = `${SOURCE_PHRASE}. ${overlapAndBroken.summary}`;
+    const seq = sequencedExecutor([JSON.stringify(overlapAndBroken)]);
+    const auth = await authorization();
+    const noRepair = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MARK_QUALITY_BLOCKED",
+    );
+    assert.equal(seq.calls(), 1, "a wording-review candidate must not be repaired");
+    assert.ok(!noRepair.safeDiagnostics.some((d) => d.startsWith("REPAIR:")));
   }
 
   // 2. Repair still blocked → terminal, exactly two calls, never a loop.
   {
+    const broken = structurallyBroken();
+    const stillBroken = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
+    stillBroken.primaryCharacters = ["Jesus", "Peter", "the disciples"];
+    stillBroken.application = "Still too short.";
     const seq = sequencedExecutor([
-      JSON.stringify(structurallyBroken()),
-      JSON.stringify(structurallyBroken()),
+      JSON.stringify(broken),
+      JSON.stringify(stillBroken),
     ]);
     const auth = await authorization();
     const stillBlocked = await expectPipelineError(
@@ -471,9 +564,13 @@ async function main(): Promise<void> {
   // review state (no acceptance capability, owner must review), with the
   // repair disclosed.
   {
+    const broken = structurallyBroken();
+    const sneakyRepair = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
+    sneakyRepair.primaryCharacters = ["Jesus", "Peter", "the disciples"];
+    sneakyRepair.application = `${SOURCE_PHRASE}. ${passingDraft("mark-8").application}`;
     const seq = sequencedExecutor([
-      JSON.stringify(structurallyBroken()),
-      JSON.stringify(copiedSource),
+      JSON.stringify(broken),
+      JSON.stringify(sneakyRepair),
     ]);
     const auth = await authorization();
     const reviewAfterRepair = await runProtectedMarkSprintDraft({

@@ -13,6 +13,7 @@ import {
   NotFoundError,
   RateLimitError,
 } from "openai";
+import { sha256Canonical } from "./generation-manifest";
 import { generatedToRenderWorkup } from "@/lib/ai/adapters/generated-to-workup";
 import { evaluateMarkSprintDraft } from "@/lib/ai/quality/mark-sprint-quality";
 import { parseChapterWorkupJson } from "@/lib/ai/schemas/chapter-workup-schema";
@@ -256,6 +257,13 @@ export interface ProtectedMarkSprintDraftResult {
   sourceOverlapReview: SourceOverlapReviewWarning | null;
   tokenUsage: Readonly<MarkSprintDraftTokenUsage>;
   overlapAcceptance: GenerationManifestV3OverlapAcceptanceCapability | null;
+  /**
+   * The one-repair amendment's audit record (PR #46 review, correction 2):
+   * null when no repair ran; otherwise the digest of the exact derived repair
+   * request plus the codes it was authorized to fix — persisted by the job's
+   * durable success audit, not only the review warnings.
+   */
+  repair: { requestDigest: string; repairedCodes: readonly string[] } | null;
   quality: {
     machineVerdict: "pass";
     overallStatus: "needs_owner_review";
@@ -463,11 +471,20 @@ export async function runProtectedMarkSprintDraft(
   let combinedUsage: MarkSprintDraftTokenUsage = tokenUsage;
   let repairApplied = false;
 
+  let repairRecord: { requestDigest: string; repairedCodes: readonly string[] } | null =
+    null;
+
   if (
     candidate.quality.machineVerdict !== "pass" ||
     candidate.quality.blockers.length > 0
   ) {
-    if (!repairableQualityBlockers(candidate.quality.blockers)) {
+    // PR #46 review, correction 2: a candidate whose wording already sits in
+    // the overlap-review (block-verdict) state is never repaired — the owner
+    // must see THAT draft's wording problem, not a rewritten one.
+    if (
+      candidate.overlapReport.verdict !== "pass" ||
+      !repairableQualityBlockers(candidate.quality.blockers)
+    ) {
       // Non-repairable blockers (theology, coverage, voice, …): terminal,
       // exactly as before the one-repair amendment.
       throw new MarkSprintDraftPipelineError(
@@ -485,24 +502,38 @@ export async function runProtectedMarkSprintDraft(
     const repairedCodeDiagnostics = candidate.quality.blockers.map((finding) =>
       safeQualityDiagnostic(finding.code),
     );
+    const repairRequest = buildMarkSprintRepairRequest(
+      input.modelRequest,
+      candidate.rawDraftJson,
+      candidate.quality.blockers,
+    );
+    // Bind the derived request: its digest travels into every outcome so the
+    // audit can prove exactly what the repair call was (PR #46, correction 2).
+    const repairRequestDigest = sha256Canonical(
+      JSON.parse(JSON.stringify(repairRequest)),
+    );
+    const repairDigestDiagnostic = `REPAIR:REQ_${repairRequestDigest.slice(0, 16)}`;
     let repairExecution: MarkSprintModelExecutionResult;
     try {
-      repairExecution = await input.executor.executeExactRequest(
-        buildMarkSprintRepairRequest(
-          input.modelRequest,
-          candidate.rawDraftJson,
-          candidate.quality.blockers,
-        ),
-      );
+      repairExecution = await input.executor.executeExactRequest(repairRequest);
     } catch (error) {
       throw new MarkSprintDraftPipelineError(
         "MODEL_EXECUTION_FAILED",
         [],
         combinedUsage,
-        ["REPAIR:EXECUTION_FAILED", safeModelExecutionDiagnostic(error), ...repairedCodeDiagnostics],
+        ["REPAIR:EXECUTION_FAILED", repairDigestDiagnostic, safeModelExecutionDiagnostic(error), ...repairedCodeDiagnostics],
       );
     }
-    const repairUsage = safeTokenUsage(repairExecution);
+    // Cost first (PR #46, correction 3): whenever the provider reported valid
+    // token usage, count it BEFORE judging the response body — an empty or
+    // useless repair response still cost real tokens.
+    const repairUsage = repairExecution ? safeTokenUsage(repairExecution) : null;
+    if (repairUsage !== null) {
+      combinedUsage = {
+        inputTokens: combinedUsage.inputTokens + repairUsage.inputTokens,
+        outputTokens: combinedUsage.outputTokens + repairUsage.outputTokens,
+      };
+    }
     if (
       !repairExecution ||
       typeof repairExecution.rawDraftJson !== "string" ||
@@ -513,18 +544,44 @@ export async function runProtectedMarkSprintDraft(
         "MODEL_RESPONSE_INVALID",
         [],
         combinedUsage,
-        ["REPAIR:RESPONSE_INVALID", ...repairedCodeDiagnostics],
+        ["REPAIR:RESPONSE_INVALID", repairDigestDiagnostic, ...repairedCodeDiagnostics],
       );
     }
-    combinedUsage = {
-      inputTokens: combinedUsage.inputTokens + repairUsage.inputTokens,
-      outputTokens: combinedUsage.outputTokens + repairUsage.outputTokens,
-    };
     const repaired = evaluateCandidateDraft(
       repairExecution.rawDraftJson,
       combinedUsage,
-      ["REPAIR:APPLIED", ...repairedCodeDiagnostics],
+      ["REPAIR:APPLIED", repairDigestDiagnostic, ...repairedCodeDiagnostics],
     );
+    // TARGETED-REPAIR ENFORCEMENT (PR #46 review, correction 1): the repair
+    // may change ONLY the top-level fields named by the checker's evidence.
+    // Every other field must round-trip canonically identical — a "repair"
+    // that rewrites unrelated theology or copy is refused.
+    {
+      const allowedRoots = new Set(
+        candidate.quality.blockers.flatMap((finding) =>
+          finding.evidencePaths.map(
+            (path) => path.replace(/^workup:[/]/u, "").split("/")[0],
+          ),
+        ),
+      );
+      const before = candidate.generated as unknown as Record<string, unknown>;
+      const after = repaired.generated as unknown as Record<string, unknown>;
+      const roots = new Set([...Object.keys(before), ...Object.keys(after)]);
+      for (const root of roots) {
+        if (allowedRoots.has(root)) continue;
+        if (
+          sha256Canonical(before[root] ?? null) !==
+          sha256Canonical(after[root] ?? null)
+        ) {
+          throw new MarkSprintDraftPipelineError(
+            "MODEL_RESPONSE_INVALID",
+            [],
+            combinedUsage,
+            ["REPAIR:SCOPE_VIOLATION", repairDigestDiagnostic, ...repairedCodeDiagnostics],
+          );
+        }
+      }
+    }
     if (
       repaired.quality.machineVerdict !== "pass" ||
       repaired.quality.blockers.length > 0
@@ -537,12 +594,19 @@ export async function runProtectedMarkSprintDraft(
         combinedUsage,
         [
           "REPAIR:STILL_BLOCKED",
+          repairDigestDiagnostic,
           ...repaired.quality.blockers.map((finding) =>
             safeQualityDiagnostic(finding.code),
           ),
         ],
       );
     }
+    repairRecord = Object.freeze({
+      requestDigest: repairRequestDigest,
+      repairedCodes: Object.freeze(
+        candidate.quality.blockers.map((finding) => finding.code),
+      ) as readonly string[],
+    });
     candidate = repaired;
     repairApplied = true;
   }
@@ -560,6 +624,7 @@ export async function runProtectedMarkSprintDraft(
     sourceOverlapReview: candidate.sourceOverlapReview,
     tokenUsage: combinedUsage,
     overlapAcceptance: candidate.overlapAcceptance,
+    repair: repairRecord,
     quality: {
       machineVerdict: "pass" as const,
       overallStatus: "needs_owner_review" as const,

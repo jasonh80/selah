@@ -1,5 +1,6 @@
 // Builds the prompt that asks the model for ONE shared global Selah chapter
 // workup. No API call here — this only assembles the instruction string.
+import { MARK_SPRINT_PROMPT_MINIMA } from "@/lib/ai/quality/mark-sprint-quality";
 import markSprintAcceptance from "../quality/mark-sprint-acceptance.v1.json";
 
 export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v6";
@@ -125,6 +126,13 @@ MACHINE-CHECKED COMPLETENESS (the draft is REJECTED automatically if any line fa
 - primaryCharacters: 1-8 entries, every label unique and substantive.
 - keyObjects: 2-6 entries, unique titles (3+ chars), descriptions 20+ chars.
 - keyPeople: 2-6 entries, unique names (2+ chars), roles 8+ chars.
+- Every "sections" entry: cardSummary ${MARK_SPRINT_PROMPT_MINIMA.sectionCardSummaryMin}+ chars, fullContent ${MARK_SPRINT_PROMPT_MINIMA.sectionFullContentMin}+ chars,
+  and no two sections may share the same body text.
+- sceneChecks: ${MARK_SPRINT_PROMPT_MINIMA.sceneChecksMin}-${MARK_SPRINT_PROMPT_MINIMA.sceneChecksMax} entries; each title ${MARK_SPRINT_PROMPT_MINIMA.sceneTitleMin}+ chars, body ${MARK_SPRINT_PROMPT_MINIMA.sceneBodyMin}+ chars,
+  every visualAccuracyNote ${MARK_SPRINT_PROMPT_MINIMA.sceneNoteMin}+ chars.
+- chapterSpecificTopics: 3-7 entries. faq: 5-8 entries (question 15+, answer 80+).
+- timeline: label 8+ chars, 2-4 items (title 3+, description 8+).
+- Both maps need real titles and descriptions (60+ chars).
 - Never repeat an identical label, title, or name anywhere a list requires
   distinct entries — near-misses like "Moses" and "Moses " count as
   duplicates.`;
@@ -300,13 +308,14 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
 }
 
 SCENE CHECKS (picture it accurately)
-- Include 1-3 "sceneChecks" ONLY where this chapter has a visual-historical detail
-  people commonly imagine wrongly (wrong building, wrong clothing, wrong scale,
-  English text on objects, a tidy scene that was really chaotic/dangerous, etc.).
-  Do not force them. Tone: warm, visual, confident, historically grounded, lightly
-  witty when it fits — like a wise friend, not a textbook. When supplied chapter
-  review notes identify real visual corrections, include at least one; otherwise
-  an empty array is better than a forced card.
+- "sceneChecks" is REQUIRED: exactly ${MARK_SPRINT_PROMPT_MINIMA.sceneChecksMin}-${MARK_SPRINT_PROMPT_MINIMA.sceneChecksMax} entries
+  (the draft is rejected outside that range — an empty array FAILS). Choose the
+  visual-historical details people most commonly imagine wrongly (wrong building,
+  wrong clothing, wrong scale, English text on objects, a tidy scene that was
+  really chaotic/dangerous, etc.). Tone: warm, visual, confident, historically
+  grounded, lightly witty when it fits — like a wise friend, not a textbook.
+  When supplied chapter review notes identify real visual corrections, include
+  at least one of those first.
 - "visualAccuracyNotes" are crisp, concrete corrections that will later be fed to
   image generation as guardrails. Be specific (materials, scale in feet, no English
   lettering, era-appropriate script, etc.).
