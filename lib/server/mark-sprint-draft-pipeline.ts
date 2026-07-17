@@ -4,6 +4,15 @@
 // executor port. This module performs no network, database, job, route, logging,
 // or publishing work. It never returns the raw request, prompt, ESV source, or
 // raw model response.
+import {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIUserAbortError,
+  AuthenticationError,
+  InternalServerError,
+  NotFoundError,
+  RateLimitError,
+} from "openai";
 import { generatedToRenderWorkup } from "@/lib/ai/adapters/generated-to-workup";
 import { evaluateMarkSprintDraft } from "@/lib/ai/quality/mark-sprint-quality";
 import { parseChapterWorkupJson } from "@/lib/ai/schemas/chapter-workup-schema";
@@ -89,21 +98,30 @@ export function safeModelExecutionDiagnostic(error: unknown): string {
     | null;
   const status = typeof e?.status === "number" ? e.status : null;
   const code = String(e?.code ?? e?.error?.code ?? "");
-  const name = String(e?.name ?? "");
-  if (code === "insufficient_quota") return "MODEL:INSUFFICIENT_QUOTA";
-  if (status === 401 || code === "invalid_api_key") return "MODEL:AUTH_FAILED";
-  if (status === 429) return "MODEL:RATE_LIMITED";
-  if (status === 404 || code === "model_not_found") return "MODEL:MODEL_NOT_FOUND";
+  // SDK subclasses first (PR #46 review): instanceof is the reliable
+  // discriminator — subclass NAMES can be mangled by bundlers. The
+  // native-DOMException AbortError (our own controller.abort) keeps a name
+  // check because it is not an SDK type.
   if (
-    name === "AbortError" ||
-    name === "APIUserAbortError" ||
-    name === "APIConnectionTimeoutError" ||
+    error instanceof APIConnectionTimeoutError ||
+    error instanceof APIUserAbortError ||
+    (error instanceof DOMException && error.name === "AbortError") ||
     code === "ETIMEDOUT"
   ) {
     return "MODEL:TIMEOUT_OR_ABORTED";
   }
-  if (status !== null && status >= 500) return "MODEL:PROVIDER_5XX";
-  if (name === "APIConnectionError" || code === "ECONNRESET" || code === "ENOTFOUND") {
+  if (code === "insufficient_quota") return "MODEL:INSUFFICIENT_QUOTA";
+  if (error instanceof AuthenticationError || status === 401 || code === "invalid_api_key") {
+    return "MODEL:AUTH_FAILED";
+  }
+  if (error instanceof RateLimitError || status === 429) return "MODEL:RATE_LIMITED";
+  if (error instanceof NotFoundError || status === 404 || code === "model_not_found") {
+    return "MODEL:MODEL_NOT_FOUND";
+  }
+  if (error instanceof InternalServerError || (status !== null && status >= 500)) {
+    return "MODEL:PROVIDER_5XX";
+  }
+  if (error instanceof APIConnectionError || code === "ECONNRESET" || code === "ENOTFOUND") {
     return "MODEL:NETWORK";
   }
   if (status !== null) return `MODEL:HTTP_${status}`;
