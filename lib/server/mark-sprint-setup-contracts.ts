@@ -315,19 +315,28 @@ export const MARK_7_SETUP_CONTRACT = buildMarkSprintSetupContract("mark-7");
 // manual_guardrails and location entries. NO bound content changed — the
 // exact notes (notes_digest is byte-identical), movements, verse count, and
 // variants the owner approved are unchanged; the projection now additionally
-// freezes the watch-outs it always displayed. This re-mint ships inside PR
+// freezes the watch-outs it always displayed. That re-mint shipped inside PR
 // #40 for Codex re-review and the owner's merge, which is the human approval
 // of the strengthened binding.
+//
+// RE-MINTED 2026-07-17 (maps config lane): five honest Mark 7 location
+// entries were ADDED to the bound acceptance fixture — this time bound
+// content DID change. The exact entries (Gennesaret/Tyre/Sidon known,
+// Decapolis debated, the 7:31 route none/no drawn line) and the
+// certainty→map-treatment model were owner-approved in
+// docs/selah/maps-config-lane.md before this re-mint; notes_digest stays
+// byte-identical (no note changed). The PR carrying this re-mint goes
+// through Codex review and the owner's merge, which records the approval.
 export const MARK_7_STUDIO_SETUP_APPROVAL: MarkSprintStudioSetupApproval | null = {
   scope: "private_studio_mark7_guidance_and_notes",
   slug: "mark-7",
   approved_by: "Jason Hales (owner)",
   approved_at: "2026-07-15T17:07:48Z",
   evidence:
-    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged).",
-  guidance_digest: "db23ddec78f4b960ab0bc13b47b61d3b2ad959c3987eb9ab0c2bce732a1dd865",
+    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged), and again 2026-07-17 when the owner approved adding the five honest Mark 7 location entries (maps config lane; notes unchanged).",
+  guidance_digest: "7b1e1b48940d68375596a97d6aac21a808f22ce4fc2eae1c90c3cc356747cc64",
   notes_digest: "8c404ddcfa1cc3ff834a76fbf4f285f2f472d09c62e8c5366fe8d27c9d262c52",
-  receipt_digest: "895e4c6738ab7c0b19ae1cb2578903608579d53ff014db9b942d6ed0bef2c4e9",
+  receipt_digest: "217b107c15fd929b1e73fc056d32e3fff99133f141dbd700355e40a29b58ce66",
 };
 
 // ---- connected-chapter receipt gate ------------------------------------------

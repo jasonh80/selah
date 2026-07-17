@@ -55,6 +55,33 @@
       "textual_variants": [
         "Mark 7:16 is omitted from the ESV main text (later-manuscript addition; do not invent it and keep ranges spanning it contiguous).",
         "Mark 7:4 washing terms vary across manuscripts and editions; explain without overclaiming."
+      ],
+      "locations": [
+        {
+          "name": "Gennesaret",
+          "certainty": "known",
+          "display": "Known plain on the NW shore of the Sea of Galilee (the crowd of 6:53–7:1 carries in); shown as a point."
+        },
+        {
+          "name": "Region of Tyre",
+          "certainty": "known",
+          "display": "Jesus withdraws to the region of Tyre (7:24), a known Phoenician coastal city and its territory; the exact house is unrecorded, so the known city is pinned, not a house."
+        },
+        {
+          "name": "Sidon",
+          "certainty": "known",
+          "display": "Named on the return route (7:31), a known coastal city north of Tyre; shown as a point."
+        },
+        {
+          "name": "Decapolis",
+          "certainty": "debated",
+          "display": "The deaf man is healed 'in the region of the Decapolis' (7:31) — a league of cities SE of the Sea of Galilee. The exact spot is not given, so a general area is shown, no pin."
+        },
+        {
+          "name": "Route Tyre to Sidon to Decapolis",
+          "certainty": "none",
+          "display": "The path of 7:31 is famously roundabout and its exact line is unrecorded — no drawn route, only the named places."
+        }
       ]
     },
     "mark-8": {
@@ -105,7 +132,29 @@
         "Do not describe Peter as demon-possessed.",
         "Do not use cross-bearing to sanctify abuse, coercion, burnout, self-harm, or preventable danger."
       ],
-      "textual_variants": []
+      "textual_variants": [],
+      "locations": [
+        {
+          "name": "Dalmanutha",
+          "certainty": "none",
+          "display": "'The district of Dalmanutha' (8:10) has never been securely identified — no site is agreed. No pin; the uncertainty is stated plainly (some manuscripts read Magadan/Magdala, itself debated)."
+        },
+        {
+          "name": "Bethsaida",
+          "certainty": "known",
+          "display": "The blind man is healed at Bethsaida (8:22), a known town near where the Jordan enters the Sea of Galilee; shown as a point."
+        },
+        {
+          "name": "Caesarea Philippi",
+          "certainty": "known",
+          "display": "Peter's confession comes 'on the way to the villages of Caesarea Philippi' (8:27), a known site at the foot of Mount Hermon; shown as a point."
+        },
+        {
+          "name": "Feeding of the 4,000",
+          "certainty": "debated",
+          "display": "The feeding (8:1–9) is on the Decapolis / SE side, but Mark gives no exact spot — a general area, no pin."
+        }
+      ]
     },
     "mark-9": {
       "book": "Mark",

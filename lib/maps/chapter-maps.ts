@@ -16,6 +16,10 @@ export interface MapPin {
   x: number;
   y: number;
   label: string;
+  /** Name of the digest-bound Prepare location entry this pin renders
+   * (mark-sprint-acceptance fixture). Verified by verify:maps-honesty:
+   * only "known" locations may carry a pin. */
+  locationName?: string;
 }
 export interface MapLabel {
   x: number;
@@ -33,6 +37,10 @@ export interface MapRegion {
   lx?: number;
   ly?: number;
   approx?: boolean;
+  /** Name of the digest-bound Prepare location entry this area renders.
+   * Verified by verify:maps-honesty: only "debated" locations may carry a
+   * glow area, and it must be marked approx. */
+  locationName?: string;
 }
 export interface MapPath {
   points: [number, number][];
@@ -104,6 +112,27 @@ export interface ChapterMapConfig {
   bigPicture?: BigPictureConfig;
   local?: LocalConfig;
   streetView?: StreetViewConfig;
+}
+
+// Owner-approved certainty → map treatment (docs/selah/maps-config-lane.md).
+// Event locations on a map DERIVE their visual treatment from the chapter's
+// digest-bound Prepare certainty — a map may never contradict an approved
+// "no pin". Enforced by verify:maps-honesty.
+//   known   → pin at the real place
+//   debated → glow area, no pin, labelled "· debated"
+//   none    → text-only: no pin, no glow — named in captions only
+export type PrepareMapTreatment = "pin" | "area" | "text-only";
+export function prepareCertaintyToMapTreatment(
+  certainty: "known" | "debated" | "none",
+): PrepareMapTreatment {
+  switch (certainty) {
+    case "known":
+      return "pin";
+    case "debated":
+      return "area";
+    case "none":
+      return "text-only";
+  }
 }
 
 const ESRI = "Imagery © Esri, Maxar, Earthstar Geographics";
@@ -303,6 +332,209 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
       location: { lat: 32.8807, lng: 35.5758 }, // representative — NW shore near Capernaum
       caption:
         "Representative modern view on the northwest shore of the Sea of Galilee — not an exact Mark 6 event site.",
+      attribution: "Google Street View (official API, planned)",
+    },
+  },
+
+  // Mark 7 — the chapter that crosses into Gentile territory. Tyre and Sidon
+  // sit ~35 mi northwest of the 35-mi Galilee frame, so their KNOWN pins live
+  // on the Big Picture map; the local map carries Gennesaret (known) and the
+  // Decapolis (debated glow). The 7:31 route is certainty "none" — per the
+  // chapter guardrail it is never drawn as a line; captions carry it.
+  "mark-7": {
+    bigPicture: {
+      baseMapImage: "/img/maps/levant-region.jpg",
+      attribution: ESRI,
+      caption:
+        "Mark 7 leaves Galilee for the Phoenician coast — Tyre and Sidon, Gentile territory northwest of the Sea of Galilee — and returns toward the Decapolis. The exact road is unrecorded, so no route is drawn.",
+      pins: [
+        { x: 39.8, y: 41.5, label: "Tyre", locationName: "Region of Tyre" },
+        { x: 40.3, y: 38.5, label: "Sidon", locationName: "Sidon" },
+        { x: 42, y: 44, label: "Galilee" },
+      ],
+      labels: [
+        { x: 18, y: 25, text: "Mediterranean Sea", tone: "water" },
+        { x: 36, y: 34, text: "Phoenicia", tone: "region" },
+        { x: 34, y: 48, text: "Israel · Judah", tone: "region" },
+        { x: 44, y: 58, text: "Dead Sea", tone: "water" },
+      ],
+      regions: [],
+    },
+
+    local: {
+      baseMapImage: "/img/maps/galilee-satellite.jpg",
+      attribution: ESRI,
+      caption:
+        "The dispute over clean hands unfolds after the Gennesaret landing (6:53–7:1). Tyre and Sidon lie well beyond this frame to the northwest (see Big Picture); the healing of the deaf man happens in the Decapolis region — an area southeast of the lake, with no exact spot given.",
+      milesAcross: 35,
+      modes: {
+        today: {
+          pins: [
+            { x: 61.7, y: 45.6, label: "Gennesaret", locationName: "Gennesaret" },
+            { x: 70.8, y: 37.6, label: "Capernaum" },
+          ],
+          labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
+          regions: [],
+          paths: [],
+          boundaries: [
+            {
+              id: "galilee-region",
+              label: "Galilee",
+              certainty: "representative",
+              geometryType: "region",
+              style: "modern-border",
+              labelAt: [30, 18],
+              coordinates: [
+                [12, 22], [86, 20], [93, 50], [74, 82], [30, 86], [9, 52],
+              ],
+            },
+          ],
+        },
+        biblical: {
+          pins: [
+            { x: 61.7, y: 45.6, label: "Gennesaret", locationName: "Gennesaret" },
+            { x: 70.8, y: 37.6, label: "Capernaum" },
+          ],
+          labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
+          regions: [
+            {
+              cx: 87,
+              cy: 72,
+              rx: 11,
+              ry: 13,
+              variant: "glow",
+              label: "Decapolis · debated area",
+              lx: 72,
+              ly: 87,
+              approx: true,
+              locationName: "Decapolis",
+            },
+          ],
+          paths: [],
+          boundaries: [
+            {
+              id: "galilee-ministry",
+              label: "Galilee · Jesus’ ministry world",
+              certainty: "representative",
+              geometryType: "region",
+              style: "biblical-territory",
+              labelAt: [30, 18],
+              coordinates: [
+                [12, 22], [86, 20], [93, 50], [74, 82], [30, 86], [9, 52],
+              ],
+            },
+          ],
+        },
+      },
+    },
+
+    streetView: {
+      status: "roadmap",
+      provider: "google-street-view",
+      location: { lat: 32.8663, lng: 35.5271 }, // representative — Gennesaret plain, NW shore
+      caption:
+        "Representative modern view on the Gennesaret plain, northwest shore of the Sea of Galilee — not an exact Mark 7 event site.",
+      attribution: "Google Street View (official API, planned)",
+    },
+  },
+
+  // Mark 8 — Dalmanutha (8:10) has never been securely identified, so it is
+  // certainty "none": named in the caption, never pinned. Caesarea Philippi
+  // sits ~25 mi north of the frame at the foot of Mount Hermon, so its KNOWN
+  // pin lives on the Big Picture map. The feeding of the 4,000 is a debated
+  // area on the Decapolis side.
+  "mark-8": {
+    bigPicture: {
+      baseMapImage: "/img/maps/levant-region.jpg",
+      attribution: ESRI,
+      caption:
+        "Mark 8 moves from the lake district north to Caesarea Philippi at the foot of Mount Hermon, where Peter's confession comes on the road. The district of Dalmanutha (8:10) has never been securely identified — it is named here, not pinned.",
+      pins: [
+        { x: 42.6, y: 42.3, label: "Caesarea Philippi", locationName: "Caesarea Philippi" },
+        { x: 42, y: 44.6, label: "Galilee" },
+      ],
+      labels: [
+        { x: 18, y: 25, text: "Mediterranean Sea", tone: "water" },
+        { x: 44.5, y: 40.5, text: "Mount Hermon", tone: "region" },
+        { x: 34, y: 48, text: "Israel · Judah", tone: "region" },
+        { x: 44, y: 58, text: "Dead Sea", tone: "water" },
+      ],
+      regions: [],
+    },
+
+    local: {
+      baseMapImage: "/img/maps/galilee-satellite.jpg",
+      attribution: ESRI,
+      caption:
+        "The feeding of the 4,000 happens on the Decapolis side of the lake — a general area, no exact spot given. Dalmanutha (8:10) is unidentified, so it is not pinned. The blind man is healed at Bethsaida; from there the road runs north, beyond this frame, to Caesarea Philippi (see Big Picture).",
+      milesAcross: 35,
+      modes: {
+        today: {
+          pins: [
+            { x: 80.2, y: 31.1, label: "Bethsaida", locationName: "Bethsaida" },
+            { x: 70.8, y: 37.6, label: "Capernaum" },
+          ],
+          labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
+          regions: [],
+          paths: [],
+          boundaries: [
+            {
+              id: "galilee-region",
+              label: "Galilee",
+              certainty: "representative",
+              geometryType: "region",
+              style: "modern-border",
+              labelAt: [30, 18],
+              coordinates: [
+                [12, 22], [86, 20], [93, 50], [74, 82], [30, 86], [9, 52],
+              ],
+            },
+          ],
+        },
+        biblical: {
+          pins: [
+            { x: 80.2, y: 31.1, label: "Bethsaida", locationName: "Bethsaida" },
+            { x: 70.8, y: 37.6, label: "Capernaum" },
+          ],
+          labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
+          regions: [
+            {
+              cx: 85,
+              cy: 62,
+              rx: 10,
+              ry: 11,
+              variant: "glow",
+              label: "Feeding of the 4,000 · debated area",
+              lx: 66,
+              ly: 76,
+              approx: true,
+              locationName: "Feeding of the 4,000",
+            },
+          ],
+          paths: [],
+          boundaries: [
+            {
+              id: "galilee-ministry",
+              label: "Galilee · Jesus’ ministry world",
+              certainty: "representative",
+              geometryType: "region",
+              style: "biblical-territory",
+              labelAt: [30, 18],
+              coordinates: [
+                [12, 22], [86, 20], [93, 50], [74, 82], [30, 86], [9, 52],
+              ],
+            },
+          ],
+        },
+      },
+    },
+
+    streetView: {
+      status: "roadmap",
+      provider: "google-street-view",
+      location: { lat: 32.9106, lng: 35.6306 }, // representative — near et-Tell/Bethsaida, NE of the lake
+      caption:
+        "Representative modern view near Bethsaida, northeast of the Sea of Galilee — not an exact Mark 8 event site.",
       attribution: "Google Street View (official API, planned)",
     },
   },
