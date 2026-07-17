@@ -316,9 +316,21 @@ import {
   validateMarkSprintPublishCandidate,
 } from "../lib/server/chapter-workups-repository";
 import {
+  buildMarkSprintSetupContract,
   connectedChapterReceiptApplies,
+  markSprintScopedSetupApprovalApplies,
+  setupContractForApproval,
   __setConnectedReceiptOverridesForTesting,
 } from "../lib/server/mark-sprint-setup-contracts";
+import { sha256Canonical, sha256Text } from "../lib/server/generation-manifest";
+import { buildMarkSprintManifestPolicy } from "../lib/server/mark-sprint-manifest-policy";
+import {
+  connectedChapterReceiptAppliesIncludingStored,
+  readStoredSetupApproval,
+  __setStoredSetupApprovalStoreForTesting,
+} from "../lib/server/chapter-setup-approvals";
+
+const LOWERCASE_SHA256_TEST = /^[a-f0-9]{64}$/u;
 import { POST as adminPost } from "../app/api/admin/generation/route";
 import textWorker, {
   __setMark8PermissionCheckerForTesting,
@@ -1505,6 +1517,365 @@ const realRouteAndWorkers = async () => {
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
+    // R2f (PR #40 review, blocker 3): the displayed watch-outs, movement
+    // names/reasons, and location entries are digest-bound in the projection.
+    // Editing ANY of them produces a different guidance digest, so a receipt
+    // minted against the edited packet never applies to the real contract.
+    {
+      const contract = buildMarkSprintSetupContract("mark-9");
+      const projection = contract.guidanceProjection as {
+        acceptance: {
+          manualGuardrails: string[];
+          locations: Array<{ name: string; certainty: string; display: string }>;
+          requiredMovements: Array<{ id: string; name?: string; reason?: string }>;
+        };
+      };
+      ok(projection.acceptance.manualGuardrails.length === 5, "R2f the five Mark 9 watch-outs are bound in the projection");
+      ok(projection.acceptance.locations.length === 3, "R2f the three honest Mark 9 locations are bound in the projection");
+      ok(
+        projection.acceptance.requiredMovements.every((m) => m.name && m.reason),
+        "R2f every Mark 9 movement carries a bound name and reason",
+      );
+      ok(
+        projection.acceptance.locations.every((l) => ["known", "debated", "none"].includes(l.certainty)),
+        "R2f every location uses the approved certainty model",
+      );
+      const mint = (guidanceDigest: string) => ({
+        scope: contract.scope,
+        slug: "mark-9" as const,
+        approved_by: "Jason Hales (owner)",
+        approved_at: "2026-07-16T00:00:00Z",
+        evidence: "offline drift regression",
+        guidance_digest: guidanceDigest,
+        notes_digest: contract.notesDigest,
+        receipt_digest: contract.setupDigest,
+      });
+      ok(
+        markSprintScopedSetupApprovalApplies("mark-9", contract, mint(contract.guidanceDigest)),
+        "R2f an exact-digest approval applies",
+      );
+      for (const [label, edit] of [
+        ["watch-out", (p: typeof projection) => { p.acceptance.manualGuardrails[0] = "Edited watch-out"; }],
+        ["location certainty", (p: typeof projection) => { p.acceptance.locations[0].certainty = "debated"; }],
+        ["movement name", (p: typeof projection) => { p.acceptance.requiredMovements[0].name = "Edited name"; }],
+      ] as const) {
+        const edited = structuredClone(projection);
+        edit(edited);
+        const editedDigest = sha256Canonical(edited);
+        ok(editedDigest !== contract.guidanceDigest, `R2f editing one ${label} changes the guidance digest`);
+        ok(
+          !markSprintScopedSetupApprovalApplies("mark-9", contract, mint(editedDigest)),
+          `R2f a receipt minted on an edited ${label} never applies`,
+        );
+      }
+    }
+
+    // R2e. Prepare Chapter (owner decision A5, 2026-07-16): the owner's
+    // digest-bound approval ROW — recorded from the screen, never code —
+    // unlocks Mark 9 with exactly the strictness of the frozen literals.
+    {
+      const contract = buildMarkSprintSetupContract("mark-9");
+      const approvalRows = new Map<string, Record<string, unknown>>();
+      __setStoredSetupApprovalStoreForTesting({
+        async read(slug) { return approvalRows.get(slug) ?? null; },
+        async upsert(row) { approvalRows.set(String(row.slug), row); },
+      });
+      try {
+        // The proposal is read-only, exact, and only for factory chapters.
+        const unauth = await adminPost(adminReq({ action: "prepare_chapter_status", slug: "mark-9" }, "wrong-token"));
+        ok(unauth.status === 401, "R2e prepare status requires the studio key");
+        for (const refusedSlug of ["mark-10", "mark-11", "exodus-27", "mark-09"]) {
+          const res = await adminPost(adminReq({ action: "prepare_chapter_status", slug: refusedSlug }));
+          ok(res.status === 400, `R2e ${refusedSlug} has no on-screen preparation`);
+        }
+        const statusRes = await adminPost(adminReq({ action: "prepare_chapter_status", slug: "mark-9" }));
+        ok(statusRes.status === 200, "R2e Mark 9 proposal is served");
+        const proposal = ((await statusRes.json()) as { prepare: Record<string, unknown> }).prepare;
+        ok(proposal.approved === false, "R2e Mark 9 starts unapproved");
+        ok(proposal.setupDigest === contract.setupDigest, "R2e the proposal carries the exact contract digest");
+        ok(Array.isArray(proposal.notes) && proposal.notes.length === 10, "R2e the proposal shows all 10 notes");
+        ok(Array.isArray(proposal.movements) && proposal.movements.length === 8, "R2e the proposal shows all 8 movements");
+        ok(Array.isArray(proposal.watchouts) && proposal.watchouts.length >= 3, "R2e the proposal surfaces the watch-outs");
+
+        // Refusals record nothing.
+        const unconfirmed = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", setupDigest: contract.setupDigest }));
+        ok(unconfirmed.status === 400, "R2e approve without confirmation → 400");
+        const drifted = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: "0".repeat(64) }));
+        ok(drifted.status === 409, "R2e approve with a drifted digest → 409");
+        ok(approvalRows.size === 0, "R2e refused approvals record NO approval row");
+        ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e Mark 9 stays unreceipted after refusals");
+
+        // Blocker 4 (PR #40 review): a failed approval-ROW write must say the
+        // approval was NOT saved — never "Your approval is saved."
+        {
+          const upsertRef = { fail: true };
+          __setStoredSetupApprovalStoreForTesting({
+            async read(readSlug) { return approvalRows.get(readSlug) ?? null; },
+            async upsert(row) {
+              if (upsertRef.fail) throw new Error("offline row-write outage");
+              approvalRows.set(String(row.slug), row);
+            },
+          });
+          const writeFailed = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: contract.setupDigest, baseSetupDigest: contract.setupDigest }));
+          ok(writeFailed.status === 500, "R2e a failed approval-row write fails closed");
+          const writeFailedBody = (await writeFailed.json()) as { error?: string };
+          ok(
+            String(writeFailedBody.error ?? "").includes("Nothing was saved") &&
+              !String(writeFailedBody.error ?? "").includes("approval is recorded") &&
+              !String(writeFailedBody.error ?? "").includes("approval is saved"),
+            "R2e a failed row write is reported as NOT saved",
+          );
+          ok(approvalRows.size === 0, "R2e a failed row write records no approval row");
+          ok(
+            audit.some(
+              (entry) =>
+                entry.action === "prepare_chapter_approve" &&
+                entry.status === "failed" &&
+                String(entry.message ?? "").includes("approval_row_write"),
+            ),
+            "R2e the failed row write is durably audited as such",
+          );
+          upsertRef.fail = false;
+          // Restore the plain in-memory store for the rest of the suite.
+          __setStoredSetupApprovalStoreForTesting({
+            async read(readSlug) { return approvalRows.get(readSlug) ?? null; },
+            async upsert(row) { approvalRows.set(String(row.slug), row); },
+          });
+        }
+
+        // The real approval records the row even when offline seeding fails
+        // closed afterward — the owner's decision is never silently lost, and
+        // the message now truthfully says the approval IS recorded while the
+        // seeding is what failed.
+        const approved = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: contract.setupDigest, baseSetupDigest: contract.setupDigest }));
+        ok(approved.status === 500, "R2e offline seeding after approval fails closed with a plain refusal");
+        const approvedBody = (await approved.clone().json()) as { error?: string };
+        ok(
+          String(approvedBody.error ?? "").includes("approval") &&
+            !String(approvedBody.error ?? "").includes("Nothing was saved"),
+          "R2e the seeding failure never claims the approval was lost",
+        );
+        ok(approvalRows.has("mark-9"), "R2e the owner approval row was recorded");
+        ok(await connectedChapterReceiptAppliesIncludingStored("mark-9"), "R2e the recorded approval row IS the Mark 9 receipt");
+        ok(!connectedChapterReceiptApplies("mark-9"), "R2e the sync code-literal gate is unchanged by a stored row");
+        ok(
+          audit.some((entry) => entry.action === "prepare_chapter_approve" && entry.slug === "mark-9" && entry.status === "started") &&
+            audit.some((entry) => entry.action === "prepare_chapter_approve" && entry.slug === "mark-9" && entry.status === "failed"),
+          "R2e the approval and its failed seeding are both durably audited",
+        );
+
+        // The serve boundary honors the stored receipt with the same
+        // tamper-evidence as everything else.
+        const validApproval = {
+          scope: contract.scope,
+          slug: "mark-9" as const,
+          approved_by: "Jason Hales (owner)",
+          approved_at: "2026-07-16T12:00:00Z",
+          evidence: "offline verification fixture",
+          guidance_digest: contract.guidanceDigest,
+          notes_digest: contract.notesDigest,
+          receipt_digest: contract.setupDigest,
+        };
+        ok(
+          protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), validApproval),
+          "R2e a receipted, self-consistent Mark 9 may serve",
+        );
+        for (const tamperedKey of ["guidance_digest", "notes_digest", "receipt_digest"] as const) {
+          ok(
+            !protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), {
+              ...validApproval,
+              [tamperedKey]: "f".repeat(64),
+            }),
+            `R2e a tampered ${tamperedKey} never serves Mark 9`,
+          );
+        }
+        ok(
+          !protectedChapterServeAllowed("mark-10", completedSprintWorkup("mark-10"), { ...validApproval, slug: "mark-10" as never }),
+          "R2e a Mark 9 approval can never serve another chapter",
+        );
+
+        // Tampered STORED rows collapse to "no receipt" at the async gate.
+        approvalRows.set("mark-9", { ...approvalRows.get("mark-9")!, notes_digest: "f".repeat(64) });
+        ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e a tampered stored row is not a receipt");
+        approvalRows.set("mark-9", { ...validApproval });
+
+        // With the stored receipt in place, mark-9 is fully runnable (PR #40
+        // review, blocker 1): the REAL route queues it, allowlists it only
+        // after every check passed, and sends the authenticated trigger.
+        lastTrigger = null;
+        const mark9Queued = await adminPost(adminReq({ action: "generate", slug: "mark-9", confirm: true, approvedManifestDigest: MANIFEST_DIGEST_A }));
+        ok(
+          mark9Queued.status === 200 && lastTrigger !== null && store.rows.has("mark-9"),
+          "R2e a stored-receipted Mark 9 queues through the real route",
+        );
+        ok(
+          (await getGenerationSettings()).allowed_slugs.includes("mark-9"),
+          "R2e Mark 9 is allowlisted only after its stored receipt passed",
+        );
+        store.rows.delete("mark-9");
+        lastTrigger = null;
+        __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+
+        // R2g (PR #40 review, items 5+6): inline note editing. The owner's
+        // edited packet is digest-previewed, bound into the approval row, and
+        // every later gate rebuilds the contract FROM that exact packet.
+        {
+          approvalRows.delete("mark-9");
+          const packetNotes = contract.notes.map((note) => ({
+            id: note.guidanceId,
+            text: note.text,
+          }));
+          const editedNotes = packetNotes.map((note, index) =>
+            index === 2 ? { ...note, text: `${note.text} Owner-added emphasis for review.` } : note,
+          );
+
+          // Read-only preview recomputes the digest for the exact edits.
+          const preview = await adminPost(adminReq({ action: "prepare_chapter_preview", slug: "mark-9", notes: editedNotes }));
+          ok(preview.status === 200, "R2g the edited-packet preview responds");
+          const editedDigest = ((await preview.json()) as { setupDigest?: string }).setupDigest ?? "";
+          ok(
+            LOWERCASE_SHA256_TEST.test(editedDigest) && editedDigest !== contract.setupDigest,
+            "R2g an edited packet gets its own distinct digest",
+          );
+
+          // Structural violations never preview or approve.
+          for (const [label, badNotes] of [
+            ["dropped note", editedNotes.slice(1)],
+            ["reordered ids", [...editedNotes].reverse()],
+            ["blank text", editedNotes.map((n, i) => (i === 0 ? { ...n, text: "   " } : n))],
+            ["foreign id", editedNotes.map((n, i) => (i === 0 ? { ...n, id: "M8-01" } : n))],
+          ] as const) {
+            const bad = await adminPost(adminReq({ action: "prepare_chapter_preview", slug: "mark-9", notes: badNotes }));
+            ok(bad.status === 400, `R2g a ${label} packet never previews`);
+            const badApprove = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: editedDigest, baseSetupDigest: contract.setupDigest, notes: badNotes }));
+            ok(badApprove.status === 400, `R2g a ${label} packet never approves`);
+          }
+          ok(approvalRows.size === 0, "R2g malformed edited packets record no approval row");
+
+          // Echoing the UNEDITED digest for edited notes is a drift → 409.
+          const staleDigest = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: contract.setupDigest, baseSetupDigest: contract.setupDigest, notes: editedNotes }));
+          ok(staleDigest.status === 409, "R2g an edited packet with the unedited digest is refused");
+
+          // The real edited approval: row recorded WITH the packet.
+          const editedApproved = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: editedDigest, baseSetupDigest: contract.setupDigest, notes: editedNotes }));
+          ok(editedApproved.status === 500, "R2g offline seeding still fails closed after the edited approval");
+          const storedRow = approvalRows.get("mark-9");
+          ok(
+            Array.isArray(storedRow?.packet_notes) &&
+              (storedRow!.packet_notes as Array<{ text: string }>)[2].text.includes("Owner-added emphasis"),
+            "R2g the approval row stores the exact edited packet",
+          );
+          ok(storedRow?.receipt_digest === editedDigest, "R2g the approval row binds the edited digest");
+          ok(
+            await connectedChapterReceiptAppliesIncludingStored("mark-9"),
+            "R2g the edited approval IS the Mark 9 receipt (packet-aware gate)",
+          );
+
+          // Adversarial-review finding 2: the BASE digest must match what the
+          // server would serve RIGHT NOW — a drifted base refuses even with a
+          // perfectly recomputed edited digest, and records no new approval.
+          {
+            const rowBefore = JSON.stringify(approvalRows.get("mark-9"));
+            const baseDrift = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: editedDigest, baseSetupDigest: "f".repeat(64), notes: editedNotes }));
+            ok(baseDrift.status === 409, "R2g a drifted base digest refuses the approval");
+            ok(JSON.stringify(approvalRows.get("mark-9")) === rowBefore, "R2g a base-drift refusal changes no approval row");
+            ok(
+              audit.some((entry) => entry.action === "prepare_chapter_approve" && String(entry.message ?? "").includes("base_digest_mismatch")),
+              "R2g the base-drift refusal is durably audited",
+            );
+          }
+
+          // Adversarial-review finding 1: a recorded-but-unseeded approval
+          // RESUMES with its exact edited packet — the status screen serves
+          // the owner's edits (and their digest), never the pristine artifact.
+          {
+            const resumed = await adminPost(adminReq({ action: "prepare_chapter_status", slug: "mark-9" }));
+            ok(resumed.status === 200, "R2g a recorded approval still serves a proposal");
+            const resumedBody = (await resumed.json()) as { prepare?: { setupDigest?: string; notes?: Array<{ text?: string }> } };
+            ok(
+              resumedBody.prepare?.setupDigest === editedDigest &&
+                Boolean(resumedBody.prepare?.notes?.[2]?.text?.includes("Owner-added emphasis")),
+              "R2g the resumed proposal is the owner's exact edited packet",
+            );
+          }
+
+          // Packet-awareness matters: the artifact contract alone must NOT
+          // match the edited approval, while the packet-aware rebuild does.
+          const editedApproval = (await readStoredSetupApproval("mark-9"))!;
+          ok(editedApproval !== null, "R2g the stored edited approval reads back strictly");
+          ok(
+            !markSprintScopedSetupApprovalApplies("mark-9", contract, editedApproval),
+            "R2g the artifact contract alone rejects the edited approval",
+          );
+          const editedContract = setupContractForApproval("mark-9", editedApproval);
+          ok(
+            markSprintScopedSetupApprovalApplies("mark-9", editedContract, editedApproval),
+            "R2g the packet-rebuilt contract accepts the edited approval",
+          );
+          ok(
+            editedContract.notes[2].text.includes("Owner-added emphasis") &&
+              editedContract.notes[2].rowId !== contract.notes[2].rowId,
+            "R2g seeding rows derive from the EDITED text with a new deterministic row id",
+          );
+
+          // Serve boundary and manifest policy follow the edited packet.
+          ok(
+            protectedChapterServeAllowed("mark-9", completedSprintWorkup("mark-9"), editedApproval),
+            "R2g an edited-receipt Mark 9 may serve",
+          );
+          const editedPolicy = buildMarkSprintManifestPolicy("mark-9", {
+            storedGuidanceApproval: editedApproval,
+          });
+          const policyNote = editedPolicy.requirements.chapterNotes[2];
+          ok(
+            policyNote.textDigest === sha256Text(editedContract.notes[2].text) &&
+              policyNote.expectedStoredRowId === editedContract.notes[2].rowId,
+            "R2g the manifest policy binds the edited text digest and row id",
+          );
+
+          // A tampered stored packet text collapses to "no receipt".
+          approvalRows.set("mark-9", {
+            ...storedRow!,
+            packet_notes: (storedRow!.packet_notes as Array<{ id: string; text: string }>).map(
+              (note, index) => (index === 2 ? { ...note, text: "tampered after approval" } : note),
+            ),
+          });
+          ok(
+            !(await connectedChapterReceiptAppliesIncludingStored("mark-9")),
+            "R2g a stored packet tampered after approval is not a receipt",
+          );
+          approvalRows.delete("mark-9");
+          approvalRows.set("mark-9", { ...validApproval });
+        }
+
+        // The blocker-1 pollution regression, generalized: a chapter with a
+        // stored-looking receipt that is NOT runnable-connected (mark-10) is
+        // refused BEFORE the allowlist write — the refusal leaves settings,
+        // claims, and triggers untouched.
+        __setConnectedReceiptOverridesForTesting({ "mark-10": true });
+        try {
+          const pollutionSettings = { ...TEST_SETTINGS, allowed_slugs: [GENERIC_SLUG] };
+          __setGenerationTestOverrides({ settings: pollutionSettings, captureAudit: audit });
+          const refusedMark10 = await adminPost(adminReq({ action: "generate", slug: "mark-10", confirm: true, approvedManifestDigest: MANIFEST_DIGEST_A }));
+          ok(refusedMark10.status === 403, "R2e non-runnable mark-10 is refused even with a receipt");
+          ok(
+            !(await getGenerationSettings()).allowed_slugs.includes("mark-10"),
+            "R2e the pre-write refusal never persists mark-10 in allowed_slugs",
+          );
+          ok(
+            !store.rows.has("mark-10") && lastTrigger === null,
+            "R2e the pre-write refusal makes no claim and no trigger",
+          );
+        } finally {
+          __setConnectedReceiptOverridesForTesting(null);
+          __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+        }
+      } finally {
+        __setStoredSetupApprovalStoreForTesting(null);
+      }
+      ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e without any store, Mark 9 fails closed again");
+    }
+
     // R3. Kill switch OFF through the REAL route: refused before any claim.
     {
       __setGenerationTestOverrides({ settings: { ...TEST_SETTINGS, text_generation_enabled: false }, captureAudit: audit });
@@ -1820,11 +2191,14 @@ const realRouteAndWorkers = async () => {
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
-    // R5d. The actual worker refuses Mark 9–11 before either generator runs.
+    // R5d. The actual worker refuses unconnected Mark 10–11 before either
+    // generator runs. Mark 9 is runnable-connected now (PR #40 review,
+    // blocker 1) but still stops safely before any generator when its live
+    // permission (allowlist/kill switch) is missing.
     {
       const callsBefore = textGeneratorCalls;
       const protectedBefore = protectedRunnerCalls;
-      for (const blockedSlug of ["mark-9", "mark-10", "mark-11"]) {
+      for (const blockedSlug of ["mark-10", "mark-11"]) {
         const job = `offline-${blockedSlug}-job`;
         const token = signJobToken(
           "text",
@@ -1841,6 +2215,41 @@ const realRouteAndWorkers = async () => {
         }));
         ok(response.status === 403, `R5d worker keeps ${blockedSlug} blocked`);
       }
+      // mark-9 is runnable-connected now: with its stored receipt and the
+      // allowlist it queues through the REAL route — and the worker's live
+      // permission recheck still stops it cold if that permission is gone
+      // before the runner (blocker-1 regression, both directions).
+      lastTrigger = null;
+      __setConnectedReceiptOverridesForTesting({ "mark-9": true });
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, allowed_slugs: [GENERIC_SLUG, "mark-8", "mark-9"] },
+        captureAudit: audit,
+      });
+      const queuedMark9 = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-9",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(
+        queuedMark9.status === 200 && lastTrigger !== null,
+        "R5d receipted + allowlisted mark-9 queues through the real route",
+      );
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+      const mark9Response = await textWorker(workerReq(
+        "generate-chapter-background",
+        { ...lastTrigger!.body },
+      ));
+      ok(
+        mark9Response.status === 403,
+        "R5d unpermitted mark-9 stops at the worker's live permission recheck",
+      );
+      ok(
+        store.rows.get("mark-9")!.status === "failed",
+        "R5d the unpermitted mark-9 queued claim was safely failed",
+      );
+      __setConnectedReceiptOverridesForTesting(null);
+      store.rows.delete("mark-9");
       ok(textGeneratorCalls === callsBefore, "R5d Mark 9–11 never reached generic generation");
       ok(protectedRunnerCalls === protectedBefore, "R5d Mark 9–11 never reached the Mark 8 runner");
     }
@@ -2209,6 +2618,62 @@ const realImagePipeline = async () => {
       const textToken = signJobToken("text", "mark-8", jid).token;
       ok((await imagesWorker(workerReq("generate-images-background", { slug: "mark-8", job: jid, token: textToken }))).status === 401, "M1 text-purpose token rejected by image worker");
       ok(audit.filter((a) => a.action === "refused:worker_images").length >= 3, "M1 image worker refusals durably audited");
+    }
+
+    // M1b (PR #40 review, blocker 2): the owner setup receipt is freshly
+    // recomputed at BOTH ends of the paid-image path — the route refuses a
+    // driftless claim, and a receipt that drifts AFTER a claim was taken is
+    // caught again by the worker immediately before model spend: the claim
+    // releases with ZERO credit used and ZERO uploads.
+    {
+      // Route side: a drifted receipt refuses generate_images before any claim.
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      __setConnectedReceiptOverridesForTesting({ "mark-8": false });
+      const refused = await adminPost(adminReq({
+        action: "generate_images",
+        slug: "mark-8",
+        approvedImagePlanDigest: MARK8_IMAGE_BINDING.planDigest,
+        approvedImageCount: 3,
+        approvedImageModel: MARK8_IMAGE_BINDING.model,
+      }));
+      ok(refused.status === 403, "M1b route refuses image work without the receipt");
+      ok(
+        store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined,
+        "M1b receipt refusal made no image claim",
+      );
+      __setConnectedReceiptOverridesForTesting(null);
+
+      // Worker side: claim taken while the receipt applied, receipt drifts,
+      // worker rechecks immediately before spend and releases the claim.
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      const token = signJobToken("image", "mark-8", jobId).token;
+      const uploadsBefore = db.uploads.length;
+      const costsBefore = costs.length;
+      __setConnectedReceiptOverridesForTesting({ "mark-8": false });
+      const stopped = await imagesWorker(workerReq("generate-images-background", {
+        slug: "mark-8",
+        job: jobId,
+        token,
+        imagePlanDigest: MARK8_IMAGE_BINDING.planDigest,
+        imageModel: MARK8_IMAGE_BINDING.model,
+      }));
+      __setConnectedReceiptOverridesForTesting(null);
+      ok(stopped.status !== 200, "M1b drifted receipt stops the worker before spend");
+      ok(db.uploads.length === uploadsBefore, "M1b receipt drift produced zero uploads");
+      ok(costs.length === costsBefore, "M1b receipt drift recorded zero image credit");
+      ok(
+        audit.some(
+          (entry) =>
+            entry.action === "image_run_refused" &&
+            String(entry.message ?? "").includes("receipt"),
+        ),
+        "M1b the pre-spend receipt refusal is durably audited",
+      );
+      ok(
+        store.rows.get("mark-8")!.workup_json[IMAGE_JOB_KEY] === undefined,
+        "M1b the unspent claim was released for a safe retry",
+      );
+      store.rows.delete("mark-8");
     }
 
     // M2. Happy path through the REAL worker: claim (as the route does) → consume → generate → upload → complete.

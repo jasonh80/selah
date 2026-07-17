@@ -12,12 +12,16 @@ import {
   type ExistingLibraryRuleRow,
 } from "./selah-brain";
 import {
+  buildMarkSprintSetupContract,
   MARK_7_SETUP_CONTRACT,
   MARK_7_STUDIO_SETUP_APPROVAL,
   markSprintSetupApprovalMatches,
+  markSprintStoredApprovalApplies,
+  setupContractForApproval,
   type MarkSprintSetupContract,
   type MarkSprintStudioSetupApproval,
 } from "./mark-sprint-setup-contracts";
+import { readStoredSetupApproval } from "./chapter-setup-approvals";
 import { SEED_RULES } from "./selah-brain-library";
 
 export interface MarkSprintFactorySetup {
@@ -26,10 +30,14 @@ export interface MarkSprintFactorySetup {
 }
 
 // Chapters served by the factory runner. Mark 8's literal contract is
-// deliberately absent; adding a chapter here requires its own owner receipt
-// in mark-sprint-setup-contracts.ts (fail-closed until then).
+// deliberately absent. A chapter needs an owner receipt to do ANYTHING here:
+// Mark 7 carries its frozen code literal; chapters listed with approval null
+// (Mark 9) stay fail-closed until the owner approves them on the Prepare
+// Chapter screen, which records a digest-bound row read back by
+// readStoredSetupApproval (owner decision A5, 2026-07-16).
 const FACTORY_SETUPS: readonly MarkSprintFactorySetup[] = [
   { contract: MARK_7_SETUP_CONTRACT, approval: MARK_7_STUDIO_SETUP_APPROVAL },
+  { contract: buildMarkSprintSetupContract("mark-9"), approval: null },
 ];
 
 export function markSprintFactorySetupFor(
@@ -112,11 +120,38 @@ export interface MarkSprintStudioSetupResult {
   totalNotes: number;
 }
 
-function approvalsReady(setup: MarkSprintFactorySetup): boolean {
+function approvalsReady(
+  setup: MarkSprintFactorySetup,
+  storedApproval: MarkSprintStudioSetupApproval | null = null,
+): boolean {
   return (
     librarySeedApproved() &&
-    markSprintSetupApprovalMatches(setup.contract, setup.approval)
+    (markSprintSetupApprovalMatches(setup.contract, setup.approval) ||
+      // Packet-aware (PR #40 review, item 6): a stored approval carrying an
+      // owner-edited packet is verified against a contract rebuilt from that
+      // exact packet.
+      markSprintStoredApprovalApplies(setup.contract.slug, storedApproval))
   );
+}
+
+/**
+ * The contract this chapter's setup actually operates on: the artifact
+ * contract for code-literal approvals and unedited rows, or the contract
+ * rebuilt from a receipt-verified owner-edited packet. Seeding, inspection,
+ * and the reviewed digest all follow this — the EXACT texts the owner
+ * approved are what reach chapter_review_notes.
+ */
+function effectiveSetupContract(
+  setup: MarkSprintFactorySetup,
+  storedApproval: MarkSprintStudioSetupApproval | null,
+): MarkSprintSetupContract {
+  if (
+    storedApproval?.packet_notes &&
+    markSprintStoredApprovalApplies(setup.contract.slug, storedApproval)
+  ) {
+    return setupContractForApproval(setup.contract.slug, storedApproval);
+  }
+  return setup.contract;
 }
 
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
@@ -373,8 +408,9 @@ export async function getMarkSprintStudioSetupStatus(
   slug: string,
 ): Promise<MarkSprintStudioSetupStatus> {
   const setup = requireFactorySetup(slug);
-  const { contract } = setup;
-  if (!approvalsReady(setup)) {
+  const storedApproval = await readStoredSetupApproval(slug);
+  const contract = effectiveSetupContract(setup, storedApproval);
+  if (!approvalsReady(setup, storedApproval)) {
     return {
       slug: contract.slug,
       approved: false,
@@ -410,9 +446,10 @@ export async function runMarkSprintStudioSetup(
   result: MarkSprintStudioSetupResult;
 }> {
   const setup = requireFactorySetup(slug);
-  const { contract } = setup;
+  const storedApproval = await readStoredSetupApproval(slug);
+  const contract = effectiveSetupContract(setup, storedApproval);
   const label = markSprintChapterLabel(contract.slug);
-  if (!approvalsReady(setup)) {
+  if (!approvalsReady(setup, storedApproval)) {
     throw new MarkSprintStudioSetupError(
       "UNAPPROVED",
       `The Brain and exact ${label} notes still need owner approval.`,

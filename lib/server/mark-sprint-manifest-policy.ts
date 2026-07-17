@@ -24,6 +24,7 @@ import {
   type Mark8StudioSetupApproval,
 } from "./mark8-studio-setup-contract";
 import {
+  setupContractForApproval,
   MARK_7_SETUP_CONTRACT,
   MARK_7_STUDIO_SETUP_APPROVAL,
   markSprintScopedSetupApprovalApplies,
@@ -215,6 +216,10 @@ export function buildMarkSprintManifestPolicy(
   options: {
     mark8GuidanceApproval?: Mark8StudioSetupApproval | null;
     mark7GuidanceApproval?: MarkSprintStudioSetupApproval | null;
+    /** Owner approval recorded from the Prepare Chapter screen (Mark 9+),
+     * fetched by the async caller and validated here against THIS slug's
+     * freshly built contract. Absent/null keeps the chapter fail-closed. */
+    storedGuidanceApproval?: MarkSprintStudioSetupApproval | null;
   } = {},
 ): MarkSprintManifestPolicy {
   const requiredCoreRuleIds = [...INJECTION_POLICY.always_on_rule_ids].sort();
@@ -248,8 +253,29 @@ export function buildMarkSprintManifestPolicy(
       ? options.mark7GuidanceApproval ?? null
       : MARK_7_STUDIO_SETUP_APPROVAL,
   );
+  // A Prepare-Chapter approval row (Mark 9+) counts ONLY when it matches this
+  // slug's freshly recomputed contract — the same strictness as the frozen
+  // Mark 7/8 literals, with the approval read from the database instead.
+  // Packet-aware (PR #40 review, item 6): when the stored approval carries
+  // owner-edited note texts, the contract is rebuilt FROM that exact packet,
+  // so its digests, deterministic row ids, and the note requirements below
+  // all bind the edited texts the owner actually approved.
+  const factoryContract =
+    slug !== "mark-8" && slug !== "mark-7"
+      ? setupContractForApproval(slug, options.storedGuidanceApproval ?? null)
+      : null;
+  const exactStoredGuidanceApproved = Boolean(
+    factoryContract &&
+      markSprintScopedSetupApprovalApplies(
+        slug,
+        factoryContract,
+        options.storedGuidanceApproval ?? null,
+      ),
+  );
   const exactChapterGuidanceApproved =
-    exactMark8GuidanceApproved || exactMark7GuidanceApproved;
+    exactMark8GuidanceApproved ||
+    exactMark7GuidanceApproved ||
+    exactStoredGuidanceApproved;
   // Deterministic note rows bind ONLY once the chapter's own scoped receipt
   // exists — an unapproved chapter stays blocked by BOTH guidance approval and
   // missing note rows (fail-closed staging, same as Mark 8 before 07-13).
@@ -263,7 +289,11 @@ export function buildMarkSprintManifestPolicy(
               note.rowId,
             ]),
           )
-        : null;
+        : factoryContract && exactStoredGuidanceApproved
+          ? new Map(
+              factoryContract.notes.map((note) => [note.guidanceId, note.rowId]),
+            )
+          : null;
 
   const requirements: MarkSprintManifestRequirements = {
     slug,
@@ -292,11 +322,21 @@ export function buildMarkSprintManifestPolicy(
       liveMatchRequired: true,
       liveMatchEvidence: null,
     },
-    chapterNotes: guidance.chapters[slug].notes.map((note) => ({
-      id: note.id,
-      textDigest: sha256Text(note.text),
-      expectedStoredRowId: storedNoteIds?.get(note.id) ?? null,
-    })),
+    // For a receipt-verified stored packet, the note requirements bind the
+    // OWNER-EDITED texts (digests and deterministic row ids from the packet);
+    // otherwise the version-controlled artifact texts bind, exactly as before.
+    chapterNotes:
+      factoryContract && exactStoredGuidanceApproved
+        ? factoryContract.notes.map((note) => ({
+            id: note.guidanceId,
+            textDigest: note.textDigest,
+            expectedStoredRowId: note.rowId,
+          }))
+        : guidance.chapters[slug].notes.map((note) => ({
+            id: note.id,
+            textDigest: sha256Text(note.text),
+            expectedStoredRowId: storedNoteIds?.get(note.id) ?? null,
+          })),
     source: (() => {
       const chapter = Number(slug.split("-")[1]);
       const radius = guidance.source_requirement.context_chapters_each_side;
