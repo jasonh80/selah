@@ -61,6 +61,7 @@ ok(prepareLocationComboAllowed("region", "debated"), "region+debated allowed");
 ok(!prepareLocationComboAllowed("region", "unknown"), "region+unknown refused (that is text-only)");
 ok(prepareLocationComboAllowed("route", "unknown"), "route+unknown allowed (never drawn)");
 ok(prepareLocationComboAllowed("route", "known"), "route+known allowed (drawable)");
+ok(prepareLocationComboAllowed("route", "probable"), "route+probable allowed (broad corridor — owner amendment 2026-07-17)");
 ok(!prepareLocationComboAllowed("route", "debated"), "route+debated refused");
 ok(!prepareLocationComboAllowed("text-only", "known"), "text-only+known refused");
 ok(prepareLocationComboAllowed("text-only", "unknown"), "text-only+unknown allowed");
@@ -71,6 +72,7 @@ ok(prepareLocationMapTreatment({ featureKind: "region", certainty: "known" }) ==
 ok(prepareLocationMapTreatment({ featureKind: "region", certainty: "debated" }) === "area", "debated region → area");
 ok(prepareLocationMapTreatment({ featureKind: "route", certainty: "unknown" }) === "text-only", "unknown route → never drawn");
 ok(prepareLocationMapTreatment({ featureKind: "route", certainty: "known" }) === "path", "known route → drawable");
+ok(prepareLocationMapTreatment({ featureKind: "route", certainty: "probable" }) === "corridor", "probable route → broad corridor, never a precise path");
 ok(prepareLocationMapTreatment({ featureKind: "text-only", certainty: "unknown" }) === "text-only", "text-only → text-only");
 
 // Legacy entries (the byte-identical Mark 9 packet) normalize losslessly.
@@ -295,6 +297,7 @@ const SYNTHETIC: PrepareLocation[] = [
   { name: "Lost District", featureKind: "text-only", certainty: "unknown", role: "event", display: "d" },
   { name: "Unrecorded Route", featureKind: "route", certainty: "unknown", role: "event", display: "d" },
   { name: "Paved Highway", featureKind: "route", certainty: "known", role: "event", display: "d" },
+  { name: "Roundabout Way", featureKind: "route", certainty: "probable", role: "event", display: "d" },
 ];
 function syntheticCheck(
   pins: MapPin[],
@@ -375,6 +378,11 @@ expectViolation("an area label missing its certainty qualifier is caught", () =>
 expectViolation("a drawn UNKNOWN route is caught", () =>
   syntheticCheck(HONEST_PINS, HONEST_REGIONS, [
     { points: [[0, 0], [1, 1]], label: "the roundabout way", locationName: "Unrecorded Route" },
+  ]),
+);
+expectViolation("a PRECISE path on a corridor-only route is caught (broad sweep, never a line)", () =>
+  syntheticCheck(HONEST_PINS, HONEST_REGIONS, [
+    { points: [[0, 0], [1, 1]], label: "the roundabout way", locationName: "Roundabout Way" },
   ]),
 );
 expectViolation("a path referencing a known POINT is caught (endpoints never make a road known)", () =>

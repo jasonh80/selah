@@ -330,16 +330,23 @@ export const MARK_7_SETUP_CONTRACT = buildMarkSprintSetupContract("mark-7");
 // shown"); the approval is memorialized in the PR #41 thread. notes_digest
 // stays byte-identical (no note changed). Codex re-reviews the exact head
 // and the owner takes the rendered-map look before merge.
+//
+// AMENDED same day (owner, 2026-07-17, memorialized on PR #41): the 7:31
+// route entry moved unknown → probable ("broad sweep shown, never a precise
+// line") after the owner asked to SEE rough A→B→C movement — which is what
+// the chapter's own guardrail ("a broad possible route, never a false
+// precise line") always specified. Digests re-minted for that one entry;
+// notes_digest unchanged.
 export const MARK_7_STUDIO_SETUP_APPROVAL: MarkSprintStudioSetupApproval | null = {
   scope: "private_studio_mark7_guidance_and_notes",
   slug: "mark-7",
   approved_by: "Jason Hales (owner)",
   approved_at: "2026-07-15T17:07:48Z",
   evidence:
-    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged), and again 2026-07-17 when the owner approved the corrected two-axis Mark 7 location entries in the working session, memorialized on PR #41 (maps config lane; notes unchanged).",
-  guidance_digest: "09e9522a2f4c7b3c9ccaf76fe79115a6e9e57ac8d70a291b9ec0bb6f92437a8b",
+    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged), and again 2026-07-17 when the owner approved the corrected two-axis Mark 7 location entries and, later the same day, the broad-corridor amendment for the 7:31 route (matching the chapter guardrail), both in the working session and memorialized on PR #41 (maps config lane; notes unchanged).",
+  guidance_digest: "023a0fcd01f9a12e9174009cd940123a897688d930b4eb802a55c3ee78f47948",
   notes_digest: "8c404ddcfa1cc3ff834a76fbf4f285f2f472d09c62e8c5366fe8d27c9d262c52",
-  receipt_digest: "32e58f35fbb9553709a3da574851967b7841cf993d1e04c4e394bb901e1b54d6",
+  receipt_digest: "6ffdce370768aeadae1d15cf935032ef332a4753287c00d876b91b2672467e99",
 };
 
 // ---- connected-chapter receipt gate ------------------------------------------

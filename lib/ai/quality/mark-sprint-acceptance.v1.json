@@ -88,9 +88,9 @@
         {
           "name": "Route Tyre to Sidon to Decapolis",
           "featureKind": "route",
-          "certainty": "unknown",
+          "certainty": "probable",
           "role": "event",
-          "display": "The path of 7:31 is famously roundabout and its exact line is unrecorded — no drawn route, only the named places."
+          "display": "The journey of 7:31 runs Tyre, north to Sidon, then down to the Decapolis — a famously roundabout way. The order of places comes from the text; the exact road is unrecorded, so a broad sweep is shown, never a precise line."
         }
       ]
     },

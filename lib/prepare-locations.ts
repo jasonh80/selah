@@ -57,17 +57,24 @@ export function prepareLocationComboAllowed(
     case "region":
       return certainty === "known" || certainty === "probable" || certainty === "debated";
     case "route":
-      // A drawn route requires the ROUTE itself to be known — known
-      // endpoints never make the connecting road known (PR #41 review).
-      return certainty === "known" || certainty === "unknown";
+      // known    → the actual road is known; a precise path may be drawn.
+      // probable → the SEQUENCE of places is given by the text but the road
+      //            is unrecorded; a broad stylized corridor may be drawn,
+      //            never a precise line (owner amendment 2026-07-17 — this
+      //            is what the Mark 7 guardrail always asked for: "a broad
+      //            possible route, never a false precise line").
+      // unknown  → even the waypoints/order are unclear; text only.
+      return certainty === "known" || certainty === "probable" || certainty === "unknown";
     case "text-only":
       return certainty === "unknown";
   }
 }
 
 /** How a location may render on a map. Derived from featureKind (the shape),
- * with certainty carried into the label qualifier — never the reverse. */
-export type PrepareMapTreatment = "pin" | "area" | "path" | "text-only";
+ * with certainty carried into the label qualifier — never the reverse.
+ * "corridor" is a broad, obviously-stylized sweep between text-given
+ * waypoints — visually distinct from a precise road path. */
+export type PrepareMapTreatment = "pin" | "area" | "path" | "corridor" | "text-only";
 export function prepareLocationMapTreatment(
   location: Pick<PrepareLocation, "featureKind" | "certainty">,
 ): PrepareMapTreatment {
@@ -77,7 +84,11 @@ export function prepareLocationMapTreatment(
     case "region":
       return "area";
     case "route":
-      return location.certainty === "known" ? "path" : "text-only";
+      return location.certainty === "known"
+        ? "path"
+        : location.certainty === "probable"
+          ? "corridor"
+          : "text-only";
     case "text-only":
       return "text-only";
   }
@@ -102,7 +113,11 @@ export function prepareLocationBadge(
         : "Debated site · area shown";
   }
   if (location.featureKind === "route") {
-    return location.certainty === "known" ? "Known route" : "Route unrecorded";
+    return location.certainty === "known"
+      ? "Known route"
+      : location.certainty === "probable"
+        ? "Broad route · road unrecorded"
+        : "Route unrecorded";
   }
   return "No pin";
 }

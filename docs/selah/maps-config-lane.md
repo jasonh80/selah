@@ -29,8 +29,12 @@ never from certainty alone:
 - `point` (always known) → pin
 - `region` → glow area marked approx; label carries the certainty qualifier
   ("approx." / "probable" / "debated")
-- `route known` → the ONLY thing a drawn path may reference — known endpoints
+- `route known` → a precise drawn path is allowed — known endpoints alone
   never make the connecting road known
+- `route probable` → the text gives the ORDER of places but not the road: a
+  broad, obviously-stylized corridor sweep may be drawn, never a precise
+  line (owner amendment 2026-07-17 — what the Mark 7 guardrail always said:
+  "a broad possible route, never a false precise line")
 - `route unknown` / `text-only` → nothing drawn; named in captions
 
 Legacy entries (`known/debated/none` — the owner-approved Mark 9 packet,
@@ -54,7 +58,7 @@ render with its exact treatment, and negative controls prove violations fail.
 | Tyre | point | known | context (the house: never pinned) |
 | Sidon | point | known | context |
 | Decapolis | region | known (approx boundary; healing spot unpinned) | event |
-| Route Tyre to Sidon to Decapolis | route | unknown — never drawn | event |
+| Route Tyre to Sidon to Decapolis | route | probable — broad corridor sweep, never a precise line (owner amendment 2026-07-17) | event |
 
 **Mark 8:**
 
