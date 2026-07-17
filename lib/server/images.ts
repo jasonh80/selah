@@ -177,7 +177,7 @@ interface ImagePlan {
   prompt: string;
   alt: string;
   caption: string;
-  wide?: boolean; // landscape output (hero-suited); default portrait
+  wide?: boolean; // landscape output; chapter images are ALWAYS wide (3:2 layout, PR #39)
 }
 
 function dynamicProtectedPlans(
