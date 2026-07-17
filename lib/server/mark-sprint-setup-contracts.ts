@@ -319,24 +319,27 @@ export const MARK_7_SETUP_CONTRACT = buildMarkSprintSetupContract("mark-7");
 // #40 for Codex re-review and the owner's merge, which is the human approval
 // of the strengthened binding.
 //
-// RE-MINTED 2026-07-17 (maps config lane): five honest Mark 7 location
-// entries were ADDED to the bound acceptance fixture — this time bound
-// content DID change. The exact entries (Gennesaret/Tyre/Sidon known,
-// Decapolis debated, the 7:31 route none/no drawn line) and the
-// certainty→map-treatment model were owner-approved in
-// docs/selah/maps-config-lane.md before this re-mint; notes_digest stays
-// byte-identical (no note changed). The PR carrying this re-mint goes
-// through Codex review and the owner's merge, which records the approval.
+// RE-MINTED 2026-07-17 (maps config lane, PR #41): five honest Mark 7
+// location entries were ADDED to the bound acceptance fixture — bound content
+// DID change. After Codex's PR #41 review rejected the first (compressed)
+// certainty model and its unevidenced approval claim, the corrected two-axis
+// entries (Gennesaret/Tyre/Sidon known context points; Decapolis a known
+// region with approximate boundary and no healing-site pin; the 7:31 route
+// unknown and never drawn) were presented to the owner in plain English in
+// the working session on 2026-07-17 and approved as shown ("Approve as
+// shown"); the approval is memorialized in the PR #41 thread. notes_digest
+// stays byte-identical (no note changed). Codex re-reviews the exact head
+// and the owner takes the rendered-map look before merge.
 export const MARK_7_STUDIO_SETUP_APPROVAL: MarkSprintStudioSetupApproval | null = {
   scope: "private_studio_mark7_guidance_and_notes",
   slug: "mark-7",
   approved_by: "Jason Hales (owner)",
   approved_at: "2026-07-15T17:07:48Z",
   evidence:
-    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged), and again 2026-07-17 when the owner approved adding the five honest Mark 7 location entries (maps config lane; notes unchanged).",
-  guidance_digest: "7b1e1b48940d68375596a97d6aac21a808f22ce4fc2eae1c90c3cc356747cc64",
+    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged), and again 2026-07-17 when the owner approved the corrected two-axis Mark 7 location entries in the working session, memorialized on PR #41 (maps config lane; notes unchanged).",
+  guidance_digest: "09e9522a2f4c7b3c9ccaf76fe79115a6e9e57ac8d70a291b9ec0bb6f92437a8b",
   notes_digest: "8c404ddcfa1cc3ff834a76fbf4f285f2f472d09c62e8c5366fe8d27c9d262c52",
-  receipt_digest: "217b107c15fd929b1e73fc056d32e3fff99133f141dbd700355e40a29b58ce66",
+  receipt_digest: "32e58f35fbb9553709a3da574851967b7841cf993d1e04c4e394bb901e1b54d6",
 };
 
 // ---- connected-chapter receipt gate ------------------------------------------

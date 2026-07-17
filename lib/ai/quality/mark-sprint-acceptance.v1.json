@@ -59,27 +59,37 @@
       "locations": [
         {
           "name": "Gennesaret",
+          "featureKind": "point",
           "certainty": "known",
-          "display": "Known plain on the NW shore of the Sea of Galilee (the crowd of 6:53–7:1 carries in); shown as a point."
+          "role": "context",
+          "display": "Known plain on the NW shore of the Sea of Galilee (the crowd of 6:53–7:1 carries in); shown as an orientation point."
         },
         {
-          "name": "Region of Tyre",
+          "name": "Tyre",
+          "featureKind": "point",
           "certainty": "known",
-          "display": "Jesus withdraws to the region of Tyre (7:24), a known Phoenician coastal city and its territory; the exact house is unrecorded, so the known city is pinned, not a house."
+          "role": "context",
+          "display": "Jesus withdraws to the region of Tyre (7:24). The city is a known site and is shown for orientation; the house itself is unrecorded and never pinned."
         },
         {
           "name": "Sidon",
+          "featureKind": "point",
           "certainty": "known",
-          "display": "Named on the return route (7:31), a known coastal city north of Tyre; shown as a point."
+          "role": "context",
+          "display": "Named on the return route (7:31), a known coastal city north of Tyre; shown for orientation."
         },
         {
           "name": "Decapolis",
-          "certainty": "debated",
-          "display": "The deaf man is healed 'in the region of the Decapolis' (7:31) — a league of cities SE of the Sea of Galilee. The exact spot is not given, so a general area is shown, no pin."
+          "featureKind": "region",
+          "certainty": "known",
+          "role": "event",
+          "display": "The deaf man is healed 'in the region of the Decapolis' (7:31) — a real, named league of cities SE of the Sea of Galilee. The region is shown with an approximate boundary; the healing spot itself is not given and gets no pin."
         },
         {
           "name": "Route Tyre to Sidon to Decapolis",
-          "certainty": "none",
+          "featureKind": "route",
+          "certainty": "unknown",
+          "role": "event",
           "display": "The path of 7:31 is famously roundabout and its exact line is unrecorded — no drawn route, only the named places."
         }
       ]
@@ -136,23 +146,31 @@
       "locations": [
         {
           "name": "Dalmanutha",
-          "certainty": "none",
+          "featureKind": "text-only",
+          "certainty": "unknown",
+          "role": "event",
           "display": "'The district of Dalmanutha' (8:10) has never been securely identified — no site is agreed. No pin; the uncertainty is stated plainly (some manuscripts read Magadan/Magdala, itself debated)."
         },
         {
           "name": "Bethsaida",
-          "certainty": "known",
-          "display": "The blind man is healed at Bethsaida (8:22), a known town near where the Jordan enters the Sea of Galilee; shown as a point."
+          "featureKind": "region",
+          "certainty": "debated",
+          "role": "event",
+          "display": "The blind man is healed at Bethsaida (8:22). Mark names the town plainly, but its modern identification is disputed between two nearby candidate sites (et-Tell and el-Araj) — an area covering both is shown, not a single pin."
         },
         {
           "name": "Caesarea Philippi",
+          "featureKind": "point",
           "certainty": "known",
-          "display": "Peter's confession comes 'on the way to the villages of Caesarea Philippi' (8:27), a known site at the foot of Mount Hermon; shown as a point."
+          "role": "context",
+          "display": "Peter's confession comes 'on the way to the villages of Caesarea Philippi' (8:27). The city at the foot of Mount Hermon is a known site, shown for orientation; the confession happened in the surrounding villages, so there is no event pin."
         },
         {
           "name": "Feeding of the 4,000",
-          "certainty": "debated",
-          "display": "The feeding (8:1–9) is on the Decapolis / SE side, but Mark gives no exact spot — a general area, no pin."
+          "featureKind": "region",
+          "certainty": "probable",
+          "role": "event",
+          "display": "The feeding (8:1–9) is on the Decapolis / SE side of the lake — a probable broader area, no exact spot and no pin."
         }
       ]
     },

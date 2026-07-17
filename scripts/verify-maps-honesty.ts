@@ -1,23 +1,37 @@
 // Offline gate for map location honesty (maps config lane,
-// docs/selah/maps-config-lane.md).
+// docs/selah/maps-config-lane.md, corrected per the PR #41 review).
 //
-// Proves every map config obeys the owner-approved certainty→treatment model
-// against the digest-bound Prepare location entries in the acceptance fixture:
-//   known   → rendered as a pin somewhere (Big Picture or Local), never a glow
-//   debated → rendered as a glow area marked approx, never a pin
-//   none    → never a pin, never a glow, never a drawn path — captions only
-// In a chapter with approved entries, EVERY pin and region must be classified
-// (locationName, checked against its treatment, or context: true, whose label
-// may never reuse an approved location's name) and EVERY path must reference
-// a "known" location — so an unclassified "Dalmanutha" pin or a drawn Mark
-// 7:31 route cannot slip past the gate (PR #41 review, both P2s). Chapters
-// with fixture locations but no map yet (mark-9) are noted, not failed — map
-// tiles ride a later config pass.
+// The owner-approved model keeps TWO INDEPENDENT facts per place, plus a
+// role (lib/prepare-locations.ts):
+//   featureKind  point · region · route · text-only   (what shape it has)
+//   certainty    known · probable · debated · unknown (how sure we are)
+//   role         event · context                      (why it is shown)
+// Geometry is never derived from certainty alone. This gate proves every map
+// config renders each digest-bound entry with its exact allowed treatment:
+//   point (always known)        → pin somewhere; never an area or path
+//   region (known/prob/debated) → glow area marked approx whose label carries
+//                                 the certainty qualifier; never a pin/path
+//   route unknown               → nothing drawn, named in a caption
+//   route known                 → the ONLY thing a drawn path may reference —
+//                                 known endpoints never make a road known
+//   text-only                   → nothing drawn, named in a caption
+// Every pin/region in a checked chapter must be classified (locationName or
+// context: true, never both), a context overlay may not reuse an approved
+// name, and every path must reference a known ROUTE entry — so an
+// unclassified "Dalmanutha" pin or a guessed Bethsaida→Caesarea line cannot
+// slip past. Chapters with fixture locations but no map yet (mark-9) are
+// noted, not failed — map tiles ride a later config pass.
 import assert from "node:assert/strict";
 import acceptanceArtifact from "../lib/ai/quality/mark-sprint-acceptance.v1.json";
 import {
+  normalizePrepareLocation,
+  prepareAreaLabelQualifier,
+  prepareLocationComboAllowed,
+  prepareLocationMapTreatment,
+  type PrepareLocation,
+} from "../lib/prepare-locations";
+import {
   CHAPTER_MAPS,
-  prepareCertaintyToMapTreatment,
   type ChapterMapConfig,
   type MapPath,
   type MapPin,
@@ -30,16 +44,59 @@ function ok(cond: boolean, label: string): void {
   assert.ok(cond, label);
 }
 
-type FixtureLocation = { name: string; certainty: string; display: string };
 const acceptance = acceptanceArtifact as unknown as {
-  chapters: Record<string, { locations?: FixtureLocation[] }>;
+  chapters: Record<string, { locations?: Array<Record<string, unknown>> }>;
 };
 
-// The mapping function IS the approved model — pin/area/text-only, exactly.
-ok(prepareCertaintyToMapTreatment("known") === "pin", "known → pin");
-ok(prepareCertaintyToMapTreatment("debated") === "area", "debated → area");
-ok(prepareCertaintyToMapTreatment("none") === "text-only", "none → text-only");
+// --- The model itself -------------------------------------------------------
+// Allowed combinations: a "debated point" may not exist — a disputed
+// identification must widen to a region or drop to text-only.
+ok(prepareLocationComboAllowed("point", "known"), "point+known allowed");
+ok(!prepareLocationComboAllowed("point", "debated"), "point+debated refused");
+ok(!prepareLocationComboAllowed("point", "probable"), "point+probable refused");
+ok(!prepareLocationComboAllowed("point", "unknown"), "point+unknown refused");
+ok(prepareLocationComboAllowed("region", "known"), "region+known allowed");
+ok(prepareLocationComboAllowed("region", "probable"), "region+probable allowed");
+ok(prepareLocationComboAllowed("region", "debated"), "region+debated allowed");
+ok(!prepareLocationComboAllowed("region", "unknown"), "region+unknown refused (that is text-only)");
+ok(prepareLocationComboAllowed("route", "unknown"), "route+unknown allowed (never drawn)");
+ok(prepareLocationComboAllowed("route", "known"), "route+known allowed (drawable)");
+ok(!prepareLocationComboAllowed("route", "debated"), "route+debated refused");
+ok(!prepareLocationComboAllowed("text-only", "known"), "text-only+known refused");
+ok(prepareLocationComboAllowed("text-only", "unknown"), "text-only+unknown allowed");
 
+// Treatment derives from featureKind (shape), not certainty.
+ok(prepareLocationMapTreatment({ featureKind: "point", certainty: "known" }) === "pin", "point → pin");
+ok(prepareLocationMapTreatment({ featureKind: "region", certainty: "known" }) === "area", "known region → area, NOT a pin");
+ok(prepareLocationMapTreatment({ featureKind: "region", certainty: "debated" }) === "area", "debated region → area");
+ok(prepareLocationMapTreatment({ featureKind: "route", certainty: "unknown" }) === "text-only", "unknown route → never drawn");
+ok(prepareLocationMapTreatment({ featureKind: "route", certainty: "known" }) === "path", "known route → drawable");
+ok(prepareLocationMapTreatment({ featureKind: "text-only", certainty: "unknown" }) === "text-only", "text-only → text-only");
+
+// Legacy entries (the byte-identical Mark 9 packet) normalize losslessly.
+ok(
+  JSON.stringify(normalizePrepareLocation({ name: "X", certainty: "known", display: "d" })) ===
+    JSON.stringify({ name: "X", featureKind: "point", certainty: "known", role: "event", display: "d" }),
+  "legacy known → known point",
+);
+ok(
+  normalizePrepareLocation({ name: "X", certainty: "none", display: "d" })?.featureKind === "text-only",
+  "legacy none → text-only",
+);
+ok(
+  normalizePrepareLocation({ name: "X", certainty: "debated", display: "d" })?.featureKind === "region",
+  "legacy debated → debated region",
+);
+ok(
+  normalizePrepareLocation({ name: "X", featureKind: "point", certainty: "debated", role: "event", display: "d" }) === null,
+  "a debated point entry is refused at normalization",
+);
+ok(
+  normalizePrepareLocation({ name: "X", featureKind: "region", certainty: "known", role: "bogus", display: "d" }) === null,
+  "a bogus role is refused",
+);
+
+// --- Per-chapter map enforcement --------------------------------------------
 function allPins(cfg: ChapterMapConfig): MapPin[] {
   return [
     ...(cfg.bigPicture?.pins ?? []),
@@ -61,9 +118,153 @@ function captions(cfg: ChapterMapConfig): string {
     .join(" ");
 }
 
+function checkChapter(
+  slug: string,
+  locations: PrepareLocation[],
+  cfg: ChapterMapConfig,
+  check: (cond: boolean, label: string) => void,
+): void {
+  const pins = allPins(cfg);
+  const regions = allRegions(cfg);
+  const paths = allPaths(cfg);
+  const captionText = captions(cfg).toLowerCase();
+  const approvedNamesLower = new Set(locations.map((l) => l.name.toLowerCase()));
+  const byName = new Map(locations.map((l) => [l.name, l]));
+
+  // Classification: every pin/region is exactly one of event or context, and
+  // a context overlay may never reuse an approved location's name.
+  for (const pin of pins) {
+    check(
+      (pin.locationName !== undefined) !== (pin.context === true),
+      `${slug}: pin "${pin.label}" must be exactly one of event (locationName) or context`,
+    );
+    if (pin.context === true) {
+      check(
+        !approvedNamesLower.has(pin.label.toLowerCase()),
+        `${slug}: context pin "${pin.label}" reuses an approved location name`,
+      );
+    }
+    if (pin.locationName !== undefined) {
+      const entry = byName.get(pin.locationName);
+      check(
+        Boolean(entry),
+        `${slug}: pin "${pin.label}" references unapproved location "${pin.locationName}"`,
+      );
+      if (entry) {
+        check(
+          prepareLocationMapTreatment(entry) === "pin",
+          `${slug}: pin "${pin.label}" contradicts approved ${entry.featureKind}/${entry.certainty}`,
+        );
+      }
+    }
+  }
+  for (const region of regions) {
+    check(
+      (region.locationName !== undefined) !== (region.context === true),
+      `${slug}: area "${region.label ?? "(unlabelled)"}" must be exactly one of event (locationName) or context`,
+    );
+    if (region.context === true) {
+      check(
+        !approvedNamesLower.has((region.label ?? "").toLowerCase()),
+        `${slug}: context area "${region.label}" reuses an approved location name`,
+      );
+    }
+    if (region.locationName !== undefined) {
+      const entry = byName.get(region.locationName);
+      check(
+        Boolean(entry),
+        `${slug}: area "${region.label}" references unapproved location "${region.locationName}"`,
+      );
+      if (entry) {
+        check(
+          prepareLocationMapTreatment(entry) === "area",
+          `${slug}: area "${region.label}" contradicts approved ${entry.featureKind}/${entry.certainty}`,
+        );
+        check(
+          region.variant === "glow" && region.approx === true,
+          `${slug}: area "${region.label}" must be a glow marked approx`,
+        );
+        check(
+          (region.label ?? "").toLowerCase().includes(prepareAreaLabelQualifier(entry.certainty)),
+          `${slug}: area "${region.label}" must carry the "${prepareAreaLabelQualifier(entry.certainty)}" qualifier`,
+        );
+      }
+    }
+  }
+  // Paths may ONLY reference a known ROUTE entry — known endpoints never make
+  // the connecting road known, and unknown routes are never drawn.
+  for (const path of paths) {
+    check(
+      path.locationName !== undefined,
+      `${slug}: path "${path.label ?? "(unlabelled)"}" must reference an approved route entry`,
+    );
+    const entry = path.locationName ? byName.get(path.locationName) : undefined;
+    check(
+      Boolean(entry),
+      `${slug}: path "${path.label}" references unapproved location "${path.locationName}"`,
+    );
+    if (entry) {
+      check(
+        entry.featureKind === "route" && prepareLocationMapTreatment(entry) === "path",
+        `${slug}: path "${path.label}" draws ${entry.featureKind}/${entry.certainty} — only a known ROUTE may be drawn`,
+      );
+    }
+  }
+
+  // Forward direction: every approved entry renders with its exact treatment.
+  for (const location of locations) {
+    const treatment = prepareLocationMapTreatment(location);
+    const pinRefs = pins.filter((p) => p.locationName === location.name);
+    const regionRefs = regions.filter((r) => r.locationName === location.name);
+    const pathRefs = paths.filter((p) => p.locationName === location.name);
+
+    if (treatment === "pin") {
+      check(
+        pinRefs.length > 0,
+        `${slug}: point "${location.name}" must be pinned on some map level`,
+      );
+      check(
+        regionRefs.length === 0 && pathRefs.length === 0,
+        `${slug}: point "${location.name}" must render only as a pin`,
+      );
+    } else if (treatment === "area") {
+      check(
+        regionRefs.length > 0,
+        `${slug}: region "${location.name}" must render as a glow area`,
+      );
+      check(
+        pinRefs.length === 0 && pathRefs.length === 0,
+        `${slug}: region "${location.name}" must never be pinned or drawn as a line`,
+      );
+    } else if (treatment === "path") {
+      check(
+        pinRefs.length === 0 && regionRefs.length === 0,
+        `${slug}: route "${location.name}" may render only as a path`,
+      );
+    } else {
+      check(
+        pinRefs.length === 0 && regionRefs.length === 0 && pathRefs.length === 0,
+        `${slug}: "${location.name}" (${location.featureKind}/${location.certainty}) must render as text only`,
+      );
+      const firstWord = location.name.split(" ")[0].toLowerCase();
+      check(
+        captionText.includes(firstWord) || captionText.includes("route"),
+        `${slug}: text-only location "${location.name}" should be named in a caption`,
+      );
+    }
+  }
+}
+
 const fixtureSlugs = Object.keys(acceptance.chapters);
 for (const slug of fixtureSlugs) {
-  const locations = acceptance.chapters[slug].locations ?? [];
+  const raw = acceptance.chapters[slug].locations ?? [];
+  const locations = raw
+    .map((entry) => normalizePrepareLocation(entry))
+    .filter((entry): entry is PrepareLocation => entry !== null);
+  ok(
+    locations.length === raw.length,
+    `${slug}: every fixture location entry is valid under the two-axis model`,
+  );
   const cfg = CHAPTER_MAPS[slug];
   if (locations.length > 0 && !cfg) {
     console.log(
@@ -72,158 +273,11 @@ for (const slug of fixtureSlugs) {
     continue;
   }
   if (!cfg) continue;
-
-  const pins = allPins(cfg);
-  const regions = allRegions(cfg);
-  const paths = allPaths(cfg);
-  const captionText = captions(cfg);
-  const approvedNamesLower = new Set(
-    locations.map((l) => l.name.toLowerCase()),
-  );
-
-  // Classification rule (PR #41 review, P2-1): every pin and region must be
-  // EITHER an event overlay (locationName, treatment-checked below) OR an
-  // explicit context overlay whose label never reuses an approved location's
-  // name — an unclassified overlay cannot exist, so no pin can quietly name
-  // an approved event location without being checked.
-  for (const pin of pins) {
-    const classified =
-      (pin.locationName !== undefined) !== (pin.context === true);
-    ok(
-      classified,
-      `${slug}: pin "${pin.label}" must be exactly one of event (locationName) or context`,
-    );
-    if (pin.context === true) {
-      ok(
-        !approvedNamesLower.has(pin.label.toLowerCase()),
-        `${slug}: context pin "${pin.label}" reuses an approved location name`,
-      );
-    }
-  }
-  for (const region of regions) {
-    const classified =
-      (region.locationName !== undefined) !== (region.context === true);
-    ok(
-      classified,
-      `${slug}: area "${region.label ?? "(unlabelled)"}" must be exactly one of event (locationName) or context`,
-    );
-    if (region.context === true) {
-      ok(
-        !approvedNamesLower.has((region.label ?? "").toLowerCase()),
-        `${slug}: context area "${region.label}" reuses an approved location name`,
-      );
-    }
-  }
-  // Path rule (PR #41 review, P2-2): a drawn line must reference a "known"
-  // location — there is no honest way to draw a "none" route (Mark 7:31) or
-  // a "debated" area, and an unclassified path is refused outright.
-  for (const path of paths) {
-    ok(
-      path.locationName !== undefined,
-      `${slug}: path "${path.label ?? "(unlabelled)"}" must reference a known location`,
-    );
-    const entry = locations.find((l) => l.name === path.locationName);
-    ok(
-      Boolean(entry),
-      `${slug}: path "${path.label}" references unapproved location "${path.locationName}"`,
-    );
-    if (entry) {
-      ok(
-        prepareCertaintyToMapTreatment(entry.certainty as never) === "pin",
-        `${slug}: path "${path.label}" draws a "${entry.certainty}" location — only known locations may anchor a drawn line`,
-      );
-    }
-  }
-
-  for (const location of locations) {
-    const treatment = prepareCertaintyToMapTreatment(
-      location.certainty as "known" | "debated" | "none",
-    );
-    const pinRefs = pins.filter((p) => p.locationName === location.name);
-    const regionRefs = regions.filter((r) => r.locationName === location.name);
-    const pathRefs = paths.filter((p) => p.locationName === location.name);
-
-    if (treatment === "pin") {
-      ok(
-        pinRefs.length > 0,
-        `${slug}: known location "${location.name}" must be pinned on some map level`,
-      );
-      ok(
-        regionRefs.length === 0,
-        `${slug}: known location "${location.name}" must never render as a glow area`,
-      );
-    } else if (treatment === "area") {
-      ok(
-        regionRefs.length > 0,
-        `${slug}: debated location "${location.name}" must render as a glow area`,
-      );
-      ok(
-        regionRefs.every((r) => r.variant === "glow" && r.approx === true),
-        `${slug}: debated location "${location.name}" areas must be glow + approx`,
-      );
-      ok(
-        regionRefs.every((r) => (r.label ?? "").toLowerCase().includes("debated")),
-        `${slug}: debated location "${location.name}" areas must be labelled debated`,
-      );
-      ok(
-        pinRefs.length === 0,
-        `${slug}: debated location "${location.name}" must never be pinned`,
-      );
-    } else {
-      ok(
-        pinRefs.length === 0,
-        `${slug}: no-pin location "${location.name}" must never be pinned`,
-      );
-      ok(
-        regionRefs.length === 0,
-        `${slug}: no-pin location "${location.name}" must never render as a glow area`,
-      );
-      ok(
-        pathRefs.length === 0,
-        `${slug}: no-pin location "${location.name}" must never render as a drawn path`,
-      );
-      // A "none" location the map covers should still be named honestly in a
-      // caption — silence would hide the uncertainty instead of stating it.
-      const firstWord = location.name.split(" ")[0];
-      ok(
-        captionText.toLowerCase().includes(firstWord.toLowerCase()) ||
-          captionText.toLowerCase().includes("route"),
-        `${slug}: no-pin location "${location.name}" should be named in a caption`,
-      );
-    }
-  }
-
-  // Reverse direction: a map may only reference approved fixture locations,
-  // with the exact approved treatment.
-  const approvedNames = new Set(locations.map((l) => l.name));
-  for (const pin of pins) {
-    if (pin.locationName === undefined) continue;
-    ok(
-      approvedNames.has(pin.locationName),
-      `${slug}: pin "${pin.label}" references unapproved location "${pin.locationName}"`,
-    );
-    const entry = locations.find((l) => l.name === pin.locationName)!;
-    ok(
-      prepareCertaintyToMapTreatment(entry.certainty as never) === "pin",
-      `${slug}: pin "${pin.label}" contradicts approved certainty "${entry.certainty}"`,
-    );
-  }
-  for (const region of regions) {
-    if (region.locationName === undefined) continue;
-    ok(
-      approvedNames.has(region.locationName),
-      `${slug}: area "${region.label}" references unapproved location "${region.locationName}"`,
-    );
-    const entry = locations.find((l) => l.name === region.locationName)!;
-    ok(
-      prepareCertaintyToMapTreatment(entry.certainty as never) === "area",
-      `${slug}: area "${region.label}" contradicts approved certainty "${entry.certainty}"`,
-    );
-  }
+  checkChapter(slug, locations, cfg, ok);
 }
 
-// Negative controls: the model itself must catch dishonest configs, so feed it
-// synthetic violations and prove each one fails.
+// --- Negative controls -------------------------------------------------------
+// Feed the SAME enforcement synthetic violations and prove each one fails.
 function expectViolation(label: string, fn: () => void): void {
   let threw = false;
   try {
@@ -234,125 +288,111 @@ function expectViolation(label: string, fn: () => void): void {
   ok(threw, label);
 }
 
-const syntheticLocations: FixtureLocation[] = [
-  { name: "Nowhere Certain", certainty: "none", display: "no pin" },
-  { name: "Argued Hill", certainty: "debated", display: "area" },
-  { name: "Real Town", certainty: "known", display: "point" },
+const SYNTHETIC: PrepareLocation[] = [
+  { name: "Real Town", featureKind: "point", certainty: "known", role: "context", display: "d" },
+  { name: "Wide League", featureKind: "region", certainty: "known", role: "event", display: "d" },
+  { name: "Argued Site", featureKind: "region", certainty: "debated", role: "event", display: "d" },
+  { name: "Lost District", featureKind: "text-only", certainty: "unknown", role: "event", display: "d" },
+  { name: "Unrecorded Route", featureKind: "route", certainty: "unknown", role: "event", display: "d" },
+  { name: "Paved Highway", featureKind: "route", certainty: "known", role: "event", display: "d" },
 ];
-function assertHonest(
-  cfgPins: MapPin[],
-  cfgRegions: MapRegion[],
-  cfgPaths: MapPath[] = [],
+function syntheticCheck(
+  pins: MapPin[],
+  regions: MapRegion[],
+  paths: MapPath[] = [],
+  caption = "The Lost District and the route are named here.",
 ): void {
-  const names = new Set(syntheticLocations.map((l) => l.name.toLowerCase()));
-  for (const pin of cfgPins) {
-    assert.ok(
-      (pin.locationName !== undefined) !== (pin.context === true),
-      "unclassified pin",
-    );
-    if (pin.context === true) {
-      assert.ok(!names.has(pin.label.toLowerCase()), "context pin reuses approved name");
-    }
-  }
-  for (const region of cfgRegions) {
-    assert.ok(
-      (region.locationName !== undefined) !== (region.context === true),
-      "unclassified region",
-    );
-    if (region.context === true) {
-      assert.ok(!names.has((region.label ?? "").toLowerCase()), "context area reuses approved name");
-    }
-  }
-  for (const path of cfgPaths) {
-    const entry = syntheticLocations.find((l) => l.name === path.locationName);
-    assert.ok(entry, "path without a known location reference");
-    assert.ok(
-      prepareCertaintyToMapTreatment(entry!.certainty as never) === "pin",
-      "path draws a non-known location",
-    );
-  }
-  for (const location of syntheticLocations) {
-    const treatment = prepareCertaintyToMapTreatment(location.certainty as never);
-    const pinRefs = cfgPins.filter((p) => p.locationName === location.name);
-    const regionRefs = cfgRegions.filter((r) => r.locationName === location.name);
-    const pathRefs = cfgPaths.filter((p) => p.locationName === location.name);
-    if (treatment === "text-only") {
-      assert.ok(
-        pinRefs.length === 0 && regionRefs.length === 0 && pathRefs.length === 0,
-        "none leaked",
-      );
-    } else if (treatment === "area") {
-      assert.ok(pinRefs.length === 0, "debated pinned");
-      assert.ok(
-        regionRefs.every((r) => r.variant === "glow" && r.approx === true),
-        "debated area not approx glow",
-      );
-    } else {
-      assert.ok(regionRefs.length === 0, "known glowed");
-    }
-  }
+  const cfg: ChapterMapConfig = {
+    local: {
+      baseMapImage: "x",
+      attribution: "x",
+      caption,
+      milesAcross: 1,
+      modes: {
+        today: { pins, labels: [], regions, paths },
+        biblical: { pins: [], labels: [], regions: [], paths: [] },
+      },
+    },
+  };
+  // Baseline renders that must exist for the synthetic fixture to pass:
+  // Real Town pin, Wide League + Argued Site areas.
+  checkChapter("synthetic", SYNTHETIC, cfg, (cond, label) => assert.ok(cond, label));
 }
-expectViolation("a pin on a certainty-none location is caught", () =>
-  assertHonest([{ x: 1, y: 1, label: "Nowhere", locationName: "Nowhere Certain" }], []),
-);
-expectViolation("a glow on a certainty-none location is caught", () =>
-  assertHonest(
-    [],
-    [{ cx: 1, cy: 1, rx: 1, ry: 1, variant: "glow", approx: true, locationName: "Nowhere Certain" }],
+const HONEST_PINS: MapPin[] = [
+  { x: 1, y: 1, label: "Real Town", locationName: "Real Town" },
+  { x: 2, y: 2, label: "Backdrop City", context: true },
+];
+const HONEST_REGIONS: MapRegion[] = [
+  { cx: 1, cy: 1, rx: 1, ry: 1, variant: "glow", approx: true, label: "Wide League · approx. extent", locationName: "Wide League" },
+  { cx: 2, cy: 2, rx: 1, ry: 1, variant: "glow", approx: true, label: "Argued Site · debated", locationName: "Argued Site" },
+];
+// The honest baseline passes — the controls below prove violations fail, not
+// that everything fails.
+syntheticCheck(HONEST_PINS, HONEST_REGIONS, [
+  { points: [[0, 0], [1, 1]], label: "along the highway", locationName: "Paved Highway" },
+]);
+ok(true, "a fully classified honest two-axis config passes");
+
+expectViolation("a pin on a KNOWN REGION is caught (certainty alone never makes a pin)", () =>
+  syntheticCheck(
+    [...HONEST_PINS, { x: 3, y: 3, label: "League HQ", locationName: "Wide League" }],
+    HONEST_REGIONS,
   ),
 );
-expectViolation("a pin on a debated location is caught", () =>
-  assertHonest([{ x: 1, y: 1, label: "Hill", locationName: "Argued Hill" }], []),
-);
-expectViolation("a non-approx debated area is caught", () =>
-  assertHonest(
-    [],
-    [{ cx: 1, cy: 1, rx: 1, ry: 1, variant: "glow", locationName: "Argued Hill" }],
+expectViolation("a single pin on a debated-identification site is caught", () =>
+  syntheticCheck(
+    [...HONEST_PINS, { x: 3, y: 3, label: "Argued Site", locationName: "Argued Site" }],
+    HONEST_REGIONS,
   ),
 );
-expectViolation("a territory variant on a debated location is caught", () =>
-  assertHonest(
-    [],
-    [{ cx: 1, cy: 1, rx: 1, ry: 1, variant: "territory", approx: true, locationName: "Argued Hill" }],
-  ),
-);
-// PR #41 review, P2-1: bypass attempts via classification.
-expectViolation("an UNCLASSIFIED pin naming an approved location is caught", () =>
-  assertHonest([{ x: 1, y: 1, label: "Nowhere Certain" }], []),
+expectViolation("an unclassified pin naming an approved location is caught", () =>
+  syntheticCheck([...HONEST_PINS, { x: 3, y: 3, label: "Lost District" }], HONEST_REGIONS),
 );
 expectViolation("a context pin reusing an approved location name is caught", () =>
-  assertHonest([{ x: 1, y: 1, label: "Nowhere Certain", context: true }], []),
-);
-expectViolation("a pin classified as BOTH event and context is caught", () =>
-  assertHonest(
-    [{ x: 1, y: 1, label: "Town", locationName: "Real Town", context: true }],
-    [],
+  syntheticCheck(
+    [...HONEST_PINS, { x: 3, y: 3, label: "Lost District", context: true }],
+    HONEST_REGIONS,
   ),
 );
-expectViolation("an unclassified region is caught", () =>
-  assertHonest([], [{ cx: 1, cy: 1, rx: 1, ry: 1, variant: "glow", label: "Somewhere" }]),
+expectViolation("a pin classified as BOTH event and context is caught", () =>
+  syntheticCheck(
+    [...HONEST_PINS, { x: 3, y: 3, label: "Town", locationName: "Real Town", context: true }],
+    HONEST_REGIONS,
+  ),
 );
-// PR #41 review, P2-2: drawn paths.
-expectViolation("a path drawing a certainty-none route is caught", () =>
-  assertHonest([], [], [{ points: [[0, 0], [1, 1]], label: "the route", locationName: "Nowhere Certain" }]),
+expectViolation("a glow on a text-only location is caught", () =>
+  syntheticCheck(HONEST_PINS, [
+    ...HONEST_REGIONS,
+    { cx: 3, cy: 3, rx: 1, ry: 1, variant: "glow", approx: true, label: "Lost District · unknown", locationName: "Lost District" },
+  ]),
 );
-expectViolation("a path drawing a debated location is caught", () =>
-  assertHonest([], [], [{ points: [[0, 0], [1, 1]], locationName: "Argued Hill" }]),
+expectViolation("an area label missing its certainty qualifier is caught", () =>
+  syntheticCheck(HONEST_PINS, [
+    HONEST_REGIONS[0],
+    { ...HONEST_REGIONS[1], label: "Argued Site" },
+  ]),
+);
+expectViolation("a drawn UNKNOWN route is caught", () =>
+  syntheticCheck(HONEST_PINS, HONEST_REGIONS, [
+    { points: [[0, 0], [1, 1]], label: "the roundabout way", locationName: "Unrecorded Route" },
+  ]),
+);
+expectViolation("a path referencing a known POINT is caught (endpoints never make a road known)", () =>
+  syntheticCheck(HONEST_PINS, HONEST_REGIONS, [
+    { points: [[0, 0], [1, 1]], label: "toward Real Town", locationName: "Real Town" },
+  ]),
 );
 expectViolation("an unclassified path is caught", () =>
-  assertHonest([], [], [{ points: [[0, 0], [1, 1]], label: "mystery line" }]),
+  syntheticCheck(HONEST_PINS, HONEST_REGIONS, [
+    { points: [[0, 0], [1, 1]], label: "mystery line" },
+  ]),
 );
-// A properly classified config passes — the controls prove violations fail,
-// not that everything fails.
-assertHonest(
-  [
-    { x: 1, y: 1, label: "Real Town", locationName: "Real Town" },
-    { x: 2, y: 2, label: "Backdrop City", context: true },
-  ],
-  [{ cx: 1, cy: 1, rx: 1, ry: 1, variant: "glow", approx: true, label: "Argued Hill · debated", locationName: "Argued Hill" }],
-  [{ points: [[0, 0], [1, 1]], label: "toward Real Town", locationName: "Real Town" }],
+expectViolation("a missing required area render is caught", () =>
+  syntheticCheck(HONEST_PINS, [HONEST_REGIONS[0]]),
 );
-ok(true, "a fully classified honest config passes the model");
+expectViolation("a missing required pin render is caught", () =>
+  syntheticCheck([HONEST_PINS[1]], HONEST_REGIONS),
+);
 
 // The chapters this lane ships must actually be covered end-to-end.
 for (const slug of ["mark-7", "mark-8"] as const) {
@@ -363,4 +403,4 @@ for (const slug of ["mark-7", "mark-8"] as const) {
   );
 }
 
-console.log(`verify:maps-honesty ✓ ${checks} checks passed (certainty→treatment model enforced against the digest-bound location entries)`);
+console.log(`verify:maps-honesty ✓ ${checks} checks passed (two-axis featureKind×certainty model enforced against the digest-bound location entries)`);

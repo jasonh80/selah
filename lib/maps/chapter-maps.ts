@@ -18,7 +18,7 @@ export interface MapPin {
   label: string;
   /** Name of the digest-bound Prepare location entry this pin renders
    * (mark-sprint-acceptance fixture). Verified by verify:maps-honesty:
-   * only "known" locations may carry a pin. */
+   * only featureKind "point" (always certainty "known") may carry a pin. */
   locationName?: string;
   /** Marks a background/context pin (not a chapter event location). In
    * chapters with approved location entries, EVERY pin must be classified —
@@ -46,8 +46,9 @@ export interface MapRegion {
   ly?: number;
   approx?: boolean;
   /** Name of the digest-bound Prepare location entry this area renders.
-   * Verified by verify:maps-honesty: only "debated" locations may carry a
-   * glow area, and it must be marked approx. */
+   * Verified by verify:maps-honesty: only featureKind "region" may carry a
+   * glow area; it must be marked approx and its label must carry the
+   * certainty qualifier (approx./probable/debated). */
   locationName?: string;
   /** Marks a background/context area. Same classification rule as MapPin. */
   context?: boolean;
@@ -57,10 +58,11 @@ export interface MapPath {
   label?: string;
   lx?: number;
   ly?: number;
-  /** Name of the digest-bound Prepare location entry this movement touches.
-   * In chapters with approved location entries, EVERY path must reference a
-   * "known" location — a drawn line may never render a "none" route (e.g.
-   * Mark 7:31) or a "debated" area. Enforced by verify:maps-honesty. */
+  /** Name of the digest-bound Prepare ROUTE entry this line renders. In
+   * chapters with approved location entries, EVERY path must reference a
+   * featureKind "route" entry with certainty "known" — known endpoints never
+   * make the connecting road known, and an unknown route (e.g. Mark 7:31)
+   * may never be drawn. Enforced by verify:maps-honesty. */
   locationName?: string;
 }
 // Curated boundary/territory layer. Coordinates are authored in IMAGE space
@@ -129,26 +131,12 @@ export interface ChapterMapConfig {
   streetView?: StreetViewConfig;
 }
 
-// Owner-approved certainty → map treatment (docs/selah/maps-config-lane.md).
-// Event locations on a map DERIVE their visual treatment from the chapter's
-// digest-bound Prepare certainty — a map may never contradict an approved
-// "no pin". Enforced by verify:maps-honesty.
-//   known   → pin at the real place
-//   debated → glow area, no pin, labelled "· debated"
-//   none    → text-only: no pin, no glow — named in captions only
-export type PrepareMapTreatment = "pin" | "area" | "text-only";
-export function prepareCertaintyToMapTreatment(
-  certainty: "known" | "debated" | "none",
-): PrepareMapTreatment {
-  switch (certainty) {
-    case "known":
-      return "pin";
-    case "debated":
-      return "area";
-    case "none":
-      return "text-only";
-  }
-}
+// Event-location treatment derives from the owner-approved TWO-AXIS model in
+// lib/prepare-locations.ts (PR #41 review): featureKind (point/region/route/
+// text-only) decides the shape, certainty (known/probable/debated/unknown)
+// rides the label as an honesty qualifier, and role separates event places
+// from orientation context. A map may never contradict an approved entry —
+// enforced by verify:maps-honesty.
 
 const ESRI = "Imagery © Esri, Maxar, Earthstar Geographics";
 
@@ -365,7 +353,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
       pins: [
         // Sidon's label renders to the LEFT (over the sea) so the two
         // close-together coastal pins never collide on narrow viewports.
-        { x: 39.7, y: 40.8, label: "Tyre", locationName: "Region of Tyre" },
+        { x: 39.7, y: 40.8, label: "Tyre", locationName: "Tyre" },
         { x: 40.3, y: 37.6, label: "Sidon", locationName: "Sidon", labelSide: "left" },
       ],
       labels: [
@@ -420,7 +408,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
               rx: 11,
               ry: 13,
               variant: "glow",
-              label: "Decapolis · debated area",
+              label: "Decapolis · approx. extent",
               lx: 72,
               ly: 87,
               approx: true,
@@ -455,11 +443,14 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
     },
   },
 
-  // Mark 8 — Dalmanutha (8:10) has never been securely identified, so it is
-  // certainty "none": named in the caption, never pinned. Caesarea Philippi
-  // sits ~25 mi north of the frame at the foot of Mount Hermon, so its KNOWN
-  // pin lives on the Big Picture map. The feeding of the 4,000 is a debated
-  // area on the Decapolis side.
+  // Mark 8 — Dalmanutha (8:10) has never been securely identified: text-only,
+  // named in the caption, never pinned. Bethsaida is named plainly in the
+  // text but its MODERN identification is debated (et-Tell vs el-Araj), so it
+  // renders as an area covering both candidates — never a single dot.
+  // Caesarea Philippi sits ~25 mi north of the frame at the foot of Mount
+  // Hermon, so its known CONTEXT pin lives on the Big Picture map (the
+  // confession was in the surrounding villages — no event pin). The feeding
+  // of the 4,000 is a probable broader area on the Decapolis side.
   "mark-8": {
     bigPicture: {
       baseMapImage: "/img/maps/levant-region.jpg",
@@ -490,11 +481,23 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
       modes: {
         today: {
           pins: [
-            { x: 80.2, y: 31.1, label: "Bethsaida", locationName: "Bethsaida" },
             { x: 70.8, y: 37.6, label: "Capernaum", context: true },
           ],
           labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
-          regions: [],
+          regions: [
+            {
+              cx: 79.8,
+              cy: 32.3,
+              rx: 4.5,
+              ry: 4.5,
+              variant: "glow",
+              label: "Bethsaida · debated site",
+              lx: 84,
+              ly: 24,
+              approx: true,
+              locationName: "Bethsaida",
+            },
+          ],
           paths: [],
           boundaries: [
             {
@@ -512,18 +515,29 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
         },
         biblical: {
           pins: [
-            { x: 80.2, y: 31.1, label: "Bethsaida", locationName: "Bethsaida" },
             { x: 70.8, y: 37.6, label: "Capernaum", context: true },
           ],
           labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
           regions: [
+            {
+              cx: 79.8,
+              cy: 32.3,
+              rx: 4.5,
+              ry: 4.5,
+              variant: "glow",
+              label: "Bethsaida · debated site",
+              lx: 84,
+              ly: 24,
+              approx: true,
+              locationName: "Bethsaida",
+            },
             {
               cx: 85,
               cy: 62,
               rx: 10,
               ry: 11,
               variant: "glow",
-              label: "Feeding of the 4,000 · debated area",
+              label: "Feeding of the 4,000 · probable area",
               lx: 66,
               ly: 76,
               approx: true,
