@@ -11,6 +11,7 @@
 //      degrades for legacy chapters, and never hides an attention stop.
 //   3. chapter_info and cost_history are authenticated, read-only, and leak
 //      no raw cost_events metadata (errors/digests/job ids) to the browser.
+import { __setStoredSetupApprovalStoreForTesting } from "../lib/server/chapter-setup-approvals";
 import assert from "node:assert/strict";
 
 process.env.DEV_ADMIN_TOKEN = "verify-studio-polish-offline-token";
@@ -444,6 +445,12 @@ const routeSuite = async () => {
   const costCapture: CostEventInput[] = [];
   __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: auditCapture });
   __setCostCaptureForTesting(costCapture);
+  // Hermetic approval store (2026-07-17): production builds must never read
+  // the live chapter_setup_approvals table from a gate.
+  __setStoredSetupApprovalStoreForTesting({
+    async read() { return null; },
+    async upsert(): Promise<void> { throw new Error("offline gate: approval store is read-only"); },
+  });
   __setReviewedAtForTesting(
     new Map([
       ["mark-7", "2026-07-15T09:30:00.000Z"],
@@ -564,6 +571,7 @@ const routeSuite = async () => {
       }
     }
   } finally {
+    __setStoredSetupApprovalStoreForTesting(null);
     __setGenerationTestOverrides(null);
     __setCostCaptureForTesting(null);
     __setReviewedAtForTesting(null);
