@@ -24,6 +24,21 @@ const contract = contractJson as AcceptanceContract;
 
 export type QualitySeverity = "blocker" | "warning";
 
+/**
+ * SINGLE SOURCE OF TRUTH for the machine-checked bounds the prompt states to
+ * the model (PR #46, correction 4): the checker sites below and the prompt's
+ * completeness block both read these, so they cannot drift apart.
+ */
+export const MARK_SPRINT_PROMPT_MINIMA = Object.freeze({
+  sectionCardSummaryMin: 30,
+  sectionFullContentMin: 160,
+  sceneChecksMin: 1,
+  sceneChecksMax: 3,
+  sceneTitleMin: 8,
+  sceneBodyMin: 80,
+  sceneNoteMin: 15,
+});
+
 export interface QualityFinding {
   code: string;
   severity: QualitySeverity;
@@ -378,18 +393,45 @@ export function evaluateMarkSprintDraft(
     const seenSectionBodies = new Map<string, string>();
     sections.forEach((section, index) => {
       const basePath = `workup:/sections/${index}`;
+      // Per-field findings (PR #46 review): evidence paths double as the
+      // repair scope, so each finding names ONLY the field that failed —
+      // a short cardSummary must never authorize rewriting a valid title.
+      if (isPlaceholder(section.id)) {
+        add(
+          "STR-004 EMPTY_REQUIRED_CONTENT",
+          "Every authored section needs a real id.",
+          [`${basePath}/id`],
+        );
+      }
+      if (isPlaceholder(section.title)) {
+        add(
+          "STR-004 EMPTY_REQUIRED_CONTENT",
+          "Every authored section needs a useful title.",
+          [`${basePath}/title`],
+        );
+      }
       if (
-        isPlaceholder(section.id) ||
-        isPlaceholder(section.title) ||
         isPlaceholder(section.cardSummary) ||
-        isPlaceholder(section.fullContent) ||
-        section.cardSummary.trim().length < 30 ||
-        section.fullContent.trim().length < 160
+        section.cardSummary.trim().length < MARK_SPRINT_PROMPT_MINIMA.sectionCardSummaryMin
       ) {
         add(
           "STR-004 EMPTY_REQUIRED_CONTENT",
-          "Every authored section needs a useful title, card summary, and substantive body.",
-          [`${basePath}/title`, `${basePath}/cardSummary`, `${basePath}/fullContent`],
+          "Every authored section needs a substantive card summary.",
+          [`${basePath}/cardSummary`],
+          `at least ${MARK_SPRINT_PROMPT_MINIMA.sectionCardSummaryMin} characters`,
+          section.cardSummary.trim().length,
+        );
+      }
+      if (
+        isPlaceholder(section.fullContent) ||
+        section.fullContent.trim().length < MARK_SPRINT_PROMPT_MINIMA.sectionFullContentMin
+      ) {
+        add(
+          "STR-004 EMPTY_REQUIRED_CONTENT",
+          "Every authored section needs a substantive body.",
+          [`${basePath}/fullContent`],
+          `at least ${MARK_SPRINT_PROMPT_MINIMA.sectionFullContentMin} characters`,
+          section.fullContent.trim().length,
         );
       }
       const bodyKey = normalized(section.fullContent);
@@ -510,7 +552,7 @@ export function evaluateMarkSprintDraft(
     }
 
     const sceneChecks = workup.sceneChecks ?? [];
-    if (sceneChecks.length < 1 || sceneChecks.length > 3) {
+    if (sceneChecks.length < MARK_SPRINT_PROMPT_MINIMA.sceneChecksMin || sceneChecks.length > MARK_SPRINT_PROMPT_MINIMA.sceneChecksMax) {
       add(
         "STR-004 EMPTY_REQUIRED_CONTENT",
         "Each Mark sprint draft needs 1-3 relevant Scene Checks.",
@@ -521,11 +563,11 @@ export function evaluateMarkSprintDraft(
     }
     sceneChecks.forEach((scene, index) => {
       if (
-        scene.title.trim().length < 8 ||
-        scene.body.trim().length < 80 ||
+        scene.title.trim().length < MARK_SPRINT_PROMPT_MINIMA.sceneTitleMin ||
+        scene.body.trim().length < MARK_SPRINT_PROMPT_MINIMA.sceneBodyMin ||
         !scene.visualAccuracyNotes?.length ||
         scene.visualAccuracyNotes.some(
-          (note) => note.trim().length < 15 || isPlaceholder(note),
+          (note) => note.trim().length < MARK_SPRINT_PROMPT_MINIMA.sceneNoteMin || isPlaceholder(note),
         ) ||
         isPlaceholder(scene.title) ||
         isPlaceholder(scene.body)

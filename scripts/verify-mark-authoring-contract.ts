@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { MARK_SPRINT_PROMPT_MINIMA } from "../lib/ai/quality/mark-sprint-quality";
 import {
   buildChapterWorkupPrompt,
   buildProtectedChapterWorkupPrompt,
@@ -838,6 +839,30 @@ const prompt = buildProtectedChapterWorkupPrompt({
   globalRules: ["Synthetic active rule for contract verification."],
   chapterNotes: mark8Notes,
 });
+// PROMPT/GATE DRIFT REGRESSION (PR #46, correction 4): the prompt must state
+// the machine-checked bounds from the SAME constants the checker enforces,
+// and must never again tell the model an empty sceneChecks array is fine.
+assert.ok(
+  prompt.includes("MACHINE-CHECKED COMPLETENESS"),
+  "prompt must carry the completeness block",
+);
+for (const bound of [
+  `cardSummary ${MARK_SPRINT_PROMPT_MINIMA.sectionCardSummaryMin}+ chars`,
+  `fullContent ${MARK_SPRINT_PROMPT_MINIMA.sectionFullContentMin}+ chars`,
+  `${MARK_SPRINT_PROMPT_MINIMA.sceneChecksMin}-${MARK_SPRINT_PROMPT_MINIMA.sceneChecksMax} entries`,
+  `body ${MARK_SPRINT_PROMPT_MINIMA.sceneBodyMin}+ chars`,
+]) {
+  assert.ok(prompt.includes(bound), `prompt lost the machine-checked bound: ${bound}`);
+}
+assert.ok(
+  !prompt.includes("empty array is better"),
+  "prompt must not contradict the 1-3 sceneChecks gate",
+);
+assert.ok(
+  prompt.includes("an empty array FAILS"),
+  "prompt must state that sceneChecks are required",
+);
+
 const genericPromptWithInjectedSource = buildChapterWorkupPrompt({
   book: "Mark",
   chapter: 7,

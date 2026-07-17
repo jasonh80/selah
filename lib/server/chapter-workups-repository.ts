@@ -583,6 +583,21 @@ export async function getStudioChapterStatus(slug: string): Promise<StudioChapte
       ? safeProtectedMarkFailure(data?.generation_error)
       : null;
   const copyInspection = inspectSourceOverlapReview(data?.workup_json);
+  // PR #46 P2: persisted machine warnings (safe enum codes, e.g. REPAIR-001)
+  // travel to the owner review UI with the draft status.
+  const rawWarnings = (data?.workup_json as { qualityWarningCodes?: unknown } | null)
+    ?.qualityWarningCodes;
+  // While a row is generating (or its last run failed), workup_json still
+  // holds the PREVIOUS draft — its warnings must not be attributed to the
+  // run in flight (PR #46 review).
+  const warningsBelongToCurrentDraft =
+    status !== "generating" && status !== "failed";
+  const qualityWarningCodes =
+    warningsBelongToCurrentDraft && Array.isArray(rawWarnings)
+      ? rawWarnings
+          .filter((code): code is string => typeof code === "string")
+          .slice(0, 12)
+      : [];
   const copyReview =
     copyInspection.kind === "warning"
       ? {
@@ -597,6 +612,7 @@ export async function getStudioChapterStatus(slug: string): Promise<StudioChapte
     status,
     ...(safeFailure ?? {}),
     ...(copyReview ? { copyReview } : {}),
+    ...(qualityWarningCodes.length ? { qualityWarningCodes } : {}),
     ...(draftRevision ? { draftRevision } : {}),
   };
 }

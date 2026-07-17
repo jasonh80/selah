@@ -286,12 +286,19 @@ function withManifestDigest(
   workup: ChapterWorkup,
   manifestDigest: string,
   sourceOverlapReview: SourceOverlapReviewWarning | null,
+  qualityWarningCodes: readonly string[] = [],
 ): ChapterWorkup {
   return {
     ...workup,
     // Safe provenance only. No ESV, prompt, exemplar, or raw response bytes.
     generationManifestDigest: manifestDigest,
     ...(sourceOverlapReview ? { sourceOverlapReview } : {}),
+    // PR #46 P2: the machine warnings (incl. REPAIR-001) persist into the
+    // SAVED review draft, not only the transient result/audit — safe enum
+    // codes only.
+    ...(qualityWarningCodes.length
+      ? { qualityWarningCodes: [...qualityWarningCodes] }
+      : {}),
   } as ChapterWorkup;
 }
 
@@ -649,6 +656,7 @@ export async function runProtectedMarkDraftJob(
           result.renderWorkup,
           input.approvedManifestDigest,
           result.sourceOverlapReview,
+          result.quality.warningCodes,
         ),
         version: result.renderWorkup.version,
         bibleVersion: "ESV",
@@ -689,6 +697,14 @@ export async function runProtectedMarkDraftJob(
         ...(result.overlapDiagnostics.length
           ? {
               diagnostics: boundedDiagnostics(result.overlapDiagnostics),
+            }
+          : {}),
+        // One-repair amendment (PR #46, correction 2): a successful repair is
+        // persisted in the durable audit, not only the review warnings.
+        ...(result.repair
+          ? {
+              repairRequestDigest: result.repair.requestDigest,
+              repairedCodes: boundedDiagnostics(result.repair.repairedCodes),
             }
           : {}),
       },

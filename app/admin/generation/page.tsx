@@ -201,6 +201,7 @@ export default function SelahStudioPage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [reviewMsg, setReviewMsg] = useState("");
   const [copyReview, setCopyReview] = useState<StudioCopyReview | null>(null);
+  const [qualityWarningCodes, setQualityWarningCodes] = useState<string[]>([]);
   const [approvedCopyReviewDigest, setApprovedCopyReviewDigest] = useState<string | null>(null);
 
   const [imagePhase, setImagePhase] = useState<ImagePhase>("idle");
@@ -337,6 +338,9 @@ export default function SelahStudioPage() {
   // fresh draft begins. An approval must never carry into a different draft.
   function resetReview() {
     setPreviewed(false);
+    // A repair card belongs to ONE chapter's draft — never let it linger
+    // across a chapter switch or fresh draft (PR #46 review).
+    setQualityWarningCodes([]);
     setVerdict("");
     setNote("");
     setScope("chapter");
@@ -480,6 +484,7 @@ export default function SelahStudioPage() {
 
     const status = j.status as string | null;
     applyCopyReview(j.copyReview);
+    setQualityWarningCodes(Array.isArray(j.qualityWarningCodes) ? j.qualityWarningCodes.filter((code: unknown): code is string => typeof code === "string") : []);
     applyDraftRevision(j);
     setStatusProblem(false);
     if (status === "reviewed") {
@@ -540,6 +545,7 @@ export default function SelahStudioPage() {
     }
     const st = j.status as string | null;
     applyCopyReview(j.copyReview);
+    setQualityWarningCodes(Array.isArray(j.qualityWarningCodes) ? j.qualityWarningCodes.filter((code: unknown): code is string => typeof code === "string") : []);
     applyDraftRevision(j);
     if (st === "draft" || st === "ready" || st === "reviewed") {
       setPhase("ready");
@@ -1642,6 +1648,21 @@ export default function SelahStudioPage() {
             <p className="mt-1 text-[13px] text-secondary">
               Selah found wording that may be too close to the Bible text. The draft is saved and nothing is live. Preview it, then decide whether the wording is acceptable.
             </p>
+          </div>
+        )}
+        {qualityWarningCodes.length > 0 && (
+          <div className="mb-3 rounded-lg border bg-card-soft p-3">
+            <p className="text-[13px] font-semibold text-primary">
+              {qualityWarningCodes.some((code) => code.startsWith("REPAIR-001"))
+                ? "Selah repaired this draft once during writing"
+                : "Machine review notes"}
+            </p>
+            <p className="mt-1 text-[13px] text-secondary">
+              {qualityWarningCodes.some((code) => code.startsWith("REPAIR-001"))
+                ? "The AI's first pass left a required spot thin or duplicated, so Studio asked it to fix exactly that spot and re-checked everything. Worth an extra glance in the preview."
+                : "The checker flagged non-blocking notes for your review."}
+            </p>
+            <p className="mt-1 text-[11px] text-secondary">{qualityWarningCodes.join(" · ")}</p>
           </div>
         )}
         {copyReview?.status === "invalid" && (

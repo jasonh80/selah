@@ -19,6 +19,7 @@ import {
 } from "../lib/server/generation-manifest-v3";
 import {
   MarkSprintDraftPipelineError,
+  repairableQualityBlockers,
   runProtectedMarkSprintDraft,
   type MarkSprintModelExecutorPort,
 } from "../lib/server/mark-sprint-draft-pipeline";
@@ -358,8 +359,285 @@ async function main(): Promise<void> {
   assert.ok(!String(executionError).includes(SOURCE_PHRASE));
   assert.ok(!JSON.stringify(executionError).includes(PRIVATE_RULE));
 
+  // ---- ONE-REPAIR AMENDMENT (board #29 directive, 2026-07-17) --------------
+  // When the ONLY quality blockers are the repairable structural codes
+  // (STR-004/STR-010), the pipeline may make exactly ONE repair call, then
+  // must re-run the full gate chain. These cases prove: repair fires only
+  // then, never loops, sums cost, stays private, and cannot bypass overlap.
+  function sequencedExecutor(responses: readonly string[]): {
+    port: MarkSprintModelExecutorPort;
+    calls: () => number;
+    requests: () => unknown[];
+  } {
+    let callCount = 0;
+    const received: unknown[] = [];
+    return {
+      port: {
+        async executeExactRequest(request) {
+          const body = responses[Math.min(callCount, responses.length - 1)];
+          callCount++;
+          received.push(request);
+          return { rawDraftJson: body, inputTokens: 321, outputTokens: 654 };
+        },
+      },
+      calls: () => callCount,
+      requests: () => received,
+    };
+  }
+  function structurallyBroken(): ReturnType<typeof passingDraft> {
+    const draft = passingDraft("mark-8");
+    draft.application = "Too short.";
+    draft.primaryCharacters = ["Jesus", "Jesus", "Peter"];
+    return draft;
+  }
+
+  // A targeted repair: the SAME broken draft with ONLY the flagged fields
+  // fixed (PR #46, correction 1 — a wholesale replacement draft must fail).
+  function targetedRepairOf(broken: ReturnType<typeof passingDraft>): ReturnType<typeof passingDraft> {
+    const clean = passingDraft("mark-8");
+    const repaired = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
+    // Only the flagged paths change: workup:/application and the duplicate
+    // entry at workup:/primaryCharacters/1 (P1 follow-up: index-scoped).
+    repaired.application = clean.application;
+    repaired.primaryCharacters[1] = "the disciples";
+    return repaired;
+  }
+
+  // 1. Repairable blockers → ONE targeted repair call → full pass,
+  // transparent + summed + audited.
+  {
+    const broken = structurallyBroken();
+    const seq = sequencedExecutor([
+      JSON.stringify(broken),
+      JSON.stringify(targetedRepairOf(broken)),
+    ]);
+    const auth = await authorization();
+    const repairedResult = await runProtectedMarkSprintDraft({
+      sourceBundle,
+      modelRequest,
+      preflight,
+      ...auth,
+      executor: seq.port,
+    });
+    assert.equal(seq.calls(), 2, "repairable block must trigger exactly one repair call");
+    assert.equal(seq.requests()[0], modelRequest, "first call must be the exact approved request");
+    const repairRequest = seq.requests()[1] as {
+      model: string;
+      messages: readonly { role: string; content: string }[];
+    };
+    assert.equal(repairRequest.model, modelRequest.model, "repair must reuse the approved model");
+    assert.ok(
+      repairRequest.messages[0].content.includes("repairing a single JSON chapter workup"),
+      "repair call must use the repair system prompt, not the original",
+    );
+    assert.ok(
+      repairRequest.messages[1].content.includes("STR-004 EMPTY_REQUIRED_CONTENT") &&
+        repairRequest.messages[1].content.includes("STR-010 EXACT_DUPLICATE_CONTENT"),
+      "repair call must name the machine findings",
+    );
+    assert.ok(
+      !repairRequest.messages[0].content.includes(SOURCE_PHRASE) &&
+        !repairRequest.messages[1].content.includes(SOURCE_PHRASE),
+      "repair call must never carry ESV source text",
+    );
+    assert.ok(
+      !JSON.stringify(repairRequest).includes(PRIVATE_RULE),
+      "repair call must never carry private guidance",
+    );
+    assert.deepEqual(
+      repairedResult.tokenUsage,
+      { inputTokens: 642, outputTokens: 1308 },
+      "both calls' tokens must be cost-visible",
+    );
+    assert.ok(
+      repairedResult.quality.warningCodes.includes("REPAIR-001 STRUCTURAL_REPAIR_APPLIED"),
+      "owner review must see that a repair happened",
+    );
+    assert.ok(repairedResult.repair, "the repair record must persist on the result");
+    assert.match(repairedResult.repair!.requestDigest, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(
+      [...repairedResult.repair!.repairedCodes].sort(),
+      ["STR-004 EMPTY_REQUIRED_CONTENT", "STR-010 EXACT_DUPLICATE_CONTENT"],
+    );
+  }
+
+  // 1b. A "repair" that swaps in a wholesale different draft (unflagged
+  // fields changed) is REFUSED — the exact hole the review named.
+  {
+    const seq = sequencedExecutor([
+      JSON.stringify(structurallyBroken()),
+      JSON.stringify(passingDraft("mark-9")),
+    ]);
+    const auth = await authorization();
+    const scope = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MODEL_RESPONSE_INVALID",
+    );
+    assert.equal(seq.calls(), 2);
+    assert.ok(
+      scope.safeDiagnostics.includes("REPAIR:SCOPE_VIOLATION"),
+      "out-of-scope repair must be named",
+    );
+    assert.deepEqual(scope.tokenUsage, { inputTokens: 642, outputTokens: 1308 });
+  }
+
+  // 1e. INDEX-SCOPED enforcement (P1 follow-up): a finding on entry 1 never
+  // authorizes changing entry 0 of the same collection.
+  {
+    const broken = structurallyBroken();
+    const siblingRewrite = targetedRepairOf(broken);
+    siblingRewrite.primaryCharacters[0] = "John the disciple";
+    const seq = sequencedExecutor([
+      JSON.stringify(broken),
+      JSON.stringify(siblingRewrite),
+    ]);
+    const auth = await authorization();
+    const sibling = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MODEL_RESPONSE_INVALID",
+    );
+    assert.equal(seq.calls(), 2);
+    assert.ok(
+      sibling.safeDiagnostics.includes("REPAIR:SCOPE_VIOLATION"),
+      "an unflagged sibling entry must not be repairable",
+    );
+  }
+
+  // 1c. Repair cost is counted even when the repair response is unusable
+  // (PR #46, correction 3).
+  {
+    const seq = sequencedExecutor([JSON.stringify(structurallyBroken()), "   "]);
+    const auth = await authorization();
+    const emptyRepair = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MODEL_RESPONSE_INVALID",
+    );
+    assert.equal(seq.calls(), 2);
+    assert.ok(emptyRepair.safeDiagnostics.includes("REPAIR:RESPONSE_INVALID"));
+    assert.deepEqual(
+      emptyRepair.tokenUsage,
+      { inputTokens: 642, outputTokens: 1308 },
+      "an empty repair response still cost both calls' tokens",
+    );
+  }
+
+  // 1d. A block-verdict (wording review) candidate is NEVER repaired
+  // (PR #46, correction 2) — even when its quality codes are repairable.
+  {
+    const overlapAndBroken = structurallyBroken();
+    overlapAndBroken.summary = `${SOURCE_PHRASE}. ${overlapAndBroken.summary}`;
+    const seq = sequencedExecutor([JSON.stringify(overlapAndBroken)]);
+    const auth = await authorization();
+    const noRepair = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MARK_QUALITY_BLOCKED",
+    );
+    assert.equal(seq.calls(), 1, "a wording-review candidate must not be repaired");
+    assert.ok(!noRepair.safeDiagnostics.some((d) => d.startsWith("REPAIR:")));
+  }
+
+  // 2. Repair still blocked → terminal, exactly two calls, never a loop.
+  {
+    const broken = structurallyBroken();
+    const stillBroken = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
+    stillBroken.primaryCharacters[1] = "the disciples";
+    stillBroken.application = "Still too short.";
+    const seq = sequencedExecutor([
+      JSON.stringify(broken),
+      JSON.stringify(stillBroken),
+    ]);
+    const auth = await authorization();
+    const stillBlocked = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MARK_QUALITY_BLOCKED",
+    );
+    assert.equal(seq.calls(), 2, "one repair only — never a retry loop");
+    assert.ok(
+      stillBlocked.safeDiagnostics.includes("REPAIR:STILL_BLOCKED"),
+      "terminal failure must say the repair ran and did not clear the bar",
+    );
+    assert.deepEqual(stillBlocked.tokenUsage, { inputTokens: 642, outputTokens: 1308 });
+  }
+
+  // 3. A repaired draft cannot bypass the overlap firewall: source-copying
+  // wording in the REPAIRED draft still lands in the block-verdict wording
+  // review state (no acceptance capability, owner must review), with the
+  // repair disclosed.
+  {
+    const broken = structurallyBroken();
+    const sneakyRepair = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
+    sneakyRepair.primaryCharacters[1] = "the disciples";
+    sneakyRepair.application = `${SOURCE_PHRASE}. ${passingDraft("mark-8").application}`;
+    const seq = sequencedExecutor([
+      JSON.stringify(broken),
+      JSON.stringify(sneakyRepair),
+    ]);
+    const auth = await authorization();
+    const reviewAfterRepair = await runProtectedMarkSprintDraft({
+      sourceBundle,
+      modelRequest,
+      preflight,
+      ...auth,
+      executor: seq.port,
+    });
+    assert.equal(seq.calls(), 2);
+    assert.equal(reviewAfterRepair.overlapVerdict, "block");
+    assert.equal(reviewAfterRepair.overlapAcceptance, null);
+    assert.ok(reviewAfterRepair.sourceOverlapReview, "repaired copy still requires wording review");
+    assert.ok(
+      reviewAfterRepair.quality.warningCodes.includes("REPAIR-001 STRUCTURAL_REPAIR_APPLIED"),
+      "the repair must stay disclosed through the review state",
+    );
+  }
+
+  // 4. Non-repairable codes never trigger a repair call (covered above by the
+  // STR-002 case asserting calls === 1); repairableQualityBlockers itself:
+  assert.equal(
+    repairableQualityBlockers([{ code: "STR-004 EMPTY_REQUIRED_CONTENT" }]),
+    true,
+  );
+  assert.equal(
+    repairableQualityBlockers([
+      { code: "STR-004 EMPTY_REQUIRED_CONTENT" },
+      { code: "STR-002 OUTPUT_IDENTITY_MISMATCH" },
+    ]),
+    false,
+    "a single non-repairable code must disable repair entirely",
+  );
+  assert.equal(repairableQualityBlockers([]), false);
+
   console.log(
-    "Mark sprint draft pipeline verification passed (schema/overlap/quality/one-call/privacy).",
+    "Mark sprint draft pipeline verification passed (schema/overlap/quality/one-call+one-repair/privacy).",
   );
 }
 
