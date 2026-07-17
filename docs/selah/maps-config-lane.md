@@ -73,22 +73,26 @@ records this approval trail honestly. Mark 8's frozen contract binds
 guidance+notes only (not the acceptance fixture), so its live receipt is
 untouched. Mark 9 entries are untouched.
 
-## Map configs
+## Rendering: real map engine (owner decision, 2026-07-17)
 
-`CHAPTER_MAPS["mark-7"]` / `["mark-8"]`: off-frame known context points
-(Tyre, Sidon, Caesarea Philippi) pin on the Big Picture (Levant) level; the
-35-mi Galilee frame carries the Gennesaret context pin, the Bethsaida
-candidate-sites glow, and the Decapolis / feeding areas with their honesty
-qualifiers. No drawn routes anywhere. Existing base imagery only; Street View
-stays roadmap.
+After seeing the static-image approach, the owner rejected it ("not refined")
+and chose a **real map engine**: MapLibre GL (open-source, no API key, no
+metered cost) with real satellite tiles, true zoom/pan, and genuine modern
+borders/city labels as a toggleable layer. The hand-authored percentage
+overlays for Mark 7/8 were therefore **stripped from this PR** — this lane
+now lands only the data model, the fixture entries, the receipt re-mint, and
+the honesty gate. Approved places become real lat/lng coordinates in the
+engine lane (`feat/maps-engine-spike`), and `verify:maps-honesty`'s render
+checks re-arm automatically the moment a chapter map config exists.
 
 ## Sequencing
 
 1. ✅ Corrected model + exact entries owner-approved (2026-07-17 session,
    memorialized on PR #41).
 2. ✅ Implemented: normalizer + combo rules, fixture entries, Mark 7 re-mint,
-   map configs, hardened verifier.
-3. Codex exact-head re-review.
-4. Jason's rendered-map taste check, then merge.
+   hardened verifier. Static drawing configs stripped per the engine decision.
+3. Codex exact-head re-review of the data-only PR.
+4. Maps engine lane: MapLibre spike → owner screenshot review → wire the
+   approved entries as geo-layers → verifier extension → its own PR.
 
 No generation, spend, publish, or live-data change anywhere in this lane.

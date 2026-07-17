@@ -394,9 +394,11 @@ expectViolation("a missing required pin render is caught", () =>
   syntheticCheck([HONEST_PINS[1]], HONEST_REGIONS),
 );
 
-// The chapters this lane ships must actually be covered end-to-end.
+// The chapters this lane ships must carry their approved entries. Their MAP
+// configs are intentionally absent: the owner chose a real map engine
+// (2026-07-17) over the static-image renderer, so the drawing layer lands in
+// the maps-engine lane and this gate picks it up the moment a config exists.
 for (const slug of ["mark-7", "mark-8"] as const) {
-  ok(Boolean(CHAPTER_MAPS[slug]), `${slug} has a map config`);
   ok(
     (acceptance.chapters[slug].locations ?? []).length > 0,
     `${slug} has approved location entries`,
