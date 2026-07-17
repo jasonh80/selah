@@ -102,7 +102,10 @@ export function deriveMarkSprintImagePlan(
       prompt: nonEmpty(source.prompt, label, `${kind} prompt`),
       caption: nonEmpty(source.caption, label, `${kind} caption`),
       alt: nonEmpty(source.alt, label, `${kind} alt text`),
-      wide: kind === heroKind,
+      // Every chapter image renders in the uniform 3:2 LANDSCAPE layout
+      // (owner layout decision, PR #39) — so every image generates landscape,
+      // not only the hero. Portrait outputs were being letterboxed/cropped.
+      wide: true,
     });
   });
   if (!seen.has(heroKind)) throw new Error(`${label} heroKind must match one planned image`);
