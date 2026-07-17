@@ -396,8 +396,10 @@ async function main(): Promise<void> {
   function targetedRepairOf(broken: ReturnType<typeof passingDraft>): ReturnType<typeof passingDraft> {
     const clean = passingDraft("mark-8");
     const repaired = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
+    // Only the flagged paths change: workup:/application and the duplicate
+    // entry at workup:/primaryCharacters/1 (P1 follow-up: index-scoped).
     repaired.application = clean.application;
-    repaired.primaryCharacters = clean.primaryCharacters;
+    repaired.primaryCharacters[1] = "the disciples";
     return repaired;
   }
 
@@ -485,6 +487,34 @@ async function main(): Promise<void> {
     assert.deepEqual(scope.tokenUsage, { inputTokens: 642, outputTokens: 1308 });
   }
 
+  // 1e. INDEX-SCOPED enforcement (P1 follow-up): a finding on entry 1 never
+  // authorizes changing entry 0 of the same collection.
+  {
+    const broken = structurallyBroken();
+    const siblingRewrite = targetedRepairOf(broken);
+    siblingRewrite.primaryCharacters[0] = "John the disciple";
+    const seq = sequencedExecutor([
+      JSON.stringify(broken),
+      JSON.stringify(siblingRewrite),
+    ]);
+    const auth = await authorization();
+    const sibling = await expectPipelineError(
+      runProtectedMarkSprintDraft({
+        sourceBundle,
+        modelRequest,
+        preflight,
+        ...auth,
+        executor: seq.port,
+      }),
+      "MODEL_RESPONSE_INVALID",
+    );
+    assert.equal(seq.calls(), 2);
+    assert.ok(
+      sibling.safeDiagnostics.includes("REPAIR:SCOPE_VIOLATION"),
+      "an unflagged sibling entry must not be repairable",
+    );
+  }
+
   // 1c. Repair cost is counted even when the repair response is unusable
   // (PR #46, correction 3).
   {
@@ -534,7 +564,7 @@ async function main(): Promise<void> {
   {
     const broken = structurallyBroken();
     const stillBroken = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
-    stillBroken.primaryCharacters = ["Jesus", "Peter", "the disciples"];
+    stillBroken.primaryCharacters[1] = "the disciples";
     stillBroken.application = "Still too short.";
     const seq = sequencedExecutor([
       JSON.stringify(broken),
@@ -566,7 +596,7 @@ async function main(): Promise<void> {
   {
     const broken = structurallyBroken();
     const sneakyRepair = JSON.parse(JSON.stringify(broken)) as ReturnType<typeof passingDraft>;
-    sneakyRepair.primaryCharacters = ["Jesus", "Peter", "the disciples"];
+    sneakyRepair.primaryCharacters[1] = "the disciples";
     sneakyRepair.application = `${SOURCE_PHRASE}. ${passingDraft("mark-8").application}`;
     const seq = sequencedExecutor([
       JSON.stringify(broken),

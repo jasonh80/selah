@@ -552,34 +552,70 @@ export async function runProtectedMarkSprintDraft(
       combinedUsage,
       ["REPAIR:APPLIED", repairDigestDiagnostic, ...repairedCodeDiagnostics],
     );
-    // TARGETED-REPAIR ENFORCEMENT (PR #46 review, correction 1): the repair
-    // may change ONLY the top-level fields named by the checker's evidence.
-    // Every other field must round-trip canonically identical — a "repair"
-    // that rewrites unrelated theology or copy is refused.
+    // TARGETED-REPAIR ENFORCEMENT (PR #46 review, correction 1 + P1
+    // follow-up): the repair may change ONLY the exact paths the checker's
+    // evidence names — a finding on sections/3/fullContent authorizes that
+    // one field, never the whole sections collection. Everything outside the
+    // allowed paths must round-trip canonically identical.
     {
-      const allowedRoots = new Set(
-        candidate.quality.blockers.flatMap((finding) =>
-          finding.evidencePaths.map(
-            (path) => path.replace(/^workup:[/]/u, "").split("/")[0],
-          ),
-        ),
+      const allowedPaths = candidate.quality.blockers.flatMap((finding) =>
+        finding.evidencePaths.map((path) => path.replace(/^workup:[/]/u, "")),
       );
-      const before = candidate.generated as unknown as Record<string, unknown>;
-      const after = repaired.generated as unknown as Record<string, unknown>;
-      const roots = new Set([...Object.keys(before), ...Object.keys(after)]);
-      for (const root of roots) {
-        if (allowedRoots.has(root)) continue;
+      const scopeViolation = (
+        before: unknown,
+        after: unknown,
+        path: string,
+      ): boolean => {
         if (
-          sha256Canonical(before[root] ?? null) !==
-          sha256Canonical(after[root] ?? null)
+          allowedPaths.some(
+            (allowed) => path === allowed || path.startsWith(`${allowed}/`),
+          )
         ) {
-          throw new MarkSprintDraftPipelineError(
-            "MODEL_RESPONSE_INVALID",
-            [],
-            combinedUsage,
-            ["REPAIR:SCOPE_VIOLATION", repairDigestDiagnostic, ...repairedCodeDiagnostics],
-          );
+          return false; // inside an explicitly repairable subtree
         }
+        const prefix = path === "" ? "" : `${path}/`;
+        const mustDescend = allowedPaths.some((allowed) =>
+          allowed.startsWith(prefix),
+        );
+        if (
+          !mustDescend ||
+          typeof before !== "object" ||
+          before === null ||
+          typeof after !== "object" ||
+          after === null
+        ) {
+          return sha256Canonical(before ?? null) !== sha256Canonical(after ?? null);
+        }
+        const keys = new Set([
+          ...Object.keys(before as Record<string, unknown>),
+          ...Object.keys(after as Record<string, unknown>),
+        ]);
+        for (const key of keys) {
+          if (
+            scopeViolation(
+              (before as Record<string, unknown>)[key],
+              (after as Record<string, unknown>)[key],
+              `${prefix}${key}`,
+            )
+          ) {
+            return true;
+          }
+        }
+        return false;
+      };
+      if (
+        scopeViolation(
+          candidate.generated as unknown,
+          repaired.generated as unknown,
+          "",
+        )
+      ) {
+        throw new MarkSprintDraftPipelineError(
+          "MODEL_RESPONSE_INVALID",
+          [],
+          combinedUsage,
+          ["REPAIR:SCOPE_VIOLATION", repairDigestDiagnostic, ...repairedCodeDiagnostics],
+        );
       }
     }
     if (

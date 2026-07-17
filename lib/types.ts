@@ -141,6 +141,8 @@ export interface ChapterWorkup {
   // marker contains only digests, closed finding codes, and counts—never Bible
   // text, generated prose, prompts, or excerpts.
   generationManifestDigest?: string;
+  /** Machine review warnings persisted with the draft (safe enum codes, e.g. REPAIR-001). */
+  qualityWarningCodes?: string[];
   sourceOverlapReview?: import("./source-overlap-review").SourceOverlapReviewWarning;
 
   slug: string;

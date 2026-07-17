@@ -286,12 +286,19 @@ function withManifestDigest(
   workup: ChapterWorkup,
   manifestDigest: string,
   sourceOverlapReview: SourceOverlapReviewWarning | null,
+  qualityWarningCodes: readonly string[] = [],
 ): ChapterWorkup {
   return {
     ...workup,
     // Safe provenance only. No ESV, prompt, exemplar, or raw response bytes.
     generationManifestDigest: manifestDigest,
     ...(sourceOverlapReview ? { sourceOverlapReview } : {}),
+    // PR #46 P2: the machine warnings (incl. REPAIR-001) persist into the
+    // SAVED review draft, not only the transient result/audit — safe enum
+    // codes only.
+    ...(qualityWarningCodes.length
+      ? { qualityWarningCodes: [...qualityWarningCodes] }
+      : {}),
   } as ChapterWorkup;
 }
 
@@ -649,6 +656,7 @@ export async function runProtectedMarkDraftJob(
           result.renderWorkup,
           input.approvedManifestDigest,
           result.sourceOverlapReview,
+          result.quality.warningCodes,
         ),
         version: result.renderWorkup.version,
         bibleVersion: "ESV",
