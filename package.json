@@ -2,7 +2,7 @@
   "name": "selah",
   "version": "0.1.0",
   "private": true,
-  "description": "Selah \u2014 your daily Bible chapter, made visual, simple, and personal.",
+  "description": "Selah — your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
     "prebuild": "npm run verify:studio-safety && npm run verify:studio-preview-access && npm run verify:studio-mark8-preflight && npm run verify:studio-polish && npm run verify:esv-attribution && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark && npm run verify:diagnostics-display && npm run verify:maps-honesty && npm run verify:image-redo",
@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",
+    "maplibre-gl": "^5.24.0",
     "next": "14.2.5",
     "openai": "4.67.3",
     "react": "18.3.1",
@@ -39,13 +40,13 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
-    "tsx": "4.19.1",
     "@types/node": "20.14.10",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
     "autoprefixer": "10.4.19",
     "postcss": "8.4.39",
     "tailwindcss": "3.4.6",
+    "tsx": "4.19.1",
     "typescript": "5.5.3"
   }
 }
