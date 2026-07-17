@@ -20,6 +20,14 @@ export interface MapPin {
    * (mark-sprint-acceptance fixture). Verified by verify:maps-honesty:
    * only "known" locations may carry a pin. */
   locationName?: string;
+  /** Marks a background/context pin (not a chapter event location). In
+   * chapters with approved location entries, EVERY pin must be classified —
+   * locationName or context — and a context pin may never use an approved
+   * location's name. Enforced by verify:maps-honesty. */
+  context?: boolean;
+  /** Which side of the dot the label renders on (default "right"). Use
+   * "left" to keep close-together pins readable. */
+  labelSide?: "left" | "right";
 }
 export interface MapLabel {
   x: number;
@@ -41,12 +49,19 @@ export interface MapRegion {
    * Verified by verify:maps-honesty: only "debated" locations may carry a
    * glow area, and it must be marked approx. */
   locationName?: string;
+  /** Marks a background/context area. Same classification rule as MapPin. */
+  context?: boolean;
 }
 export interface MapPath {
   points: [number, number][];
   label?: string;
   lx?: number;
   ly?: number;
+  /** Name of the digest-bound Prepare location entry this movement touches.
+   * In chapters with approved location entries, EVERY path must reference a
+   * "known" location — a drawn line may never render a "none" route (e.g.
+   * Mark 7:31) or a "debated" area. Enforced by verify:maps-honesty. */
+  locationName?: string;
 }
 // Curated boundary/territory layer. Coordinates are authored in IMAGE space
 // (percent of the base image) for now; the same shape maps cleanly to GeoJSON
@@ -348,14 +363,16 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
       caption:
         "Mark 7 leaves Galilee for the Phoenician coast — Tyre and Sidon, Gentile territory northwest of the Sea of Galilee — and returns toward the Decapolis. The exact road is unrecorded, so no route is drawn.",
       pins: [
-        { x: 39.8, y: 41.5, label: "Tyre", locationName: "Region of Tyre" },
-        { x: 40.3, y: 38.5, label: "Sidon", locationName: "Sidon" },
-        { x: 42, y: 44, label: "Galilee" },
+        // Sidon's label renders to the LEFT (over the sea) so the two
+        // close-together coastal pins never collide on narrow viewports.
+        { x: 39.7, y: 40.8, label: "Tyre", locationName: "Region of Tyre" },
+        { x: 40.3, y: 37.6, label: "Sidon", locationName: "Sidon", labelSide: "left" },
       ],
       labels: [
         { x: 18, y: 25, text: "Mediterranean Sea", tone: "water" },
-        { x: 36, y: 34, text: "Phoenicia", tone: "region" },
-        { x: 34, y: 48, text: "Israel · Judah", tone: "region" },
+        { x: 36, y: 33, text: "Phoenicia", tone: "region" },
+        { x: 44, y: 46.5, text: "Galilee", tone: "region" },
+        { x: 34, y: 50, text: "Israel · Judah", tone: "region" },
         { x: 44, y: 58, text: "Dead Sea", tone: "water" },
       ],
       regions: [],
@@ -371,7 +388,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
         today: {
           pins: [
             { x: 61.7, y: 45.6, label: "Gennesaret", locationName: "Gennesaret" },
-            { x: 70.8, y: 37.6, label: "Capernaum" },
+            { x: 70.8, y: 37.6, label: "Capernaum", context: true },
           ],
           labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
           regions: [],
@@ -393,7 +410,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
         biblical: {
           pins: [
             { x: 61.7, y: 45.6, label: "Gennesaret", locationName: "Gennesaret" },
-            { x: 70.8, y: 37.6, label: "Capernaum" },
+            { x: 70.8, y: 37.6, label: "Capernaum", context: true },
           ],
           labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
           regions: [
@@ -449,14 +466,16 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
       attribution: ESRI,
       caption:
         "Mark 8 moves from the lake district north to Caesarea Philippi at the foot of Mount Hermon, where Peter's confession comes on the road. The district of Dalmanutha (8:10) has never been securely identified — it is named here, not pinned.",
+      // The contextual Galilee marker is a LABEL, offset below-left, so the
+      // Caesarea Philippi pin stays readable on narrow viewports (Codex P2).
+      // Mount Hermon lives in the caption for the same reason.
       pins: [
         { x: 42.6, y: 42.3, label: "Caesarea Philippi", locationName: "Caesarea Philippi" },
-        { x: 42, y: 44.6, label: "Galilee" },
       ],
       labels: [
         { x: 18, y: 25, text: "Mediterranean Sea", tone: "water" },
-        { x: 44.5, y: 40.5, text: "Mount Hermon", tone: "region" },
-        { x: 34, y: 48, text: "Israel · Judah", tone: "region" },
+        { x: 41, y: 47, text: "Galilee", tone: "region" },
+        { x: 34, y: 51, text: "Israel · Judah", tone: "region" },
         { x: 44, y: 58, text: "Dead Sea", tone: "water" },
       ],
       regions: [],
@@ -472,7 +491,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
         today: {
           pins: [
             { x: 80.2, y: 31.1, label: "Bethsaida", locationName: "Bethsaida" },
-            { x: 70.8, y: 37.6, label: "Capernaum" },
+            { x: 70.8, y: 37.6, label: "Capernaum", context: true },
           ],
           labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
           regions: [],
@@ -494,7 +513,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
         biblical: {
           pins: [
             { x: 80.2, y: 31.1, label: "Bethsaida", locationName: "Bethsaida" },
-            { x: 70.8, y: 37.6, label: "Capernaum" },
+            { x: 70.8, y: 37.6, label: "Capernaum", context: true },
           ],
           labels: [{ x: 74, y: 55, text: "Sea of Galilee", tone: "water" }],
           regions: [

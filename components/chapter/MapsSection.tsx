@@ -74,10 +74,10 @@ function Anchored({ x, y, inv, children }: { x: number; y: number; inv: number; 
   );
 }
 
-function Pin({ pin, inv }: { pin: { x: number; y: number; label: string }; inv: number }) {
+function Pin({ pin, inv }: { pin: { x: number; y: number; label: string; labelSide?: "left" | "right" }; inv: number }) {
   return (
     <Anchored x={pin.x} y={pin.y} inv={inv}>
-      <span className="flex items-center gap-1.5">
+      <span className={`flex items-center gap-1.5 ${pin.labelSide === "left" ? "flex-row-reverse" : ""}`}>
         <span className="h-3 w-3 rounded-full bg-white shadow-[0_0_0_2px_rgba(0,0,0,0.35)] ring-[3px] ring-[var(--accent-strong)]" />
         <span
           className="whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] font-bold text-white"

@@ -117,3 +117,11 @@ Jason approved the **certainty → map treatment** mapping:
 It is now the enforced rule (`prepareCertaintyToMapTreatment` in
 `lib/maps/chapter-maps.ts`, gated by `scripts/verify-maps-honesty.ts`). Final
 step before ship remains the owner's look at the rendered Mark 7/8 maps.
+
+Hardened after Codex's PR #41 review (both P2s): in a chapter with approved
+entries, every pin/region must be explicitly classified — event
+(`locationName`, treatment-checked) or `context: true` (label may never reuse
+an approved location's name) — and every drawn path must reference a `known`
+location, so a "none" route (Mark 7:31) can never be drawn. Clustered Levant
+pins were also separated (contextual Galilee/Hermon markers became offset
+labels; Sidon's label renders left of its dot).
