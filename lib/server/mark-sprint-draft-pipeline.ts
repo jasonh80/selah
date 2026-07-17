@@ -76,6 +76,40 @@ export function safeQualityDiagnostic(code: string): string {
   return `QUALITY:${code.trim().split(/\s+/).join("_")}`;
 }
 
+/**
+ * Excerpt-free classification of a model-transport failure into a closed
+ * MODEL:<KIND> token (same single-token grammar as QUALITY diagnostics).
+ * ONLY enum values derived from provider status/code fields — never provider
+ * message text — so the durable audit can say WHY the model call died
+ * (out of credit vs auth vs timeout) without leaking anything.
+ */
+export function safeModelExecutionDiagnostic(error: unknown): string {
+  const e = error as
+    | ({ status?: unknown; code?: unknown; name?: unknown; error?: { code?: unknown } } & Partial<Error>)
+    | null;
+  const status = typeof e?.status === "number" ? e.status : null;
+  const code = String(e?.code ?? e?.error?.code ?? "");
+  const name = String(e?.name ?? "");
+  if (code === "insufficient_quota") return "MODEL:INSUFFICIENT_QUOTA";
+  if (status === 401 || code === "invalid_api_key") return "MODEL:AUTH_FAILED";
+  if (status === 429) return "MODEL:RATE_LIMITED";
+  if (status === 404 || code === "model_not_found") return "MODEL:MODEL_NOT_FOUND";
+  if (
+    name === "AbortError" ||
+    name === "APIUserAbortError" ||
+    name === "APIConnectionTimeoutError" ||
+    code === "ETIMEDOUT"
+  ) {
+    return "MODEL:TIMEOUT_OR_ABORTED";
+  }
+  if (status !== null && status >= 500) return "MODEL:PROVIDER_5XX";
+  if (name === "APIConnectionError" || code === "ECONNRESET" || code === "ENOTFOUND") {
+    return "MODEL:NETWORK";
+  }
+  if (status !== null) return `MODEL:HTTP_${status}`;
+  return "MODEL:UNKNOWN";
+}
+
 /** Compact, excerpt-free diagnostic line for one overlap finding. */
 export function safeOverlapDiagnostic(finding: {
   code: string;
@@ -197,8 +231,13 @@ export async function runProtectedMarkSprintDraft(
   let execution: MarkSprintModelExecutionResult;
   try {
     execution = await input.executor.executeExactRequest(input.modelRequest);
-  } catch {
-    throw new MarkSprintDraftPipelineError("MODEL_EXECUTION_FAILED");
+  } catch (error) {
+    // Classify the transport failure into a safe MODEL:<KIND> token so the
+    // durable audit names the cause (out of credit / auth / timeout / 5xx)
+    // instead of a bare MODEL_EXECUTION_FAILED — no provider text leaks.
+    throw new MarkSprintDraftPipelineError("MODEL_EXECUTION_FAILED", [], null, [
+      safeModelExecutionDiagnostic(error),
+    ]);
   }
   const tokenUsage = execution ? safeTokenUsage(execution) : null;
   if (
