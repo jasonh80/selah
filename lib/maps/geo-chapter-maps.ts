@@ -1,0 +1,245 @@
+// Real-map (MapLibre) chapter geography — the owner-approved maps engine
+// (2026-07-17): live satellite tiles, genuine borders/city labels, 3-D
+// terrain, a guided journey tour, and a Today/Biblical swipe compare.
+//
+// Every overlay derives from the digest-bound Prepare location entries in
+// mark-sprint-acceptance.v1.json under the two-axis model
+// (lib/prepare-locations.ts) — enforced by verify:maps-honesty:
+//   point (known)      → 3-D pin at the real coordinate
+//   region             → soft area with its certainty qualifier in the label
+//   route (known)      → precise drawn path
+//   route (probable)   → broad stylized CORRIDOR between the text-given
+//                        waypoints — obviously not a road line
+//   route (unknown) / text-only → nothing drawn; named in captions
+// Coordinates are real WGS84 lng/lat.
+
+export interface GeoPin {
+  lng: number;
+  lat: number;
+  label: string;
+  /** Digest-bound Prepare entry this pin renders (event or context role). */
+  locationName?: string;
+  /** Background orientation pin — never an approved location's name. */
+  context?: true;
+  /** Render the label left of the pin (for close-together coastal pins). */
+  labelSide?: "left";
+}
+
+export interface GeoArea {
+  locationName: string;
+  label: string;
+  /** Polygon ring, [lng, lat][] (closed or open — renderer closes it). */
+  polygon: [number, number][];
+  labelAt: [number, number];
+}
+
+export interface GeoCorridor {
+  locationName: string;
+  label: string;
+  /** Text-given waypoints; the renderer sweeps a broad smoothed band
+   * through them — never a precise road line. */
+  waypoints: [number, number][];
+  labelAt: [number, number];
+}
+
+export interface GeoView {
+  center: [number, number];
+  zoom: number;
+  pitch?: number;
+  bearing?: number;
+}
+
+export interface GeoTourStop {
+  center: [number, number];
+  zoom: number;
+  pitch?: number;
+  bearing?: number;
+  title: string;
+  caption: string;
+}
+
+export interface GeoChapterMap {
+  views: { big: GeoView; local: GeoView };
+  pins: GeoPin[];
+  areas: GeoArea[];
+  corridors: GeoCorridor[];
+  tour: GeoTourStop[];
+  caption: string;
+}
+
+/** Circle polygon around a point, radius in km. */
+export function circlePolygon(
+  lng: number,
+  lat: number,
+  km: number,
+  steps = 48,
+): [number, number][] {
+  const kx = km / (111.32 * Math.cos((lat * Math.PI) / 180));
+  const ky = km / 110.57;
+  const pts: [number, number][] = [];
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * 2 * Math.PI;
+    pts.push([lng + Math.cos(a) * kx, lat + Math.sin(a) * ky]);
+  }
+  return pts;
+}
+
+// Real places (WGS84): Capernaum 32.8807N 35.5758E · Gennesaret plain
+// 32.8657N 35.5203E · Tyre 33.2705N 35.2038E · Sidon 33.5615N 35.3690E ·
+// Caesarea Philippi (Banias) 33.2486N 35.6944E · Bethsaida candidates
+// et-Tell 32.9097N 35.6310E and el-Araj 32.8894N 35.6178E.
+const CAPERNAUM: [number, number] = [35.5758, 32.8807];
+
+export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
+  "mark-7": {
+    views: {
+      local: { center: [35.62, 32.83], zoom: 10.2 },
+      big: { center: [35.42, 33.1], zoom: 7.8 },
+    },
+    pins: [
+      { lng: 35.5203, lat: 32.8657, label: "Gennesaret", locationName: "Gennesaret" },
+      { lng: 35.2038, lat: 33.2705, label: "Tyre", locationName: "Tyre" },
+      { lng: 35.369, lat: 33.5615, label: "Sidon", locationName: "Sidon", labelSide: "left" },
+      { lng: CAPERNAUM[0], lat: CAPERNAUM[1], label: "Capernaum", context: true },
+    ],
+    areas: [
+      {
+        locationName: "Decapolis",
+        label: "Decapolis · approx.",
+        polygon: [
+          [35.65, 32.82], [35.86, 32.88], [36.02, 32.62],
+          [35.92, 32.38], [35.68, 32.5], [35.645, 32.68],
+        ],
+        labelAt: [35.83, 32.63],
+      },
+    ],
+    corridors: [
+      {
+        locationName: "Route Tyre to Sidon to Decapolis",
+        label: "Approx. route",
+        waypoints: [
+          [35.2038, 33.2705], [35.369, 33.5615], [35.72, 33.28],
+          [35.78, 32.98], [35.8, 32.7],
+        ],
+        labelAt: [35.62, 33.32],
+      },
+    ],
+    tour: [
+      {
+        center: [35.5203, 32.8657], zoom: 12, pitch: 50,
+        title: "Gennesaret",
+        caption: "The chapter opens on the crowded northwest shore — the dispute over clean hands finds Jesus right where the boats landed (6:53–7:1).",
+      },
+      {
+        center: [35.2038, 33.2705], zoom: 11.5, pitch: 45,
+        title: "The region of Tyre",
+        caption: "Jesus withdraws roughly 35 miles northwest into Gentile territory (7:24). The city is known; the house he entered is not — so no pin marks it.",
+      },
+      {
+        center: [35.369, 33.5615], zoom: 11, pitch: 45,
+        title: "Through Sidon",
+        caption: "The return route runs north through Sidon before turning back southeast (7:31) — famously the long way around.",
+      },
+      {
+        center: [35.6, 33.1], zoom: 8.6, pitch: 30,
+        title: "The roundabout way",
+        caption: "The broad sweep shows the direction of travel the text gives — Tyre, Sidon, then down toward the lake. The exact road is unrecorded, so no precise line is drawn.",
+      },
+      {
+        center: [35.83, 32.63], zoom: 9.8, pitch: 45,
+        title: "Into the Decapolis",
+        caption: "The deaf man is healed somewhere in the Decapolis, the league of Greek cities southeast of the lake (7:31–37). The region is real; the exact spot is not given.",
+      },
+    ],
+    caption:
+      "Mark 7 crosses into Gentile territory — the coast at Tyre and Sidon, then back to the Decapolis. Known cities carry pins; the healing site is shown as a region; the roundabout route of 7:31 appears only as a broad sweep because the exact road is unrecorded.",
+  },
+
+  "mark-8": {
+    views: {
+      local: { center: [35.66, 32.85], zoom: 10.4 },
+      big: { center: [35.62, 33.0], zoom: 8.4 },
+    },
+    pins: [
+      { lng: 35.6944, lat: 33.2486, label: "Caesarea Philippi", locationName: "Caesarea Philippi" },
+      { lng: CAPERNAUM[0], lat: CAPERNAUM[1], label: "Capernaum", context: true },
+    ],
+    areas: [
+      {
+        locationName: "Bethsaida",
+        label: "Bethsaida · debated",
+        polygon: circlePolygon(35.6244, 32.8995, 1.7),
+        labelAt: [35.665, 32.93],
+      },
+      {
+        locationName: "Feeding of the 4,000",
+        label: "Feeding of 4,000 · probable",
+        polygon: circlePolygon(35.66, 32.77, 4.2),
+        labelAt: [35.725, 32.72],
+      },
+    ],
+    corridors: [],
+    tour: [
+      {
+        center: [35.66, 32.77], zoom: 11, pitch: 50,
+        title: "Feeding of the 4,000",
+        caption: "On the eastern, Decapolis side of the lake, Jesus feeds four thousand (8:1–9). The area is probable; no exact spot is given.",
+      },
+      {
+        center: [35.5, 32.83], zoom: 11, pitch: 40,
+        title: "The district of Dalmanutha",
+        caption: "The boat crosses to 'the district of Dalmanutha' (8:10) — a place no one has securely identified to this day. It is named honestly, never pinned.",
+      },
+      {
+        center: [35.6244, 32.8995], zoom: 12.2, pitch: 50,
+        title: "Bethsaida",
+        caption: "The blind man is healed in stages at Bethsaida (8:22–26). The town is certain in the text; which of two nearby ruins it is remains debated — the area covers both.",
+      },
+      {
+        center: [35.6944, 33.2486], zoom: 11, pitch: 55, bearing: 20,
+        title: "Toward Caesarea Philippi",
+        caption: "Twenty-five miles north, at the foot of Mount Hermon, Peter answers the question of the whole Gospel: 'You are the Christ' (8:27–30) — on the road, in the villages around the city.",
+      },
+    ],
+    caption:
+      "Mark 8 moves from the lake's eastern shore to the far north. Dalmanutha stays unpinned (unidentified), Bethsaida shows as an area covering both candidate ruins, and Caesarea Philippi anchors Peter's confession country.",
+  },
+
+  // Mark 9 uses the owner-approved legacy entries (bound byte-identical):
+  // Capernaum known point; the Transfiguration mountain and the passage
+  // through Galilee are no-pin entries — captions only.
+  "mark-9": {
+    views: {
+      local: { center: [35.6, 32.95], zoom: 9.6 },
+      big: { center: [35.62, 33.0], zoom: 8.4 },
+    },
+    pins: [
+      { lng: CAPERNAUM[0], lat: CAPERNAUM[1], label: "Capernaum", locationName: "Capernaum" },
+    ],
+    areas: [],
+    corridors: [],
+    tour: [
+      {
+        center: [35.66, 33.2], zoom: 9, pitch: 55, bearing: 15,
+        title: "A high mountain",
+        caption: "Jesus is transfigured on 'a high mountain' Mark leaves unnamed (9:2). Tabor is the tradition; the Hermon country fits the journey — the uncertainty is stated, not painted over. No pin claims the summit.",
+      },
+      {
+        center: [35.45, 32.85], zoom: 9.4, pitch: 40,
+        title: "Passing through Galilee",
+        caption: "They pass through Galilee by an unrecorded way, and Jesus does not want anyone to know (9:30) — teaching his disciples about the cross. No route is drawn.",
+      },
+      {
+        center: CAPERNAUM, zoom: 12.5, pitch: 50,
+        title: "Capernaum",
+        caption: "Back in the house at Capernaum (9:33), the argument about who is greatest meets a child in the middle of the room.",
+      },
+    ],
+    caption:
+      "Mark 9 runs from an unnamed high mountain down through Galilee to a house in Capernaum. Only Capernaum earns a pin — the mountain and the route are honestly uncertain and stay unpinned.",
+  },
+};
+
+export function getGeoChapterMap(slug: string): GeoChapterMap | null {
+  return GEO_CHAPTER_MAPS[slug] ?? null;
+}

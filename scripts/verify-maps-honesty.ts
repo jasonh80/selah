@@ -41,6 +41,7 @@ import {
   type MapPin,
   type MapRegion,
 } from "../lib/maps/chapter-maps";
+import { GEO_CHAPTER_MAPS, type GeoChapterMap } from "../lib/maps/geo-chapter-maps";
 
 let checks = 0;
 function ok(cond: boolean, label: string): void {
@@ -291,6 +292,101 @@ function checkChapter(
   }
 }
 
+/** Same honesty rules over the REAL-MAP engine layer (geo-chapter-maps):
+ * pins ↔ known points, areas ↔ regions (label carries the certainty
+ * qualifier), corridors ↔ probable routes only, text-only entries named in
+ * the caption or a tour caption and never drawn. */
+function checkGeoChapter(
+  slug: string,
+  locations: PrepareLocation[],
+  cfg: GeoChapterMap,
+  check: (cond: boolean, label: string) => void,
+): void {
+  const approvedNamesLower = new Set(locations.map((l) => l.name.toLowerCase()));
+  const byName = new Map(locations.map((l) => [l.name, l]));
+  const captionText = [cfg.caption, ...cfg.tour.map((t) => `${t.title} ${t.caption}`)]
+    .join(" ")
+    .toLowerCase();
+
+  for (const pin of cfg.pins) {
+    check(
+      (pin.locationName !== undefined) !== (pin.context === true),
+      `${slug} geo: pin "${pin.label}" must be exactly one of event (locationName) or context`,
+    );
+    if (pin.context === true) {
+      check(
+        !approvedNamesLower.has(pin.label.toLowerCase()),
+        `${slug} geo: context pin "${pin.label}" reuses an approved location name`,
+      );
+    }
+    if (pin.locationName !== undefined) {
+      const entry = byName.get(pin.locationName);
+      check(Boolean(entry), `${slug} geo: pin "${pin.label}" references unapproved "${pin.locationName}"`);
+      if (entry) {
+        check(
+          prepareLocationMapTreatment(entry) === "pin",
+          `${slug} geo: pin "${pin.label}" contradicts approved ${entry.featureKind}/${entry.certainty}`,
+        );
+      }
+    }
+  }
+  for (const area of cfg.areas) {
+    const entry = byName.get(area.locationName);
+    check(Boolean(entry), `${slug} geo: area "${area.label}" references unapproved "${area.locationName}"`);
+    if (entry) {
+      check(
+        prepareLocationMapTreatment(entry) === "area",
+        `${slug} geo: area "${area.label}" contradicts approved ${entry.featureKind}/${entry.certainty}`,
+      );
+      check(
+        area.label.toLowerCase().includes(prepareAreaLabelQualifier(entry.certainty)),
+        `${slug} geo: area "${area.label}" must carry the "${prepareAreaLabelQualifier(entry.certainty)}" qualifier`,
+      );
+    }
+    check(area.polygon.length >= 4, `${slug} geo: area "${area.label}" needs a real polygon`);
+  }
+  for (const corridor of cfg.corridors) {
+    const entry = byName.get(corridor.locationName);
+    check(Boolean(entry), `${slug} geo: corridor "${corridor.label}" references unapproved "${corridor.locationName}"`);
+    if (entry) {
+      check(
+        prepareLocationMapTreatment(entry) === "corridor",
+        `${slug} geo: corridor "${corridor.label}" contradicts approved ${entry.featureKind}/${entry.certainty} — only probable routes render as corridors`,
+      );
+    }
+    check(
+      corridor.label.toLowerCase().includes("approx") || corridor.label.toLowerCase().includes("possible"),
+      `${slug} geo: corridor "${corridor.label}" must state its approximation`,
+    );
+  }
+  for (const location of locations) {
+    const treatment = prepareLocationMapTreatment(location);
+    const pinRefs = cfg.pins.filter((p) => p.locationName === location.name);
+    const areaRefs = cfg.areas.filter((a) => a.locationName === location.name);
+    const corridorRefs = cfg.corridors.filter((c) => c.locationName === location.name);
+    if (treatment === "pin") {
+      check(pinRefs.length > 0, `${slug} geo: point "${location.name}" must be pinned`);
+      check(areaRefs.length === 0 && corridorRefs.length === 0, `${slug} geo: point "${location.name}" renders only as a pin`);
+    } else if (treatment === "area") {
+      check(areaRefs.length > 0, `${slug} geo: region "${location.name}" must render as an area`);
+      check(pinRefs.length === 0 && corridorRefs.length === 0, `${slug} geo: region "${location.name}" never pins or sweeps`);
+    } else if (treatment === "corridor") {
+      check(corridorRefs.length > 0, `${slug} geo: probable route "${location.name}" must render as a broad corridor`);
+      check(pinRefs.length === 0 && areaRefs.length === 0, `${slug} geo: route "${location.name}" renders only as a corridor`);
+    } else {
+      check(
+        pinRefs.length === 0 && areaRefs.length === 0 && corridorRefs.length === 0,
+        `${slug} geo: "${location.name}" (${location.featureKind}/${location.certainty}) must never be drawn`,
+      );
+      const firstWord = location.name.split(" ")[0].toLowerCase();
+      check(
+        captionText.includes(firstWord) || captionText.includes("route"),
+        `${slug} geo: undrawn location "${location.name}" must be named in a caption or tour stop`,
+      );
+    }
+  }
+}
+
 const fixtureSlugs = Object.keys(acceptance.chapters);
 for (const slug of fixtureSlugs) {
   const raw = acceptance.chapters[slug].locations ?? [];
@@ -302,14 +398,15 @@ for (const slug of fixtureSlugs) {
     `${slug}: every fixture location entry is valid under the two-axis model`,
   );
   const cfg = CHAPTER_MAPS[slug];
-  if (locations.length > 0 && !cfg) {
+  const geoCfg = GEO_CHAPTER_MAPS[slug];
+  if (locations.length > 0 && !cfg && !geoCfg) {
     console.log(
       `[maps-honesty] ${slug}: ${locations.length} approved location(s), no map config yet — allowed (map tiles ride a later pass)`,
     );
     continue;
   }
-  if (!cfg) continue;
-  checkChapter(slug, locations, cfg, ok);
+  if (cfg) checkChapter(slug, locations, cfg, ok);
+  if (geoCfg) checkGeoChapter(slug, locations, geoCfg, ok);
 }
 
 // --- Negative controls -------------------------------------------------------
@@ -435,6 +532,57 @@ expectViolation("a missing required area render is caught", () =>
 expectViolation("a missing required pin render is caught", () =>
   syntheticCheck([HONEST_PINS[1]], HONEST_REGIONS),
 );
+
+// Geo negative controls: the geo checker itself must refuse dishonest configs.
+function expectGeoViolation(label: string, mutate: (cfg: GeoChapterMap) => void): void {
+  const base: GeoChapterMap = {
+    views: { big: { center: [0, 0], zoom: 1 }, local: { center: [0, 0], zoom: 1 } },
+    pins: [{ lng: 0, lat: 0, label: "Real Town", locationName: "Real Town" }],
+    areas: [
+      { locationName: "Wide League", label: "Wide League · approx.", polygon: [[0, 0], [1, 0], [1, 1], [0, 1]], labelAt: [0, 0] },
+      { locationName: "Argued Site", label: "Argued Site · debated", polygon: [[0, 0], [1, 0], [1, 1], [0, 1]], labelAt: [0, 0] },
+    ],
+    corridors: [{ locationName: "Roundabout Way", label: "Approx. route", waypoints: [[0, 0], [1, 1]], labelAt: [0, 0] }],
+    tour: [],
+    caption: "The Lost District and the unrecorded route are named here.",
+  };
+  const cfg = structuredClone(base);
+  mutate(cfg);
+  let threw = false;
+  try {
+    checkGeoChapter("synthetic-geo", SYNTHETIC, cfg, (cond, msg) => assert.ok(cond, msg));
+  } catch {
+    threw = true;
+  }
+  ok(threw, label);
+}
+{
+  // The honest baseline itself passes.
+  expectGeoViolation("geo baseline sanity (a violation IS caught when added)", (cfg) => {
+    cfg.pins.push({ lng: 0, lat: 0, label: "Lost District", locationName: "Lost District" });
+  });
+  expectGeoViolation("geo: pin on a known REGION is caught", (cfg) => {
+    cfg.pins.push({ lng: 0, lat: 0, label: "League HQ", locationName: "Wide League" });
+  });
+  expectGeoViolation("geo: single pin on a debated site is caught", (cfg) => {
+    cfg.pins.push({ lng: 0, lat: 0, label: "Argued Site", locationName: "Argued Site" });
+  });
+  expectGeoViolation("geo: corridor on an UNKNOWN route is caught", (cfg) => {
+    cfg.corridors.push({ locationName: "Unrecorded Route", label: "Approx. route", waypoints: [[0, 0], [1, 1]], labelAt: [0, 0] });
+  });
+  expectGeoViolation("geo: corridor on a known POINT is caught", (cfg) => {
+    cfg.corridors.push({ locationName: "Real Town", label: "Approx. route", waypoints: [[0, 0], [1, 1]], labelAt: [0, 0] });
+  });
+  expectGeoViolation("geo: unclassified pin naming an approved location is caught", (cfg) => {
+    cfg.pins.push({ lng: 0, lat: 0, label: "Lost District" });
+  });
+  expectGeoViolation("geo: area without its certainty qualifier is caught", (cfg) => {
+    cfg.areas[1].label = "Argued Site";
+  });
+  expectGeoViolation("geo: missing required corridor render is caught", (cfg) => {
+    cfg.corridors = [];
+  });
+}
 
 // The chapters this lane ships must carry their approved entries. Their MAP
 // configs are intentionally absent: the owner chose a real map engine
