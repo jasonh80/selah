@@ -24,6 +24,10 @@
 import assert from "node:assert/strict";
 import acceptanceArtifact from "../lib/ai/quality/mark-sprint-acceptance.v1.json";
 import {
+  MARK_7_BOUND_CONTENT_CHANGED_AT,
+  MARK_7_STUDIO_SETUP_APPROVAL,
+} from "../lib/server/mark-sprint-setup-contracts";
+import {
   normalizePrepareLocation,
   prepareAreaLabelQualifier,
   prepareLocationComboAllowed,
@@ -74,6 +78,36 @@ ok(prepareLocationMapTreatment({ featureKind: "route", certainty: "unknown" }) =
 ok(prepareLocationMapTreatment({ featureKind: "route", certainty: "known" }) === "path", "known route → drawable");
 ok(prepareLocationMapTreatment({ featureKind: "route", certainty: "probable" }) === "corridor", "probable route → broad corridor, never a precise path");
 ok(prepareLocationMapTreatment({ featureKind: "text-only", certainty: "unknown" }) === "text-only", "text-only → text-only");
+
+// The helper itself fails closed on forbidden combinations (PR #41 review,
+// P2) — a "debated point" must throw, never quietly return a pin.
+function treatmentThrows(featureKind: string, certainty: string): boolean {
+  try {
+    prepareLocationMapTreatment({ featureKind, certainty } as never);
+    return false;
+  } catch {
+    return true;
+  }
+}
+ok(treatmentThrows("point", "debated"), "treatment(point+debated) throws — never a pin");
+ok(treatmentThrows("point", "unknown"), "treatment(point+unknown) throws");
+ok(treatmentThrows("region", "unknown"), "treatment(region+unknown) throws");
+ok(treatmentThrows("route", "debated"), "treatment(route+debated) throws");
+ok(treatmentThrows("text-only", "known"), "treatment(text-only+known) throws");
+
+// The re-minted Mark 7 receipt must record the LATEST owner decision (PR #41
+// review, P1): approved_at may never predate the moment the bound content
+// last changed, so a re-mint can never silently ride an old approval date.
+{
+  const approvedAt = Date.parse(MARK_7_STUDIO_SETUP_APPROVAL?.approved_at ?? "");
+  const contentChangedAt = Date.parse(MARK_7_BOUND_CONTENT_CHANGED_AT);
+  ok(!Number.isNaN(approvedAt), "mark-7 approved_at parses");
+  ok(!Number.isNaN(contentChangedAt), "mark-7 bound-content-changed-at parses");
+  ok(
+    approvedAt >= contentChangedAt,
+    "mark-7 approved_at must not predate the re-mint that changed bound content",
+  );
+}
 
 // Legacy entries (the byte-identical Mark 9 packet) normalize losslessly.
 ok(

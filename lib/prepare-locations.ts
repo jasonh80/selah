@@ -73,11 +73,20 @@ export function prepareLocationComboAllowed(
 /** How a location may render on a map. Derived from featureKind (the shape),
  * with certainty carried into the label qualifier — never the reverse.
  * "corridor" is a broad, obviously-stylized sweep between text-given
- * waypoints — visually distinct from a precise road path. */
+ * waypoints — visually distinct from a precise road path.
+ * FAIL-CLOSED (PR #41 review, P2): a forbidden featureKind×certainty
+ * combination throws here rather than returning a plausible treatment —
+ * upstream normalization already refuses these, but the helper must never
+ * hand a pin to a "debated point" even if called directly. */
 export type PrepareMapTreatment = "pin" | "area" | "path" | "corridor" | "text-only";
 export function prepareLocationMapTreatment(
   location: Pick<PrepareLocation, "featureKind" | "certainty">,
 ): PrepareMapTreatment {
+  if (!prepareLocationComboAllowed(location.featureKind, location.certainty)) {
+    throw new Error(
+      `forbidden location combination: ${location.featureKind}/${location.certainty}`,
+    );
+  }
   switch (location.featureKind) {
     case "point":
       return "pin";
