@@ -329,6 +329,7 @@ import {
   readStoredSetupApproval,
   __setStoredSetupApprovalStoreForTesting,
 } from "../lib/server/chapter-setup-approvals";
+import { __setMarkSprintStudioSetupStoreForTesting } from "../lib/server/mark-sprint-studio-setup";
 
 const LOWERCASE_SHA256_TEST = /^[a-f0-9]{64}$/u;
 import { POST as adminPost } from "../app/api/admin/generation/route";
@@ -1267,6 +1268,37 @@ const realRouteAndWorkers = async () => {
   __setJobStoreForTesting(store);
   __setRowLookupForTesting(storeLookup(store));
   __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+  // HERMETIC OFFLINE SETUP (P0 launch blocker, board 2026-07-17): production
+  // builds carry real Supabase env, so without this seam any block reaching
+  // runMarkSprintStudioSetup would use the LIVE adapter — the "offline" gate
+  // becomes environment-dependent (green locally/preview, red in production
+  // builds) and could even touch live data during a build. Installing a
+  // deterministic failing store makes every setup path fail identically in
+  // every environment; the counter proves the INJECTED store (never a live
+  // adapter) is what was reached.
+  const offlineSetup = { reached: 0 };
+  const offlineSetupFailure = (): never => {
+    offlineSetup.reached++;
+    throw new Error("offline setup store: deterministic failure (gates never use a live adapter)");
+  };
+  __setMarkSprintStudioSetupStoreForTesting({
+    async readCanonicalRules() { return offlineSetupFailure(); },
+    async readChapterNotes() { return offlineSetupFailure(); },
+    async upsertNotes() { offlineSetupFailure(); },
+  });
+  // Same hermeticity for the APPROVAL-ROW store: outside the blocks that
+  // install their own fakes, reads must deterministically see an empty store
+  // — never the live table. (Otherwise a production build would do live
+  // reads, and the final "fails closed" check would flip the moment a real
+  // mark-9 approval row exists — breaking every deploy after the owner
+  // prepares the chapter.)
+  const EMPTY_APPROVAL_STORE = {
+    async read() { return null; },
+    async upsert(): Promise<void> {
+      throw new Error("offline approval store is read-only outside its test windows");
+    },
+  };
+  __setStoredSetupApprovalStoreForTesting(EMPTY_APPROVAL_STORE);
   __setCostCaptureForTesting(costs);
   __setGenerationConfigBypassForTesting(true);
   __setTriggerTransportForTesting(async (req) => {
@@ -1648,7 +1680,8 @@ const realRouteAndWorkers = async () => {
         // the message now truthfully says the approval IS recorded while the
         // seeding is what failed.
         const approved = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: contract.setupDigest, baseSetupDigest: contract.setupDigest }));
-        ok(approved.status === 500, "R2e offline seeding after approval fails closed with a plain refusal");
+        ok(approved.status === 500, "R2e offline setup after approval fails closed with a plain refusal");
+        ok(offlineSetup.reached > 0, "R2e the INJECTED offline setup store (never a live adapter) is what failed");
         const approvedBody = (await approved.clone().json()) as { error?: string };
         ok(
           String(approvedBody.error ?? "").includes("approval") &&
@@ -1758,7 +1791,7 @@ const realRouteAndWorkers = async () => {
 
           // The real edited approval: row recorded WITH the packet.
           const editedApproved = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-9", confirm: true, setupDigest: editedDigest, baseSetupDigest: contract.setupDigest, notes: editedNotes }));
-          ok(editedApproved.status === 500, "R2g offline seeding still fails closed after the edited approval");
+          ok(editedApproved.status === 500, "R2g offline setup still fails closed after the edited approval");
           const storedRow = approvalRows.get("mark-9");
           ok(
             Array.isArray(storedRow?.packet_notes) &&
@@ -1871,9 +1904,9 @@ const realRouteAndWorkers = async () => {
           __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
         }
       } finally {
-        __setStoredSetupApprovalStoreForTesting(null);
+        __setStoredSetupApprovalStoreForTesting(EMPTY_APPROVAL_STORE);
       }
-      ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e without any store, Mark 9 fails closed again");
+      ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-9")), "R2e with an empty approval store, Mark 9 fails closed again");
     }
 
     // R3. Kill switch OFF through the REAL route: refused before any claim.
@@ -2472,6 +2505,37 @@ const realImagePipeline = async () => {
   __setJobStoreForTesting(store);
   __setRowLookupForTesting(storeLookup(store));
   __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+  // HERMETIC OFFLINE SETUP (P0 launch blocker, board 2026-07-17): production
+  // builds carry real Supabase env, so without this seam any block reaching
+  // runMarkSprintStudioSetup would use the LIVE adapter — the "offline" gate
+  // becomes environment-dependent (green locally/preview, red in production
+  // builds) and could even touch live data during a build. Installing a
+  // deterministic failing store makes every setup path fail identically in
+  // every environment; the counter proves the INJECTED store (never a live
+  // adapter) is what was reached.
+  const offlineSetup = { reached: 0 };
+  const offlineSetupFailure = (): never => {
+    offlineSetup.reached++;
+    throw new Error("offline setup store: deterministic failure (gates never use a live adapter)");
+  };
+  __setMarkSprintStudioSetupStoreForTesting({
+    async readCanonicalRules() { return offlineSetupFailure(); },
+    async readChapterNotes() { return offlineSetupFailure(); },
+    async upsertNotes() { offlineSetupFailure(); },
+  });
+  // Same hermeticity for the APPROVAL-ROW store: outside the blocks that
+  // install their own fakes, reads must deterministically see an empty store
+  // — never the live table. (Otherwise a production build would do live
+  // reads, and the final "fails closed" check would flip the moment a real
+  // mark-9 approval row exists — breaking every deploy after the owner
+  // prepares the chapter.)
+  const EMPTY_APPROVAL_STORE = {
+    async read() { return null; },
+    async upsert(): Promise<void> {
+      throw new Error("offline approval store is read-only outside its test windows");
+    },
+  };
+  __setStoredSetupApprovalStoreForTesting(EMPTY_APPROVAL_STORE);
   __setCostCaptureForTesting(costs);
   __setImageTestOverrides({
     configBypass: true,
@@ -3436,6 +3500,8 @@ const realImagePipeline = async () => {
     __setImageTestOverrides(null);
     __setImageDepsForTesting(null);
     __setTriggerTransportForTesting(null);
+    __setMarkSprintStudioSetupStoreForTesting(null);
+    __setStoredSetupApprovalStoreForTesting(null);
   }
 };
 
