@@ -1,6 +1,6 @@
 // Real-map (MapLibre) chapter geography — the owner-approved maps engine
 // (2026-07-17): live satellite tiles, genuine borders/city labels, 3-D
-// terrain, a guided journey tour, and a Today/Biblical swipe compare.
+// terrain, a guided journey tour, and a Today/Terrain swipe compare.
 //
 // Every overlay derives from the digest-bound Prepare location entries in
 // mark-sprint-acceptance.v1.json under the two-axis model
@@ -186,7 +186,10 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
         caption: "On the eastern, Decapolis side of the lake, Jesus feeds four thousand (8:1–9). The area is probable; no exact spot is given.",
       },
       {
-        center: [35.5, 32.83], zoom: 11, pitch: 40,
+        // WIDE whole-lake frame — Dalmanutha is unidentified, so the camera
+        // must not assert a spot for it (PR #43 review, P1-2). The caption
+        // carries the honesty.
+        center: [35.59, 32.82], zoom: 9.4, pitch: 0,
         title: "The district of Dalmanutha",
         caption: "The boat crosses to 'the district of Dalmanutha' (8:10) — a place no one has securely identified to this day. It is named honestly, never pinned.",
       },
@@ -220,7 +223,10 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     corridors: [],
     tour: [
       {
-        center: [35.66, 33.2], zoom: 9, pitch: 55, bearing: 15,
+        // WIDE northern-region frame — Mark leaves the mountain unnamed, so
+        // the camera frames the whole candidate country (Tabor to Hermon)
+        // without asserting a summit (PR #43 review, P1-2).
+        center: [35.5, 33.0], zoom: 7.8, pitch: 30, bearing: 0,
         title: "A high mountain",
         caption: "Jesus is transfigured on 'a high mountain' Mark leaves unnamed (9:2). Tabor is the tradition; the Hermon country fits the journey — the uncertainty is stated, not painted over. No pin claims the summit.",
       },

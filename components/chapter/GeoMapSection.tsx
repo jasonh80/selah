@@ -3,7 +3,7 @@
 // Real-map Maps & Places (owner decision 2026-07-17): MapLibre GL over free
 // Esri World Imagery tiles with the Esri boundaries/places reference layer,
 // free AWS Terrarium elevation for 3-D terrain, a guided journey tour, and a
-// Today/Biblical swipe compare. No API keys, no metered services.
+// Today/Terrain swipe compare. No API keys, no metered services.
 //
 // Overlays render ONLY the digest-bound Prepare location entries via
 // lib/maps/geo-chapter-maps.ts (verify:maps-honesty enforces the two-axis
@@ -29,7 +29,7 @@ const TERRAIN_TILES =
 const ATTRIBUTION =
   "Imagery © Esri, Maxar, Earthstar Geographics · Terrain © Mapzen/AWS";
 
-type Mode = "today" | "biblical";
+type Mode = "today" | "terrain";
 
 /** Catmull-Rom smoothing through corridor waypoints so the sweep reads as a
  * broad gesture, never a surveyed road line. */
@@ -144,10 +144,13 @@ function addOverlays(map: maplibregl.Map, cfg: GeoChapterMap): maplibregl.Marker
 }
 
 function applyMode(map: maplibregl.Map, mode: Mode, borders: boolean): void {
-  const biblical = mode === "biblical";
-  map.setLayoutProperty("reference", "visibility", !biblical && borders ? "visible" : "none");
-  map.setLayoutProperty("hillshade", "visibility", biblical ? "visible" : "none");
-  map.setPaintProperty("imagery", "raster-saturation", biblical ? -0.45 : 0);
+  // "Terrain" is honest: today's satellite imagery with hillshade emphasis
+  // and reduced saturation so the LANDFORM reads — it is not (and never
+  // claims to be) a biblical-era map (PR #43 review, P1-3).
+  const terrain = mode === "terrain";
+  map.setLayoutProperty("reference", "visibility", !terrain && borders ? "visible" : "none");
+  map.setLayoutProperty("hillshade", "visibility", terrain ? "visible" : "none");
+  map.setPaintProperty("imagery", "raster-saturation", terrain ? -0.45 : 0);
 }
 
 export function GeoMapSection({ data }: { data: ChapterWorkup }) {
@@ -165,17 +168,34 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
   const [swipe, setSwipe] = useState(0.5);
   const [tourIdx, setTourIdx] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   // init main map
   useEffect(() => {
     if (!cfg || !mapRef.current || mapObj.current) return;
-    const map = new maplibregl.Map({
-      container: mapRef.current,
-      style: baseStyle(),
-      center: cfg.views.local.center,
-      zoom: cfg.views.local.zoom,
-      attributionControl: { compact: true },
-    });
+    const container = mapRef.current;
+    const localView = cfg.views.local;
+    let map: maplibregl.Map;
+    try {
+      map = new maplibregl.Map({
+        container,
+        style: baseStyle(),
+        center: localView.center,
+        zoom: localView.zoom,
+        // One-finger page scrolling stays with the PAGE; the map asks for two
+        // fingers (touch) or ctrl+scroll (desktop) — no scroll trap on a
+        // full-width mobile map (PR #43 review, P1-4).
+        cooperativeGestures: true,
+        // Attribution renders as a permanent pill overlay (never clipped by
+        // compare mode) — see below (PR #43 review, P1-1).
+        attributionControl: false,
+      });
+    } catch {
+      // No WebGL (or map init failed): show the honest fallback panel
+      // instead of a dead black frame (PR #43, P2).
+      setFailed(true);
+      return;
+    }
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
     map.on("error", (e) => console.warn("[selah-map] error:", e.error?.message ?? e));
     map.on("load", () => {
@@ -187,7 +207,7 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
     // The section mounts inside a page that is still laying out — keep the
     // canvas matched to its container.
     const ro = new ResizeObserver(() => map.resize());
-    ro.observe(mapRef.current);
+    ro.observe(container);
     mapObj.current = map;
     return () => {
       ro.disconnect();
@@ -261,7 +281,11 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
     });
     under.on("load", () => {
       addOverlays(under, cfg);
-      applyMode(under, "biblical", false);
+      applyMode(under, "terrain", false);
+      // Keep elevation aligned across the two layers when 3-D is on, so the
+      // swipe seam never shows two different ground heights (PR #43, P2).
+      if (threeD) under.setTerrain({ source: "dem", exaggeration: 1.4 });
+      under.resize();
     });
     const sync = () => {
       under.jumpTo({
@@ -272,14 +296,17 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
       });
     };
     main.on("move", sync);
+    const ro = new ResizeObserver(() => under.resize());
+    ro.observe(compareRef.current);
     compareObj.current = under;
     return () => {
+      ro.disconnect();
       main.off("move", sync);
       under.remove();
       compareObj.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compare, cfg]);
+  }, [compare, cfg, threeD]);
 
   if (!cfg) return null;
 
@@ -309,8 +336,8 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
             <button className={seg(mode === "today")} aria-pressed={mode === "today"} onClick={() => setMode("today")}>
               Today
             </button>
-            <button className={seg(mode === "biblical")} aria-pressed={mode === "biblical"} onClick={() => setMode("biblical")}>
-              Biblical
+            <button className={seg(mode === "terrain")} aria-pressed={mode === "terrain"} onClick={() => setMode("terrain")}>
+              Terrain
             </button>
           </div>
         )}
@@ -336,7 +363,15 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
         className="flex flex-col overflow-hidden rounded-md border bg-card"
         style={{ boxShadow: "0 0 0 1px var(--line), 0 14px 40px -20px var(--accent)" }}
       >
-        <div className="relative w-full" style={{ aspectRatio: "4 / 3", touchAction: "none" }}>
+        {failed && (
+          <div className="flex items-center justify-center p-8 text-center" style={{ aspectRatio: "4 / 3" }}>
+            <p className="max-w-[40ch] text-[13px] leading-relaxed text-secondary">
+              The interactive map needs graphics support your browser did not
+              provide. The chapter's places are described in the caption below.
+            </p>
+          </div>
+        )}
+        <div className="relative w-full" style={failed ? { display: "none" } : { aspectRatio: "4 / 3" }}>
           {/* maplibre-gl.css forces position:relative on map containers, so
               position them with inline styles (which win over the stylesheet). */}
           {compare && (
@@ -366,15 +401,21 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
                 max={100}
                 value={swipe * 100}
                 onChange={(e) => setSwipe(Number(e.target.value) / 100)}
-                aria-label="Swipe between today and biblical views"
+                aria-label="Swipe between today and terrain views"
                 className="absolute left-3 right-3 top-2 z-10 accent-[var(--accent-strong)]"
               />
               <span className="absolute left-2.5 bottom-2.5 rounded-full bg-[rgba(12,14,20,0.66)] px-2.5 py-0.5 text-[11px] font-semibold text-white">Today</span>
-              <span className="absolute right-2.5 bottom-2.5 rounded-full bg-[rgba(12,14,20,0.66)] px-2.5 py-0.5 text-[11px] font-semibold text-white">Biblical</span>
+              <span className="absolute right-2.5 bottom-6 rounded-full bg-[rgba(12,14,20,0.66)] px-2.5 py-0.5 text-[11px] font-semibold text-white">Terrain</span>
             </>
           )}
+          <span
+            className="pointer-events-none absolute bottom-1.5 right-2 z-20 rounded bg-[rgba(12,14,20,0.55)] px-1.5 py-0.5 text-[9px] leading-none text-white/85"
+            aria-hidden="true"
+          >
+            {ATTRIBUTION}
+          </span>
           {activeTour && (
-            <div className="absolute inset-x-3 bottom-3 z-10 rounded-md bg-[rgba(12,14,20,0.78)] px-3.5 py-2.5 text-white backdrop-blur-sm">
+            <div role="status" aria-live="polite" className="absolute inset-x-3 bottom-8 z-10 rounded-md bg-[rgba(12,14,20,0.78)] px-3.5 py-2.5 text-white backdrop-blur-sm">
               <p className="text-[12px] font-semibold">
                 {tourIdx! + 1} / {cfg.tour.length} · {activeTour.title}
               </p>
