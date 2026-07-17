@@ -338,6 +338,9 @@ export default function SelahStudioPage() {
   // fresh draft begins. An approval must never carry into a different draft.
   function resetReview() {
     setPreviewed(false);
+    // A repair card belongs to ONE chapter's draft — never let it linger
+    // across a chapter switch or fresh draft (PR #46 review).
+    setQualityWarningCodes([]);
     setVerdict("");
     setNote("");
     setScope("chapter");
