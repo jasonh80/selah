@@ -35,6 +35,16 @@ flows; every proposed gate must name whom it protects.
   known, shaded area = debated). Esri stays; vendor revisit only if the style
   contract hits limits.
 
+## Shared improvement queue
+
+Improvement candidates from launches, QA, and reviews live in
+[`improvement-queue.yml`](improvement-queue.yml) (owner-approved 2026-07-17):
+one entry per candidate — ID · area · improvement · evidence ·
+priority/trigger · status (`queued|working|finished|declined`) ·
+completion PR. Both AIs read it on "catch up" and nightly homework; before
+any chapter refresh, review that chapter's queued notes. Jason does no
+recordkeeping here.
+
 ## Inventory
 
 **Already exists:** date chip · whole-Bible timeline ("Where It Fits") ·
