@@ -334,7 +334,7 @@
           "name": "Jericho",
           "featureKind": "point",
           "certainty": "known",
-          "role": "event",
+          "role": "context",
           "display": "Known city on the road up to Jerusalem; Bartimaeus is healed as Jesus leaves it (10:46). The city is a point — the healing roadside itself is not pinned."
         },
         {
@@ -348,7 +348,7 @@
           "name": "Road up to Jerusalem",
           "featureKind": "route",
           "certainty": "probable",
-          "role": "context",
+          "role": "event",
           "display": "They were on the road going up to Jerusalem (10:32) — the sequence of places is given by the text but the road is unrecorded, so only a broad stylized corridor is shown, never a precise line, and no event along it is pinned."
         }
       ]
