@@ -73,9 +73,13 @@ entries:
       Codex overnight QA of published Mark 9, board #29 (2026-07-18): hero
       source landscape; images 2-3 portrait sources cropped into the 3:2
       frame.
-    priority_trigger: owner-gated paid regeneration — needs Jason's explicit
-      go (image credit); pairs naturally with the Studio single-image redo
-      once merged
+    priority_trigger: >-
+      owner-gated paid regeneration — needs Jason's explicit go (image
+      credit). OWNER DECISION 2026-07-18: the redo tool is draft-only
+      (published chapters refuse via the mutation guard), so the first redo
+      test happens naturally on Mark 10's draft images; Mark 9's two
+      portrait sources stay queued until a published-chapter refresh lane
+      exists (its own owner decision).
     status: queued
     completion_pr: null
 
@@ -112,5 +116,88 @@ entries:
       (lib/server/images.ts spend envelope).
     priority_trigger: before the next paid full image run (protects real
       money; owner-gated path, so fix + gate first)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-007
+    area: navigation
+    improvement: >-
+      Retire the prescribed-daily-chapter framing. Remove the visible
+      "Today" button/concept from navigation; Selah becomes a
+      choose-what-you-study experience. Every chapter lives on its
+      canonical shareable URL (/chapter/mark-9 etc.) and chapter selection,
+      Continue Reading, next/previous, notifications, bookmarks, and share
+      actions all land there. If /today is retained for compatibility it
+      becomes a quiet temporary redirect to the selected/latest chapter's
+      canonical URL — the browser must END on /chapter/{slug}, never render
+      duplicate chapter content on a second URL. Canonical metadata and
+      share actions always use /chapter/{book}-{chapter}. Visible nav:
+      Chapters now; Continue Reading later once reading history exists.
+    evidence: >-
+      Owner direction, board #29 (2026-07-18, two comments — "Remove the
+      visible Today button" + "Final owner direction — chapter URLs and
+      Today").
+    priority_trigger: next navigation/layout pass — explicitly sequenced
+      AFTER launch-critical safety work (IQ-005/IQ-006); do not code ahead
+      of it
+    status: queued
+    completion_pr: null
+
+  - id: IQ-008
+    area: design-workflow
+    improvement: >-
+      Product-design work moves to a shared visual tool before code: Figma
+      for chapter/app layout (inspectable measurements, clean
+      design-to-code handoff); Canva stays for marketing graphics and
+      moodboards. First deliverable: ONE mobile chapter mockup using real
+      Mark 9 content with reduced visual competition — no code changes.
+    evidence: >-
+      Owner direction, board #29 (2026-07-18, "Shared layout design
+      workflow" addendum).
+    priority_trigger: next product-design session (owner said "tomorrow's
+      product-design work", i.e. from 2026-07-19); mockup precedes any
+      layout code
+    status: queued
+    completion_pr: null
+
+  - id: IQ-009
+    area: runtime-health
+    improvement: >-
+      Chapter pages log React hydration errors in the browser console
+      (minified #418, #423, #425 — server/client content mismatch) on
+      initial load. No visible breakage observed, but hydration mismatches
+      can silently drop event handlers and mask real regressions. Find the
+      mismatching render (suspects: date/time-dependent output rendered at
+      request time) and make server and client output identical.
+    evidence: >-
+      Claude live check of production r100/r101 (2026-07-18) during the
+      maps visual verification; errors present on mark-7/8/9 chapter loads
+      before any map interaction.
+    priority_trigger: next runtime/layout pass (free; diagnose first —
+      the fix must not touch chapter content)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-010
+    area: images
+    improvement: >-
+      OWNER DECISION (binding): never delete generated images, and keep
+      retained ones findable — any future cleanup tooling must be
+      owner-gated and default to keep. Storage already honors the first
+      half by design (unique per-job directories, upsert:false, zero
+      deletion code) — replaced images, rejected redo candidates, and
+      superseded runs all stay at their URLs. PROPOSED IMPLEMENTATION
+      (Claude's suggestion, open to redesign): a lightweight owner-facing
+      image library cataloging every stored image (e.g. chapter, kind,
+      job, date, status such as in-use / replaced / rejected-candidate /
+      orphaned-run) so old images can be browsed and reused instead of
+      being reachable only through audit rows.
+    evidence: >-
+      Owner direction (Jason, 2026-07-18, in-session): "do not get rid of
+      old images, find a smart way to keep them stored when they are not
+      used or discarded." Claude verified the append-only storage claims
+      against lib/server/images.ts the same day.
+    priority_trigger: after the current safety work (IQ-005/IQ-006) and
+      Mark 10; pairs naturally with the People/gallery direction
     status: queued
     completion_pr: null
