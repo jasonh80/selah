@@ -104,5 +104,8 @@ too). Codex reviews completed launches after the fact; it is not a
 pre-launch gate.
 
 Not built yet (v1, deliberate): on-screen editing of a proposal — reject and
-regenerate instead. A stale generating claim past the worker's maximum
+regenerate instead. Also deliberate in v1: textual-variant claims are omitted
+entirely (shape validation cannot prove a manuscript claim), and a proposed
+place must be named by the chapter's own text — unsupported claims are
+dropped, never offered for the owner to catch. A stale generating claim past the worker's maximum
 lifetime is cleared honestly by the next create attempt.

@@ -216,16 +216,32 @@ export async function generateAndStoreChapter(
   // The ROUTE took the single atomic claim; this worker atomically CONSUMES it
   // (queued → running) — a duplicated delivery loses at that conditional write
   // BEFORE any spend, and the refusal is durably audited.
+  const store = requireJobStore(slug, "generateAndStoreChapter");
   // IQ-011: a chapter drafted through the self-serve lane loads its owner-
   // approved preparation proposal into the prompt — the exact reviewed
   // version, nothing else. Chapters without any proposal row (legacy
   // regenerations) proceed unchanged; a chapter WITH a proposal row whose
-  // approval is missing/invalid/superseded FAILS the run HERE, before the
-  // claim is even consumed — the job stays queued/releasable and provably
-  // nothing was spent (fail-closed; adversarial pre-review finding: a
-  // fail-soft read silently dropped all approved guidance from a paid draft).
-  const proposalGuidance = await loadProposalGuidanceOrFail(slug);
-  const store = requireJobStore(slug, "generateAndStoreChapter");
+  // approval is missing/invalid/superseded — or whose storage cannot be
+  // read — FAILS the run HERE, BEFORE the claim is consumed, and the queued
+  // claim is terminally failed so nothing strands as "generating" (Codex #58
+  // P1-3): provably nothing was spent.
+  let proposalGuidance: string[];
+  try {
+    proposalGuidance = await loadProposalGuidanceOrFail(slug);
+  } catch (e) {
+    const reason = `approved preparation unavailable: ${String((e as Error).message).slice(0, 200)}`;
+    await failGenerationJob(store, slug, jobId, reason, {
+      expectedState: "queued",
+      approvedManifestDigest,
+    });
+    await logGenerationAudit({
+      action: "generate_text",
+      slug,
+      status: "failed",
+      message: `${reason} (queued claim terminally failed; no spend occurred)`,
+    });
+    throw e;
+  }
   try {
     await consumeGenerationClaim(store, slug, jobId, approvedManifestDigest);
   } catch (e) {

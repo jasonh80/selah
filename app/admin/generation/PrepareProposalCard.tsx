@@ -34,7 +34,7 @@ interface ProposalContent {
 }
 interface ProposalStatus {
   ok: boolean;
-  status: "none" | "generating" | "proposed" | "failed" | "approved" | "superseded";
+  status: "none" | "generating" | "running" | "proposed" | "failed" | "approved" | "superseded";
   proposal: ProposalContent | null;
   proposalDigest: string | null;
   error: string | null;
@@ -61,16 +61,35 @@ export function PrepareProposalCard({
 
   const refresh = useCallback(async () => {
     activeSlug.current = slug;
-    const res = (await api("POST", { action: "prepare_proposal_status", slug })) as ProposalStatus & { error?: string };
+    let res: (ProposalStatus & { error?: string }) | null = null;
+    let dropped = false;
+    try {
+      res = (await api("POST", { action: "prepare_proposal_status", slug })) as ProposalStatus & { error?: string };
+    } catch {
+      dropped = true; // connection drop: keep polling rather than sticking
+    }
     if (activeSlug.current !== slug) return;
-    if (!res?.ok) {
-      // Lane-refused chapter (protected/legacy) or storage off: render nothing
-      // rather than a stuck "Checking…" — the server is the authority.
+    if (dropped || !res) {
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      pollTimer.current = setTimeout(() => void refresh(), 7000);
+      return;
+    }
+    if (!res.ok) {
+      // Lane-refused chapter (protected/legacy) renders nothing; a 503
+      // storage outage keeps polling — the server is the authority either way.
+      const outage = /storage/.test(res.error ?? "");
+      if (outage) {
+        if (pollTimer.current) clearTimeout(pollTimer.current);
+        pollTimer.current = setTimeout(() => void refresh(), 7000);
+        return;
+      }
       setState({ ok: false, status: "none", proposal: null, proposalDigest: null, error: null, maxCostUsd: 0, ineligible: true } as ProposalStatus & { ineligible: boolean });
       return;
     }
     setState(res);
-    if (res?.ok && res.status === "generating") {
+    // generating (queued) and running (worker consumed) are ONE waiting state
+    // for the owner — keep polling through both (Codex #58 P1-6).
+    if (res.status === "generating" || res.status === "running") {
       if (pollTimer.current) clearTimeout(pollTimer.current);
       pollTimer.current = setTimeout(() => void refresh(), 5000);
     }
@@ -86,37 +105,49 @@ export function PrepareProposalCard({
   async function create() {
     setBusy(true);
     setMessage("");
-    const res = (await api("POST", { action: "prepare_proposal_create", slug, confirm: true })) as {
-      ok: boolean;
-      error?: string;
-    };
-    setBusy(false);
-    setConfirming(false);
-    if (!res?.ok) {
-      setMessage(res?.error ?? "The proposal could not be started.");
-      return;
+    try {
+      const res = (await api("POST", { action: "prepare_proposal_create", slug, confirm: true })) as {
+        ok: boolean;
+        error?: string;
+      };
+      if (!res?.ok) {
+        setMessage(res?.error ?? "The proposal could not be started.");
+        return;
+      }
+      void refresh();
+    } catch {
+      setMessage("The connection dropped — check the status again before retrying.");
+      void refresh();
+    } finally {
+      setBusy(false);
+      setConfirming(false);
     }
-    void refresh();
   }
 
   async function decide(action: "prepare_proposal_approve" | "prepare_proposal_reject") {
     if (!state?.proposalDigest) return;
     setBusy(true);
     setMessage("");
-    const res = (await api("POST", {
-      action,
-      slug,
-      proposalDigest: state.proposalDigest,
-      ...(action === "prepare_proposal_approve" ? { confirm: true } : {}),
-    })) as { ok: boolean; error?: string };
-    setBusy(false);
-    if (!res?.ok) {
-      setMessage(res?.error ?? "That decision could not be recorded.");
+    try {
+      const res = (await api("POST", {
+        action,
+        slug,
+        proposalDigest: state.proposalDigest,
+        ...(action === "prepare_proposal_approve" ? { confirm: true } : {}),
+      })) as { ok: boolean; error?: string };
+      if (!res?.ok) {
+        setMessage(res?.error ?? "That decision could not be recorded.");
+        void refresh();
+        return;
+      }
+      if (action === "prepare_proposal_approve") onApproved();
       void refresh();
-      return;
+    } catch {
+      setMessage("The connection dropped — the decision may not have been recorded; check the status.");
+      void refresh();
+    } finally {
+      setBusy(false);
     }
-    if (action === "prepare_proposal_approve") onApproved();
-    void refresh();
   }
 
   const ghost =
@@ -131,7 +162,7 @@ export function PrepareProposalCard({
     return null; // this chapter is served by another lane (or storage is off)
   }
 
-  if (state.status === "generating") {
+  if (state.status === "generating" || state.status === "running") {
     return (
       <div className="rounded-lg border bg-card-soft p-3">
         <p className="text-[13px] font-medium text-primary">Creating the {chapterLabel} preparation proposal</p>

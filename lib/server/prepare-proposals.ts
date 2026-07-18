@@ -33,7 +33,7 @@ import { getEsvPassage } from "./esv";
 import { sha256Canonical, sha256Text } from "./generation-manifest";
 import { estimateChapterWorkupCost } from "../ai/costs";
 import { recordCostEventStrict } from "./cost-events-repository";
-import { logGenerationAudit } from "./generation-settings";
+import { logGenerationAudit, getGenerationSettings } from "./generation-settings";
 import { normalizePrepareLocation, type PrepareLocation } from "../prepare-locations";
 import { parseSlug } from "./generate-chapter-workup";
 import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
@@ -82,6 +82,10 @@ export interface PrepareProposalContent {
   chapter: number;
   sourceReference: string;
   expectedVerseCount: number;
+  /** The verse numbers actually present in the loaded ESV source, in order —
+   * digest-bound with the rest of the content so stored rows revalidate
+   * their own coverage (ESV-omitted traditional numbers stay honest). */
+  sourceVerseNumbers: number[];
   movements: PrepareProposalMovement[];
   notes: { id: string; text: string }[];
   watchouts: string[];
@@ -107,6 +111,7 @@ export interface PrepareProposalRow {
   proposal_json: PrepareProposalContent | null;
   proposal_digest: string | null;
   source_digest: string | null;
+  brain_digest: string | null;
   model: string | null;
   schema_version: string | null;
   error: string | null;
@@ -120,16 +125,24 @@ export interface PrepareProposalRow {
 // ---------------------------------------------------------------------------
 // Store port + test seam (mirrors chapter-setup-approvals / JobStorePort).
 // ---------------------------------------------------------------------------
+export type ProposalLatest =
+  | { kind: "row"; row: Record<string, unknown> }
+  | { kind: "missing" }
+  | { kind: "error"; message: string };
+
 export interface PrepareProposalStore {
-  latest(slug: string): Promise<Record<string, unknown> | null>;
+  /** Tri-state read (Codex #58 P1-3): a database ERROR is never collapsed to
+   * "no row" — callers fail closed instead of treating an outage as legacy. */
+  latest(slug: string): Promise<ProposalLatest>;
   insert(row: Record<string, unknown>): Promise<"ok" | "conflict" | { error: string }>;
-  /** Conditional write: only rows matching (id, expected status) move. Returns
-   * the number of rows changed — 0 means the predicate lost (never throw a
-   * plausible success). */
+  /** Conditional write: only rows matching (id, expected status, and every
+   * extraEquals column) move. Returns the number of rows changed — 0 means
+   * the predicate lost (never throw a plausible success). */
   conditionalUpdate(
     id: string,
     expectedStatus: PrepareProposalStatus,
     next: Record<string, unknown>,
+    extraEquals?: Record<string, string>,
   ): Promise<number | { error: string }>;
 }
 
@@ -143,7 +156,7 @@ function productionStore(): PrepareProposalStore | null {
   const db = getSupabaseAdmin();
   if (!db) return null;
   return {
-    async latest(slug: string) {
+    async latest(slug: string): Promise<ProposalLatest> {
       const { data, error } = await db
         .from(TABLE)
         .select("*")
@@ -153,9 +166,9 @@ function productionStore(): PrepareProposalStore | null {
         .maybeSingle();
       if (error) {
         console.error(`[selah] prepare proposal read failed (${slug})`);
-        return null;
+        return { kind: "error", message: error.message };
       }
-      return (data as Record<string, unknown> | null) ?? null;
+      return data ? { kind: "row", row: data as Record<string, unknown> } : { kind: "missing" };
     },
     async insert(row: Record<string, unknown>) {
       const { error } = await db.from(TABLE).insert(row);
@@ -166,13 +179,12 @@ function productionStore(): PrepareProposalStore | null {
       console.error(`[selah] prepare proposal insert failed (${String(row.slug)})`);
       return { error: error.message };
     },
-    async conditionalUpdate(id, expectedStatus, next) {
-      const { data, error } = await db
-        .from(TABLE)
-        .update(next)
-        .eq("id", id)
-        .eq("status", expectedStatus)
-        .select("id");
+    async conditionalUpdate(id, expectedStatus, next, extraEquals) {
+      let query = db.from(TABLE).update(next).eq("id", id).eq("status", expectedStatus);
+      for (const [column, value] of Object.entries(extraEquals ?? {})) {
+        query = query.eq(column, value);
+      }
+      const { data, error } = await query.select("id");
       if (error) {
         console.error(`[selah] prepare proposal update failed (${id})`);
         return { error: error.message };
@@ -193,11 +205,20 @@ function rowStatus(raw: Record<string, unknown>): PrepareProposalStatus | null {
     : null;
 }
 
+export class ProposalStoreError extends Error {}
+
+/** Latest row, strictly validated. Returns null ONLY for a genuinely missing
+ * row; a database error THROWS ProposalStoreError (fail-closed — Codex #58
+ * P1-3: an outage must never read as "no proposal"/legacy). */
 export async function readLatestProposal(slug: string): Promise<PrepareProposalRow | null> {
   const store = productionStore();
   if (!store) return null;
-  const raw = await store.latest(slug);
-  if (!raw) return null;
+  const latest = await store.latest(slug);
+  if (latest.kind === "error") {
+    throw new ProposalStoreError(`proposal storage read failed: ${latest.message}`);
+  }
+  if (latest.kind === "missing") return null;
+  const raw = latest.row;
   const status = rowStatus(raw);
   if (!status || raw.slug !== slug || typeof raw.id !== "string" || typeof raw.job_id !== "string") {
     return null;
@@ -218,6 +239,7 @@ export async function readLatestProposal(slug: string): Promise<PrepareProposalR
     proposal_json: content,
     proposal_digest: typeof raw.proposal_digest === "string" ? raw.proposal_digest : null,
     source_digest: typeof raw.source_digest === "string" ? raw.source_digest : null,
+    brain_digest: typeof raw.brain_digest === "string" ? raw.brain_digest : null,
     model: typeof raw.model === "string" ? raw.model : null,
     schema_version: typeof raw.schema_version === "string" ? raw.schema_version : null,
     error: typeof raw.error === "string" ? raw.error : null,
@@ -232,7 +254,12 @@ export async function readLatestProposal(slug: string): Promise<PrepareProposalR
 /** The gate the generic generate path consults: an APPROVED, digest-intact
  * proposal for this exact slug. Fail-closed everywhere. */
 export async function approvedProposalApplies(slug: string): Promise<boolean> {
-  const row = await readLatestProposal(slug);
+  let row: PrepareProposalRow | null;
+  try {
+    row = await readLatestProposal(slug);
+  } catch {
+    return false; // storage outage: fail closed — an unverifiable approval never unlocks spend
+  }
   return Boolean(
     row &&
       row.status === "approved" &&
@@ -261,8 +288,13 @@ export async function readApprovedProposalContent(
 export async function loadProposalGuidanceOrFail(slug: string): Promise<string[]> {
   const store = productionStore();
   if (!store) return []; // storage off entirely — legacy/offline behavior
-  const raw = await store.latest(slug);
-  if (!raw) return []; // legacy chapter: never had a proposal
+  const latest = await store.latest(slug);
+  if (latest.kind === "error") {
+    throw new Error(
+      "proposal storage could not be read — the draft must not run while its approved preparation is unverifiable (fail-closed)",
+    );
+  }
+  if (latest.kind === "missing") return []; // legacy chapter: never had a proposal
   const row = await readLatestProposal(slug);
   if (!row || row.status !== "approved" || !row.proposal_json) {
     throw new Error(
@@ -320,7 +352,8 @@ function cleanString(value: unknown, max: number): string | null {
 export function validateProposalContent(
   value: unknown,
   slug: string,
-  sourceVerseCount?: number,
+  sourceMarkers?: readonly number[],
+  sourceText?: string,
 ): ProposalValidation {
   if (!value || typeof value !== "object") return { ok: false, reason: "proposal is not an object" };
   const raw = value as Record<string, unknown>;
@@ -346,21 +379,46 @@ export function validateProposalContent(
   ) {
     return { ok: false, reason: "expectedVerseCount is not a sane verse count" };
   }
-  if (sourceVerseCount !== undefined && expectedVerseCount !== sourceVerseCount) {
-    return {
-      ok: false,
-      reason: `expectedVerseCount ${expectedVerseCount} does not match the loaded ESV source (${sourceVerseCount} verse markers)`,
-    };
-  }
+  // (expectedVerseCount is checked against the marker list below, which is
+  // itself checked against the loaded source when one is provided.)
 
   // Movements: full coverage 1..N, contiguous, no gaps or overlaps, named.
   if (!Array.isArray(raw.movements)) return { ok: false, reason: "movements missing" };
   if (raw.movements.length < BOUNDS.movementsMin || raw.movements.length > BOUNDS.movementsMax) {
     return { ok: false, reason: `movements count must be ${BOUNDS.movementsMin}–${BOUNDS.movementsMax}` };
   }
+  // The proposal carries its own marker list (digest-bound). At proposal time
+  // it must equal the LOADED source's markers exactly; at re-read time it is
+  // the trusted record the movements are checked against.
+  const ownMarkers = raw.sourceVerseNumbers;
+  if (
+    !Array.isArray(ownMarkers) ||
+    ownMarkers.length === 0 ||
+    ownMarkers.length > 250 ||
+    !ownMarkers.every((n, i) => Number.isInteger(n) && n >= 1 && (i === 0 || n > (ownMarkers[i - 1] as number)))
+  ) {
+    return { ok: false, reason: "sourceVerseNumbers must be the ascending verse numbers present in the source" };
+  }
+  if (sourceMarkers !== undefined) {
+    const same =
+      ownMarkers.length === sourceMarkers.length && ownMarkers.every((n, i) => n === sourceMarkers[i]);
+    if (!same) {
+      return { ok: false, reason: "sourceVerseNumbers do not match the verse numbers actually present in the loaded ESV source" };
+    }
+  }
+  // Coverage is defined over the REAL marker sequence: every present verse
+  // number falls in exactly one movement, movement endpoints are real markers,
+  // and consecutive movements meet at the next PRESENT marker (an ESV-omitted
+  // traditional number inside or between movements is never demanded).
+  const markers = ownMarkers as number[];
+  if (markers.length === 0) return { ok: false, reason: "the source has no verse markers" };
+  if (expectedVerseCount !== markers[markers.length - 1]) {
+    return { ok: false, reason: `expectedVerseCount ${expectedVerseCount} must equal the highest present verse number (${markers[markers.length - 1]})` };
+  }
+  const markerSet = new Set(markers);
   const movements: PrepareProposalMovement[] = [];
   const movementIds = new Set<string>();
-  let cursor = 1;
+  let nextExpectedStart: number | undefined = markers[0];
   for (const entry of raw.movements) {
     const m = entry as Record<string, unknown>;
     const id = cleanString(m.id, 24);
@@ -373,16 +431,20 @@ export function validateProposalContent(
     if (typeof start !== "number" || typeof end !== "number" || !Number.isInteger(start) || !Number.isInteger(end)) {
       return { ok: false, reason: "movement verse bounds must be integers" };
     }
-    if (start !== cursor) {
-      return { ok: false, reason: `movement coverage breaks at verse ${cursor} (gap or overlap)` };
+    if (!markerSet.has(start) || !markerSet.has(end)) {
+      return { ok: false, reason: `movement bounds ${start}–${end} must be verse numbers actually present in the source` };
+    }
+    if (nextExpectedStart === undefined || start !== nextExpectedStart) {
+      return { ok: false, reason: `movement coverage breaks at verse ${nextExpectedStart ?? "(past the end)"} (gap or overlap)` };
     }
     if (end < start) return { ok: false, reason: "movement end before start" };
-    cursor = end + 1;
+    const endIdx = markers.indexOf(end);
+    nextExpectedStart = endIdx + 1 < markers.length ? markers[endIdx + 1] : undefined;
     movementIds.add(id);
     movements.push({ id, startVerse: start, endVerse: end, name, reason });
   }
-  if (cursor !== expectedVerseCount + 1) {
-    return { ok: false, reason: `movements cover 1–${cursor - 1} but the chapter has ${expectedVerseCount} verses` };
+  if (nextExpectedStart !== undefined) {
+    return { ok: false, reason: `movements stop before verse ${nextExpectedStart}; every present verse must be covered` };
   }
 
   // Notes: chapter-appropriate count (no 10-note hardcode), each real.
@@ -417,11 +479,18 @@ export function validateProposalContent(
   if (!watchouts) return { ok: false, reason: "watchouts malformed" };
   const textualVariants = readStrings("textualVariants", BOUNDS.variantsMax, BOUNDS.variantMax);
   if (!textualVariants) return { ok: false, reason: "textual variants malformed" };
+  // v1: textual-variant claims need trusted grounding this lane does not have
+  // (shape validation cannot prove a manuscript claim true) — omit rather
+  // than ask the owner to catch expert-level hallucinations (Codex #58).
+  if (textualVariants.length > 0) {
+    return { ok: false, reason: "v1 proposals must not assert textual variants — omit them (unsupported claims are dropped, not reviewed)" };
+  }
 
   // Locations: OPTIONAL (empty = no map value for this chapter, Places stays
   // hidden). Anything present must be the full three-axis shape and an
   // allowed featureKind × certainty combination — legacy shapes refuse.
   const locations: PrepareLocation[] = [];
+  const sourceLower = typeof sourceText === "string" ? sourceText.toLowerCase() : null;
   if (raw.locations !== undefined && raw.locations !== null) {
     if (!Array.isArray(raw.locations) || raw.locations.length > BOUNDS.locationsMax) {
       return { ok: false, reason: "locations malformed" };
@@ -436,6 +505,12 @@ export function validateProposalContent(
       if (normalized.display.length > BOUNDS.displayMax || PLACEHOLDER.test(normalized.display)) {
         return { ok: false, reason: "a location display text is unbounded or placeholder" };
       }
+      // v1 grounding (Codex #58): a place may only be proposed when its name
+      // literally appears in the loaded chapter text — unsupported claims are
+      // omitted, not offered for review.
+      if (sourceLower !== null && !sourceLower.includes(normalized.name.toLowerCase())) {
+        return { ok: false, reason: `location "${normalized.name}" is not named in this chapter's text — v1 proposes only places the chapter itself names` };
+      }
       locations.push(normalized);
     }
   }
@@ -447,6 +522,7 @@ export function validateProposalContent(
     chapter: identity.chapter,
     sourceReference,
     expectedVerseCount,
+    sourceVerseNumbers: markers,
     movements,
     notes,
     watchouts,
@@ -481,12 +557,19 @@ export function proposalLaneEligible(slug: string): ProposalEligibility {
   return { eligible: true };
 }
 
-/** Conservative maximum cost shown before the one confirmation. Computed from
- * the bounded call shape (input ≈ chapter text + rules, output ≤ the
- * completion cap) — the real cost is recorded from actual usage. */
+// The prompt is HARD-BOUNDED: a request whose assembled prompt exceeds this
+// character count refuses BEFORE dispatch, so the disclosed ceiling can never
+// be exceeded (Codex #58 P1-8). ~4 chars/token conservative → ≤ 30k input
+// tokens; output is capped at 6k by max_completion_tokens.
+export const PROPOSAL_PROMPT_MAX_CHARS = 120_000;
+const PROPOSAL_INPUT_TOKEN_CEILING = Math.ceil(PROPOSAL_PROMPT_MAX_CHARS / 4);
+
+/** The disclosed maximum cost: the hard input bound + the full completion
+ * cap. The worker refuses pre-dispatch any prompt that exceeds the bound, so
+ * this number is a true ceiling, not an assumption. */
 export function proposalMaxCostUsd(): number {
   const estimate = estimateChapterWorkupCost({
-    inputTokens: 16_000,
+    inputTokens: PROPOSAL_INPUT_TOKEN_CEILING,
     cachedInputTokens: 0,
     outputTokens: 6_000,
   });
@@ -513,7 +596,11 @@ export async function claimPrepareProposal(slug: string, jobId: string): Promise
   }
   const store = productionStore();
   if (!store) throw new ProposalClaimError("WRITE_FAILED", "proposal storage is not available (fail-closed)");
-  const raw = await store.latest(slug);
+  const latest = await store.latest(slug);
+  if (latest.kind === "error") {
+    throw new ProposalClaimError("WRITE_FAILED", "proposal storage could not be read — refusing to claim blind (fail-closed)");
+  }
+  const raw = latest.kind === "row" ? latest.row : null;
   const rawStatus = raw ? rowStatus(raw) : null;
   if (raw && (rawStatus === "generating" || rawStatus === "running")) {
     // Stale-claim unstick (adversarial pre-review finding 2): a worker that
@@ -529,10 +616,42 @@ export async function claimPrepareProposal(slug: string, jobId: string): Promise
     if (!stale) {
       throw new ProposalClaimError("CONFLICT", "a proposal is already being created for this chapter");
     }
+    if (rawStatus === "running") {
+      // The dead worker had CONSUMED the claim, so it may have dispatched a
+      // model request without living long enough to log it (Codex #58 P1-4).
+      // Record the conservative possible spend FIRST — refusing to unstick at
+      // all if that durable row cannot be written — so no ledgerless paid run
+      // is ever silently unlocked. If the worker did log before dying, this
+      // may duplicate a row: over-counting is the honest direction, and the
+      // metadata says exactly what happened.
+      try {
+        await recordCostEventStrict({
+          requestType: "prepare_proposal",
+          provider: "openai",
+          model: CHAPTER_WORKUP_TEXT_MODEL,
+          estimatedCostUsd: proposalMaxCostUsd(),
+          metadata: {
+            slug,
+            jobId: String(raw.job_id ?? ""),
+            failed: true,
+            billingUncertain: true,
+            staleRecovery: true,
+            note: "worker died after consuming the claim; conservative ceiling recorded (may duplicate a row the worker logged before dying)",
+          },
+        });
+      } catch {
+        throw new ProposalClaimError(
+          "WRITE_FAILED",
+          "the stale run's possible spend could not be durably recorded — refusing to unlock a possibly-paid claim (fail-closed)",
+        );
+      }
+    }
     const cleared = await store.conditionalUpdate(String(raw.id), rawStatus, {
       status: "failed",
       error:
-        "stale claim cleared after its worker's maximum lifetime; any spend it made is in the cost ledger",
+        rawStatus === "running"
+          ? "stale consumed claim cleared after its worker's maximum lifetime; its conservative possible spend was recorded just now (billingUncertain)"
+          : "stale queued claim cleared after its worker's maximum lifetime; the claim was never consumed, so nothing was dispatched",
     });
     if (typeof cleared !== "number" || cleared !== 1) {
       throw new ProposalClaimError("CONFLICT", "the previous proposal finished just now — check its result first");
@@ -574,6 +693,12 @@ export function __setProposalModelForTesting(fn: ProposalModelCall | null): void
 }
 // ESV seam: the gate runs with no network/key.
 let esvLoaderForTesting: ((reference: string) => Promise<{ text: string } | null>) | null = null;
+let brainLoaderForTesting: ((slug: string) => Promise<readonly string[]>) | null = null;
+export function __setProposalBrainLoaderForTesting(
+  fn: ((slug: string) => Promise<readonly string[]>) | null,
+): void {
+  brainLoaderForTesting = fn;
+}
 export function __setProposalEsvLoaderForTesting(
   fn: ((reference: string) => Promise<{ text: string } | null>) | null,
 ): void {
@@ -584,18 +709,21 @@ function proposalPrompt(
   book: string,
   chapter: number,
   esvText: string,
-  verseCount: number,
+  markers: readonly number[],
   brainRules: readonly string[],
 ): string {
+  const verseCount = markers[markers.length - 1];
   return [
-    `You are preparing a study specification for ${book} ${chapter} (ESV, ${verseCount} verses).`,
-    "Return ONLY a JSON object with keys: schemaVersion, slug, book, chapter, sourceReference, expectedVerseCount, movements, notes, watchouts, textualVariants, locations.",
+    `You are preparing a study specification for ${book} ${chapter} (ESV).`,
+    `The verse numbers actually present in this ESV text are: ${markers.join(", ")} (highest: ${verseCount}; any traditional number missing from this list is omitted by the ESV — never invent it).`,
+    "Return ONLY a JSON object with keys: schemaVersion, slug, book, chapter, sourceReference, expectedVerseCount, sourceVerseNumbers, movements, notes, watchouts, textualVariants, locations.",
+    "sourceVerseNumbers must be EXACTLY the list of present verse numbers given above, in the same order.",
     `schemaVersion must be "${PREPARE_PROPOSAL_SCHEMA_VERSION}". sourceReference must be "${book} ${chapter}".`,
-    `movements: ${BOUNDS.movementsMin}–${BOUNDS.movementsMax} entries covering verses 1–${verseCount} exactly, contiguous, no gaps or overlaps; each {id, startVerse, endVerse, name, reason} — short honest name (≤${BOUNDS.nameMax} chars) and one-sentence reason with a verse anchor (≤${BOUNDS.reasonMax} chars).`,
+    `movements: ${BOUNDS.movementsMin}–${BOUNDS.movementsMax} entries covering every PRESENT verse number exactly once (endpoints must be numbers from the list above; consecutive movements meet at the next present number); each {id, startVerse, endVerse, name, reason} — short honest name (≤${BOUNDS.nameMax} chars) and one-sentence reason with a verse anchor (≤${BOUNDS.reasonMax} chars).`,
     `notes: ${BOUNDS.notesMin}–${BOUNDS.notesMax} guidance notes {id, text} for faithful presentation — accuracy over flourish; state uncertainty plainly; never assign collective blame; never turn narrative details into promises or formulas.`,
     `watchouts: up to ${BOUNDS.watchoutsMax} short cautions (common misreadings, dignity concerns, things not to fabricate).`,
-    `textualVariants: up to ${BOUNDS.variantsMax} notes ONLY for real manuscript/translation variants in this chapter (empty array if none).`,
-    `locations: ONLY if a map genuinely serves this chapter, up to ${BOUNDS.locationsMax} entries {name, featureKind, certainty, role, display}; featureKind ∈ point|region|route|text-only; certainty ∈ known|probable|debated|unknown; role ∈ event|context. A point must be certainty known; an unrecorded road is route/probable at most; never pin an uncertain site. If a map adds nothing (e.g. a psalm), return an empty array.`,
+    "textualVariants: ALWAYS an empty array in v1 — do not assert manuscript claims here.",
+    `locations: ONLY if a map genuinely serves this chapter, and ONLY places this chapter's own text names, up to ${BOUNDS.locationsMax} entries {name, featureKind, certainty, role, display}; featureKind ∈ point|region|route|text-only; certainty ∈ known|probable|debated|unknown; role ∈ event|context. A point must be certainty known; an unrecorded road is route/probable at most; never pin an uncertain site. If a map adds nothing (e.g. a psalm), return an empty array.`,
     ...(brainRules.length > 0
       ? ["Selah Brain rules (the product's standing editorial rules — the proposal must be compatible with every one):", ...brainRules]
       : []),
@@ -610,9 +738,9 @@ async function callProposalModel(input: {
   book: string;
   chapter: number;
   esvText: string;
-  verseCount: number;
+  markers: readonly number[];
   brainRules: readonly string[];
-}): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+}): Promise<{ content: string; inputTokens: number; outputTokens: number | null }> {
   if (proposalModelForTesting) return proposalModelForTesting(input);
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
@@ -622,28 +750,34 @@ async function callProposalModel(input: {
     const resp = await client.chat.completions.create(
       {
         model: CHAPTER_WORKUP_TEXT_MODEL,
-        messages: [{ role: "user", content: proposalPrompt(input.book, input.chapter, input.esvText, input.verseCount, input.brainRules) }],
+        messages: [{ role: "user", content: proposalPrompt(input.book, input.chapter, input.esvText, input.markers, input.brainRules) }],
         response_format: { type: "json_object" },
         max_completion_tokens: 6_000,
       },
-      { signal: controller.signal },
+      // maxRetries 0 (Codex #58 P1-1): "one request" must be literally true —
+      // the shared client's default retry could turn one confirmation into
+      // two provider dispatches.
+      { signal: controller.signal, maxRetries: 0 },
     );
     return {
       content: resp.choices[0]?.message?.content ?? "",
+      // null usage = usage MISSING (billing uncertainty), never zero.
       inputTokens: resp.usage?.prompt_tokens ?? 0,
-      outputTokens: resp.usage?.completion_tokens ?? 0,
+      outputTokens: resp.usage ? (resp.usage.completion_tokens ?? 0) : null,
     };
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** Count ESV verse markers ([1] … [n]) — the source-derived verse count the
- * movements must cover. No hardcoded per-book tables. */
-export function esvVerseCount(esvText: string): number {
+/** The ORDERED verse-marker numbers actually present in the loaded ESV text
+ * ([1] … [n]) — chapters with omitted traditional verse numbers (e.g. a
+ * chapter whose v21 the ESV omits) are modeled by their real markers, never
+ * by a count (Codex #58 P1-7). No hardcoded per-book tables. */
+export function esvVerseMarkers(esvText: string): number[] {
   const markers = new Set<number>();
   for (const match of esvText.matchAll(/\[(\d+)\]/g)) markers.add(Number(match[1]));
-  return markers.size;
+  return [...markers].sort((a, b) => a - b);
 }
 
 export interface ProposalRunResult {
@@ -660,7 +794,11 @@ export interface ProposalRunResult {
 export async function runPrepareProposalJob(slug: string, jobId: string): Promise<ProposalRunResult> {
   const store = productionStore();
   if (!store) return { ok: false, slug, status: "failed", reason: "proposal storage unavailable" };
-  const row = await store.latest(slug);
+  const latest = await store.latest(slug);
+  if (latest.kind === "error") {
+    return { ok: false, slug, status: "failed", reason: "proposal storage could not be read — refusing to run blind (the claim is untouched)" };
+  }
+  const row = latest.kind === "row" ? latest.row : null;
   if (!row || row.job_id !== jobId || rowStatus(row) !== "generating" || typeof row.id !== "string") {
     return { ok: false, slug, status: "failed", reason: "no matching claimed proposal job (duplicate or superseded delivery)" };
   }
@@ -701,27 +839,50 @@ export async function runPrepareProposalJob(slug: string, jobId: string): Promis
   if (!passage || !passage.text.trim()) {
     return failRow("the ESV source for this chapter could not be loaded — nothing was spent");
   }
-  const verseCount = esvVerseCount(passage.text);
-  if (verseCount < 1) return failRow("the loaded source has no verse markers — nothing was spent");
+  const markers = esvVerseMarkers(passage.text);
+  if (markers.length < 1) return failRow("the loaded source has no verse markers — nothing was spent");
 
-  // Free read/check: the current Selah Brain rules ride into the proposal
-  // prompt (design note step 1) and their digest is stored as provenance
-  // (step 5). Fail SOFT to empty exactly like the draft pipeline does — an
-  // empty rule set is a legitimate state, and the digest records which rules
-  // (possibly none) actually applied.
+  // Live kill-switch recheck immediately before any dispatch (Codex #58
+  // P1-2): turning Text Generation OFF stops queued proposal jobs too.
+  try {
+    if (!(await getGenerationSettings()).text_generation_enabled) {
+      return failRow("Text Generation was turned OFF before dispatch — nothing was spent");
+    }
+  } catch {
+    return failRow("the generation settings could not be read before dispatch — refusing to spend blind");
+  }
+
+  // The current Selah Brain rules ride into the proposal prompt (design note
+  // step 1) and their digest is stored as provenance (step 5). REQUIRED in
+  // production (Codex #58 P1-9): a Brain outage or empty core selection
+  // stops the run BEFORE spend — quality guidance must not silently vanish.
   let brainRules: readonly string[] = [];
   try {
-    brainRules = (await selectRulesForGeneration(slug, "copy_generation")).texts;
+    brainRules = brainLoaderForTesting
+      ? await brainLoaderForTesting(slug)
+      : (await selectRulesForGeneration(slug, "copy_generation")).texts;
   } catch {
-    brainRules = [];
+    return failRow("the Selah Brain rules could not be loaded — refusing to prepare without them (nothing was spent)");
+  }
+  if (brainRules.length === 0) {
+    return failRow("the Selah Brain returned no rules — refusing to prepare without quality guidance (nothing was spent)");
   }
   const brainDigest = sha256Canonical([...brainRules]);
+
+  // Hard prompt bound BEFORE dispatch: the disclosed ceiling is enforced,
+  // never assumed (Codex #58 P1-8).
+  const assembledPrompt = proposalPrompt(identity.book, identity.chapter, passage.text, markers, brainRules);
+  if (assembledPrompt.length > PROPOSAL_PROMPT_MAX_CHARS) {
+    return failRow(
+      `this chapter's assembled prompt (${assembledPrompt.length} chars) exceeds the bounded maximum (${PROPOSAL_PROMPT_MAX_CHARS}) — refusing before dispatch so the shown ceiling stays true`,
+    );
+  }
 
   // ONE bounded model request. Dispatch accounting mirrors IQ-006: any
   // failure after dispatch records possible spend durably before the row
   // fails; a provably-local pre-dispatch failure records none.
   let dispatched = false;
-  let usage = { inputTokens: 0, outputTokens: 0 };
+  let usage: { inputTokens: number; outputTokens: number | null } = { inputTokens: 0, outputTokens: 0 };
   let contentText = "";
   try {
     if (!proposalModelForTesting && !getOpenAI()) throw new Error("OpenAI not configured");
@@ -731,7 +892,7 @@ export async function runPrepareProposalJob(slug: string, jobId: string): Promis
       book: identity.book,
       chapter: identity.chapter,
       esvText: passage.text,
-      verseCount,
+      markers,
       brainRules,
     });
     contentText = result.content;
@@ -760,21 +921,27 @@ export async function runPrepareProposalJob(slug: string, jobId: string): Promis
     return failRow(`model request failed after dispatch (the one request MAY be billed; possible spend recorded): ${msg}`, costUsd);
   }
 
-  // Durable cost row from real usage BEFORE the proposal can exist.
-  const estimate = estimateChapterWorkupCost({
-    inputTokens: usage.inputTokens,
-    cachedInputTokens: 0,
-    outputTokens: usage.outputTokens,
-  });
+  // Durable cost row from real usage BEFORE the proposal can exist. A
+  // success WITHOUT usage data records the conservative ceiling with
+  // billingUncertain — never $0 (Codex #58 P1-8).
+  const usageMissing = usage.outputTokens === null;
+  const estimate = usageMissing
+    ? { textEstimateUsd: proposalMaxCostUsd() }
+    : estimateChapterWorkupCost({
+        inputTokens: usage.inputTokens,
+        cachedInputTokens: 0,
+        outputTokens: usage.outputTokens ?? 0,
+      });
   try {
     await recordCostEventStrict({
       requestType: "prepare_proposal",
       provider: "openai",
       model: CHAPTER_WORKUP_TEXT_MODEL,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
+      ...(usageMissing ? {} : { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens ?? 0 }),
       estimatedCostUsd: estimate.textEstimateUsd,
-      metadata: { slug, jobId },
+      metadata: usageMissing
+        ? { slug, jobId, billingUncertain: true, note: "provider returned no usage data; conservative ceiling recorded" }
+        : { slug, jobId },
     });
   } catch {
     return failRow("the proposal's cost row could not be recorded — the spend happened, so the run stops here for manual inspection", estimate.textEstimateUsd);
@@ -791,7 +958,7 @@ export async function runPrepareProposalJob(slug: string, jobId: string): Promis
   if (typeof modelError === "string" && modelError.trim()) {
     return failRow(`the model declined honestly: ${modelError.slice(0, 200)}`, estimate.textEstimateUsd);
   }
-  const validated = validateProposalContent(parsedJson, slug, verseCount);
+  const validated = validateProposalContent(parsedJson, slug, markers, passage.text);
   if (!validated.ok) return failRow(`validation failed: ${validated.reason}`, estimate.textEstimateUsd);
 
   const digest = proposalDigestOf(validated.content);
@@ -826,8 +993,10 @@ export async function failClaimedPrepareProposal(
 ): Promise<boolean> {
   const store = productionStore();
   if (!store) return false;
-  const raw = await store.latest(slug);
-  if (!raw || raw.job_id !== jobId || rowStatus(raw) !== "generating" || typeof raw.id !== "string") {
+  const latest = await store.latest(slug);
+  if (latest.kind !== "row") return false;
+  const raw = latest.row;
+  if (raw.job_id !== jobId || rowStatus(raw) !== "generating" || typeof raw.id !== "string") {
     return false;
   }
   const moved = await store.conditionalUpdate(raw.id, "generating", {
@@ -852,19 +1021,46 @@ export async function approvePrepareProposal(
 ): Promise<ProposalDecisionResult> {
   const store = productionStore();
   if (!store) return { ok: false, code: "WRITE_FAILED", reason: "proposal storage unavailable" };
-  const row = await readLatestProposal(slug);
+  let row: PrepareProposalRow | null;
+  try {
+    row = await readLatestProposal(slug);
+  } catch {
+    return { ok: false, code: "WRITE_FAILED", reason: "proposal storage could not be read — nothing was approved" };
+  }
   if (!row || row.status !== "proposed" || !row.proposal_digest) {
     return { ok: false, code: "NOT_FOUND", reason: "no reviewable proposal exists for this chapter" };
   }
   if (row.proposal_digest !== proposalDigest) {
     return { ok: false, code: "DIGEST_MISMATCH", reason: "the proposal changed since you reviewed it — review the current one" };
   }
-  const moved = await store.conditionalUpdate(row.id, "proposed", {
-    status: "approved",
-    approved_by: approvedBy,
-    approved_at: new Date().toISOString(),
-    evidence: evidence.slice(0, 300),
-  });
+  // Provenance must exist BEFORE approval and is bound into the conditional
+  // write below (Codex #58 P1-5): the approval lands only on the exact row
+  // still carrying the reviewed digest, job, and stated provenance.
+  if (
+    !SHA256.test(row.source_digest ?? "") ||
+    !SHA256.test(row.brain_digest ?? "") ||
+    !row.model ||
+    row.schema_version !== PREPARE_PROPOSAL_SCHEMA_VERSION
+  ) {
+    return { ok: false, code: "NOT_FOUND", reason: "the proposal is missing its source/Brain/model/schema provenance — it cannot be approved" };
+  }
+  const moved = await store.conditionalUpdate(
+    row.id,
+    "proposed",
+    {
+      status: "approved",
+      approved_by: approvedBy,
+      approved_at: new Date().toISOString(),
+      evidence: evidence.slice(0, 300),
+    },
+    {
+      proposal_digest: proposalDigest,
+      job_id: row.job_id,
+      source_digest: row.source_digest!,
+      brain_digest: row.brain_digest!,
+      schema_version: PREPARE_PROPOSAL_SCHEMA_VERSION,
+    },
+  );
   if (typeof moved !== "number") return { ok: false, code: "WRITE_FAILED", reason: "the approval could not be recorded" };
   if (moved !== 1) return { ok: false, code: "CONFLICT", reason: "the proposal changed underneath the approval; nothing was recorded" };
   return { ok: true };
@@ -873,14 +1069,19 @@ export async function approvePrepareProposal(
 export async function rejectPrepareProposal(slug: string, proposalDigest: string): Promise<ProposalDecisionResult> {
   const store = productionStore();
   if (!store) return { ok: false, code: "WRITE_FAILED", reason: "proposal storage unavailable" };
-  const row = await readLatestProposal(slug);
+  let row: PrepareProposalRow | null;
+  try {
+    row = await readLatestProposal(slug);
+  } catch {
+    return { ok: false, code: "WRITE_FAILED", reason: "proposal storage could not be read — nothing was rejected" };
+  }
   if (!row || row.status !== "proposed" || !row.proposal_digest) {
     return { ok: false, code: "NOT_FOUND", reason: "no reviewable proposal exists for this chapter" };
   }
   if (row.proposal_digest !== proposalDigest) {
     return { ok: false, code: "DIGEST_MISMATCH", reason: "the proposal changed since you reviewed it" };
   }
-  const moved = await store.conditionalUpdate(row.id, "proposed", { status: "superseded" });
+  const moved = await store.conditionalUpdate(row.id, "proposed", { status: "superseded" }, { proposal_digest: proposalDigest });
   if (typeof moved !== "number") return { ok: false, code: "WRITE_FAILED", reason: "the rejection could not be recorded" };
   if (moved !== 1) return { ok: false, code: "CONFLICT", reason: "the proposal changed underneath the rejection" };
   return { ok: true };

@@ -515,7 +515,15 @@ export async function POST(req: Request) {
     if (!eligibility.eligible) {
       return NextResponse.json({ ok: false, error: eligibility.reason }, { status: 400 });
     }
-    const row = await readLatestProposal(slug);
+    let row;
+    try {
+      row = await readLatestProposal(slug);
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "proposal storage could not be read — try again (fail-closed, nothing changed)" },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({
       ok: true,
       slug,

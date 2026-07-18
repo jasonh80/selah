@@ -30,10 +30,14 @@ import {
   validateProposalContent,
   proposalGuidanceTexts,
   proposalLaneEligible,
-  esvVerseCount,
+  esvVerseMarkers,
+  proposalMaxCostUsd,
+  PROPOSAL_PROMPT_MAX_CHARS,
   PREPARE_PROPOSAL_SCHEMA_VERSION,
+  __setProposalBrainLoaderForTesting,
   type PrepareProposalStore,
   type PrepareProposalStatus,
+  type ProposalLatest,
 } from "../lib/server/prepare-proposals";
 import { __setGenerationTestOverrides, getGenerationSettings, type GenerationSettings } from "../lib/server/generation-settings";
 import { __setCostCaptureForTesting, type CostEventInput } from "../lib/server/cost-events-repository";
@@ -72,20 +76,35 @@ function workerReq(body: Record<string, unknown>, method = "POST"): Request {
 // and strictly conditional updates.
 class FakeProposalStore implements PrepareProposalStore {
   rows: Array<Record<string, unknown>> = [];
-  async latest(slug: string) {
+  failReads = false; // simulates a database outage on latest()
+  async latest(slug: string): Promise<ProposalLatest> {
+    if (this.failReads) return { kind: "error", message: "simulated database outage" };
     const mine = this.rows.filter((r) => r.slug === slug);
-    return mine.length ? mine[mine.length - 1] : null;
+    // Array order stands in for created_at DESC (fake stamps are not
+    // lexicographically ordered; production orders by timestamptz).
+    return mine.length ? { kind: "row", row: mine[mine.length - 1] } : { kind: "missing" };
   }
   async insert(row: Record<string, unknown>) {
-    if (row.status === "generating" && this.rows.some((r) => r.slug === row.slug && r.status === "generating")) {
-      return "conflict" as const;
+    if (
+      (row.status === "generating" || row.status === "running") &&
+      this.rows.some((r) => r.slug === row.slug && (r.status === "generating" || r.status === "running"))
+    ) {
+      return "conflict" as const; // the partial unique index, faithfully
     }
-    this.rows.push({ ...row, created_at: `T${this.rows.length + 1}` });
+    this.rows.push({ created_at: new Date().toISOString(), ...row });
     return "ok" as const;
   }
-  async conditionalUpdate(id: string, expectedStatus: PrepareProposalStatus, next: Record<string, unknown>) {
+  async conditionalUpdate(
+    id: string,
+    expectedStatus: PrepareProposalStatus,
+    next: Record<string, unknown>,
+    extraEquals?: Record<string, string>,
+  ) {
     const row = this.rows.find((r) => r.id === id);
     if (!row || row.status !== expectedStatus) return 0;
+    for (const [column, value] of Object.entries(extraEquals ?? {})) {
+      if (row[column] !== value) return 0;
+    }
     Object.assign(row, next);
     return 1;
   }
@@ -133,8 +152,11 @@ const TEST_SETTINGS: GenerationSettings = {
 // Canned ESV texts: John 3 (Gospel, trimmed to 8 verse markers for the
 // harness) and Psalm 117 (real 2-verse chapter — the non-map OT case).
 const ESV: Record<string, string> = {
-  "John 3": "[1] Now there was a man of the Pharisees named Nicodemus. [2] This man came to Jesus by night. [3] Jesus answered him, Truly, truly. [4] Nicodemus said to him, How can a man be born when he is old? [5] Jesus answered, Truly, truly. [6] That which is born of the flesh is flesh. [7] Do not marvel that I said to you. [8] The wind blows where it wishes.",
+  "John 3": "[1] Now there was a man of the Pharisees named Nicodemus, near Jerusalem. [2] This man came to Jesus by night. [3] Jesus answered him, Truly, truly. [4] Nicodemus said to him, How can a man be born when he is old? [5] Jesus answered, Truly, truly. [6] That which is born of the flesh is flesh. [7] Do not marvel that I said to you. [8] The wind blows where it wishes.",
   "Psalm 117": "[1] Praise the LORD, all nations! Extol him, all peoples! [2] For great is his steadfast love toward us, and the faithfulness of the LORD endures forever. Praise the LORD!",
+  // An omitted-traditional-verse chapter (the ESV omits "v3" here): markers
+  // run 1,2,4,5 — movement coverage must follow the REAL marker sequence.
+  "John 5": "[1] After this there was a feast. [2] Now there is in Jerusalem by the Sheep Gate a pool. [4] One man was there. [5] He had been an invalid.",
 };
 
 function movementsCovering(count: number, prefix: string) {
@@ -159,6 +181,7 @@ function proposalFor(slug: string, book: string, chapter: number, verseCount: nu
     chapter,
     sourceReference: `${book} ${chapter}`,
     expectedVerseCount: verseCount,
+    sourceVerseNumbers: Array.from({ length: verseCount }, (_unused, i) => i + 1),
     movements: movementsCovering(verseCount, slug.toUpperCase().replace(/[^A-Z0-9]/g, "")),
     notes: [
       { id: "N01", text: "State plainly what the text says and what it does not." },
@@ -191,13 +214,15 @@ async function main() {
   __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
   __setCostCaptureForTesting(costs);
   __setProposalEsvLoaderForTesting(async (ref) => (ESV[ref] ? { text: ESV[ref] } : null));
+  __setProposalBrainLoaderForTesting(async () => ["Accuracy over flourish; state uncertainty plainly."]);
   __setTriggerTransportForTesting(async (req) => {
     lastTrigger = { url: req.url, body: req.body as unknown as Record<string, unknown> };
     return { ok: true, status: 202 };
   });
   __setProposalModelForTesting(async ({ slug, book, chapter, esvText }) => {
     modelCalls += 1;
-    const count = esvVerseCount(esvText);
+    const markers = esvVerseMarkers(esvText);
+    const count = markers[markers.length - 1];
     const locations =
       slug === "john-3"
         ? [
@@ -317,7 +342,7 @@ async function main() {
     const legacyShaped = validateProposalContent(
       proposalFor("psalm-117", "Psalm", 117, 2, [{ name: "Zion", certainty: "known", display: "legacy shape" }]),
       "psalm-117",
-      2,
+      [1, 2],
     );
     ok(!legacyShaped.ok && /three-axis/.test((legacyShaped as { reason: string }).reason), "G4 legacy-shaped locations refuse — only the three-axis honesty model is accepted");
 
@@ -329,7 +354,8 @@ async function main() {
       expectReason: RegExp,
     ) => {
       __setProposalModelForTesting(async ({ book, chapter, esvText }) => {
-        const p = proposalFor(slug, book, chapter, esvVerseCount(esvText), []) as unknown as Record<string, unknown>;
+        const m2 = esvVerseMarkers(esvText);
+      const p = proposalFor(slug, book, chapter, m2[m2.length - 1], []) as unknown as Record<string, unknown>;
         mutate(p);
         return { content: JSON.stringify(p), inputTokens: 100, outputTokens: 50 };
       });
@@ -393,8 +419,9 @@ async function main() {
     __setProposalModelForTesting(async ({ slug: s2, book, chapter, esvText }) => {
       modelCalls += 1;
       await new Promise((resolve) => setTimeout(resolve, 20)); // let the race overlap
+      const m3 = esvVerseMarkers(esvText);
       return {
-        content: JSON.stringify(proposalFor(s2, book, chapter, esvVerseCount(esvText), [])),
+        content: JSON.stringify(proposalFor(s2, book, chapter, m3[m3.length - 1], [])),
         inputTokens: 500,
         outputTokens: 200,
       };
@@ -428,7 +455,9 @@ async function main() {
     const unstuck = await claimPrepareProposal("luke-10", "fresh-job");
     ok(typeof unstuck === "string", "N1 a fresh claim proceeds past the stale one");
     const staleRow = proposals.rows.find((r) => r.id === "stale-row-1")!;
-    ok(staleRow.status === "failed" && /cost ledger/.test(String(staleRow.error)), "N2 the stale claim failed with honest spend wording (never 'nothing was spent')");
+    ok(staleRow.status === "failed" && /possible spend was recorded/.test(String(staleRow.error)), "N2 the stale CONSUMED claim failed with honest possible-spend wording");
+    const staleCost = costs.find((c) => (c.metadata as { staleRecovery?: boolean })?.staleRecovery === true);
+    ok(Boolean(staleCost) && (staleCost!.metadata as { billingUncertain?: boolean }).billingUncertain === true, "N2b the recovery recorded the conservative possible spend BEFORE unlocking");
     // A RECENT claim still conflicts.
     let recentConflict = false;
     try {
@@ -443,7 +472,8 @@ async function main() {
     {
       const realLatest = proposals.latest.bind(proposals);
       let hidden = true;
-      proposals.latest = async (slugArg: string) => (hidden && slugArg === "luke-10" ? null : realLatest(slugArg));
+      proposals.latest = async (slugArg: string) =>
+        hidden && slugArg === "luke-10" ? { kind: "missing" as const } : realLatest(slugArg);
       let raceConflict = false;
       try {
         await claimPrepareProposal("luke-10", "racing-job");
@@ -453,6 +483,143 @@ async function main() {
       proposals.latest = realLatest;
       hidden = false;
       ok(raceConflict, "O1 a racing create loses at the INSERT (partial-unique) even when the pre-read missed the claim");
+    }
+
+    // P. Marker-sequence coverage: an ESV-omitted traditional verse is never
+    // demanded — and never silently skipped either.
+    __setProposalModelForTesting(async ({ slug: s5, book, chapter }) => {
+      modelCalls += 1;
+      const good = {
+        schemaVersion: PREPARE_PROPOSAL_SCHEMA_VERSION,
+        slug: s5, book, chapter, sourceReference: `${book} ${chapter}`,
+        expectedVerseCount: 5,
+        sourceVerseNumbers: [1, 2, 4, 5],
+        movements: [
+          { id: "J5-M01", startVerse: 1, endVerse: 2, name: "The feast and the pool", reason: "Setting by the Sheep Gate (vv. 1-2)." },
+          { id: "J5-M02", startVerse: 4, endVerse: 5, name: "The invalid", reason: "A man long unable to walk (vv. 4-5)." },
+        ],
+        notes: [
+          { id: "N01", text: "State plainly what the text says." },
+          { id: "N02", text: "No healing formulas." },
+          { id: "N03", text: "Keep the man dignified." },
+        ],
+        watchouts: [], textualVariants: [], locations: [],
+      };
+      return { content: JSON.stringify(good), inputTokens: 300, outputTokens: 150 };
+    });
+    lastTrigger = null;
+    ok((await adminPost({ action: "prepare_proposal_create", slug: "john-5", confirm: true })).status === 200, "P1 the omitted-verse chapter creates");
+    await prepareWorker(workerReq({ slug: "john-5", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
+    const j5 = await readLatestProposal("john-5");
+    ok(j5?.status === "proposed", "P2 movements that meet at the next PRESENT marker (1-2, 4-5) validate");
+    // A movement that pretends the omitted verse exists must refuse.
+    const badBounds = validateProposalContent(
+      { ...(j5!.proposal_json as object), movements: [
+        { id: "J5-M01", startVerse: 1, endVerse: 3, name: "The feast and the pool", reason: "Setting by the Sheep Gate (vv. 1-3)." },
+        { id: "J5-M02", startVerse: 4, endVerse: 5, name: "The invalid", reason: "A man long unable to walk (vv. 4-5)." },
+      ] },
+      "john-5",
+      [1, 2, 4, 5],
+    );
+    ok(!badBounds.ok && /actually present/.test((badBounds as { reason: string }).reason), "P3 a movement bound on an ESV-omitted verse number refuses");
+
+    // Q. v1 unsupported claims are OMITTED, not offered for review.
+    const withVariant = validateProposalContent(
+      { ...(j5!.proposal_json as object), textualVariants: ["Some manuscripts add a stirring angel."] },
+      "john-5",
+      [1, 2, 4, 5],
+    );
+    ok(!withVariant.ok && /must not assert textual variants/.test((withVariant as { reason: string }).reason), "Q1 textual-variant claims refuse in v1");
+    const ungrounded = validateProposalContent(
+      { ...(j5!.proposal_json as object), locations: [
+        { name: "Bethesda", featureKind: "point", certainty: "known", role: "context", display: "A pool by the Sheep Gate." },
+      ] },
+      "john-5",
+      [1, 2, 4, 5],
+      ESV["John 5"],
+    );
+    ok(!ungrounded.ok && /not named in this chapter/.test((ungrounded as { reason: string }).reason), "Q2 a place the chapter text never names refuses (grounding)");
+    const grounded = validateProposalContent(
+      { ...(j5!.proposal_json as object), locations: [
+        { name: "Jerusalem", featureKind: "point", certainty: "known", role: "context", display: "The feast setting (v. 2)." },
+      ] },
+      "john-5",
+      [1, 2, 4, 5],
+      ESV["John 5"],
+    );
+    ok(grounded.ok, "Q3 a place the chapter itself names passes grounding");
+
+    // R. Worker-level kill switch: a QUEUED job stops if generation turns OFF
+    // between confirm and dispatch — before any spend.
+    __setProposalModelForTesting(async () => {
+      throw new Error("model must never be reached with the switch off");
+    });
+    lastTrigger = null;
+    ok((await adminPost({ action: "prepare_proposal_create", slug: "luke-11", confirm: true })).status === 200, "R1 creates while the switch is on");
+    ESV["Luke 11"] = ESV["John 3"];
+    __setGenerationTestOverrides({ settings: { ...TEST_SETTINGS, text_generation_enabled: false }, captureAudit: audit });
+    await prepareWorker(workerReq({ slug: "luke-11", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
+    __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+    const switched = await readLatestProposal("luke-11");
+    ok(switched?.status === "failed" && /turned OFF before dispatch — nothing was spent/.test(switched.error ?? ""), "R2 the worker's live recheck stops a queued job with no spend");
+
+    // S. Brain rules are REQUIRED before spend.
+    __setProposalBrainLoaderForTesting(async () => []);
+    lastTrigger = null;
+    await adminPost({ action: "prepare_proposal_create", slug: "luke-11", confirm: true });
+    await prepareWorker(workerReq({ slug: "luke-11", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
+    const noBrain = await readLatestProposal("luke-11");
+    ok(noBrain?.status === "failed" && /no rules — refusing to prepare/.test(noBrain.error ?? ""), "S1 an empty Brain selection stops the run before spend");
+    __setProposalBrainLoaderForTesting(async () => ["Accuracy over flourish; state uncertainty plainly."]);
+
+    // T. The disclosed ceiling is ENFORCED: an oversized prompt refuses
+    // before dispatch.
+    ESV["Luke 12"] = "[1] " + "In the meantime, ".repeat(Math.ceil(PROPOSAL_PROMPT_MAX_CHARS / 16)) + "Jesus began to say.";
+    lastTrigger = null;
+    await adminPost({ action: "prepare_proposal_create", slug: "luke-12", confirm: true });
+    await prepareWorker(workerReq({ slug: "luke-12", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
+    const oversized = await readLatestProposal("luke-12");
+    ok(oversized?.status === "failed" && /exceeds the bounded maximum/.test(oversized.error ?? ""), "T1 an oversized prompt refuses BEFORE dispatch — the shown ceiling cannot be exceeded");
+    ok(proposalMaxCostUsd() > 0, "T2 the ceiling itself is a real positive number");
+
+    // U. Storage outage fails closed everywhere: status 503, create refuses,
+    // draft-time guidance load throws, approval gate answers false.
+    proposals.failReads = true;
+    ok((await adminPost({ action: "prepare_proposal_status", slug: "john-3" })).status === 503, "U1 status reports the outage instead of 'none'");
+    ok((await adminPost({ action: "prepare_proposal_create", slug: "luke-11", confirm: true })).status === 500, "U2 a claim never proceeds blind through an outage");
+    let outageThrew = false;
+    try {
+      await loadProposalGuidanceOrFail("john-3");
+    } catch {
+      outageThrew = true;
+    }
+    ok(outageThrew, "U3 draft-time guidance load fails closed during an outage (no guidance-less paid draft)");
+    ok(!(await approvedProposalApplies("john-3")), "U4 an unverifiable approval unlocks nothing during an outage");
+    proposals.failReads = false;
+    ok(await approvedProposalApplies("john-3"), "U5 the approval applies again after the outage clears");
+
+    // V. Atomic approve predicate: a row whose digest is swapped BETWEEN the
+    // read and the conditional write loses at the write itself.
+    {
+      __setProposalModelForTesting(async ({ slug: s6, book, chapter, esvText }) => {
+        modelCalls += 1;
+        const m6 = esvVerseMarkers(esvText);
+        return { content: JSON.stringify(proposalFor(s6, book, chapter, m6[m6.length - 1], [])), inputTokens: 200, outputTokens: 100 };
+      });
+      ESV["Luke 13"] = ESV["John 3"];
+      lastTrigger = null;
+      await adminPost({ action: "prepare_proposal_create", slug: "luke-13", confirm: true });
+      await prepareWorker(workerReq({ slug: "luke-13", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
+      const l13 = await readLatestProposal("luke-13");
+      ok(l13?.status === "proposed", "V1 the race fixture proposes");
+      // Simulate the mid-flight swap: the stored digest changes after the
+      // route's read would have passed.
+      const target = proposals.rows.find((r) => r.id === l13!.id)!;
+      const realDigest = String(target.proposal_digest);
+      target.proposal_digest = "f".repeat(64);
+      const raced = await adminPost({ action: "prepare_proposal_approve", slug: "luke-13", confirm: true, proposalDigest: realDigest });
+      ok(raced.status !== 200 && target.status !== "approved", "V2 the swapped row cannot be approved — the digest is bound in the WRITE predicate, not just the read");
+      target.proposal_digest = realDigest;
     }
 
     // K. A failed trigger clears its claim (nothing stranded generating).
@@ -466,6 +633,7 @@ async function main() {
     __setPrepareProposalStoreForTesting(null);
     __setProposalModelForTesting(null);
     __setProposalEsvLoaderForTesting(null);
+    __setProposalBrainLoaderForTesting(null);
     __setGenerationTestOverrides(null);
     __setCostCaptureForTesting(null);
     __setTriggerTransportForTesting(null);

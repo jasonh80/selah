@@ -42,3 +42,7 @@ create index if not exists chapter_prepare_proposals_slug_created
 
 alter table chapter_prepare_proposals enable row level security;
 -- No policies on purpose: service-role access only, like the other tables.
+-- Explicit minimum grants (current Supabase guidance no longer guarantees
+-- automatic table grants for the Data API): service_role only; anon and
+-- authenticated stay blocked by RLS-without-policies AND absent grants.
+grant select, insert, update on chapter_prepare_proposals to service_role;
