@@ -176,3 +176,26 @@ entries:
       the fix must not touch chapter content)
     status: queued
     completion_pr: null
+
+  - id: IQ-010
+    area: images
+    improvement: >-
+      Never delete generated images, and make the retained ones findable.
+      Storage is already append-only by design (unique per-job directories,
+      upsert:false, zero deletion code) — replaced images, rejected redo
+      candidates, and superseded runs all stay at their URLs. What is
+      missing is discoverability: today an unused image is only reachable
+      by digging through audit rows. Build a lightweight owner-facing image
+      library that catalogs every stored image (chapter, kind, job, date,
+      status: in-use / replaced / rejected-candidate / orphaned-run) so old
+      images can be browsed and reused instead of forgotten. Any future
+      cleanup tooling must be owner-gated and default to keep.
+    evidence: >-
+      Owner direction (Jason, 2026-07-18, in-session): "do not get rid of
+      old images, find a smart way to keep them stored when they are not
+      used or discarded." Claude verified the append-only storage claims
+      against lib/server/images.ts the same day.
+    priority_trigger: after the current safety work (IQ-005/IQ-006) and
+      Mark 10; pairs naturally with the People/gallery direction
+    status: queued
+    completion_pr: null
