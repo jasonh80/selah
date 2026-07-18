@@ -73,12 +73,13 @@ entries:
       Codex overnight QA of published Mark 9, board #29 (2026-07-18): hero
       source landscape; images 2-3 portrait sources cropped into the 3:2
       frame.
-    priority_trigger: owner-gated paid regeneration — needs Jason's explicit
-      go (image credit). OWNER DECISION 2026-07-18: the redo tool is
-      draft-only (published chapters refuse via the mutation guard), so the
-      first redo test happens naturally on Mark 10's draft images; Mark 9's
-      two portrait sources stay queued until a published-chapter refresh
-      lane exists (its own owner decision).
+    priority_trigger: >-
+      owner-gated paid regeneration — needs Jason's explicit go (image
+      credit). OWNER DECISION 2026-07-18: the redo tool is draft-only
+      (published chapters refuse via the mutation guard), so the first redo
+      test happens naturally on Mark 10's draft images; Mark 9's two
+      portrait sources stay queued until a published-chapter refresh lane
+      exists (its own owner decision).
     status: queued
     completion_pr: null
 
@@ -180,16 +181,17 @@ entries:
   - id: IQ-010
     area: images
     improvement: >-
-      Never delete generated images, and make the retained ones findable.
-      Storage is already append-only by design (unique per-job directories,
-      upsert:false, zero deletion code) — replaced images, rejected redo
-      candidates, and superseded runs all stay at their URLs. What is
-      missing is discoverability: today an unused image is only reachable
-      by digging through audit rows. Build a lightweight owner-facing image
-      library that catalogs every stored image (chapter, kind, job, date,
-      status: in-use / replaced / rejected-candidate / orphaned-run) so old
-      images can be browsed and reused instead of forgotten. Any future
-      cleanup tooling must be owner-gated and default to keep.
+      OWNER DECISION (binding): never delete generated images, and keep
+      retained ones findable — any future cleanup tooling must be
+      owner-gated and default to keep. Storage already honors the first
+      half by design (unique per-job directories, upsert:false, zero
+      deletion code) — replaced images, rejected redo candidates, and
+      superseded runs all stay at their URLs. PROPOSED IMPLEMENTATION
+      (Claude's suggestion, open to redesign): a lightweight owner-facing
+      image library cataloging every stored image (e.g. chapter, kind,
+      job, date, status such as in-use / replaced / rejected-candidate /
+      orphaned-run) so old images can be browsed and reused instead of
+      being reachable only through audit rows.
     evidence: >-
       Owner direction (Jason, 2026-07-18, in-session): "do not get rid of
       old images, find a smart way to keep them stored when they are not
