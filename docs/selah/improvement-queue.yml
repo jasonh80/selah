@@ -222,7 +222,9 @@ entries:
       safety stays: digest-bound approval, explicit paid-run confirms,
       spend accounting, honest-map model, fail-closed gates. PROPOSED
       SHAPE (open to Codex design input): the spec generation is itself a
-      bounded free step with the same two-axis location honesty and closed
+      bounded preparation step — when AI is used, Studio shows the exact
+      maximum cost and requires one explicit confirmation, one request, no
+      automatic retry — with the same two-axis location honesty and closed
       movement-range validation the code fixtures enforce today; specs the
       flow produces are stored digest-bound like current approvals, never
       silently editable.
