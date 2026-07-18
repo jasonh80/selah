@@ -14,6 +14,7 @@ import {
   failGenerationJob,
   requireJobStore,
 } from "./generation-jobs";
+import { loadProposalGuidanceOrFail } from "./prepare-proposals";
 import { isChapterMutationError } from "./protected-chapters";
 import { recordCostEvent } from "./cost-events-repository";
 import { snapshotVersion } from "./chapter-versions-repository";
@@ -215,6 +216,15 @@ export async function generateAndStoreChapter(
   // The ROUTE took the single atomic claim; this worker atomically CONSUMES it
   // (queued → running) — a duplicated delivery loses at that conditional write
   // BEFORE any spend, and the refusal is durably audited.
+  // IQ-011: a chapter drafted through the self-serve lane loads its owner-
+  // approved preparation proposal into the prompt — the exact reviewed
+  // version, nothing else. Chapters without any proposal row (legacy
+  // regenerations) proceed unchanged; a chapter WITH a proposal row whose
+  // approval is missing/invalid/superseded FAILS the run HERE, before the
+  // claim is even consumed — the job stays queued/releasable and provably
+  // nothing was spent (fail-closed; adversarial pre-review finding: a
+  // fail-soft read silently dropped all approved guidance from a paid draft).
+  const proposalGuidance = await loadProposalGuidanceOrFail(slug);
   const store = requireJobStore(slug, "generateAndStoreChapter");
   try {
     await consumeGenerationClaim(store, slug, jobId, approvedManifestDigest);
@@ -252,7 +262,7 @@ export async function generateAndStoreChapter(
       bibleVersion,
       model,
       globalRules,
-      chapterNotes,
+      chapterNotes: [...chapterNotes, ...proposalGuidance],
       examples,
     });
 

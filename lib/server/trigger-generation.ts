@@ -108,6 +108,16 @@ export async function triggerBackgroundGeneration(
   return trigger("text", "generate-chapter-background", slug, host, jobId, approvedManifestDigest);
 }
 
+/** Self-serve Prepare proposal worker trigger (IQ-011). Same signed-token
+ * discipline; the claim is the inserted 'generating' proposal row. */
+export async function triggerBackgroundPrepareProposal(
+  slug: string,
+  host: string,
+  jobId: string,
+): Promise<TriggerResult> {
+  return trigger("prepare", "prepare-proposal-background", slug, host, jobId);
+}
+
 export async function triggerBackgroundImageGeneration(
   slug: string,
   host: string,
