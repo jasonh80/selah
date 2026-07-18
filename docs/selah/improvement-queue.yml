@@ -59,8 +59,10 @@ entries:
       overflow at 390px; one 11px overflow at true 320px content width,
       traced to the control row.
     priority_trigger: next layout pass (small bounded fix; free)
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "#56 — control row wraps below ~332px (flex-wrap only, no
+      typography change); verify:layout-320 pins the row + the pill metrics
+      the 330.6px measurement assumed"
 
   - id: IQ-004
     area: mark-9-images

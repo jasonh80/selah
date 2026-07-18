@@ -42,7 +42,11 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
       <div className="pt-2">
         <div className="flex flex-col gap-s3 md:flex-row md:flex-wrap md:items-center md:justify-between">
           <h1 className="text-title text-primary lg:text-[48px]">{data.title}</h1>
-          <div className="flex flex-nowrap items-center gap-s2">
+          {/* flex-wrap (IQ-003): at a true 320px content viewport the three
+              pills measure ~330.6px, so Deep Dive must be allowed to wrap to
+              a second line instead of overflowing an 11px sliver. Wrapping
+              only engages below ~332px; typography and pill sizes unchanged. */}
+          <div className="flex flex-wrap items-center gap-s2">
             <button
               onClick={() => setScriptureOpen((open) => !open)}
               aria-expanded={scriptureOpen}
