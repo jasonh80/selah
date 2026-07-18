@@ -32,12 +32,14 @@ export interface MarkSprintFactorySetup {
 // Chapters served by the factory runner. Mark 8's literal contract is
 // deliberately absent. A chapter needs an owner receipt to do ANYTHING here:
 // Mark 7 carries its frozen code literal; chapters listed with approval null
-// (Mark 9) stay fail-closed until the owner approves them on the Prepare
-// Chapter screen, which records a digest-bound row read back by
-// readStoredSetupApproval (owner decision A5, 2026-07-16).
+// (Mark 9, Mark 10) stay fail-closed until the owner approves them on the
+// Prepare Chapter screen, which records a digest-bound row read back by
+// readStoredSetupApproval (owner decision A5, 2026-07-16; Mark 10 via the
+// board #29 Codex handoff, 2026-07-18).
 const FACTORY_SETUPS: readonly MarkSprintFactorySetup[] = [
   { contract: MARK_7_SETUP_CONTRACT, approval: MARK_7_STUDIO_SETUP_APPROVAL },
   { contract: buildMarkSprintSetupContract("mark-9"), approval: null },
+  { contract: buildMarkSprintSetupContract("mark-10"), approval: null },
 ];
 
 export function markSprintFactorySetupFor(
