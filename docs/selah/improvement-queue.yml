@@ -61,8 +61,8 @@ entries:
     priority_trigger: next layout pass (small bounded fix; free)
     status: finished
     completion_pr: "#56 — control row wraps below ~332px (flex-wrap only, no
-      typography change); verify:layout-320 pins the row + the pill metrics
-      the 330.6px measurement assumed"
+      typography change); Codex verifies 320/390px in the browser post-merge
+      (lean: no permanent gate for a one-class visual fix)"
 
   - id: IQ-004
     area: mark-9-images
