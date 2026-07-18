@@ -206,19 +206,26 @@ entries:
     area: studio-launch
     improvement: >-
       OWNER DECISION (binding): Prepare becomes a built-in step of the
-      launch page for EVERY chapter — pick a chapter, Studio generates its
-      proposed spec (movement boundaries and names, guardrails, honest
-      location entries, guidance notes) on-screen, the owner reviews and
+      launch page — the same self-serve workflow supports ANY chapter (not
+      every genre forced into identical modules): pick a chapter, Studio
+      generates a CHAPTER-APPROPRIATE proposed spec on-screen (movement
+      boundaries and names, guardrails, guidance notes, honest location
+      entries only when genuinely useful), the owner reviews and
       digest-binds his approval, and launch proceeds. No coding session, no
-      PR, no pre-arranged AI work per chapter. Codex reviews AFTER the
-      fact (post-hoc audit), not as a pre-launch gate — simplify the
-      process. All existing safety stays: digest-bound approval, explicit
-      paid-run confirms, spend accounting, honest-map model, fail-closed
-      gates. PROPOSED SHAPE (open to Codex design input): the spec
-      generation is itself a bounded free step with the same two-axis
-      location honesty and closed movement-range validation the code
-      fixtures enforce today; specs the flow produces are stored
-      digest-bound like current approvals, never silently editable.
+      PR, no pre-arranged AI work per chapter. FAIL-CLOSED: if Studio
+      cannot create and validate a safe spec, it stops with a clear reason
+      — it never fills gaps silently and never bypasses Jason. Audit line
+      in plain language: Jason remains the required reviewer before any
+      paid generation or publication; Codex may review completed launches
+      afterward for learning, cannot change live content automatically,
+      and is not a pre-launch gate — simplify the process. All existing
+      safety stays: digest-bound approval, explicit paid-run confirms,
+      spend accounting, honest-map model, fail-closed gates. PROPOSED
+      SHAPE (open to Codex design input): the spec generation is itself a
+      bounded free step with the same two-axis location honesty and closed
+      movement-range validation the code fixtures enforce today; specs the
+      flow produces are stored digest-bound like current approvals, never
+      silently editable.
     evidence: >-
       Owner direction (Jason, 2026-07-18, in-session), after Mark 10
       needed PR #54 to become launchable: "preload needs to be a step on
