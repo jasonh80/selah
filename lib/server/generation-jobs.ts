@@ -25,7 +25,9 @@ import {
 import {
   assertMarkSprintImagesArePlaceholders,
   deriveMarkSprintImagePlan,
+  deriveMarkSprintImageRedoPlan,
   MARK_8_IMAGE_MODEL,
+  type MarkSprintImageRedoPlan,
 } from "./mark8-image-plan";
 import {
   connectedChapterLabel,
@@ -41,6 +43,17 @@ export const IMAGE_JOB_PLAN_DIGEST_KEY = "imageJobPlanDigest";
 export const IMAGE_JOB_MODEL_KEY = "imageJobModel";
 export const IMAGE_JOB_SPENT_COUNT_KEY = "imageJobSpentCount";
 export const IMAGE_JOB_ERROR_CODE_KEY = "imageJobErrorCode";
+// Single-image redo candidate (board #29 owner decision, 2026-07-17). Same
+// no-schema pattern as the imageJob* keys; names must match
+// IMAGE_REDO_TRANSIENT_KEYS in mark8-image-plan.ts.
+export const IMAGE_REDO_JOB_KEY = "imageRedoJobId";
+export const IMAGE_REDO_STATE_KEY = "imageRedoState";
+export const IMAGE_REDO_KIND_KEY = "imageRedoKind";
+export const IMAGE_REDO_NOTES_KEY = "imageRedoNotes";
+export const IMAGE_REDO_BINDING_DIGEST_KEY = "imageRedoBindingDigest";
+export const IMAGE_REDO_CANDIDATE_URL_KEY = "imageRedoCandidateUrl";
+export const IMAGE_REDO_SPENT_COUNT_KEY = "imageRedoSpentCount";
+export const IMAGE_REDO_ERROR_CODE_KEY = "imageRedoErrorCode";
 
 const LOWERCASE_SHA256 = /^[0-9a-f]{64}$/;
 
@@ -222,6 +235,47 @@ const IMAGE_JOB_METADATA_KEYS = [
   IMAGE_JOB_ERROR_CODE_KEY,
 ] as const;
 
+const IMAGE_REDO_METADATA_KEYS = [
+  IMAGE_REDO_JOB_KEY,
+  IMAGE_REDO_STATE_KEY,
+  IMAGE_REDO_KIND_KEY,
+  IMAGE_REDO_NOTES_KEY,
+  IMAGE_REDO_BINDING_DIGEST_KEY,
+  IMAGE_REDO_CANDIDATE_URL_KEY,
+  IMAGE_REDO_SPENT_COUNT_KEY,
+  IMAGE_REDO_ERROR_CODE_KEY,
+] as const;
+
+/**
+ * Every transient job-control key that may live inside workup_json. Version
+ * snapshot/restore strip these (job state is a property of the LIVE row, never
+ * of an archived draft), and whole-workup writers refuse while any is active —
+ * otherwise a restore could erase a live paid claim or resurrect a dead one.
+ */
+export const TRANSIENT_JOB_CONTROL_KEYS = [
+  TEXT_JOB_KEY,
+  TEXT_JOB_STATE_KEY,
+  TEXT_JOB_MANIFEST_DIGEST_KEY,
+  ...IMAGE_JOB_METADATA_KEYS,
+  ...IMAGE_REDO_METADATA_KEYS,
+] as const;
+
+/** True when the row's workup_json carries ANY live job-control key. */
+export function hasTransientJobControlKeys(json: Record<string, unknown>): boolean {
+  return TRANSIENT_JOB_CONTROL_KEYS.some((key) =>
+    Object.prototype.hasOwnProperty.call(json, key),
+  );
+}
+
+/** Pure: a copy of the workup JSON with every job-control key removed. */
+export function stripTransientJobControlKeys(
+  json: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...json };
+  for (const key of TRANSIENT_JOB_CONTROL_KEYS) delete next[key];
+  return next;
+}
+
 const PAID_IMAGE_JOB_STATES = new Set(["queued", "running", "failed", "blocked"]);
 
 /**
@@ -249,6 +303,20 @@ function assertTextClaimMayReplaceImages(
       "claimGenerationJob",
       slug,
       `image job${state} is active or unresolved — refusing to replace its paid work`,
+    );
+  }
+  // A pending/unresolved single-image redo is paid work too: a text regen
+  // replaces the whole workup and would silently discard the candidate.
+  if (
+    IMAGE_REDO_METADATA_KEYS.some((key) =>
+      Object.prototype.hasOwnProperty.call(json, key),
+    )
+  ) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "claimGenerationJob",
+      slug,
+      "an image redo candidate is active or unresolved — use or reject it before regenerating text",
     );
   }
 
@@ -762,6 +830,14 @@ export async function claimImageJob(
   if (previousJobId && !ownerConfirmedRetry) {
     throw new ChapterMutationError("CONFLICT", "claimImageJob", slug, "an image job is already active for this chapter");
   }
+  if (typeof json[IMAGE_REDO_JOB_KEY] === "string") {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "claimImageJob",
+      slug,
+      "an image redo candidate is active or unresolved — use or reject it before a full image run",
+    );
+  }
   const exactBinding = validatedImageBinding(
     slug,
     json as unknown as ChapterWorkup,
@@ -777,12 +853,16 @@ export async function claimImageJob(
     {
       status: decision.expected!.status,
       updatedAt: decision.expected!.updatedAt,
-      json: ownerConfirmedRetry
-        ? [
-            { key: IMAGE_JOB_KEY, equals: previousJobId },
-            { key: IMAGE_JOB_STATE_KEY, equals: "failed" },
-          ]
-        : [{ key: IMAGE_JOB_KEY, equals: null }], // key must still be absent at write time
+      json: [
+        // A redo candidate must still be absent at write time (cross-exclusion).
+        { key: IMAGE_REDO_JOB_KEY, equals: null },
+        ...(ownerConfirmedRetry
+          ? [
+              { key: IMAGE_JOB_KEY, equals: previousJobId },
+              { key: IMAGE_JOB_STATE_KEY, equals: "failed" },
+            ]
+          : [{ key: IMAGE_JOB_KEY, equals: null }]), // key must still be absent at write time
+      ],
     },
     {
       workup_json: {
@@ -977,6 +1057,471 @@ export async function markImageJobTerminalFailure(
       },
       updated_at: new Date().toISOString(),
     },
+  );
+  return typeof changed === "number" && changed === 1;
+}
+
+// ---------------- single-image redo jobs (one candidate; duplicates cannot double-spend) ----------------
+
+export interface ImageRedoBinding {
+  kind: string;
+  index: number;
+  notes: string;
+  bindingDigest: string;
+  model: string;
+}
+
+function validatedRedoPlan(
+  slug: string,
+  workup: ChapterWorkup,
+  kind: string,
+  notes: string,
+  expectedDigest: string,
+  action: string,
+): MarkSprintImageRedoPlan {
+  if (!isConnectedStudioSlug(slug)) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      action,
+      slug,
+      "single-image redo is available only for connected protected chapters",
+    );
+  }
+  let plan: MarkSprintImageRedoPlan;
+  try {
+    plan = deriveMarkSprintImageRedoPlan(slug, workup, kind, notes);
+  } catch (error) {
+    throw new ChapterMutationError("REFUSED", action, slug, String((error as Error).message));
+  }
+  if (!LOWERCASE_SHA256.test(expectedDigest) || plan.digest !== expectedDigest) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      action,
+      slug,
+      `the ${connectedChapterLabel(slug)} image or its redo request changed after you reviewed the cost`,
+    );
+  }
+  return plan;
+}
+
+/**
+ * Atomic single-use REDO claim on a draft row (route-side). Exactly one
+ * candidate may exist per chapter; a full image job and a redo can never be
+ * claimed together. A "failed" redo may be re-claimed only by a fresh
+ * owner-confirmed request (new preflight + confirm); "blocked" stays locked.
+ */
+export async function claimImageRedoJob(
+  store: JobStorePort,
+  slug: string,
+  request: { kind: string; notes: string; bindingDigest: string },
+): Promise<{ jobId: string; binding: ImageRedoBinding }> {
+  const row = await store.read(slug);
+  const decision = decideMutation("updateChapterWorkupJson", slug, toLookup(row));
+  if (!decision.allowed) {
+    throw new ChapterMutationError("REFUSED", "claimImageRedoJob", slug, decision.reason);
+  }
+  const json = (row && !("error" in row) && row.workupJson) || {};
+  if (typeof json[IMAGE_JOB_KEY] === "string") {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "claimImageRedoJob",
+      slug,
+      "a full image job is active or unresolved for this chapter",
+    );
+  }
+  const previousRedoId =
+    typeof json[IMAGE_REDO_JOB_KEY] === "string" ? json[IMAGE_REDO_JOB_KEY] : "";
+  const previousRedoState =
+    typeof json[IMAGE_REDO_STATE_KEY] === "string" ? json[IMAGE_REDO_STATE_KEY] : "";
+  const ownerConfirmedRetry = previousRedoId !== "" && previousRedoState === "failed";
+  if (previousRedoId && !ownerConfirmedRetry) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "claimImageRedoJob",
+      slug,
+      "an image redo candidate is already active or unresolved for this chapter",
+    );
+  }
+  const plan = validatedRedoPlan(
+    slug,
+    json as unknown as ChapterWorkup,
+    request.kind,
+    request.notes,
+    request.bindingDigest,
+    "claimImageRedoJob",
+  );
+  const jobId = newJobId();
+  const claimedJson = { ...json };
+  for (const key of IMAGE_REDO_METADATA_KEYS) delete claimedJson[key];
+  const changed = await store.update(
+    slug,
+    {
+      status: decision.expected!.status,
+      updatedAt: decision.expected!.updatedAt,
+      json: [
+        { key: IMAGE_JOB_KEY, equals: null },
+        ...(ownerConfirmedRetry
+          ? [
+              { key: IMAGE_REDO_JOB_KEY, equals: previousRedoId },
+              { key: IMAGE_REDO_STATE_KEY, equals: "failed" },
+            ]
+          : [{ key: IMAGE_REDO_JOB_KEY, equals: null }]),
+      ],
+    },
+    {
+      workup_json: {
+        ...claimedJson,
+        [IMAGE_REDO_JOB_KEY]: jobId,
+        [IMAGE_REDO_STATE_KEY]: "queued",
+        [IMAGE_REDO_KIND_KEY]: plan.kind,
+        [IMAGE_REDO_NOTES_KEY]: plan.notes,
+        [IMAGE_REDO_BINDING_DIGEST_KEY]: plan.digest,
+      },
+      updated_at: new Date().toISOString(),
+    },
+  );
+  if (typeof changed === "object") {
+    throw new ChapterMutationError("WRITE_FAILED", "claimImageRedoJob", slug, changed.error);
+  }
+  if (changed !== 1) {
+    throw new ChapterMutationError("CONFLICT", "claimImageRedoJob", slug, "another claim won the race");
+  }
+  return {
+    jobId,
+    binding: {
+      kind: plan.kind,
+      index: plan.index,
+      notes: plan.notes,
+      bindingDigest: plan.digest,
+      model: plan.model,
+    },
+  };
+}
+
+/**
+ * Worker-side atomic consumption of a redo claim ("queued" → "running").
+ * Revalidates the FULL binding against the row it reads — the stored target,
+ * notes, and digest must still derive to exactly the owner-confirmed request —
+ * so a row change between route and worker can never carry a stale review
+ * into paid work. Duplicated deliveries lose at the conditional write.
+ */
+export async function consumeImageRedoClaim(
+  store: JobStorePort,
+  slug: string,
+  jobId: string,
+  bindingDigest: string,
+): Promise<{ workup: ChapterWorkup; plan: MarkSprintImageRedoPlan }> {
+  if (!jobId) {
+    throw new ChapterMutationError("REFUSED", "consumeImageRedoClaim", slug, "missing job id");
+  }
+  const row = await readRowForTerminalWrite(store, slug, "consumeImageRedoClaim");
+  if (row.status !== "draft" || row.workupJson?.[IMAGE_REDO_JOB_KEY] !== jobId) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "consumeImageRedoClaim",
+      slug,
+      "redo claim is not owned by this worker",
+    );
+  }
+  const storedKind = row.workupJson?.[IMAGE_REDO_KIND_KEY];
+  const storedNotes = row.workupJson?.[IMAGE_REDO_NOTES_KEY];
+  const plan = validatedRedoPlan(
+    slug,
+    row.workupJson as unknown as ChapterWorkup,
+    typeof storedKind === "string" ? storedKind : "",
+    typeof storedNotes === "string" ? storedNotes : "",
+    bindingDigest,
+    "consumeImageRedoClaim",
+  );
+  const changed = await store.update(
+    slug,
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_REDO_JOB_KEY, equals: jobId },
+        { key: IMAGE_REDO_STATE_KEY, equals: "queued" },
+        { key: IMAGE_REDO_BINDING_DIGEST_KEY, equals: bindingDigest },
+      ],
+    },
+    {
+      workup_json: { ...row.workupJson, [IMAGE_REDO_STATE_KEY]: "running" },
+      updated_at: new Date().toISOString(),
+    },
+  );
+  if (typeof changed === "object") {
+    throw new ChapterMutationError("WRITE_FAILED", "consumeImageRedoClaim", slug, changed.error);
+  }
+  if (changed !== 1) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "consumeImageRedoClaim",
+      slug,
+      "redo claim already consumed or superseded — refusing duplicate delivery",
+    );
+  }
+  return { workup: { ...(row.workupJson as unknown as ChapterWorkup) }, plan };
+}
+
+/**
+ * Terminal redo SUCCESS: the candidate is stored UNLINKED (public-bucket
+ * URL, referenced by nothing until the owner approves). The chapter's
+ * images stay byte-for-byte unchanged; only the transient candidate keys move.
+ */
+export async function completeImageRedoCandidate(
+  store: JobStorePort,
+  slug: string,
+  jobId: string,
+  candidateUrl: string,
+): Promise<void> {
+  const row = await readRowForTerminalWrite(store, slug, "completeImageRedoCandidate");
+  const changed = await store.update(
+    slug,
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_REDO_JOB_KEY, equals: jobId },
+        { key: IMAGE_REDO_STATE_KEY, equals: "running" },
+      ],
+    },
+    {
+      workup_json: {
+        ...row.workupJson,
+        [IMAGE_REDO_STATE_KEY]: "candidate",
+        [IMAGE_REDO_CANDIDATE_URL_KEY]: candidateUrl,
+      },
+      updated_at: new Date().toISOString(),
+    },
+  );
+  if (typeof changed === "object") {
+    throw new ChapterMutationError("WRITE_FAILED", "completeImageRedoCandidate", slug, changed.error);
+  }
+  if (changed !== 1) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "completeImageRedoCandidate",
+      slug,
+      "stale redo worker: claim superseded or row changed",
+    );
+  }
+}
+
+/**
+ * Release a redo claim after a PRE-SPEND refusal (queued or running). Clears
+ * every redo key. Never throws; false = not released (superseded/write failed).
+ */
+export async function releaseImageRedoJob(
+  store: JobStorePort,
+  slug: string,
+  jobId: string,
+  expectedState: "queued" | "running",
+): Promise<boolean> {
+  let row: JobRow;
+  try {
+    row = await readRowForTerminalWrite(store, slug, "releaseImageRedoJob");
+  } catch (e) {
+    console.error(`[selah] releaseImageRedoJob(${slug}): ${(e as Error).message}`);
+    return false;
+  }
+  if (row.workupJson?.[IMAGE_REDO_JOB_KEY] !== jobId) return false;
+  if (row.workupJson?.[IMAGE_REDO_STATE_KEY] !== expectedState) return false;
+  const json = { ...row.workupJson };
+  for (const key of IMAGE_REDO_METADATA_KEYS) delete json[key];
+  const changed = await store.update(
+    slug,
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_REDO_JOB_KEY, equals: jobId },
+        { key: IMAGE_REDO_STATE_KEY, equals: expectedState },
+      ],
+    },
+    { workup_json: json, updated_at: new Date().toISOString() },
+  );
+  return typeof changed === "number" && changed === 1;
+}
+
+/**
+ * Paid redo work that cannot produce a reviewable candidate stays locked:
+ * `failed` = spend durably recorded (a NEW owner-confirmed redo may follow);
+ * `blocked` = even the cost record failed (needs attention; nothing may run).
+ */
+export async function markImageRedoTerminalFailure(
+  store: JobStorePort,
+  slug: string,
+  jobId: string,
+  state: "failed" | "blocked",
+  spentCount: number,
+  errorCode: string,
+): Promise<boolean> {
+  let row: JobRow;
+  try {
+    row = await readRowForTerminalWrite(store, slug, "markImageRedoTerminalFailure");
+  } catch (error) {
+    console.error(`[selah] markImageRedoTerminalFailure(${slug}): ${(error as Error).message}`);
+    return false;
+  }
+  if (
+    row.workupJson?.[IMAGE_REDO_JOB_KEY] !== jobId ||
+    row.workupJson?.[IMAGE_REDO_STATE_KEY] !== "running"
+  ) {
+    return false;
+  }
+  const changed = await store.update(
+    slug,
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_REDO_JOB_KEY, equals: jobId },
+        { key: IMAGE_REDO_STATE_KEY, equals: "running" },
+      ],
+    },
+    {
+      workup_json: {
+        ...row.workupJson,
+        [IMAGE_REDO_STATE_KEY]: state,
+        [IMAGE_REDO_SPENT_COUNT_KEY]: Math.max(0, Math.floor(spentCount)),
+        [IMAGE_REDO_ERROR_CODE_KEY]: errorCode.slice(0, 80),
+      },
+      updated_at: new Date().toISOString(),
+    },
+  );
+  return typeof changed === "number" && changed === 1;
+}
+
+/**
+ * Owner APPROVAL: swap exactly the target image's src to the stored candidate
+ * URL and clear every redo key, in one conditional write pinned to the exact
+ * candidate the owner reviewed. Label, order, prompt, caption, and alt stay
+ * byte-for-byte unchanged (v1 boundary). Everything else in the workup is
+ * untouched.
+ */
+export async function applyImageRedoCandidate(
+  store: JobStorePort,
+  slug: string,
+  expected: { kind: string; candidateUrl: string },
+): Promise<void> {
+  const row = await readRowForTerminalWrite(store, slug, "applyImageRedoCandidate");
+  const decision = decideMutation("updateChapterWorkupJson", slug, {
+    kind: "row",
+    row: { status: row.status, updatedAt: row.updatedAt },
+  });
+  if (!decision.allowed) {
+    throw new ChapterMutationError("REFUSED", "applyImageRedoCandidate", slug, decision.reason);
+  }
+  const json = row.workupJson;
+  const jobId = json?.[IMAGE_REDO_JOB_KEY];
+  if (
+    typeof jobId !== "string" ||
+    json?.[IMAGE_REDO_STATE_KEY] !== "candidate" ||
+    json?.[IMAGE_REDO_KIND_KEY] !== expected.kind ||
+    json?.[IMAGE_REDO_CANDIDATE_URL_KEY] !== expected.candidateUrl
+  ) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "applyImageRedoCandidate",
+      slug,
+      "the redo candidate changed or was resolved after you reviewed it",
+    );
+  }
+  const images = json.images;
+  if (!Array.isArray(images) || !images.some((image) => (image as Record<string, unknown>)?.kind === expected.kind)) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "applyImageRedoCandidate",
+      slug,
+      "stored images are unreadable or the target image is missing (fail closed)",
+    );
+  }
+  const nextImages = images.map((image) => {
+    const record = image as Record<string, unknown>;
+    return record?.kind === expected.kind
+      ? { ...record, src: expected.candidateUrl }
+      : record;
+  });
+  const nextJson: Record<string, unknown> = { ...json, images: nextImages };
+  for (const key of IMAGE_REDO_METADATA_KEYS) delete nextJson[key];
+  const changed = await store.update(
+    slug,
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_REDO_JOB_KEY, equals: jobId },
+        { key: IMAGE_REDO_STATE_KEY, equals: "candidate" },
+        { key: IMAGE_REDO_CANDIDATE_URL_KEY, equals: expected.candidateUrl },
+      ],
+    },
+    { workup_json: nextJson, updated_at: new Date().toISOString() },
+  );
+  if (typeof changed === "object") {
+    throw new ChapterMutationError("WRITE_FAILED", "applyImageRedoCandidate", slug, changed.error);
+  }
+  if (changed !== 1) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      "applyImageRedoCandidate",
+      slug,
+      "the chapter changed while you were deciding — check the candidate again",
+    );
+  }
+}
+
+/**
+ * Owner REJECTION / DISMISSAL: clear every redo key; the chapter is untouched.
+ * Works on a reviewable "candidate", on a "failed" redo (whose spend is
+ * already durably recorded), and on a STALE "queued" claim — one whose row
+ * revision is older than the worker-token TTL, so its signed token is
+ * provably expired and NO worker can ever consume it (consume is the only
+ * path to spend, so a stale queued claim is provably zero-spend). A live
+ * "queued"/"running" claim and "blocked" (cost not recorded) stay locked.
+ * The candidate file stays orphaned in its immutable job directory
+ * (auditable, never served). Never throws; false = nothing cleared.
+ */
+export async function rejectImageRedoCandidate(
+  store: JobStorePort,
+  slug: string,
+  now = Date.now(),
+): Promise<boolean> {
+  let row: JobRow;
+  try {
+    row = await readRowForTerminalWrite(store, slug, "rejectImageRedoCandidate");
+  } catch (e) {
+    console.error(`[selah] rejectImageRedoCandidate(${slug}): ${(e as Error).message}`);
+    return false;
+  }
+  const jobId = row.workupJson?.[IMAGE_REDO_JOB_KEY];
+  const state = row.workupJson?.[IMAGE_REDO_STATE_KEY];
+  // No claim/terminal write between claim-time and now can have happened on a
+  // queued redo (every other claim refuses while it exists), so updated_at IS
+  // the claim time. Unparseable timestamps are never stale (fail closed).
+  const revisionMs = Date.parse(row.updatedAt ?? "");
+  const staleQueued =
+    state === "queued" &&
+    Number.isFinite(revisionMs) &&
+    now - revisionMs > JOB_TOKEN_TTL_MS;
+  if (
+    typeof jobId !== "string" ||
+    (state !== "candidate" && state !== "failed" && !staleQueued)
+  ) {
+    return false;
+  }
+  const json = { ...row.workupJson };
+  for (const key of IMAGE_REDO_METADATA_KEYS) delete json[key];
+  const changed = await store.update(
+    slug,
+    {
+      status: "draft",
+      updatedAt: row.updatedAt,
+      json: [
+        { key: IMAGE_REDO_JOB_KEY, equals: jobId },
+        { key: IMAGE_REDO_STATE_KEY, equals: String(state) },
+      ],
+    },
+    { workup_json: json, updated_at: new Date().toISOString() },
   );
   return typeof changed === "number" && changed === 1;
 }

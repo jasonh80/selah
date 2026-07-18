@@ -77,6 +77,34 @@ Choose Chapter → Generate Draft → Preview Draft → (Compare Versions)
   probe STOPS the run (no fallback). Sizes: wide 1536×1024 (hero-suited),
   portrait 1024×1536 (grid cards).
 
+## Redo one image (draft chapters only)
+
+When one image of a completed draft set is wrong, redo exactly that one —
+never the text and never the other images (board #29 owner decision,
+2026-07-17; Codex spec 2026-07-18):
+
+1. In **Create & Review Images**, open the image's card → **Redo this image**.
+2. Type **what should change** (required, ≤600 chars). The redo prompt is the
+   image's frozen approved prompt + your note; style/composition boundaries
+   stay.
+3. **Check cost (free)** — shows the exact model, size, and maximum charge,
+   and binds a digest of the target, its current bytes, and your note.
+4. **Create one candidate** — exactly one model request, one image, no
+   automatic retry. The candidate is stored UNLINKED under its own immutable
+   `<slug>/<jobId>/` directory; the chapter stays byte-for-byte unchanged.
+5. Compare current vs candidate, **Preview in chapter** (required — the
+   preview shows the candidate in place with a banner), then **Use this
+   image** (swaps only that one `src`, after an automatic rollback snapshot)
+   or **Reject** (chapter untouched; the file stays orphaned).
+6. Any unresolved redo NULLS the review digest — the set must be re-previewed
+   and re-approved, and publish refuses until the candidate is decided.
+- Gates: same kill switch, allowlist, owner receipt, model probe, atomic
+  single-use claim, strict cost recording (`imageCount: 1`, `redo: true`),
+  and audit trail as the full run. Published chapters always refuse.
+- Offline gate: `verify:image-redo` (prebuild) proves one-spend, privacy,
+  exact-swap, reject-changes-nothing, published-refuses, and fail-closed
+  cost recording.
+
 ## Cost stewardship
 
 - Both kill switches stay **OFF** except during an approved run; flip OFF

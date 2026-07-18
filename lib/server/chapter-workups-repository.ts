@@ -22,6 +22,7 @@ import {
   type JobRow,
 } from "./generation-jobs";
 import {
+  IMAGE_REDO_TRANSIENT_KEYS,
   isStoredMarkSprintImageUrl,
   markSprintFinalReviewDigest,
   MARK_8_IMAGE_SLUG,
@@ -144,6 +145,9 @@ const MARK_8_IMAGE_JOB_KEYS = [
   IMAGE_JOB_MODEL_KEY,
   IMAGE_JOB_SPENT_COUNT_KEY,
   IMAGE_JOB_ERROR_CODE_KEY,
+  // An unresolved single-image redo candidate blocks publishing exactly like
+  // an unresolved image job (markSprintFinalReviewDigest also returns null).
+  ...IMAGE_REDO_TRANSIENT_KEYS,
 ] as const;
 
 export type Mark8PublishValidation =

@@ -10,3 +10,7 @@
 next-env.d.ts
 _archive_v1_2026-06-13/
 .claude/
+
+# local-only
+Screenshots/
+tsconfig.tsbuildinfo

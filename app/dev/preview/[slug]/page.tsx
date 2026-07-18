@@ -33,6 +33,27 @@ export default async function DraftPreviewPage({
   const imagePlan = getChapterImagePlan(params.slug);
   const storedKinds = new Set(draft.workup.images.filter((i) => /^https?:\/\//.test(i.src)).map((i) => i.kind));
 
+  // Single-image redo candidate (board #29): show it IN PLACE with a clear
+  // banner so the owner can judge it inside the real chapter. Display-only —
+  // the stored draft is untouched until the owner clicks "Use this image".
+  const raw = draft.workup as unknown as Record<string, unknown>;
+  const redoCandidate =
+    draft.status === "draft" &&
+    raw.imageRedoState === "candidate" &&
+    typeof raw.imageRedoKind === "string" &&
+    typeof raw.imageRedoCandidateUrl === "string" &&
+    /^https:\/\//.test(raw.imageRedoCandidateUrl)
+      ? { kind: raw.imageRedoKind, url: raw.imageRedoCandidateUrl }
+      : null;
+  const displayWorkup = redoCandidate
+    ? {
+        ...draft.workup,
+        images: draft.workup.images.map((image) =>
+          image.kind === redoCandidate.kind ? { ...image, src: redoCandidate.url } : image,
+        ),
+      }
+    : draft.workup;
+
   return (
     <AppShell>
       <div className="mx-auto max-w-[1180px] px-4 pt-3 lg:px-6">
@@ -40,6 +61,13 @@ export default async function DraftPreviewPage({
           <span className="font-semibold text-accent-strong">DRAFT PREVIEW</span> · {params.slug} · status:{" "}
           <code>{draft.status}</code>
         </div>
+        {redoCandidate && (
+          <div className="mt-2 rounded-md border border-dashed bg-card-soft px-3 py-2 text-[12px] text-secondary">
+            <span className="font-semibold text-accent-strong">REDO CANDIDATE SHOWN</span> · the{" "}
+            <code>{redoCandidate.kind}</code> image below is the unapproved candidate. The stored draft is
+            unchanged until you choose &ldquo;Use this image&rdquo; in Studio.
+          </div>
+        )}
         {imagePlan && (
           <details className="mt-2 rounded-md border border-dashed bg-card-soft px-3 py-2 text-[12px] text-secondary">
             <summary className="cursor-pointer">
@@ -61,7 +89,7 @@ export default async function DraftPreviewPage({
           </details>
         )}
       </div>
-      <ChapterView data={draft.workup} source="draft" />
+      <ChapterView data={displayWorkup} source="draft" />
     </AppShell>
   );
 }

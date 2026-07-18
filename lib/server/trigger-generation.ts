@@ -25,6 +25,8 @@ interface TriggerRequest {
     imagePlanDigest?: string;
     imageModel?: string;
     sourceOverlapReportDigest?: string;
+    redoBindingDigest?: string;
+    redoKind?: string;
   };
 }
 
@@ -113,4 +115,31 @@ export async function triggerBackgroundImageGeneration(
   binding?: ImageJobBinding,
 ): Promise<TriggerResult> {
   return trigger("image", "generate-images-background", slug, host, jobId, undefined, binding);
+}
+
+/** Single-image redo worker trigger. Same signed-token discipline. */
+export async function triggerBackgroundImageRedo(
+  slug: string,
+  host: string,
+  jobId: string,
+  redo: { bindingDigest: string; kind: string; model: string },
+): Promise<TriggerResult> {
+  let token: string;
+  try {
+    token = signJobToken("image", slug, jobId).token;
+  } catch (e) {
+    return { ok: false, error: String((e as Error).message).slice(0, 200) };
+  }
+  const req: TriggerRequest = {
+    url: `${baseUrl(host)}/.netlify/functions/redo-image-background`,
+    body: {
+      slug,
+      job: jobId,
+      token,
+      redoBindingDigest: redo.bindingDigest,
+      redoKind: redo.kind,
+      imageModel: redo.model,
+    },
+  };
+  return triggerOverride ? triggerOverride(req) : post(req);
 }

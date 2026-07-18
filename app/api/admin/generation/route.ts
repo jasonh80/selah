@@ -25,6 +25,10 @@ import { BUILD_ID } from "@/lib/build";
 import {
   claimGenerationJob,
   claimImageJob,
+  claimImageRedoJob,
+  applyImageRedoCandidate,
+  rejectImageRedoCandidate,
+  releaseImageRedoJob,
   failGenerationJob,
   releaseImageJob,
   requireJobStore,
@@ -33,13 +37,27 @@ import {
   IMAGE_JOB_MODEL_KEY,
   IMAGE_JOB_SPENT_COUNT_KEY,
   IMAGE_JOB_STATE_KEY,
+  IMAGE_REDO_BINDING_DIGEST_KEY,
+  IMAGE_REDO_CANDIDATE_URL_KEY,
+  IMAGE_REDO_ERROR_CODE_KEY,
+  IMAGE_REDO_JOB_KEY,
+  IMAGE_REDO_KIND_KEY,
+  IMAGE_REDO_NOTES_KEY,
+  IMAGE_REDO_SPENT_COUNT_KEY,
+  IMAGE_REDO_STATE_KEY,
   ALLOW_DISCARD_COMPLETED_IMAGES,
+  hasTransientJobControlKeys,
 } from "@/lib/server/generation-jobs";
-import { triggerBackgroundGeneration, triggerBackgroundImageGeneration } from "@/lib/server/trigger-generation";
+import {
+  triggerBackgroundGeneration,
+  triggerBackgroundImageGeneration,
+  triggerBackgroundImageRedo,
+} from "@/lib/server/trigger-generation";
 import {
   imageGenAllowed,
   checkImageModel,
   prepareImageJobBinding,
+  prepareImageRedoBinding,
 } from "@/lib/server/images";
 import {
   deriveMarkSprintImagePlan,
@@ -153,6 +171,39 @@ async function currentPreparePacket(slug: string) {
       ? stored.packet_notes
       : undefined;
   return packet;
+}
+
+// Shape the transient single-image-redo keys for the Studio status poll (so a
+// page refresh recovers redo progress). Returns null when no redo is active.
+const IMAGE_REDO_STATES = ["queued", "running", "candidate", "failed", "blocked"] as const;
+function redoStatusFor(
+  json: Record<string, unknown>,
+): { redo: Record<string, unknown> } | null {
+  const jobId = json[IMAGE_REDO_JOB_KEY];
+  const rawState = json[IMAGE_REDO_STATE_KEY];
+  if (
+    typeof jobId !== "string" ||
+    !IMAGE_REDO_STATES.includes(rawState as (typeof IMAGE_REDO_STATES)[number])
+  ) {
+    return null;
+  }
+  const spentRaw = Number(json[IMAGE_REDO_SPENT_COUNT_KEY]);
+  const candidateUrl = json[IMAGE_REDO_CANDIDATE_URL_KEY];
+  const bindingDigest = json[IMAGE_REDO_BINDING_DIGEST_KEY];
+  const errorCode = json[IMAGE_REDO_ERROR_CODE_KEY];
+  return {
+    redo: {
+      kind: typeof json[IMAGE_REDO_KIND_KEY] === "string" ? json[IMAGE_REDO_KIND_KEY] : "",
+      state: rawState,
+      notes: typeof json[IMAGE_REDO_NOTES_KEY] === "string" ? json[IMAGE_REDO_NOTES_KEY] : "",
+      spentCount: Number.isSafeInteger(spentRaw) && spentRaw >= 0 ? spentRaw : 0,
+      ...(typeof candidateUrl === "string" && /^https:\/\//u.test(candidateUrl)
+        ? { candidateUrl }
+        : {}),
+      ...(typeof bindingDigest === "string" ? { bindingDigest } : {}),
+      ...(typeof errorCode === "string" && errorCode !== "" ? { errorCode } : {}),
+    },
+  };
 }
 
 function authed(req: Request): boolean {
@@ -868,10 +919,39 @@ export async function POST(req: Request) {
     const workup = await getVersionWorkup(String(body.slug ?? ""), Number(body.version));
     return NextResponse.json({ ok: Boolean(workup), workup });
   }
+  // Whole-workup writers must never run over a LIVE job claim or an
+  // unresolved redo candidate: the write would erase paid work (or hide a
+  // blocked, unrecorded spend) with neither a decision nor an audit trail.
+  // This pre-check exists for the CLEAR error message; the race itself is
+  // closed by the write, which asserts the absence of every transient job
+  // key in its own conditional predicates (Codex review, PR #51 P1). An
+  // unreadable row FAILS CLOSED here — never "assume idle".
+  async function refuseVersionWriteDuringActiveJob(slug: string, what: string) {
+    let row;
+    try {
+      row = await requireJobStore(slug, what).read(slug);
+    } catch (error) {
+      return mapMutationError(slug, what, error);
+    }
+    if (row && "error" in row) {
+      return refuse(slug, what, "the chapter row is unreadable — nothing was written (fail closed)", 503);
+    }
+    if (row && hasTransientJobControlKeys(row.workupJson)) {
+      return refuse(
+        slug,
+        what,
+        "a generation, image, or redo job is active or unresolved on this chapter — resolve it before restoring or merging drafts",
+        409,
+      );
+    }
+    return null;
+  }
   if (action === "version_restore") {
     const slug = String(body.slug ?? "");
     const blocked = await guardOrRefuse(slug, "version_restore", "restoreVersion");
     if (blocked) return blocked;
+    const busy = await refuseVersionWriteDuringActiveJob(slug, "version_restore");
+    if (busy) return busy;
     const ok = await restoreVersion(slug, Number(body.version));
     if (!ok) return refuse(slug, "version_restore", "restore failed or conflicted — nothing was written", 409);
     return NextResponse.json({ ok: true });
@@ -884,6 +964,8 @@ export async function POST(req: Request) {
     const slug = String(body.slug ?? "");
     const blocked = await guardOrRefuse(slug, "version_apply", "applyMergedDraft");
     if (blocked) return blocked;
+    const busy = await refuseVersionWriteDuringActiveJob(slug, "version_apply");
+    if (busy) return busy;
     const result = await applyMergedDraft(
       slug,
       body.workup as ChapterWorkup,
@@ -1072,6 +1154,10 @@ export async function POST(req: Request) {
         kind: image.kind,
         label: image.label,
         description: image.description ?? "",
+        // The admin-only per-image src powers the Studio review thumbnails and
+        // the redo comparison; only completed stored HTTPS urls are surfaced.
+        src:
+          image.status === "complete" && /^https:\/\//u.test(image.src) ? image.src : "",
         status:
           (state === "queued" || state === "running") && image.status !== "complete"
             ? "generating"
@@ -1080,7 +1166,256 @@ export async function POST(req: Request) {
               : "placeholder",
       })),
       ...(reviewDigest === null ? {} : { reviewDigest }),
+      ...(redoStatusFor(row.workupJson) ?? {}),
     });
+  }
+
+  // ---- single-image redo (board #29 owner decision, 2026-07-17) ----
+  // Four steps, each separately owner-driven: FREE preflight (exact model,
+  // size, max charge, binding digest) → ONE paid candidate (no auto-retry)
+  // → owner Use (swaps exactly one src, snapshot first) or Reject (chapter
+  // untouched). Draft chapters only; published chapters refuse via the same
+  // mutation guard as every other write.
+  if (action === "redo_image_preflight") {
+    const slug = String(body.slug ?? "");
+    const kind = String(body.kind ?? "");
+    const notes = typeof body.notes === "string" ? body.notes : "";
+    const blocked = await guardOrRefuse(slug, "redo_image_preflight", "updateChapterWorkupJson");
+    if (blocked) return blocked;
+    if (!(await imageGenAllowed(slug))) {
+      return refuse(
+        slug,
+        "redo_image_preflight",
+        "Image generation not allowed — needs Image Generation ON and the chapter allowlisted.",
+        403,
+      );
+    }
+    if (
+      isMarkSprintSlug(slug) &&
+      !(await connectedChapterReceiptAppliesIncludingStored(slug))
+    ) {
+      return refuse(
+        slug,
+        "redo_image_preflight",
+        `blocked — ${markSprintChapterLabel(slug)}'s exact owner setup receipt is missing or changed`,
+        403,
+      );
+    }
+    let store: ReturnType<typeof requireJobStore>;
+    try {
+      store = requireJobStore(slug, "redo_image_preflight");
+    } catch (error) {
+      return mapMutationError(slug, "redo_image_preflight", error);
+    }
+    try {
+      const row = await store.read(slug);
+      const json = (row && !("error" in row) && row.workupJson) || {};
+      if (typeof json[IMAGE_JOB_KEY] === "string") {
+        return refuse(slug, "redo_image_preflight", "a full image job is active or unresolved for this chapter", 409);
+      }
+      if (
+        typeof json[IMAGE_REDO_JOB_KEY] === "string" &&
+        json[IMAGE_REDO_STATE_KEY] !== "failed"
+      ) {
+        return refuse(
+          slug,
+          "redo_image_preflight",
+          "an image redo is already in progress or awaiting your decision — resolve it first",
+          409,
+        );
+      }
+      const redo = await prepareImageRedoBinding(store, slug, kind, notes);
+      return NextResponse.json({
+        ok: true,
+        slug,
+        redo: {
+          kind: redo.kind,
+          index: redo.index,
+          label: redo.label,
+          notes: redo.notes,
+          model: redo.model,
+          size: redo.size,
+          estimatedCostUsd: redo.estimatedCostUsd,
+          bindingDigest: redo.bindingDigest,
+        },
+      });
+    } catch (error) {
+      return mapMutationError(slug, "redo_image_preflight", error);
+    }
+  }
+  if (action === "redo_image") {
+    const slug = String(body.slug ?? "");
+    const kind = String(body.kind ?? "");
+    const notes = typeof body.notes === "string" ? body.notes : "";
+    const bindingDigest = typeof body.bindingDigest === "string" ? body.bindingDigest : "";
+    if (body.confirm !== true) {
+      return refuse(slug, "redo_image", "confirmation required", 400);
+    }
+    const blocked = await guardOrRefuse(slug, "redo_image", "updateChapterWorkupJson");
+    if (blocked) return blocked;
+    if (!(await imageGenAllowed(slug))) {
+      return refuse(
+        slug,
+        "redo_image",
+        "Image generation not allowed — needs Image Generation ON and the chapter allowlisted.",
+        403,
+      );
+    }
+    if (
+      isMarkSprintSlug(slug) &&
+      !(await connectedChapterReceiptAppliesIncludingStored(slug))
+    ) {
+      return refuse(
+        slug,
+        "redo_image",
+        `blocked — ${markSprintChapterLabel(slug)}'s exact owner setup receipt is missing or changed; no image credit was used`,
+        403,
+      );
+    }
+    let store: ReturnType<typeof requireJobStore>;
+    try {
+      store = requireJobStore(slug, "redo_image");
+    } catch (error) {
+      return mapMutationError(slug, "redo_image", error);
+    }
+    let fresh: Awaited<ReturnType<typeof prepareImageRedoBinding>>;
+    try {
+      fresh = await prepareImageRedoBinding(store, slug, kind, notes);
+    } catch (error) {
+      return mapMutationError(slug, "redo_image", error);
+    }
+    if (fresh.bindingDigest !== bindingDigest) {
+      return refuse(
+        slug,
+        "redo_image",
+        "The image or your redo request changed after you reviewed its cost. Check it again before spending credit.",
+        409,
+      );
+    }
+    const probe = await checkImageModel(fresh.model);
+    if (!probe.ok) {
+      return refuse(slug, "redo_image", `image model "${probe.model}" unavailable: ${probe.error}`, 502);
+    }
+    let redoJobId: string;
+    try {
+      const claim = await claimImageRedoJob(store, slug, { kind, notes, bindingDigest });
+      redoJobId = claim.jobId;
+    } catch (e) {
+      return mapMutationError(slug, "redo_image", e);
+    }
+    await logGenerationAudit({
+      action: "redo_image",
+      slug,
+      status: "started",
+      message: `job ${redoJobId} — one candidate for "${fresh.kind}"`,
+    });
+    const triggered = await triggerBackgroundImageRedo(slug, new URL(req.url).host, redoJobId, {
+      bindingDigest,
+      kind: fresh.kind,
+      model: fresh.model,
+    });
+    if (!triggered.ok) {
+      const released = await releaseImageRedoJob(store, slug, redoJobId, "queued");
+      return refuse(
+        slug,
+        "redo_image",
+        `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ` +
+          (released
+            ? "redo claim released"
+            : "redo claim could NOT be released; the row may still hold a stale claim"),
+        released ? 502 : 500,
+      );
+    }
+    return NextResponse.json({ ok: true, triggered: true, slug, jobId: redoJobId });
+  }
+  if (action === "redo_image_apply") {
+    const slug = String(body.slug ?? "");
+    const kind = String(body.kind ?? "");
+    const candidateUrl = typeof body.candidateUrl === "string" ? body.candidateUrl : "";
+    if (body.confirm !== true) {
+      return refuse(slug, "redo_image_apply", "confirmation required", 400);
+    }
+    const blocked = await guardOrRefuse(slug, "redo_image_apply", "updateChapterWorkupJson");
+    if (blocked) return blocked;
+    let store: ReturnType<typeof requireJobStore>;
+    try {
+      store = requireJobStore(slug, "redo_image_apply");
+    } catch (error) {
+      return mapMutationError(slug, "redo_image_apply", error);
+    }
+    // Pre-validate the exact candidate BEFORE the snapshot: a refused apply
+    // (double-click after success, stale tab, wrong url) must not append a
+    // version row — and must never write a POST-apply state under the
+    // "before-image-redo-apply" label, which would defeat the rollback. The
+    // atomic conditional write below still guards the race.
+    try {
+      const row = await store.read(slug);
+      const json = (row && !("error" in row) && row.workupJson) || {};
+      if (
+        json[IMAGE_REDO_STATE_KEY] !== "candidate" ||
+        json[IMAGE_REDO_KIND_KEY] !== kind ||
+        json[IMAGE_REDO_CANDIDATE_URL_KEY] !== candidateUrl
+      ) {
+        return refuse(
+          slug,
+          "redo_image_apply",
+          "the redo candidate changed or was resolved after you reviewed it",
+          409,
+        );
+      }
+    } catch (error) {
+      return mapMutationError(slug, "redo_image_apply", error);
+    }
+    // Rollback snapshot FAIL-CLOSED before the one-image swap: no snapshot,
+    // no mutation ("Snapshot before every regeneration or image run").
+    const version = await snapshotVersion(slug, "before-image-redo-apply");
+    if (version === null) {
+      return refuse(
+        slug,
+        "redo_image_apply",
+        "Studio could not save a rollback snapshot, so nothing was changed. Try again.",
+        500,
+      );
+    }
+    try {
+      await applyImageRedoCandidate(store, slug, { kind, candidateUrl });
+    } catch (e) {
+      return mapMutationError(slug, "redo_image_apply", e);
+    }
+    await logGenerationAudit({
+      action: "image_redo_applied",
+      slug,
+      status: "succeeded",
+      message: `"${kind}" now uses the approved candidate (rollback snapshot v${version})`,
+    });
+    return NextResponse.json({ ok: true, slug, kind, src: candidateUrl });
+  }
+  if (action === "redo_image_reject") {
+    const slug = String(body.slug ?? "");
+    const blocked = await guardOrRefuse(slug, "redo_image_reject", "updateChapterWorkupJson");
+    if (blocked) return blocked;
+    let store: ReturnType<typeof requireJobStore>;
+    try {
+      store = requireJobStore(slug, "redo_image_reject");
+    } catch (error) {
+      return mapMutationError(slug, "redo_image_reject", error);
+    }
+    const rejected = await rejectImageRedoCandidate(store, slug);
+    if (!rejected) {
+      return refuse(
+        slug,
+        "redo_image_reject",
+        "Nothing was cleared — the candidate may already be resolved, the request may still be live, or the redo needs attention (blocked spend stays locked).",
+        409,
+      );
+    }
+    await logGenerationAudit({
+      action: "image_redo_rejected",
+      slug,
+      status: "succeeded",
+      message: "candidate rejected; the chapter is unchanged (file stays orphaned in its job directory)",
+    });
+    return NextResponse.json({ ok: true, slug });
   }
 
   // ---- Selah Brain approved examples ----
