@@ -8,6 +8,8 @@ import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
 import { InsightCardGrid } from "@/components/chapter/InsightCardGrid";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
+import { GeoMapSection } from "@/components/chapter/GeoMapSection";
+import { getGeoChapterMap } from "@/lib/maps/geo-chapter-maps";
 import { ChapterTopControls } from "@/components/chapter/ChapterTopControls";
 import { CompactPreviewRow } from "@/components/chapter/CompactPreviewRow";
 import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSection";
@@ -67,7 +69,9 @@ export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) 
 
         <AuthorAudienceEvidence data={data} />
         <InsightCardGrid data={data} />
-        <MapsSection data={data} />
+        {/* Real-map engine for chapters with geo configs (owner decision
+            2026-07-17); older chapters keep the static maps until migrated. */}
+        {getGeoChapterMap(data.slug) ? <GeoMapSection data={data} /> : <MapsSection data={data} />}
         <ChaptersSection data={data} />
 
         <footer className="flex flex-col items-center gap-s2 pt-s2 text-center">
