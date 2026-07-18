@@ -58,26 +58,62 @@ export async function resolveChapter(slug: string): Promise<ResolvedChapter | nu
   return null;
 }
 
-export async function resolveTodaysChapter(): Promise<ResolvedChapter> {
-  // Newest published chapter first ("newest" = greatest reviewed_at). Every
-  // candidate resolves through resolveChapter → getChapterWorkupBySlug, which
-  // enforces the protected-chapter serve guard — an unservable row is skipped,
-  // never served. Any failure falls through to the guaranteed local chapter.
-  if (isSupabaseConfigured()) {
+/**
+ * Injectable core of /today resolution, so the offline verifier can prove the
+ * search order without Supabase. The REAL wiring is resolveTodaysChapter below.
+ */
+export interface TodaysChapterDeps {
+  supabaseConfigured(): boolean;
+  listReviewedSlugsNewestFirst(): Promise<string[]>;
+  /** GUARDED, DATABASE-ONLY published read: null = unservable/missing. */
+  readPublishedChapter(slug: string): Promise<ChapterWorkup | null>;
+  /** Guaranteed non-null final fallback (local Exodus 27). */
+  localFallback(): Promise<ResolvedChapter>;
+}
+
+export async function resolveTodaysChapterWith(
+  deps: TodaysChapterDeps,
+): Promise<ResolvedChapter> {
+  // Newest published chapter first ("newest" = greatest reviewed_at). The
+  // candidate walk is DATABASE-ONLY (Codex review, PR #49 P1): each candidate
+  // resolves through the GUARDED published reader, so an unservable or failing
+  // candidate is SKIPPED and the search continues to the next-newest published
+  // chapter — the local fallback can never truncate the search early. Only
+  // after every reviewed candidate is exhausted does the local chapter serve.
+  if (deps.supabaseConfigured()) {
+    let slugs: string[] = [];
     try {
-      for (const slug of await listReviewedSlugsNewestFirst()) {
-        const resolved = await resolveChapter(slug);
-        if (resolved) return resolved;
-      }
+      slugs = await deps.listReviewedSlugsNewestFirst();
     } catch (e) {
       console.warn(
         "[selah] newest-published lookup failed, falling back:",
         (e as Error).message,
       );
     }
+    for (const slug of slugs) {
+      try {
+        const workup = await deps.readPublishedChapter(slug);
+        if (workup) return { workup, source: "Supabase" };
+      } catch (e) {
+        // A single unreadable candidate must not end the search.
+        console.warn(
+          `[selah] published candidate ${slug} unreadable, trying the next:`,
+          (e as Error).message,
+        );
+      }
+    }
   }
-  // Exodus 27 always exists locally, so this never returns null.
-  return (await resolveChapter(FALLBACK_SLUG))!;
+  return deps.localFallback();
+}
+
+export async function resolveTodaysChapter(): Promise<ResolvedChapter> {
+  return resolveTodaysChapterWith({
+    supabaseConfigured: isSupabaseConfigured,
+    listReviewedSlugsNewestFirst,
+    readPublishedChapter: getChapterWorkupBySlug,
+    // Exodus 27 always exists locally, so this never returns null.
+    localFallback: async () => (await resolveChapter(FALLBACK_SLUG))!,
+  });
 }
 
 /** Back-compat: workup only (used where the source isn't needed). */
