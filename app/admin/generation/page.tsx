@@ -239,7 +239,9 @@ export default function SelahStudioPage() {
   const [redoPreflight, setRedoPreflight] = useState<StudioRedoPreflight | null>(null);
   const [redoBusy, setRedoBusy] = useState(false);
   const [redoMsg, setRedoMsg] = useState("");
-  const [redoPreviewed, setRedoPreviewed] = useState(false);
+  // Preview proof is bound to the EXACT candidate URL previewed (Codex review
+  // P2): a replacement candidate from another tab can never inherit approval.
+  const [redoPreviewedUrl, setRedoPreviewedUrl] = useState<string | null>(null);
 
   const [published, setPublished] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -368,7 +370,7 @@ export default function SelahStudioPage() {
     setRedoPreflight(null);
     setRedoBusy(false);
     setRedoMsg("");
-    setRedoPreviewed(false);
+    setRedoPreviewedUrl(null);
   }
 
   // Reset the review, image, and publish state when the chapter changes or a
@@ -1215,7 +1217,7 @@ export default function SelahStudioPage() {
         return;
       }
       cancelRedo();
-      setRedoPreviewed(false);
+      setRedoPreviewedUrl(null);
       void loadImagesStatus(target);
     } catch {
       if (activeSlug.current === target) {
@@ -1243,7 +1245,7 @@ export default function SelahStudioPage() {
       const response = await api("POST", { action: "preview_access", slug: target });
       if (!response.ok) throw new Error("preview access refused");
       previewWindow.location.href = previewUrl;
-      setRedoPreviewed(true);
+      setRedoPreviewedUrl(imageStatus?.redo?.candidateUrl ?? null);
       setRedoMsg("");
     } catch {
       previewWindow.close();
@@ -1253,7 +1255,12 @@ export default function SelahStudioPage() {
 
   async function applyRedoCandidate() {
     const redo = imageStatus?.redo;
-    if (!redo || redo.state !== "candidate" || !redo.candidateUrl || !redoPreviewed) return;
+    if (
+      !redo ||
+      redo.state !== "candidate" ||
+      !redo.candidateUrl ||
+      redoPreviewedUrl !== redo.candidateUrl
+    ) return;
     const target = slug;
     setRedoBusy(true);
     setRedoMsg("");
@@ -1272,7 +1279,7 @@ export default function SelahStudioPage() {
         );
         return;
       }
-      setRedoPreviewed(false);
+      setRedoPreviewedUrl(null);
       void loadImagesStatus(target);
     } catch {
       if (activeSlug.current === target) {
@@ -1303,7 +1310,7 @@ export default function SelahStudioPage() {
         );
         return;
       }
-      setRedoPreviewed(false);
+      setRedoPreviewedUrl(null);
       void loadImagesStatus(target);
     } catch {
       if (activeSlug.current === target) {
@@ -2135,7 +2142,7 @@ export default function SelahStudioPage() {
                   <button
                     type="button"
                     onClick={() => void applyRedoCandidate()}
-                    disabled={!redoPreviewed || redoBusy}
+                    disabled={redoPreviewedUrl !== activeRedo.candidateUrl || redoBusy}
                     className={`${primary} min-h-[44px]`}
                   >
                     Use this image
@@ -2149,7 +2156,7 @@ export default function SelahStudioPage() {
                     Reject
                   </button>
                 </div>
-                {!redoPreviewed && (
+                {redoPreviewedUrl !== activeRedo.candidateUrl && (
                   <p className="mt-2 text-[12px] text-secondary">
                     Preview the candidate in the chapter before choosing.
                   </p>

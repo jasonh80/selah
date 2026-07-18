@@ -90,7 +90,7 @@ never the text and never the other images (board #29 owner decision,
 3. **Check cost (free)** — shows the exact model, size, and maximum charge,
    and binds a digest of the target, its current bytes, and your note.
 4. **Create one candidate** — exactly one model request, one image, no
-   automatic retry. The candidate is stored PRIVATELY under its own immutable
+   automatic retry. The candidate is stored UNLINKED under its own immutable
    `<slug>/<jobId>/` directory; the chapter stays byte-for-byte unchanged.
 5. Compare current vs candidate, **Preview in chapter** (required — the
    preview shows the candidate in place with a banner), then **Use this

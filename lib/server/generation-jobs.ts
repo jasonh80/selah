@@ -1264,7 +1264,8 @@ export async function consumeImageRedoClaim(
 }
 
 /**
- * Terminal redo SUCCESS: the candidate is stored and PRIVATE. The chapter's
+ * Terminal redo SUCCESS: the candidate is stored UNLINKED (public-bucket
+ * URL, referenced by nothing until the owner approves). The chapter's
  * images stay byte-for-byte unchanged; only the transient candidate keys move.
  */
 export async function completeImageRedoCandidate(

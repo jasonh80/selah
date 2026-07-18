@@ -922,19 +922,27 @@ export async function POST(req: Request) {
   // Whole-workup writers must never run over a LIVE job claim or an
   // unresolved redo candidate: the write would erase paid work (or hide a
   // blocked, unrecorded spend) with neither a decision nor an audit trail.
+  // This pre-check exists for the CLEAR error message; the race itself is
+  // closed by the write, which asserts the absence of every transient job
+  // key in its own conditional predicates (Codex review, PR #51 P1). An
+  // unreadable row FAILS CLOSED here — never "assume idle".
   async function refuseVersionWriteDuringActiveJob(slug: string, what: string) {
+    let row;
     try {
-      const row = await requireJobStore(slug, what).read(slug);
-      if (row && !("error" in row) && hasTransientJobControlKeys(row.workupJson)) {
-        return refuse(
-          slug,
-          what,
-          "a generation, image, or redo job is active or unresolved on this chapter — resolve it before restoring or merging drafts",
-          409,
-        );
-      }
-    } catch {
-      // Storage unavailable: the underlying write will fail closed on its own.
+      row = await requireJobStore(slug, what).read(slug);
+    } catch (error) {
+      return mapMutationError(slug, what, error);
+    }
+    if (row && "error" in row) {
+      return refuse(slug, what, "the chapter row is unreadable — nothing was written (fail closed)", 503);
+    }
+    if (row && hasTransientJobControlKeys(row.workupJson)) {
+      return refuse(
+        slug,
+        what,
+        "a generation, image, or redo job is active or unresolved on this chapter — resolve it before restoring or merging drafts",
+        409,
+      );
     }
     return null;
   }

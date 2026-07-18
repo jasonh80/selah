@@ -1,6 +1,7 @@
 // Netlify BACKGROUND function: generates the SINGLE-image redo candidate
 // (board #29 owner decision, 2026-07-17), uploads it to its own immutable
-// storage directory, and records it as a PRIVATE candidate. 15-min budget.
+// storage directory, and records it as an UNLINKED candidate (public-bucket
+// URL, referenced by nothing until the owner approves). 15-min budget.
 //
 // AUTHENTICATED single-use worker: POST-only with a signed, expiring job token
 // bound to (image, slug, jobId). The ROUTE already probed the model and took

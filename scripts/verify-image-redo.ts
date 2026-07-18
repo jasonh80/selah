@@ -13,7 +13,7 @@
 //   3. Approval changes only the chosen image; reject
 //      changes nothing                                     → G3, G4
 //   4. Refresh recovers progress (status carries redo)     → F1
-//   5. Candidate stays private; approved file never
+//   5. Candidate stays unlinked (never referenced); approved file never
 //      overwrites an old file                              → E5, E6, G3
 //   6. Published chapter regeneration refuses              → C2
 //   7. 320/375/390px interaction checks                    → live QA (Codex),
@@ -65,7 +65,11 @@ import {
 import { validateMarkSprintPublishCandidate } from "../lib/server/chapter-workups-repository";
 import { __setStoredSetupApprovalStoreForTesting } from "../lib/server/chapter-setup-approvals";
 import { __setConnectedReceiptOverridesForTesting } from "../lib/server/mark-sprint-setup-contracts";
-import { __setVersionSnapshotForTesting } from "../lib/server/chapter-versions-repository";
+import {
+  __setVersionSnapshotForTesting,
+  __setVersionWorkupForTesting,
+  restoreVersion,
+} from "../lib/server/chapter-versions-repository";
 import { POST as adminPost } from "../app/api/admin/generation/route";
 import redoWorker from "../netlify/functions/redo-image-background.mts";
 import type { ChapterWorkup } from "../lib/types";
@@ -98,12 +102,17 @@ const TEST_SETTINGS: GenerationSettings = {
 
 class FakeJobStore implements JobStorePort {
   rows = new Map<string, { status: string; updated_at: string | null; workup_json: Record<string, unknown> }>();
+  failNextRead = false; // simulates an unreadable row on the next read
   private tick = 0;
   now(): string { return `T${++this.tick}`; }
   seed(slug: string, status: string, json: Record<string, unknown>): void {
     this.rows.set(slug, { status, updated_at: this.now(), workup_json: json });
   }
   async read(slug: string): Promise<JobRow | null | { error: string }> {
+    if (this.failNextRead) {
+      this.failNextRead = false;
+      return { error: "simulated read failure" };
+    }
     const r = this.rows.get(slug);
     return r ? { status: r.status, updatedAt: r.updated_at, workupJson: r.workup_json } : null;
   }
@@ -367,7 +376,7 @@ const main = async () => {
       })();
     }
 
-    // ---------------- E. REAL worker: one spend, private candidate ----------------
+    // ---------------- E. REAL worker: one spend, unlinked candidate ----------------
     {
       ok((await redoWorker(workerReq({}, "GET"))).status === 405, "E1 non-POST → 405");
       ok((await redoWorker(workerReq({ slug: SLUG, job: redoJobId, token: "junk", redoBindingDigest: bindingDigest, imageModel: MARK_8_IMAGE_MODEL }))).status === 401, "E1 bad token → 401");
@@ -391,7 +400,7 @@ const main = async () => {
       ok(db.uploads.length === 1 && db.uploads[0] === `${SLUG}/${redoJobId}/bread-in-the-boat.png`, "E3 one upload, new path — the original run's files were never touched");
       ok(costs.length === 1 && costs[0].imageCount === 1 && costs[0].metadata?.redo === true, "E4 spend recorded strictly: one image, marked as a redo");
       ok(JSON.stringify(store.rows.get(SLUG)!.workup_json.images) === imagesBefore, "E5 chapter images are BYTE-FOR-BYTE unchanged while the candidate waits");
-      ok(!imagesBefore.includes(candidateUrl), "E6 candidate is private — nothing in the chapter references it");
+      ok(!imagesBefore.includes(candidateUrl), "E6 candidate is unlinked — nothing in the chapter references it (the public-bucket URL itself is reachable, by design)");
     }
 
     // ---------------- F. Refresh recovery via images_status ----------------
@@ -629,6 +638,79 @@ const main = async () => {
       const staleRunning = { ...staleJson, [IMAGE_REDO_STATE_KEY]: "running" };
       store.rows.set(SLUG, { status: "draft", updated_at: staleIso, workup_json: staleRunning });
       ok(!(await rejectImageRedoCandidate(store, SLUG)), "I3 running claims stay locked even when old (may hide un-recorded spend — needs attention, not dismissal)");
+
+      // I4. The INTERLEAVING regression (Codex review, PR #51 P1): the version
+      // write itself — not just the route pre-check — asserts the absence of
+      // every transient job key in its conditional predicates. Drive the REAL
+      // restoreVersion against a row that gained a redo claim after any
+      // earlier check: the write must match zero rows and fail.
+      __setVersionWorkupForTesting(async () => completedWorkup());
+      try {
+        store.seed(SLUG, "draft", {
+          ...(completedWorkup() as unknown as Record<string, unknown>),
+          [IMAGE_REDO_JOB_KEY]: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          [IMAGE_REDO_STATE_KEY]: "running",
+          [IMAGE_REDO_KIND_KEY]: "peter-confession",
+          [IMAGE_REDO_NOTES_KEY]: NOTES,
+          [IMAGE_REDO_BINDING_DIGEST_KEY]: "b".repeat(64),
+        });
+        ok(!(await restoreVersion(SLUG, 1)), "I4 REAL restore write refuses while a redo claim is on the row (atomic predicate, not a separate read)");
+        ok(store.rows.get(SLUG)!.workup_json[IMAGE_REDO_STATE_KEY] === "running", "I4 the live claim survived the refused restore");
+
+        store.seed(SLUG, "draft", completedWorkup() as unknown as Record<string, unknown>);
+        ok(await restoreVersion(SLUG, 1), "I4 the same restore succeeds on an idle row");
+        ok(!(IMAGE_REDO_JOB_KEY in store.rows.get(SLUG)!.workup_json), "I4 restored workups carry no job-control keys (stripped at the write)");
+      } finally {
+        __setVersionWorkupForTesting(null);
+      }
+
+      // I4b. The route pre-check FAILS CLOSED on an unreadable row.
+      store.seed(SLUG, "draft", completedWorkup() as unknown as Record<string, unknown>);
+      store.failNextRead = true;
+      ok(
+        (await adminPost(adminReq({ action: "version_restore", slug: SLUG, version: 1 }))).status === 503,
+        "I4b unreadable row → version_restore refuses (never assumes idle)",
+      );
+    }
+
+    // ---------------- H5. Post-dispatch failure is POSSIBLE SPEND (Codex P1) ----------------
+    {
+      store.seed(SLUG, "draft", completedWorkup() as unknown as Record<string, unknown>);
+      const digest = deriveMarkSprintImageRedoPlan(SLUG, completedWorkup(), "bread-in-the-boat", NOTES).digest;
+      lastTrigger = null;
+      const queued = await adminPost(adminReq({ action: "redo_image", slug: SLUG, kind: "bread-in-the-boat", notes: NOTES, bindingDigest: digest, confirm: true }));
+      const queuedBody = await json(queued);
+      ok(queued.status === 200, "H5 redo queued for the network-failure drill");
+      // The model request DISPATCHES, then the connection dies before any
+      // response — the provider may still have billed it.
+      __setImageDepsForTesting({
+        db: db as never,
+        generateBytes: async () => {
+          throw new Error("socket hang up after dispatch");
+        },
+      });
+      const costsBefore = costs.length;
+      const trigger = (lastTrigger as unknown as { body: Record<string, unknown> }).body;
+      const run = await redoWorker(workerReq({ slug: SLUG, job: queuedBody.jobId, token: trigger.token, redoBindingDigest: digest, imageModel: MARK_8_IMAGE_MODEL }));
+      __setImageDepsForTesting({
+        db: db as never,
+        generateBytes: async () => {
+          generateCalls++;
+          return Buffer.from("fake-png-bytes");
+        },
+      });
+      ok(run.status === 500, "H5 post-dispatch failure fails the run");
+      const row = store.rows.get(SLUG)!.workup_json;
+      ok(row[IMAGE_REDO_STATE_KEY] === "failed", "H5 claim locked FAILED — never silently released");
+      ok(row[IMAGE_REDO_SPENT_COUNT_KEY] === 1, "H5 the one in-flight request is recorded as possible spend");
+      const costRow = costs[costs.length - 1];
+      ok(
+        costs.length === costsBefore + 1 &&
+          costRow.imageCount === 1 &&
+          costRow.metadata?.billingUncertain === true &&
+          costRow.metadata?.requestsStarted === 1,
+        "H5 durable cost row records the may-be-billed request (billingUncertain)",
+      );
     }
   } finally {
     __setJobStoreForTesting(null);

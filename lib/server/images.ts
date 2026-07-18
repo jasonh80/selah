@@ -873,7 +873,10 @@ export async function prepareImageRedoBinding(
  * the claim (queued → running, full binding revalidated) before any spend,
  * generates EXACTLY ONE image from the frozen prompt + owner notes, uploads
  * it to the job's own immutable directory, strictly records the spend, and
- * stores the result as a PRIVATE candidate. The chapter's images are never
+ * stores the result as an UNLINKED candidate — the bucket is public, so the
+ * URL is reachable, but nothing in the chapter references it and it never
+ * serves until the owner approves (owner-accepted trade-off for non-secret
+ * chapter art; Codex review, PR #51). The chapter's images are never
  * touched here — only the owner's later approval swaps the one src.
  * No automatic retry on any path.
  */
@@ -990,9 +993,12 @@ async function runImageRedoJobWithinDeadline(
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 200);
     const deadlineExceeded = e instanceof ImageRunDeadlineError;
-    const possibleSpendCount = deadlineExceeded
-      ? Math.max(generatedCount, startedCount)
-      : generatedCount;
+    // ANY failure after the model request was dispatched counts as POSSIBLE
+    // spend — a connection loss or 5xx after dispatch may still be billed by
+    // the provider even though no response arrived (Codex review, PR #51 P1).
+    // Only a failure provably before dispatch (startedCount 0, e.g. bucket
+    // setup) is a true no-spend release.
+    const possibleSpendCount = Math.max(generatedCount, startedCount);
     const billingUncertain = possibleSpendCount > generatedCount;
     if (possibleSpendCount > 0) {
       let costRecorded = false;
@@ -1041,7 +1047,7 @@ async function runImageRedoJobWithinDeadline(
         model,
         status: "failed",
         message:
-          `redo of "${exactPlan.kind}" failed after spend: ${msg}; ` +
+          `redo of "${exactPlan.kind}" failed ${billingUncertain ? "after dispatch (the one in-flight request MAY be billed)" : "after spend"}: ${msg}; ` +
           `${costRecorded ? "spend recorded" : "COST NOT RECORDED"}; ` +
           `${terminal ? "redo locked" : "redo lock write failed — manual inspection required"}; ` +
           `orphaned dir: ${slug}/${jobId}/`,
@@ -1051,10 +1057,13 @@ async function runImageRedoJobWithinDeadline(
         slug,
         model,
         error: costRecorded
-          ? "the redo image failed after using image credit; a fresh owner-confirmed redo is required"
+          ? billingUncertain
+            ? "the redo request failed after it was sent — it may still be billed, so the possible spend is recorded; a fresh owner-confirmed redo is required"
+            : "the redo image failed after using image credit; a fresh owner-confirmed redo is required"
           : "the redo stopped after spend because its cost could not be recorded",
       };
     }
+    // Provably pre-dispatch (the model request was never sent): true no-spend.
     const released = await releaseImageRedoJob(store, slug, jobId, "running");
     await logGenerationAudit({
       action: "image_redo_failed",
@@ -1062,10 +1071,10 @@ async function runImageRedoJobWithinDeadline(
       model,
       status: "failed",
       message:
-        `redo of "${exactPlan.kind}" failed before spend: ${msg}` +
+        `redo of "${exactPlan.kind}" failed before the model request was dispatched (no spend): ${msg}` +
         `${released ? "" : "; claim NOT released — manual cleanup needed"}`,
     });
-    return { ok: false, slug, model, error: `image redo failed before spend: ${msg}` };
+    return { ok: false, slug, model, error: `image redo failed before dispatch: ${msg}` };
   }
 
   // The spend must have a durable cost row before the candidate exists.
@@ -1127,7 +1136,7 @@ async function runImageRedoJobWithinDeadline(
     slug,
     model,
     status: "succeeded",
-    message: `candidate for "${exactPlan.kind}" stored under ${slug}/${jobId}/ (private until the owner decides)`,
+    message: `candidate for "${exactPlan.kind}" stored under ${slug}/${jobId}/ (unlinked — public URL, referenced by nothing — until the owner decides)`,
   });
   return { ok: true, slug, model, images: [{ kind: exactPlan.kind, url: candidateUrl }] };
 }
