@@ -5,18 +5,20 @@
 // bound to (image, slug, jobId). The ROUTE already probed the model and took
 // the atomic image claim; this worker atomically CONSUMES it (queued →
 // running) before any spend, so a duplicated delivery cannot double-spend.
-// Refusals are durably audited. No text generation here.
+// Pre-auth refusals are console-only; post-auth failures are durably audited.
+// No text generation here.
 import { generateAndStoreChapterImages } from "../../lib/server/images";
 import { verifyJobToken, type ImageJobBinding } from "../../lib/server/generation-jobs";
 import { logGenerationAudit } from "../../lib/server/generation-settings";
 
-async function refuse(slug: string, reason: string, status: number): Promise<Response> {
-  await logGenerationAudit({
-    action: "refused:worker_images",
-    slug: slug || undefined,
-    status: "failed",
-    message: reason.slice(0, 300),
-  });
+// PRE-AUTH refusals log to the console only (IQ-005, mirroring the redo
+// worker's PR #51 fix). The function URL is publicly reachable, so writing
+// durable audit rows before the signature check would hand unauthenticated
+// callers a primitive to flood the audit table and bury the genuine refusal
+// entries the owner reviews. Post-auth failures (inside
+// generateAndStoreChapterImages) stay durably audited as before.
+function refuse(slug: string, reason: string, status: number): Response {
+  console.error(`[selah] worker_images refused${slug ? ` (${slug})` : ""}: ${reason}`);
   return new Response(JSON.stringify({ ok: false, error: reason }), { status });
 }
 

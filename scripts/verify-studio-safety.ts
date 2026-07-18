@@ -2043,8 +2043,13 @@ const realRouteAndWorkers = async () => {
       ok(audit.some((a) => a.action === "generate_text_conflict" || String(a.message ?? "").includes("claim not consumed")), "R4 duplicate delivery durably audited");
     }
 
-    // R5. Worker authentication/method handling (the real handler).
+    // R5. Worker authentication/method handling (the real handler). PRE-AUTH
+    // refusals must stay console-only (IQ-005, same rule as both image
+    // workers): the function URL is publicly reachable, so a durable audit row
+    // before the signature check would let unauthenticated callers flood the
+    // audit table and bury genuine refusal entries.
     {
+      const preAuthAuditBefore = audit.filter((a) => a.action === "refused:worker_generate").length;
       const jid = "22222222-2222-4222-8222-222222222222";
       const get = await textWorker(workerReq("generate-chapter-background", {}, "GET"));
       ok(get.status === 405, "R5 non-POST → 405");
@@ -2079,7 +2084,10 @@ const realRouteAndWorkers = async () => {
         approvedManifestDigest: MANIFEST_DIGEST_A,
       }));
       ok(wp.status === 401, "R5 image-purpose token rejected by text worker");
-      ok(audit.filter((a) => a.action === "refused:worker_generate").length >= 4, "R5 worker refusals durably audited");
+      ok(
+        audit.filter((a) => a.action === "refused:worker_generate").length === preAuthAuditBefore,
+        "R5 pre-auth refusals are console-only — no durable audit rows for unauthenticated callers to flood",
+      );
     }
 
     // R5b. Real trigger + worker bind an optional approved manifest digest.
@@ -2674,14 +2682,21 @@ const realImagePipeline = async () => {
       store.rows.delete("mark-8");
     }
 
-    // M1. Worker method/auth (real handler).
+    // M1. Worker method/auth (real handler). PRE-AUTH refusals must stay
+    // console-only (IQ-005, mirroring the redo worker's PR #51 fix): the
+    // function URL is publicly reachable, so a durable audit row before the
+    // signature check would let unauthenticated callers flood the audit table.
     {
+      const preAuthAuditBefore = audit.filter((a) => a.action === "refused:worker_images").length;
       const jid = "33333333-3333-4333-8333-333333333333";
       ok((await imagesWorker(workerReq("generate-images-background", {}, "GET"))).status === 405, "M1 non-POST → 405");
       ok((await imagesWorker(workerReq("generate-images-background", { slug: "mark-8", job: jid, token: "junk" }))).status === 401, "M1 bad token → 401");
       const textToken = signJobToken("text", "mark-8", jid).token;
       ok((await imagesWorker(workerReq("generate-images-background", { slug: "mark-8", job: jid, token: textToken }))).status === 401, "M1 text-purpose token rejected by image worker");
-      ok(audit.filter((a) => a.action === "refused:worker_images").length >= 3, "M1 image worker refusals durably audited");
+      ok(
+        audit.filter((a) => a.action === "refused:worker_images").length === preAuthAuditBefore,
+        "M1 pre-auth refusals are console-only — no durable audit rows for unauthenticated callers to flood",
+      );
     }
 
     // M1b (PR #40 review, blocker 2): the owner setup receipt is freshly
@@ -3031,6 +3046,130 @@ const realImagePipeline = async () => {
         generateBytes: async () => Buffer.from("fake-png"),
       });
       store.rows.delete("mark-8");
+    }
+
+    // M9 (IQ-006). ANY post-dispatch failure — not just the deadline — is
+    // possible spend: a connection loss/5xx after the model request was sent
+    // may still be billed. The claim locks FAILED with the possible spend
+    // durably recorded (billingUncertain), never silently released.
+    {
+      store.seed("mark-8", "draft", structuredClone(workupJson));
+      costs.length = 0;
+      __setImageDepsForTesting({
+        db: { storage: db.storage } as never,
+        generateBytes: async () => {
+          throw new Error("socket hang up (connection lost after dispatch)");
+        },
+      });
+      const { jobId } = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      const result = await generateAndStoreChapterImages("mark-8", jobId, MARK8_IMAGE_BINDING);
+      const row = store.rows.get("mark-8")!;
+      ok(
+        !result.ok && /may be billed/u.test(result.error ?? ""),
+        "M9 post-dispatch failure surfaces the may-be-billed uncertainty to the owner",
+      );
+      ok(
+        row.workup_json[IMAGE_JOB_STATE_KEY] === "failed" &&
+          row.workup_json[IMAGE_JOB_SPENT_COUNT_KEY] === 1,
+        "M9 claim locked FAILED with the in-flight request counted — never silently released",
+      );
+      const uncertainCost = costs.find(
+        (cost) => (cost.metadata as { billingUncertain?: boolean })?.billingUncertain === true,
+      );
+      ok(
+        uncertainCost?.imageCount === 1 &&
+          (uncertainCost.metadata as { generated?: number }).generated === 0 &&
+          (uncertainCost.metadata as { requestsStarted?: number }).requestsStarted === 1 &&
+          (uncertainCost.metadata as { deadlineExceeded?: boolean }).deadlineExceeded === false,
+        "M9 durable cost row records the may-be-billed request without calling it a completed image",
+      );
+      const retry = await claimImageJob(store, "mark-8", MARK8_IMAGE_BINDING);
+      ok(
+        retry.jobId !== jobId && store.rows.get("mark-8")!.workup_json[IMAGE_JOB_STATE_KEY] === "queued",
+        "M9 retry is a NEW explicit owner-driven claim — the failed job never resumes itself",
+      );
+      __setImageDepsForTesting({
+        db: { storage: db.storage } as never,
+        generateBytes: async () => Buffer.from("fake-png"),
+      });
+      store.rows.delete("mark-8");
+    }
+
+    // M10 (IQ-006). The LEGACY (non-connected) envelope is unreachable today
+    // (every static-plan slug is protected and refused pre-spend), but it must
+    // stay honest for any future legacy slug: a post-dispatch failure records
+    // the possible spend STRICTLY, then RELEASES the claim (legacy slugs have
+    // no owner-confirmed retry gate, so a terminal lock would be permanent) —
+    // and if the strict cost row cannot be written the claim is visibly
+    // BLOCKED, never released with unrecorded possible spend.
+    {
+      const LEGACY = "test-legacy-chapter";
+      const legacyPlans = [
+        { kind: "establishing" as const, caption: "c", alt: "a", prompt: "p" },
+      ];
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, allowed_slugs: [...TEST_SETTINGS.allowed_slugs, LEGACY] },
+        captureAudit: audit,
+      });
+      __setImageTestOverrides({
+        configBypass: true,
+        plans: { [LEGACY]: legacyPlans },
+        modelProbe: async (model) => ({ ok: true, model }),
+      });
+      __setImageDepsForTesting({
+        db: { storage: db.storage } as never,
+        generateBytes: async () => {
+          throw new Error("socket hang up (connection lost after dispatch)");
+        },
+      });
+      // Uncertain billing + recorded cost → released, not locked.
+      store.seed(LEGACY, "draft", { images: [] });
+      costs.length = 0;
+      const { jobId } = await claimImageJob(store, LEGACY);
+      const result = await generateAndStoreChapterImages(LEGACY, jobId);
+      const row = store.rows.get(LEGACY)!;
+      ok(
+        !result.ok && /may be billed/u.test(result.error ?? ""),
+        "M10 legacy post-dispatch failure surfaces the may-be-billed uncertainty",
+      );
+      const legacyCost = costs.find(
+        (cost) => (cost.metadata as { billingUncertain?: boolean })?.billingUncertain === true,
+      );
+      ok(
+        legacyCost?.imageCount === 1 &&
+          (legacyCost.metadata as { requestsStarted?: number }).requestsStarted === 1 &&
+          (legacyCost.metadata as { generated?: number }).generated === 0,
+        "M10 legacy possible spend gets a durable billingUncertain cost row",
+      );
+      ok(
+        row.workup_json[IMAGE_JOB_KEY] === undefined &&
+          audit.some((a) => String(a.message ?? "").includes("MAY be billed") && String(a.message ?? "").includes("claim released")),
+        "M10 legacy claim releases (no permanent lock exists for legacy slugs) with the uncertainty audited",
+      );
+      // Uncertain billing + cost write failure → BLOCKED, never released.
+      const second = await claimImageJob(store, LEGACY);
+      __setCostCaptureForTesting(null);
+      __setCostWriteFailureForTesting("insert_failed");
+      const blocked = await generateAndStoreChapterImages(LEGACY, second.jobId);
+      __setCostWriteFailureForTesting(null);
+      __setCostCaptureForTesting(costs);
+      const blockedRow = store.rows.get(LEGACY)!;
+      ok(
+        !blocked.ok && /blocked/.test(blocked.error ?? "") &&
+          blockedRow.workup_json[IMAGE_JOB_STATE_KEY] === "blocked" &&
+          blockedRow.workup_json[IMAGE_JOB_ERROR_CODE_KEY] === "cost_record_failed",
+        "M10 legacy unrecorded possible spend is visibly BLOCKED, never silently released",
+      );
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+      __setImageTestOverrides({
+        configBypass: true,
+        modelProbe: async (model) => ({ ok: true, model }),
+      });
+      __setImageDepsForTesting({
+        db: { storage: db.storage } as never,
+        generateBytes: async () => Buffer.from("fake-png"),
+      });
+      store.rows.delete(LEGACY);
     }
 
     // N. Final publishing is bound to the exact, owner-reviewed Mark 8 workup.

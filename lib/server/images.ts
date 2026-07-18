@@ -533,12 +533,23 @@ async function generateAndStoreChapterImagesWithinDeadline(
   let generatedCount = 0;
   let startedCount = 0;
   try {
+    // Provably-local config failure BEFORE any dispatch: the provider client
+    // does not exist, so no request can have been sent (keeps startedCount 0
+    // → true no-spend release instead of a false "may be billed").
+    if (generate === generateImageBytes && !getOpenAI()) {
+      throw new Error("OpenAI not configured");
+    }
     await withinImageRunDeadline(deadline, () => ensureBucket(exactDb));
     for (const plan of plans) {
-      if (isDynamicMark8) startedCount += 1;
-      const bytes = await withinImageRunDeadline(deadline, () =>
-        generate(model, plan, deadline?.signal),
-      );
+      // startedCount increments INSIDE the deadline thunk, immediately before
+      // the model call: an already-expired deadline rejects without invoking
+      // the thunk, so a request that never left the process is never counted
+      // as dispatched (IQ-006 — dispatch is spend-relevant on every path that
+      // reaches the model).
+      const bytes = await withinImageRunDeadline(deadline, () => {
+        startedCount += 1;
+        return generate(model, plan, deadline?.signal);
+      });
       generatedCount += 1; // model spend happened even if the upload below fails
       const url = await withinImageRunDeadline(deadline, () =>
         uploadImage(exactDb, `${slug}/${jobId}/${fileFor(plan.kind)}`, bytes),
@@ -548,12 +559,14 @@ async function generateAndStoreChapterImagesWithinDeadline(
   } catch (e) {
     const msg = String((e as Error).message).slice(0, 200);
     const deadlineExceeded = e instanceof ImageRunDeadlineError;
-    // A request aborted at the deadline may still be billed even though no
-    // image response arrived. Record that one in-flight request as POSSIBLE
-    // spend, but keep `generated` truthful and never call it a completed image.
-    const possibleSpendCount = deadlineExceeded
-      ? Math.max(generatedCount, startedCount)
-      : generatedCount;
+    // ANY failure after a model request was dispatched counts as POSSIBLE
+    // spend — a connection loss or 5xx after dispatch may still be billed by
+    // the provider even though no response arrived, exactly like the deadline
+    // abort (IQ-006, mirroring the single-image redo rule from PR #51). Only
+    // a failure provably before dispatch (startedCount 0, e.g. bucket setup)
+    // is a true no-spend release. `generated` stays truthful; an unfinished
+    // request is never called a completed image.
+    const possibleSpendCount = Math.max(generatedCount, startedCount);
     const billingUncertain = possibleSpendCount > generatedCount;
     if (isDynamicMark8 && possibleSpendCount > 0) {
       let costRecorded = false;
@@ -604,7 +617,7 @@ async function generateAndStoreChapterImagesWithinDeadline(
         status: "failed",
         message:
           `${billingUncertain
-            ? `deadline after ${generatedCount} completed image(s); ${possibleSpendCount} request(s) may be billed`
+            ? `${deadlineExceeded ? "deadline" : "failure after dispatch"} after ${generatedCount} completed image(s); the in-flight request MAY be billed (${possibleSpendCount} possible)`
             : `generated ${generatedCount}/${plans.length}, uploaded ${stored.length}`}: ${msg}; ` +
           `${costRecorded ? "spend recorded" : "COST NOT RECORDED"}; ` +
           `${terminal ? "job locked" : "job lock write failed — manual inspection required"}; ` +
@@ -616,28 +629,75 @@ async function generateAndStoreChapterImagesWithinDeadline(
         model,
         error: costRecorded
           ? billingUncertain
-            ? `image run stopped at its safety deadline after ${generatedCount}/${plans.length} completed images; one in-flight request may be billed and retry requires owner confirmation`
+            ? deadlineExceeded
+              ? `image run stopped at its safety deadline after ${generatedCount}/${plans.length} completed images; one in-flight request may be billed and retry requires owner confirmation`
+              : `image run failed after a request was dispatched (${generatedCount}/${plans.length} completed); the in-flight request may be billed, so the possible spend is recorded and retry requires owner confirmation`
             : `image run failed after ${generatedCount}/${plans.length} images; spend recorded and retry requires owner confirmation`
           : "image run blocked after spend because its cost could not be recorded",
       };
     }
-    if (generatedCount > 0) {
-      await recordCostEvent({
-        requestType: "chapter_image_generation",
-        provider: "openai",
-        model,
-        imageCount: generatedCount,
-        estimatedCostUsd: estimateImageCostUsd(model, generatedCount),
-        metadata: {
+    // Legacy (non-connected) path. This envelope is unreachable today — every
+    // static-plan slug is protected and refused pre-spend — but it must stay
+    // honest for any future legacy slug. Same accounting rule as above: any
+    // possible spend gets a STRICT durable cost row before the claim moves.
+    // Recorded → the claim RELEASES (legacy slugs have no owner-confirmed
+    // retry gate, so a terminal lock would be permanent; the durable row +
+    // audit keep the release honest, never silent). Unrecorded possible
+    // spend → visibly BLOCKED for manual inspection, per the failed/blocked
+    // contract in generation-jobs.
+    if (possibleSpendCount > 0) {
+      let costRecorded = false;
+      try {
+        await recordCostEventStrict({
+          requestType: "chapter_image_generation",
+          provider: "openai",
+          model,
+          imageCount: possibleSpendCount,
+          estimatedCostUsd: estimateImageCostUsd(model, possibleSpendCount),
+          metadata: {
+            slug,
+            jobId,
+            failed: true,
+            error: msg,
+            generated: generatedCount,
+            requestsStarted: startedCount,
+            possibleSpendCount,
+            billingUncertain,
+            deadlineExceeded,
+            uploaded: stored.length,
+            completedKinds: stored.map((x) => x.kind),
+          },
+        });
+        costRecorded = true;
+      } catch {
+        // A paid run without a durable cost row must stay locked and visible.
+      }
+      if (!costRecorded) {
+        const terminal = await markImageJobTerminalFailure(
+          store,
           slug,
           jobId,
-          failed: true,
-          error: msg,
-          generated: generatedCount,
-          uploaded: stored.length,
-          completedKinds: stored.map((x) => x.kind),
-        },
-      });
+          "blocked",
+          possibleSpendCount,
+          "cost_record_failed",
+        );
+        await logGenerationAudit({
+          action: "image_run_blocked",
+          slug,
+          model,
+          status: "failed",
+          message:
+            `${billingUncertain ? "failure after dispatch (the in-flight request MAY be billed)" : `generated ${generatedCount}/${plans.length}, uploaded ${stored.length}`}: ${msg}; ` +
+            `COST NOT RECORDED; ${terminal ? "job blocked" : "job block write failed — manual inspection required"}; ` +
+            `orphaned dir: ${slug}/${jobId}/`,
+        });
+        return {
+          ok: false,
+          slug,
+          model,
+          error: "image run blocked after possible spend because its cost could not be recorded",
+        };
+      }
     }
     const released = await releaseImageJob(store, slug, jobId, "running");
     await logGenerationAudit({
@@ -646,10 +706,21 @@ async function generateAndStoreChapterImagesWithinDeadline(
       model,
       status: "failed",
       message:
-        `generated ${generatedCount}/${plans.length}, uploaded ${stored.length} before error: ${msg}; ` +
+        `${startedCount === 0
+          ? `failed before any model request was dispatched (no spend): ${msg}`
+          : billingUncertain
+            ? `failure after dispatch — the in-flight request MAY be billed (${possibleSpendCount} possible, ${generatedCount} completed); possible spend durably recorded; claim released for explicit retry: ${msg}`
+            : `generated ${generatedCount}/${plans.length}, uploaded ${stored.length} before error (spend durably recorded): ${msg}`}; ` +
         `orphaned dir: ${slug}/${jobId}/${released ? "" : "; claim NOT released — manual cleanup needed"}`,
     });
-    return { ok: false, slug, model, error: `image run failed after ${generatedCount}/${plans.length} images: ${msg}` };
+    return {
+      ok: false,
+      slug,
+      model,
+      error: billingUncertain
+        ? `image run failed after a request was dispatched (${generatedCount}/${plans.length} completed); the in-flight request may be billed and its possible spend is durably recorded`
+        : `image run failed after ${generatedCount}/${plans.length} images: ${msg}`,
+    };
   }
 
   // Mark 8 replaces its exact stored placeholder array in exact order. Legacy
