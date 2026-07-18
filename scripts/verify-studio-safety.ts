@@ -2791,9 +2791,19 @@ const realImagePipeline = async () => {
         "M2 Studio status exposes the exact complete-workup review digest",
       );
       const statusItems = statusBody.images as Array<Record<string, unknown>>;
+      // Since the single-image redo (board #29, 2026-07-17) the admin-authed
+      // status carries each COMPLETED image's public-bucket src for the Studio
+      // review thumbnails and redo comparison. Prompts stay server-side.
       ok(
-        statusItems.length === 3 && statusItems.every((item) => typeof item.description === "string" && !("prompt" in item) && !("src" in item)),
-        "M2 Studio status is useful but exposes no prompts or storage URLs",
+        statusItems.length === 3 &&
+          statusItems.every(
+            (item) =>
+              typeof item.description === "string" &&
+              !("prompt" in item) &&
+              typeof item.src === "string" &&
+              (item.src === "" || /^https:\/\//u.test(item.src as string)),
+          ),
+        "M2 Studio status is useful but exposes no prompts; src is only a stored public https url",
       );
       // Duplicate delivery of the same run: refused, no double spend.
       db.uploads.length = 0;

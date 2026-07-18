@@ -15,18 +15,25 @@ import { getGenerationSettings, logGenerationAudit } from "./generation-settings
 import {
   consumeImageClaim,
   completeImageJob,
+  consumeImageRedoClaim,
+  completeImageRedoCandidate,
   markImageJobTerminalFailure,
+  markImageRedoTerminalFailure,
   releaseImageJob,
+  releaseImageRedoJob,
   requireJobStore,
   type ImageJobBinding,
+  type ImageRedoBinding,
   type JobStorePort,
 } from "./generation-jobs";
 import {
   assertMarkSprintImagesArePlaceholders,
   deriveMarkSprintImagePlan,
+  deriveMarkSprintImageRedoPlan,
   MARK_8_IMAGE_ESTIMATED_COST_USD,
   MARK_8_IMAGE_MODEL,
   type Mark8ImagePlanItem,
+  type MarkSprintImageRedoPlan,
 } from "./mark8-image-plan";
 import {
   CONNECTED_STUDIO_SLUGS,
@@ -792,4 +799,328 @@ async function generateAndStoreChapterImagesWithinDeadline(
 // (psalm-23 paths unchanged); chapter-driven kinds map to "<kind>.png".
 function fileFor(kind: ImageKind): string {
   return `${String(kind).toLowerCase().replace(/[^a-z0-9-]/g, "-")}.png`;
+}
+
+// ---------------- single-image redo (board #29 owner decision, 2026-07-17) ----------------
+
+/** Free route preflight for ONE-image redo: exact target, model, size, cost. */
+export interface PreparedImageRedoBinding {
+  kind: ImageKind;
+  index: number;
+  label: string;
+  currentSrc: string;
+  notes: string;
+  bindingDigest: string;
+  model: string;
+  size: string;
+  estimatedCostUsd: number;
+}
+
+export async function prepareImageRedoBinding(
+  store: JobStorePort,
+  slug: string,
+  kind: string,
+  notes: string,
+): Promise<PreparedImageRedoBinding> {
+  if (!isConnectedStudioSlug(slug)) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "prepareImageRedoBinding",
+      slug,
+      "single-image redo is available only for connected protected chapters",
+    );
+  }
+  const row = await store.read(slug);
+  if (!row || "error" in row) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "prepareImageRedoBinding",
+      slug,
+      `stored ${connectedChapterLabel(slug)} draft is unreadable`,
+    );
+  }
+  let plan: MarkSprintImageRedoPlan;
+  try {
+    plan = deriveMarkSprintImageRedoPlan(
+      slug,
+      row.workupJson as unknown as ChapterWorkup,
+      kind,
+      notes,
+    );
+  } catch (error) {
+    throw new ChapterMutationError(
+      "REFUSED",
+      "prepareImageRedoBinding",
+      slug,
+      String((error as Error).message),
+    );
+  }
+  return {
+    kind: plan.kind,
+    index: plan.index,
+    label: plan.label,
+    currentSrc: plan.currentSrc,
+    notes: plan.notes,
+    bindingDigest: plan.digest,
+    model: plan.model,
+    size: imageSize(plan.model, { kind: plan.kind, wide: true } as ImagePlan),
+    estimatedCostUsd: MARK_8_IMAGE_ESTIMATED_COST_USD,
+  };
+}
+
+/**
+ * Worker for an ALREADY-CLAIMED single-image redo job. Atomically CONSUMES
+ * the claim (queued → running, full binding revalidated) before any spend,
+ * generates EXACTLY ONE image from the frozen prompt + owner notes, uploads
+ * it to the job's own immutable directory, strictly records the spend, and
+ * stores the result as a PRIVATE candidate. The chapter's images are never
+ * touched here — only the owner's later approval swaps the one src.
+ * No automatic retry on any path.
+ */
+export async function runImageRedoJob(
+  slug: string,
+  jobId: string,
+  binding: Pick<ImageRedoBinding, "bindingDigest" | "model">,
+): Promise<ImageGenResult> {
+  const deadline = createMark8ImageRunDeadline();
+  try {
+    return await runImageRedoJobWithinDeadline(slug, jobId, binding, deadline);
+  } finally {
+    deadline.dispose();
+  }
+}
+
+async function runImageRedoJobWithinDeadline(
+  slug: string,
+  jobId: string,
+  binding: Pick<ImageRedoBinding, "bindingDigest" | "model">,
+  deadline: ImageRunDeadline,
+): Promise<ImageGenResult> {
+  const store = requireJobStore(slug, "runImageRedoJob");
+  const model = MARK_8_IMAGE_MODEL;
+  let plan: MarkSprintImageRedoPlan | undefined;
+  let db: NonNullable<ReturnType<typeof getSupabaseAdmin>> | undefined;
+  let consumed = false;
+
+  // Every control check happens BEFORE paid work; a pre-spend failure releases
+  // the claim with zero credit used.
+  try {
+    if (!isConnectedStudioSlug(slug)) {
+      throw new Error("single-image redo is available only for connected protected chapters");
+    }
+    if (binding.model !== MARK_8_IMAGE_MODEL) {
+      throw new Error(`${connectedChapterLabel(slug)} requires ${MARK_8_IMAGE_MODEL} exactly`);
+    }
+    if (!(await withinImageRunDeadline(deadline, () => imageGenAllowed(slug)))) {
+      throw new Error("image generation not allowed for this slug");
+    }
+    db = imageDepsOverride?.db ?? getSupabaseAdmin() ?? undefined;
+    if (!db) throw new Error("Supabase not configured");
+
+    const consumedClaim = await consumeImageRedoClaim(store, slug, jobId, binding.bindingDigest);
+    consumed = true;
+    plan = consumedClaim.plan;
+
+    // Re-read the kill switch and the owner setup receipt immediately before
+    // spend — the same worker-side re-checks the full image run performs.
+    if (!(await withinImageRunDeadline(deadline, () => imageGenAllowed(slug)))) {
+      throw new Error("image generation was disabled before spend");
+    }
+    if (
+      isMarkSprintSlug(slug) &&
+      !(await withinImageRunDeadline(deadline, () =>
+        connectedChapterReceiptAppliesIncludingStored(slug),
+      ))
+    ) {
+      throw new Error("owner setup receipt missing or changed before spend");
+    }
+  } catch (error) {
+    const msg = isChapterMutationError(error)
+      ? `${error.code}: ${error.message}`
+      : String((error as Error).message);
+    const released = await releaseImageRedoJob(
+      store,
+      slug,
+      jobId,
+      consumed ? "running" : "queued",
+    );
+    console.error(`[selah] image redo pre-spend refusal for ${slug}: ${msg}`);
+    await logGenerationAudit({
+      action: "image_redo_refused",
+      slug,
+      model,
+      status: "failed",
+      message: `${msg} (no spend occurred; ${released ? "claim released" : "claim not released or owned by another worker"})`.slice(0, 300),
+    });
+    return { ok: false, slug, model, error: msg };
+  }
+
+  const exactPlan = plan!;
+  const exactDb = db!;
+  const generate = imageDepsOverride?.generateBytes ?? generateImageBytes;
+  const redoImagePlan: ImagePlan = {
+    kind: exactPlan.kind,
+    prompt: exactPlan.revisedPrompt,
+    alt: exactPlan.alt,
+    caption: exactPlan.caption,
+    wide: true,
+  };
+
+  // ONE spend envelope: exactly one model request, one upload, no retry.
+  let generatedCount = 0;
+  let startedCount = 0;
+  let candidateUrl = "";
+  try {
+    await withinImageRunDeadline(deadline, () => ensureBucket(exactDb));
+    startedCount = 1;
+    const bytes = await withinImageRunDeadline(deadline, () =>
+      generate(model, redoImagePlan, deadline.signal),
+    );
+    generatedCount = 1; // model spend happened even if the upload below fails
+    candidateUrl = await withinImageRunDeadline(deadline, () =>
+      uploadImage(exactDb, `${slug}/${jobId}/${fileFor(exactPlan.kind)}`, bytes),
+    );
+  } catch (e) {
+    const msg = String((e as Error).message).slice(0, 200);
+    const deadlineExceeded = e instanceof ImageRunDeadlineError;
+    const possibleSpendCount = deadlineExceeded
+      ? Math.max(generatedCount, startedCount)
+      : generatedCount;
+    const billingUncertain = possibleSpendCount > generatedCount;
+    if (possibleSpendCount > 0) {
+      let costRecorded = false;
+      try {
+        await recordCostEventStrict({
+          requestType: "chapter_image_generation",
+          provider: "openai",
+          model,
+          imageCount: possibleSpendCount,
+          estimatedCostUsd: possibleSpendCount * MARK_8_IMAGE_ESTIMATED_COST_USD,
+          imageQuality: "high",
+          metadata: {
+            slug,
+            jobId,
+            redo: true,
+            kind: exactPlan.kind,
+            bindingDigest: exactPlan.digest,
+            failed: true,
+            error: msg,
+            generated: generatedCount,
+            requestsStarted: startedCount,
+            possibleSpendCount,
+            billingUncertain,
+            deadlineExceeded,
+          },
+        });
+        costRecorded = true;
+      } catch {
+        // A paid redo without a durable cost row must stay locked and visible.
+      }
+      const terminal = await markImageRedoTerminalFailure(
+        store,
+        slug,
+        jobId,
+        costRecorded ? "failed" : "blocked",
+        possibleSpendCount,
+        costRecorded
+          ? deadlineExceeded
+            ? "image_run_deadline"
+            : "image_run_failed"
+          : "cost_record_failed",
+      );
+      await logGenerationAudit({
+        action: costRecorded ? "image_redo_failed" : "image_redo_blocked",
+        slug,
+        model,
+        status: "failed",
+        message:
+          `redo of "${exactPlan.kind}" failed after spend: ${msg}; ` +
+          `${costRecorded ? "spend recorded" : "COST NOT RECORDED"}; ` +
+          `${terminal ? "redo locked" : "redo lock write failed — manual inspection required"}; ` +
+          `orphaned dir: ${slug}/${jobId}/`,
+      });
+      return {
+        ok: false,
+        slug,
+        model,
+        error: costRecorded
+          ? "the redo image failed after using image credit; a fresh owner-confirmed redo is required"
+          : "the redo stopped after spend because its cost could not be recorded",
+      };
+    }
+    const released = await releaseImageRedoJob(store, slug, jobId, "running");
+    await logGenerationAudit({
+      action: "image_redo_failed",
+      slug,
+      model,
+      status: "failed",
+      message:
+        `redo of "${exactPlan.kind}" failed before spend: ${msg}` +
+        `${released ? "" : "; claim NOT released — manual cleanup needed"}`,
+    });
+    return { ok: false, slug, model, error: `image redo failed before spend: ${msg}` };
+  }
+
+  // The spend must have a durable cost row before the candidate exists.
+  try {
+    await recordCostEventStrict({
+      requestType: "chapter_image_generation",
+      provider: "openai",
+      model,
+      imageCount: 1,
+      estimatedCostUsd: MARK_8_IMAGE_ESTIMATED_COST_USD,
+      imageQuality: "high",
+      metadata: {
+        slug,
+        jobId,
+        redo: true,
+        kind: exactPlan.kind,
+        bindingDigest: exactPlan.digest,
+      },
+    });
+  } catch {
+    const terminal = await markImageRedoTerminalFailure(
+      store,
+      slug,
+      jobId,
+      "blocked",
+      1,
+      "cost_record_failed",
+    );
+    await logGenerationAudit({
+      action: "image_redo_blocked",
+      slug,
+      model,
+      status: "failed",
+      message:
+        `redo image generated but COST NOT RECORDED; ` +
+        `${terminal ? "redo locked" : "redo lock write failed — manual inspection required"}; ` +
+        `orphaned dir: ${slug}/${jobId}/`,
+    });
+    return { ok: false, slug, model, error: "the redo stopped because its cost could not be recorded" };
+  }
+
+  try {
+    await completeImageRedoCandidate(store, slug, jobId, candidateUrl);
+  } catch (e) {
+    const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
+    console.error(`[selah] image redo candidate for ${slug} not recorded — ${msg}`);
+    await markImageRedoTerminalFailure(store, slug, jobId, "failed", 1, "completion_conflict");
+    await logGenerationAudit({
+      action: "image_redo_conflict",
+      slug,
+      model,
+      status: "failed",
+      message: `candidate not recorded (${msg}); orphaned file under ${slug}/${jobId}/`,
+    });
+    return { ok: false, slug, model, error: `image redo candidate not recorded — ${msg}` };
+  }
+  await logGenerationAudit({
+    action: "image_redo_candidate_ready",
+    slug,
+    model,
+    status: "succeeded",
+    message: `candidate for "${exactPlan.kind}" stored under ${slug}/${jobId}/ (private until the owner decides)`,
+  });
+  return { ok: true, slug, model, images: [{ kind: exactPlan.kind, url: candidateUrl }] };
 }

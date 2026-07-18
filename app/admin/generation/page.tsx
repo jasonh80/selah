@@ -103,7 +103,29 @@ type StudioImage = {
   kind: string;
   label: string;
   description: string;
+  src: string;
   status: string;
+};
+
+// Single-image redo (board #29 owner decision): server-held candidate state,
+// so a page refresh recovers exactly where the owner left off.
+type StudioImageRedo = {
+  kind: string;
+  state: "queued" | "running" | "candidate" | "failed" | "blocked";
+  notes: string;
+  spentCount: number;
+  candidateUrl: string | null;
+  errorCode: string | null;
+};
+
+type StudioRedoPreflight = {
+  kind: string;
+  label: string;
+  notes: string;
+  model: string;
+  size: string;
+  estimatedCostUsd: number;
+  bindingDigest: string;
 };
 
 type StudioImageStatus = {
@@ -118,6 +140,7 @@ type StudioImageStatus = {
   reviewDigest: string | null;
   spentCount: number;
   estimatedCostUsd: number;
+  redo: StudioImageRedo | null;
 };
 
 type StudioCopyReview =
@@ -209,6 +232,14 @@ export default function SelahStudioPage() {
   const [imageMsg, setImageMsg] = useState("");
   const [imagesPreviewed, setImagesPreviewed] = useState(false);
   const [approvedReviewDigest, setApprovedReviewDigest] = useState<string | null>(null);
+  // Single-image redo entry state (client-side until the paid claim exists;
+  // after that the server's redo state via images_status is authoritative).
+  const [redoOpenKind, setRedoOpenKind] = useState<string | null>(null);
+  const [redoNotes, setRedoNotes] = useState("");
+  const [redoPreflight, setRedoPreflight] = useState<StudioRedoPreflight | null>(null);
+  const [redoBusy, setRedoBusy] = useState(false);
+  const [redoMsg, setRedoMsg] = useState("");
+  const [redoPreviewed, setRedoPreviewed] = useState(false);
 
   const [published, setPublished] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -332,6 +363,12 @@ export default function SelahStudioPage() {
     setApprovedReviewDigest(null);
     setConfirmingImageDiscard(false);
     setApprovedImageDiscard(false);
+    setRedoOpenKind(null);
+    setRedoNotes("");
+    setRedoPreflight(null);
+    setRedoBusy(false);
+    setRedoMsg("");
+    setRedoPreviewed(false);
   }
 
   // Reset the review, image, and publish state when the chapter changes or a
@@ -961,6 +998,22 @@ export default function SelahStudioPage() {
     }
     applyImageStatus(next);
 
+    // An active single-image redo owns the step: keep polling while the
+    // candidate is being created; otherwise the redo panel renders from the
+    // server state (candidate / failed / blocked) until the owner resolves it.
+    if (next.redo) {
+      if (next.redo.state === "queued" || next.redo.state === "running") {
+        setImagePhase("queued");
+        setTimeout(() => {
+          void checkImagesStatus(target, requestId, attempt + 1, false);
+        }, 6000);
+      } else {
+        setImagePhase("idle");
+        setImageMsg("");
+      }
+      return;
+    }
+
     const exactPlan = next.total === 3 || next.total === 5;
     const complete =
       exactPlan &&
@@ -1086,6 +1139,174 @@ export default function SelahStudioPage() {
   function approveImages() {
     if (!imagesPreviewed || imagePhase !== "ready" || !imageStatus?.reviewDigest) return;
     setApprovedReviewDigest(imageStatus.reviewDigest);
+  }
+
+  // ---------------- single-image redo (board #29 owner decision) ----------------
+
+  function openRedo(kind: string) {
+    setRedoOpenKind(kind);
+    setRedoNotes("");
+    setRedoPreflight(null);
+    setRedoMsg("");
+  }
+
+  function cancelRedo() {
+    setRedoOpenKind(null);
+    setRedoNotes("");
+    setRedoPreflight(null);
+    setRedoMsg("");
+  }
+
+  async function loadRedoPreflight() {
+    if (!redoOpenKind || redoNotes.trim() === "") return;
+    const target = slug;
+    setRedoBusy(true);
+    setRedoMsg("");
+    try {
+      const j = await api("POST", {
+        action: "redo_image_preflight",
+        slug: target,
+        kind: redoOpenKind,
+        notes: redoNotes,
+      });
+      if (activeSlug.current !== target) return;
+      const parsed = readStudioRedoPreflight(j);
+      if (!parsed) {
+        setRedoMsg(
+          typeof j.error === "string" ? j.error : "Studio could not check the redo cost. Try again.",
+        );
+        return;
+      }
+      setRedoPreflight(parsed);
+    } catch {
+      if (activeSlug.current === target) {
+        setRedoMsg("Studio could not check the redo cost. Try again.");
+      }
+    } finally {
+      setRedoBusy(false);
+    }
+  }
+
+  async function createRedoCandidate() {
+    if (
+      !redoPreflight ||
+      settings?.image_generation_enabled !== true ||
+      confirmedSettings.current?.image_generation_enabled !== true
+    ) return;
+    const target = slug;
+    setRedoBusy(true);
+    setRedoMsg("");
+    try {
+      const j = await api("POST", {
+        action: "redo_image",
+        slug: target,
+        kind: redoPreflight.kind,
+        notes: redoPreflight.notes,
+        bindingDigest: redoPreflight.bindingDigest,
+        confirm: true,
+      });
+      if (activeSlug.current !== target) return;
+      if (!j.ok) {
+        setRedoMsg(
+          typeof j.error === "string"
+            ? j.error
+            : "Studio could not start the redo. Check the images before trying again.",
+        );
+        return;
+      }
+      cancelRedo();
+      setRedoPreviewed(false);
+      void loadImagesStatus(target);
+    } catch {
+      if (activeSlug.current === target) {
+        setRedoMsg("Studio lost its connection while starting the redo. Check the images before trying again.");
+      }
+    } finally {
+      setRedoBusy(false);
+    }
+  }
+
+  async function openRedoPreview() {
+    const target = slug;
+    const previewUrl = studioPreviewUrl(target);
+    if (!previewUrl) return;
+    // Open synchronously so browsers do not block the tab (same pattern as
+    // previewDraft). The preview page shows the candidate in place with a
+    // clear banner; nothing is applied by looking.
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      setRedoMsg("Allow pop-ups for Selah, then try the candidate preview again.");
+      return;
+    }
+    previewWindow.opener = null;
+    try {
+      const response = await api("POST", { action: "preview_access", slug: target });
+      if (!response.ok) throw new Error("preview access refused");
+      previewWindow.location.href = previewUrl;
+      setRedoPreviewed(true);
+      setRedoMsg("");
+    } catch {
+      previewWindow.close();
+      setRedoMsg("Studio could not open the candidate preview. Try again.");
+    }
+  }
+
+  async function applyRedoCandidate() {
+    const redo = imageStatus?.redo;
+    if (!redo || redo.state !== "candidate" || !redo.candidateUrl || !redoPreviewed) return;
+    const target = slug;
+    setRedoBusy(true);
+    setRedoMsg("");
+    try {
+      const j = await api("POST", {
+        action: "redo_image_apply",
+        slug: target,
+        kind: redo.kind,
+        candidateUrl: redo.candidateUrl,
+        confirm: true,
+      });
+      if (activeSlug.current !== target) return;
+      if (!j.ok) {
+        setRedoMsg(
+          typeof j.error === "string" ? j.error : "Studio could not apply the candidate. Nothing changed.",
+        );
+        return;
+      }
+      setRedoPreviewed(false);
+      void loadImagesStatus(target);
+    } catch {
+      if (activeSlug.current === target) {
+        setRedoMsg("Studio lost its connection while applying the candidate. Check the images.");
+      }
+    } finally {
+      setRedoBusy(false);
+    }
+  }
+
+  async function rejectRedoCandidate() {
+    const redo = imageStatus?.redo;
+    if (!redo || (redo.state !== "candidate" && redo.state !== "failed")) return;
+    const target = slug;
+    setRedoBusy(true);
+    setRedoMsg("");
+    try {
+      const j = await api("POST", { action: "redo_image_reject", slug: target });
+      if (activeSlug.current !== target) return;
+      if (!j.ok) {
+        setRedoMsg(
+          typeof j.error === "string" ? j.error : "Studio could not clear the candidate. Try again.",
+        );
+        return;
+      }
+      setRedoPreviewed(false);
+      void loadImagesStatus(target);
+    } catch {
+      if (activeSlug.current === target) {
+        setRedoMsg("Studio lost its connection while clearing the candidate. Check the images.");
+      }
+    } finally {
+      setRedoBusy(false);
+    }
   }
 
   function toggleTag(t: string) {
@@ -1350,6 +1571,11 @@ export default function SelahStudioPage() {
     imagesPreviewed &&
     Boolean(approvedReviewDigest) &&
     approvedReviewDigest === imageStatus?.reviewDigest;
+  // Single-image redo: while a redo is active/unresolved it owns Step 4.
+  const activeRedo = isProtectedChapter ? (imageStatus?.redo ?? null) : null;
+  const activeRedoImage = activeRedo
+    ? imageStatus?.images.find((image) => image.kind === activeRedo.kind) ?? null
+    : null;
   const canPublish =
     draftReady &&
     textApproved &&
@@ -1835,6 +2061,116 @@ export default function SelahStudioPage() {
                   ? "The Bible-wording review must be repaired before creating images."
                   : "Preview the draft and mark the text Ready first."}
             </p>
+          ) : activeRedo ? (
+            activeRedo.state === "queued" || activeRedo.state === "running" ? (
+              <div role="status" aria-live="polite" className="rounded-lg border bg-card-soft p-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-accent-strong" aria-hidden="true" />
+                  <p className="text-[14px] font-semibold text-primary">Creating one candidate image</p>
+                </div>
+                <p className="mt-2 text-[13px] text-secondary">
+                  Redoing {activeRedoImage?.label ?? activeRedo.kind} with your note. This is exactly one
+                  image request; the chapter text and its other images stay as they are.
+                </p>
+                <p className="mt-2 text-[13px] font-medium text-primary">
+                  Nothing replaces the current image until you approve the result.
+                </p>
+              </div>
+            ) : activeRedo.state === "candidate" ? (
+              <div className="rounded-lg border bg-card-soft p-3">
+                <p className="text-[13px] font-medium text-primary">
+                  Candidate ready — {activeRedoImage?.label ?? activeRedo.kind}
+                </p>
+                <p className="mt-1 text-[12px] text-secondary">Your note: {activeRedo.notes}</p>
+                <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <figure>
+                    {activeRedoImage?.src ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={activeRedoImage.src}
+                        alt={`Current image: ${activeRedoImage.label}`}
+                        className="aspect-[3/2] w-full rounded-md border object-cover"
+                      />
+                    ) : null}
+                    <figcaption className="mt-1 text-[12px] text-secondary">Current</figcaption>
+                  </figure>
+                  <figure>
+                    {activeRedo.candidateUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={activeRedo.candidateUrl}
+                        alt={`Candidate image: ${activeRedoImage?.label ?? activeRedo.kind}`}
+                        className="aspect-[3/2] w-full rounded-md border object-cover"
+                      />
+                    ) : null}
+                    <figcaption className="mt-1 text-[12px] text-secondary">Candidate</figcaption>
+                  </figure>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void openRedoPreview()} className={`${ghost} min-h-[44px]`}>
+                    Preview in chapter ↗
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void applyRedoCandidate()}
+                    disabled={!redoPreviewed || redoBusy}
+                    className={`${primary} min-h-[44px]`}
+                  >
+                    Use this image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void rejectRedoCandidate()}
+                    disabled={redoBusy}
+                    className={`${ghost} min-h-[44px]`}
+                  >
+                    Reject
+                  </button>
+                </div>
+                {!redoPreviewed && (
+                  <p className="mt-2 text-[12px] text-secondary">
+                    Preview the candidate in the chapter before choosing.
+                  </p>
+                )}
+                {redoMsg && <p role="alert" className="mt-2 text-[13px] text-jesus-red">{redoMsg}</p>}
+              </div>
+            ) : activeRedo.state === "failed" ? (
+              <div className="rounded-lg border bg-card-soft p-3">
+                <p role="alert" className="text-[13px] text-jesus-red">
+                  The redo stopped before a candidate was ready.{" "}
+                  {activeRedo.spentCount > 0
+                    ? `Image credit was used for ${activeRedo.spentCount} ${activeRedo.spentCount === 1 ? "image" : "images"}.`
+                    : "No image credit was used."}{" "}
+                  The chapter is unchanged.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void rejectRedoCandidate()}
+                  disabled={redoBusy}
+                  className={`${ghost} mt-2.5 min-h-[44px]`}
+                >
+                  Dismiss
+                </button>
+                <p className="mt-2 text-[12px] text-secondary">
+                  Dismiss this attempt, then start a fresh redo from the image list if you still want the change.
+                </p>
+                {redoMsg && <p role="alert" className="mt-2 text-[13px] text-jesus-red">{redoMsg}</p>}
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-card-soft p-3">
+                <p role="alert" className="text-[13px] text-jesus-red">
+                  The redo used image credit, but Studio could not safely record the spend. Studio needs
+                  attention before more image work. Nothing was changed or published.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void loadImagesStatus(slug)}
+                  className={`${ghost} mt-2.5 min-h-[44px]`}
+                >
+                  Check images again
+                </button>
+              </div>
+            )
           ) : imagePhase === "checking" ? (
             <p role="status" className="text-[13px] text-secondary">Checking the image plan…</p>
           ) : imagePhase === "confirming" && imageStatus ? (
@@ -1860,13 +2196,109 @@ export default function SelahStudioPage() {
                 ✓ {imageStatus?.total} images are ready to review
               </p>
               {imageStatus?.images && imageStatus.images.length > 0 && (
-                <ul className="space-y-1 text-[12px] text-secondary">
+                <div className="space-y-2">
                   {imageStatus.images.map((image) => (
-                    <li key={image.kind}>
-                      {image.kind === imageStatus.heroKind ? "Featured: " : ""}{image.label}
-                    </li>
+                    <div key={image.kind} className="rounded-lg border bg-card-soft p-3">
+                      <div className="flex flex-wrap items-start gap-3">
+                        {image.src ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={image.src}
+                            alt={image.label}
+                            className="aspect-[3/2] w-full max-w-[240px] rounded-md border object-cover"
+                          />
+                        ) : null}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-medium text-primary">
+                            {image.kind === imageStatus.heroKind ? "Featured: " : ""}
+                            {image.label}
+                          </p>
+                          {redoOpenKind === image.kind ? (
+                            <div className="mt-2 space-y-2">
+                              <label
+                                className="block text-[13px] text-secondary"
+                                htmlFor={`redo-notes-${image.kind}`}
+                              >
+                                What should change? (required)
+                              </label>
+                              <textarea
+                                id={`redo-notes-${image.kind}`}
+                                value={redoNotes}
+                                maxLength={600}
+                                rows={3}
+                                onChange={(e) => {
+                                  setRedoNotes(e.target.value);
+                                  setRedoPreflight(null);
+                                }}
+                                placeholder="Describe exactly what is not right in this image."
+                                className={field}
+                              />
+                              <p className="text-[11px] text-secondary">{redoNotes.length}/600</p>
+                              {!redoPreflight ? (
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => void loadRedoPreflight()}
+                                    disabled={redoBusy || redoNotes.trim() === ""}
+                                    className={`${ghost} min-h-[44px]`}
+                                  >
+                                    {redoBusy ? "Checking…" : "Check cost (free)"}
+                                  </button>
+                                  <button type="button" onClick={cancelRedo} className={`${ghost} min-h-[44px]`}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="rounded-lg border bg-card p-3">
+                                  <p className="text-[13px] text-primary">
+                                    One candidate image with{" "}
+                                    <span className="font-semibold">{redoPreflight.model}</span> at{" "}
+                                    {redoPreflight.size} — maximum charge{" "}
+                                    <span className="font-semibold">
+                                      about {formatUsd(redoPreflight.estimatedCostUsd)}
+                                    </span>
+                                    . Exactly one request, no automatic retry; nothing replaces this image
+                                    until you approve the result.
+                                  </p>
+                                  <div className="mt-2.5 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => void createRedoCandidate()}
+                                      disabled={redoBusy || imagesOff}
+                                      className={`${primary} min-h-[44px]`}
+                                    >
+                                      Create one candidate
+                                    </button>
+                                    <button type="button" onClick={cancelRedo} className={`${ghost} min-h-[44px]`}>
+                                      Cancel
+                                    </button>
+                                  </div>
+                                  {imagesOff && (
+                                    <p className="mt-2 text-[12px] text-secondary">
+                                      Image creation is paused. Turn it on and save in{" "}
+                                      <span className="text-primary">Settings &amp; history</span> first.
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                              {redoMsg && (
+                                <p role="alert" className="text-[13px] text-jesus-red">{redoMsg}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openRedo(image.kind)}
+                              className={`${ghost} mt-2 min-h-[44px]`}
+                            >
+                              Redo this image
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
               {!imagesPreviewed ? (
                 <>
@@ -2412,8 +2844,36 @@ function readStudioImageStatus(value: unknown): StudioImageStatus | null {
       kind: image.kind,
       label: image.label,
       description: image.description,
+      src: typeof image.src === "string" && /^https:\/\//u.test(image.src) ? image.src : "",
       status: image.status,
     });
+  }
+
+  let redo: StudioImageRedo | null = null;
+  if (row.redo !== undefined && row.redo !== null) {
+    if (typeof row.redo !== "object") return null;
+    const r = row.redo as Record<string, unknown>;
+    if (typeof r.kind !== "string" || typeof r.notes !== "string") return null;
+    if (
+      r.state !== "queued" &&
+      r.state !== "running" &&
+      r.state !== "candidate" &&
+      r.state !== "failed" &&
+      r.state !== "blocked"
+    ) return null;
+    const redoSpent = r.spentCount === undefined ? 0 : r.spentCount;
+    if (!Number.isInteger(redoSpent) || (redoSpent as number) < 0) return null;
+    redo = {
+      kind: r.kind,
+      state: r.state,
+      notes: r.notes,
+      spentCount: redoSpent as number,
+      candidateUrl:
+        typeof r.candidateUrl === "string" && /^https:\/\//u.test(r.candidateUrl)
+          ? r.candidateUrl
+          : null,
+      errorCode: typeof r.errorCode === "string" && r.errorCode ? r.errorCode : null,
+    };
   }
 
   const spentCount = row.spentCount === undefined ? 0 : row.spentCount;
@@ -2438,6 +2898,33 @@ function readStudioImageStatus(value: unknown): StudioImageStatus | null {
     reviewDigest: typeof row.reviewDigest === "string" && row.reviewDigest ? row.reviewDigest : null,
     spentCount: spentCount as number,
     estimatedCostUsd: row.estimatedCostUsd,
+    redo,
+  };
+}
+
+function readStudioRedoPreflight(value: unknown): StudioRedoPreflight | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  if (row.ok !== true || !row.redo || typeof row.redo !== "object") return null;
+  const r = row.redo as Record<string, unknown>;
+  if (typeof r.kind !== "string" || r.kind === "") return null;
+  if (typeof r.label !== "string" || typeof r.notes !== "string" || r.notes.trim() === "") return null;
+  if (typeof r.model !== "string" || r.model.trim() === "") return null;
+  if (typeof r.size !== "string" || r.size.trim() === "") return null;
+  if (
+    typeof r.estimatedCostUsd !== "number" ||
+    !Number.isFinite(r.estimatedCostUsd) ||
+    r.estimatedCostUsd < 0
+  ) return null;
+  if (typeof r.bindingDigest !== "string" || !LOWERCASE_SHA256.test(r.bindingDigest)) return null;
+  return {
+    kind: r.kind,
+    label: r.label,
+    notes: r.notes,
+    model: r.model,
+    size: r.size,
+    estimatedCostUsd: r.estimatedCostUsd,
+    bindingDigest: r.bindingDigest,
   };
 }
 

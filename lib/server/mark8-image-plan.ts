@@ -143,6 +143,116 @@ export function assertMark8ImagesArePlaceholders(workup: ChapterWorkup): void {
   assertMarkSprintImagesArePlaceholders(MARK_8_IMAGE_SLUG, workup);
 }
 
+// ---------------- single-image redo (owner decision, board #29 2026-07-17) ----------------
+
+// Transient workup_json keys for an in-flight redo candidate. Mirrors the
+// imageJob* keys: no schema change, cleared on apply/reject, and excluded
+// from (in fact, nulling) the final-review identity while unresolved.
+export const IMAGE_REDO_TRANSIENT_KEYS = [
+  "imageRedoJobId",
+  "imageRedoState",
+  "imageRedoKind",
+  "imageRedoNotes",
+  "imageRedoBindingDigest",
+  "imageRedoCandidateUrl",
+  "imageRedoSpentCount",
+  "imageRedoErrorCode",
+] as const;
+
+export const IMAGE_REDO_NOTES_MAX_CHARS = 600;
+
+export interface MarkSprintImageRedoPlan {
+  slug: string;
+  kind: ImageKind;
+  index: number;
+  label: string;
+  caption: string;
+  alt: string;
+  basePrompt: string;
+  revisedPrompt: string;
+  notes: string;
+  currentSrc: string;
+  model: string;
+  wide: true;
+  digest: string;
+}
+
+/**
+ * Derive the exact ONE-image redo request from the stored draft: the target's
+ * frozen prompt plus the owner's revision notes. Requires a COMPLETED stored
+ * image set (a redo replaces one finished image; it never substitutes for the
+ * full paid run). The digest binds slug, target, current bytes URL, base
+ * prompt, and the exact notes — any drift between preflight and spend refuses.
+ */
+export function deriveMarkSprintImageRedoPlan(
+  slug: string,
+  workup: ChapterWorkup,
+  kind: string,
+  notes: string,
+): MarkSprintImageRedoPlan {
+  const label = chapterLabel(slug);
+  const plan = deriveMarkSprintImagePlan(slug, workup);
+  const trimmedNotes = typeof notes === "string" ? notes.trim() : "";
+  if (trimmedNotes === "") {
+    throw new Error(`${label} image redo requires a "what should change" note`);
+  }
+  if (trimmedNotes.length > IMAGE_REDO_NOTES_MAX_CHARS) {
+    throw new Error(
+      `${label} image redo notes must stay within ${IMAGE_REDO_NOTES_MAX_CHARS} characters`,
+    );
+  }
+  if (
+    !workup.images.every(
+      (image) => image.status === "complete" && isStoredMarkSprintImageUrl(slug, image),
+    )
+  ) {
+    throw new Error(
+      `${label} image redo requires a fully completed stored image set`,
+    );
+  }
+  const target = plan.images.find((image) => image.kind === kind);
+  const source = workup.images.find((image) => image.kind === kind);
+  if (!target || !source) {
+    throw new Error(`${label} has no image "${kind}" to redo`);
+  }
+  const revisedPrompt =
+    `${target.prompt}\n\nOWNER REVISION REQUEST — change exactly this and keep ` +
+    `everything else about the scene, style, and composition unchanged: ${trimmedNotes}`;
+  const digest = sha256Canonical({
+    domain: `selah-${slug}-image-redo`,
+    slug,
+    kind: target.kind,
+    index: target.index,
+    currentSrc: source.src,
+    basePrompt: target.prompt,
+    notes: trimmedNotes,
+    model: MARK_8_IMAGE_MODEL,
+  });
+  return Object.freeze({
+    slug,
+    kind: target.kind,
+    index: target.index,
+    label: target.label,
+    caption: target.caption,
+    alt: target.alt,
+    basePrompt: target.prompt,
+    revisedPrompt,
+    notes: trimmedNotes,
+    currentSrc: source.src,
+    model: MARK_8_IMAGE_MODEL,
+    wide: true,
+    digest,
+  });
+}
+
+/** True while an unresolved redo candidate (any redo key) is on the workup. */
+export function markSprintImageRedoUnresolved(workup: ChapterWorkup): boolean {
+  const raw = workup as unknown as Record<string, unknown>;
+  return IMAGE_REDO_TRANSIENT_KEYS.some((key) =>
+    Object.prototype.hasOwnProperty.call(raw, key),
+  );
+}
+
 const JOB_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 function storedJobId(slug: string, image: ChapterImage): string | null {
@@ -187,9 +297,15 @@ export function markSprintFinalReviewDigest(
   } catch {
     return null;
   }
+  // An unresolved redo candidate has no final identity: the owner must Use or
+  // Reject it before the set can be reviewed or published.
+  if (markSprintImageRedoUnresolved(workup)) return null;
   const storedJobIds = workup.images.map((image) => storedJobId(slug, image));
   if (storedJobIds.some((jobId) => jobId === null)) return null;
-  if (new Set(storedJobIds).size !== 1) return null;
+  // Multiple job directories are legitimate: an owner-approved single-image
+  // redo stores its replacement under its own immutable job directory. The
+  // digest below binds the exact src set, so any unapproved mix still changes
+  // the identity the owner must re-approve and publish re-verifies.
   // Bind the complete final render workup, not only the pictures. Transient
   // job-control keys are deliberately excluded so the digest is stable after
   // completion and can be recomputed by a future server-side publish check.

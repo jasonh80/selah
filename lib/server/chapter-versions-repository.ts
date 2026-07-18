@@ -17,7 +17,19 @@ export interface VersionMeta {
 
 // Snapshot the CURRENT working draft (chapter_workups) as the next version.
 // Returns the new version number, or null if there's nothing to snapshot.
+// TEST SEAM (offline safety gates only): lets a hermetic verify script prove
+// snapshot-before-mutation behavior without Supabase. Never set in production.
+let snapshotOverrideForTesting:
+  | ((slug: string, label?: string) => Promise<number | null>)
+  | null = null;
+export function __setVersionSnapshotForTesting(
+  fn: ((slug: string, label?: string) => Promise<number | null>) | null,
+): void {
+  snapshotOverrideForTesting = fn;
+}
+
 export async function snapshotVersion(slug: string, label?: string): Promise<number | null> {
+  if (snapshotOverrideForTesting) return snapshotOverrideForTesting(slug, label);
   const db = getSupabaseAdmin();
   if (!db) return null;
   const cur = await db.from("chapter_workups").select("workup_json,status").eq("slug", slug).maybeSingle();
