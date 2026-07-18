@@ -114,3 +114,62 @@ entries:
       money; owner-gated path, so fix + gate first)
     status: queued
     completion_pr: null
+
+  - id: IQ-007
+    area: navigation
+    improvement: >-
+      Retire the prescribed-daily-chapter framing. Remove the visible
+      "Today" button/concept from navigation; Selah becomes a
+      choose-what-you-study experience. Every chapter lives on its
+      canonical shareable URL (/chapter/mark-9 etc.) and chapter selection,
+      Continue Reading, next/previous, notifications, bookmarks, and share
+      actions all land there. If /today is retained for compatibility it
+      becomes a quiet temporary redirect to the selected/latest chapter's
+      canonical URL — the browser must END on /chapter/{slug}, never render
+      duplicate chapter content on a second URL. Canonical metadata and
+      share actions always use /chapter/{book}-{chapter}. Visible nav:
+      Chapters now; Continue Reading later once reading history exists.
+    evidence: >-
+      Owner direction, board #29 (2026-07-18, two comments — "Remove the
+      visible Today button" + "Final owner direction — chapter URLs and
+      Today").
+    priority_trigger: next navigation/layout pass — explicitly sequenced
+      AFTER launch-critical safety work (IQ-005/IQ-006); do not code ahead
+      of it
+    status: queued
+    completion_pr: null
+
+  - id: IQ-008
+    area: design-workflow
+    improvement: >-
+      Product-design work moves to a shared visual tool before code: Figma
+      for chapter/app layout (inspectable measurements, clean
+      design-to-code handoff); Canva stays for marketing graphics and
+      moodboards. First deliverable: ONE mobile chapter mockup using real
+      Mark 9 content with reduced visual competition — no code changes.
+    evidence: >-
+      Owner direction, board #29 (2026-07-18, "Shared layout design
+      workflow" addendum).
+    priority_trigger: next product-design session (owner said "tomorrow's
+      product-design work", i.e. from 2026-07-19); mockup precedes any
+      layout code
+    status: queued
+    completion_pr: null
+
+  - id: IQ-009
+    area: runtime-health
+    improvement: >-
+      Chapter pages log React hydration errors in the browser console
+      (minified #418, #423, #425 — server/client content mismatch) on
+      initial load. No visible breakage observed, but hydration mismatches
+      can silently drop event handlers and mask real regressions. Find the
+      mismatching render (suspects: date/time-dependent output rendered at
+      request time) and make server and client output identical.
+    evidence: >-
+      Claude live check of production r100/r101 (2026-07-18) during the
+      maps visual verification; errors present on mark-7/8/9 chapter loads
+      before any map interaction.
+    priority_trigger: next runtime/layout pass (free; diagnose first —
+      the fix must not touch chapter content)
+    status: queued
+    completion_pr: null
