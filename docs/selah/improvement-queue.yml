@@ -1,0 +1,116 @@
+# Selah shared improvement queue (board #29 owner decision, 2026-07-17).
+#
+# The single place both AIs record improvement candidates. Rules:
+# - "catch up" = both AIs read this file; nightly homework checks it.
+# - Before any chapter refresh, review that chapter's queued notes.
+# - Completed work updates the entry and links its PR. Jason does no
+#   recordkeeping here.
+# - status is a CLOSED enum: queued | working | finished | declined —
+#   nothing else, so catch-up and nightly homework can filter
+#   deterministically.
+# - priority/trigger says WHEN the item should be picked up, not how
+#   important it feels.
+# - Lean by design: no framework, no Studio display or gate, no live-data
+#   coupling. This file is version control only.
+
+entries:
+  - id: IQ-001
+    area: mark-9-wording
+    improvement: >-
+      In the suffering-boy movement, show how the plural "help us" (Mark 9:22
+      says "us" explicitly) includes the father in the burden — he carries the
+      boy's suffering as his own. The wider whole-family implication is a
+      strong, reasonable INFERENCE and must be labeled as such, not stated as
+      fact. Current copy reads the plea as primarily the father's faith
+      moment.
+    evidence: >-
+      Codex non-blocking launch note, board #29 (2026-07-17), from the full
+      published-chapter review; echoed in the Mark 9 refresh notes.
+    priority_trigger: next Mark 9 content refresh (rollback-safe regeneration
+      only — never in-place mutation)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-002
+    area: mark-9-wording
+    improvement: >-
+      In the "not one of us" movement (Mark 9:38-41), sharpen that Jesus
+      corrects POSSESSIVE gatekeeping without abandoning wise discernment —
+      openness to outsiders working in His name is not indifference to truth.
+      Current copy leans on the welcome and underplays the discernment edge.
+    evidence: >-
+      Codex non-blocking launch note, board #29 (2026-07-17), from the full
+      published-chapter review; echoed in the Mark 9 refresh notes.
+    priority_trigger: next Mark 9 content refresh (rollback-safe regeneration
+      only — never in-place mutation)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-003
+    area: layout
+    improvement: >-
+      Fix the true-320px overflow: the flex-nowrap Quick/Deep control row
+      overflows an 11px sliver (the Deep Dive button ends ~330.6px against a
+      320px content viewport). Allow that row to wrap or give it a
+      narrow-width treatment, then add a 320px regression check. Do NOT touch
+      typography or the rest of the layout.
+    evidence: >-
+      Codex overnight QA of published Mark 9, board #29 (2026-07-18): no
+      overflow at 390px; one 11px overflow at true 320px content width,
+      traced to the control row.
+    priority_trigger: next layout pass (small bounded fix; free)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-004
+    area: mark-9-images
+    improvement: >-
+      Regenerate Mark 9 images 2-3 with landscape 3:2 sources. They predate
+      PR #48 (which only affects future runs), so their sources are portrait
+      1024x1536 cropped into the shared 3:2 frame; the hero is already
+      landscape 1536x1024.
+    evidence: >-
+      Codex overnight QA of published Mark 9, board #29 (2026-07-18): hero
+      source landscape; images 2-3 portrait sources cropped into the 3:2
+      frame.
+    priority_trigger: owner-gated paid regeneration — needs Jason's explicit
+      go (image credit); pairs naturally with the Studio single-image redo
+      once merged
+    status: queued
+    completion_pr: null
+
+  - id: IQ-005
+    area: workers
+    improvement: >-
+      generate-images-background writes durable audit rows for PRE-AUTH
+      refusals (non-POST, missing fields, bad token) on a publicly reachable
+      function URL — an unauthenticated caller can flood the audit table and
+      bury genuine refusal entries. Mirror the redo worker's fix (PR #51):
+      console-only before signature verification, durable audit after.
+    evidence: >-
+      Codex exact-head review of PR #51 (2026-07-18) confirmed the pattern;
+      the redo worker was fixed there, the pre-existing images worker was
+      left untouched (frozen path).
+    priority_trigger: next Studio-safety pass (small bounded fix; free; no
+      behavior change for authenticated flows)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-006
+    area: workers
+    improvement: >-
+      generateAndStoreChapterImages (full-run path) counts an in-flight
+      model request as possible spend only on DEADLINE errors — a normal
+      connection loss or 5xx after dispatch can record "no spend" and
+      release the claim even though the provider may have billed the
+      request. Apply PR #51's fix: any post-dispatch failure is possible
+      spend (max(generated, started)), recorded durably with
+      billingUncertain, claim locked rather than silently released.
+    evidence: >-
+      Codex exact-head review of PR #51 (2026-07-18) found the class on the
+      redo path; the same accounting exists in the frozen full-run worker
+      (lib/server/images.ts spend envelope).
+    priority_trigger: before the next paid full image run (protects real
+      money; owner-gated path, so fix + gate first)
+    status: queued
+    completion_pr: null
