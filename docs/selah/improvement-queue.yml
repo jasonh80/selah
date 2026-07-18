@@ -239,3 +239,67 @@ entries:
       first, then one focused build PR
     status: queued
     completion_pr: null
+
+  - id: IQ-012
+    area: navigation
+    improvement: >-
+      Chapter nav must only link PUBLISHED neighbors: published Mark 10
+      shows "Next: Mark 11" but /chapter/mark-11 is 404. Derive
+      next/previous from the published set, not arithmetic.
+    evidence: >-
+      Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
+    priority_trigger: next navigation pass (small bounded fix; free; pairs
+      with IQ-007)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-013
+    area: mark-10-images
+    improvement: >-
+      Single-image redo, owner-gated: (a) Bartimaeus appears to make direct
+      eye contact BEFORE receiving sight — use an unfocused gaze / head
+      oriented by Jesus' voice; (b) the road image reads as leaving a
+      nearby Jerusalem — use open road / Jordan highlands with Jerusalem
+      distant or absent.
+    evidence: >-
+      Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
+    priority_trigger: owner-gated paid redo (~$0.17 each); Jason's explicit
+      go; draft-only tool means these ride the next Mark 10 revision lane
+      or a future published-chapter refresh lane
+    status: queued
+    completion_pr: null
+
+  - id: IQ-014
+    area: layout
+    improvement: >-
+      Quick Dive should surface one Jesus card, one response, and a short
+      prayer BEFORE the extra FAQs — the essentials come first.
+    evidence: >-
+      Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
+    priority_trigger: the Figma-driven layout pass (IQ-008; Codex owns the
+      editable mockup, Claude implements after Jason approves the design)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-015
+    area: mark-10-wording
+    improvement: >-
+      Strengthen "ransom for many" (10:45): Jesus gives his life to free
+      people who cannot free themselves. Rollback-safe regeneration only.
+    evidence: >-
+      Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
+    priority_trigger: next Mark 10 content refresh (never in-place mutation)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-016
+    area: metadata
+    improvement: >-
+      Chapter-specific title/description/canonical/social-preview metadata;
+      remove generic "daily" language from chapter pages. Pairs with
+      IQ-007's canonical-URL direction.
+    evidence: >-
+      Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
+    priority_trigger: next navigation/metadata pass (free)
+    status: queued
+    completion_pr: null
