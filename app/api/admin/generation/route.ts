@@ -46,6 +46,7 @@ import {
   IMAGE_REDO_SPENT_COUNT_KEY,
   IMAGE_REDO_STATE_KEY,
   ALLOW_DISCARD_COMPLETED_IMAGES,
+  hasTransientJobControlKeys,
 } from "@/lib/server/generation-jobs";
 import {
   triggerBackgroundGeneration,
@@ -918,10 +919,31 @@ export async function POST(req: Request) {
     const workup = await getVersionWorkup(String(body.slug ?? ""), Number(body.version));
     return NextResponse.json({ ok: Boolean(workup), workup });
   }
+  // Whole-workup writers must never run over a LIVE job claim or an
+  // unresolved redo candidate: the write would erase paid work (or hide a
+  // blocked, unrecorded spend) with neither a decision nor an audit trail.
+  async function refuseVersionWriteDuringActiveJob(slug: string, what: string) {
+    try {
+      const row = await requireJobStore(slug, what).read(slug);
+      if (row && !("error" in row) && hasTransientJobControlKeys(row.workupJson)) {
+        return refuse(
+          slug,
+          what,
+          "a generation, image, or redo job is active or unresolved on this chapter — resolve it before restoring or merging drafts",
+          409,
+        );
+      }
+    } catch {
+      // Storage unavailable: the underlying write will fail closed on its own.
+    }
+    return null;
+  }
   if (action === "version_restore") {
     const slug = String(body.slug ?? "");
     const blocked = await guardOrRefuse(slug, "version_restore", "restoreVersion");
     if (blocked) return blocked;
+    const busy = await refuseVersionWriteDuringActiveJob(slug, "version_restore");
+    if (busy) return busy;
     const ok = await restoreVersion(slug, Number(body.version));
     if (!ok) return refuse(slug, "version_restore", "restore failed or conflicted — nothing was written", 409);
     return NextResponse.json({ ok: true });
@@ -934,6 +956,8 @@ export async function POST(req: Request) {
     const slug = String(body.slug ?? "");
     const blocked = await guardOrRefuse(slug, "version_apply", "applyMergedDraft");
     if (blocked) return blocked;
+    const busy = await refuseVersionWriteDuringActiveJob(slug, "version_apply");
+    if (busy) return busy;
     const result = await applyMergedDraft(
       slug,
       body.workup as ChapterWorkup,
@@ -1311,6 +1335,29 @@ export async function POST(req: Request) {
     } catch (error) {
       return mapMutationError(slug, "redo_image_apply", error);
     }
+    // Pre-validate the exact candidate BEFORE the snapshot: a refused apply
+    // (double-click after success, stale tab, wrong url) must not append a
+    // version row — and must never write a POST-apply state under the
+    // "before-image-redo-apply" label, which would defeat the rollback. The
+    // atomic conditional write below still guards the race.
+    try {
+      const row = await store.read(slug);
+      const json = (row && !("error" in row) && row.workupJson) || {};
+      if (
+        json[IMAGE_REDO_STATE_KEY] !== "candidate" ||
+        json[IMAGE_REDO_KIND_KEY] !== kind ||
+        json[IMAGE_REDO_CANDIDATE_URL_KEY] !== candidateUrl
+      ) {
+        return refuse(
+          slug,
+          "redo_image_apply",
+          "the redo candidate changed or was resolved after you reviewed it",
+          409,
+        );
+      }
+    } catch (error) {
+      return mapMutationError(slug, "redo_image_apply", error);
+    }
     // Rollback snapshot FAIL-CLOSED before the one-image swap: no snapshot,
     // no mutation ("Snapshot before every regeneration or image run").
     const version = await snapshotVersion(slug, "before-image-redo-apply");
@@ -1350,7 +1397,7 @@ export async function POST(req: Request) {
       return refuse(
         slug,
         "redo_image_reject",
-        "No pending redo candidate to reject — it may already be resolved.",
+        "Nothing was cleared — the candidate may already be resolved, the request may still be live, or the redo needs attention (blocked spend stays locked).",
         409,
       );
     }

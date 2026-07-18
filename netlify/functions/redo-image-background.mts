@@ -12,13 +12,13 @@ import { runImageRedoJob } from "../../lib/server/images";
 import { verifyJobToken } from "../../lib/server/generation-jobs";
 import { logGenerationAudit } from "../../lib/server/generation-settings";
 
-async function refuse(slug: string, reason: string, status: number): Promise<Response> {
-  await logGenerationAudit({
-    action: "refused:worker_image_redo",
-    slug: slug || undefined,
-    status: "failed",
-    message: reason.slice(0, 300),
-  });
+// PRE-AUTH refusals log to the console only. The function URL is publicly
+// reachable, so writing durable audit rows before the signature check would
+// hand unauthenticated callers a primitive to flood the audit table and bury
+// the genuine refusal entries the owner reviews. Post-auth failures (inside
+// runImageRedoJob) stay durably audited as before.
+function refuse(slug: string, reason: string, status: number): Response {
+  console.error(`[selah] worker_image_redo refused${slug ? ` (${slug})` : ""}: ${reason}`);
   return new Response(JSON.stringify({ ok: false, error: reason }), { status });
 }
 

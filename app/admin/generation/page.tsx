@@ -1285,7 +1285,12 @@ export default function SelahStudioPage() {
 
   async function rejectRedoCandidate() {
     const redo = imageStatus?.redo;
-    if (!redo || (redo.state !== "candidate" && redo.state !== "failed")) return;
+    // "queued" is dismissable only when STALE — the server proves the worker
+    // token expired before clearing anything; a live request refuses.
+    if (
+      !redo ||
+      (redo.state !== "candidate" && redo.state !== "failed" && redo.state !== "queued")
+    ) return;
     const target = slug;
     setRedoBusy(true);
     setRedoMsg("");
@@ -2061,7 +2066,7 @@ export default function SelahStudioPage() {
                   ? "The Bible-wording review must be repaired before creating images."
                   : "Preview the draft and mark the text Ready first."}
             </p>
-          ) : activeRedo ? (
+          ) : activeRedo && imagePhase !== "error" ? (
             activeRedo.state === "queued" || activeRedo.state === "running" ? (
               <div role="status" aria-live="polite" className="rounded-lg border bg-card-soft p-4">
                 <div className="flex items-center gap-2">
@@ -2075,6 +2080,23 @@ export default function SelahStudioPage() {
                 <p className="mt-2 text-[13px] font-medium text-primary">
                   Nothing replaces the current image until you approve the result.
                 </p>
+                {activeRedo.state === "queued" && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => void rejectRedoCandidate()}
+                      disabled={redoBusy}
+                      className={`${ghost} min-h-[44px]`}
+                    >
+                      Stuck for a while? Clear the request
+                    </button>
+                    <p className="mt-1.5 text-[12px] text-secondary">
+                      Studio only clears a request whose worker can provably no longer start
+                      (no image credit was used). A healthy request refuses to be cleared.
+                    </p>
+                    {redoMsg && <p role="alert" className="mt-1.5 text-[13px] text-jesus-red">{redoMsg}</p>}
+                  </div>
+                )}
               </div>
             ) : activeRedo.state === "candidate" ? (
               <div className="rounded-lg border bg-card-soft p-3">

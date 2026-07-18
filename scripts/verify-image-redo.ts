@@ -27,6 +27,9 @@ import {
   claimImageJob,
   claimImageRedoJob,
   rejectImageRedoCandidate,
+  stripTransientJobControlKeys,
+  hasTransientJobControlKeys,
+  JOB_TOKEN_TTL_MS,
   __setJobStoreForTesting,
   IMAGE_JOB_KEY,
   IMAGE_JOB_STATE_KEY,
@@ -38,6 +41,7 @@ import {
   IMAGE_REDO_CANDIDATE_URL_KEY,
   IMAGE_REDO_SPENT_COUNT_KEY,
   IMAGE_REDO_ERROR_CODE_KEY,
+  TEXT_JOB_KEY,
 } from "../lib/server/generation-jobs";
 import { isChapterMutationError, __setRowLookupForTesting } from "../lib/server/protected-chapters";
 import { __setTriggerTransportForTesting } from "../lib/server/trigger-generation";
@@ -415,6 +419,12 @@ const main = async () => {
       ok(store.rows.get(SLUG)!.workup_json[IMAGE_REDO_STATE_KEY] === "candidate", "G2 failed snapshot leaves everything unchanged");
       snapshotResult = 7;
 
+      // A refused apply must never append a version row — and never write a
+      // post-apply state under the rollback label (adversarial review P2).
+      const snapsBefore = snapshotCalls;
+      ok((await adminPost(adminReq({ action: "redo_image_apply", slug: SLUG, kind: "bread-in-the-boat", candidateUrl: `${ORIGIN}/never-reviewed.png`, confirm: true }))).status === 409, "G2b wrong-url apply refuses");
+      ok(snapshotCalls === snapsBefore, "G2b refused apply took NO snapshot (no junk/mislabeled version rows)");
+
       const workupBefore = JSON.parse(JSON.stringify(store.rows.get(SLUG)!.workup_json)) as Record<string, unknown>;
       const applied = await adminPost(adminReq({ action: "redo_image_apply", slug: SLUG, kind: "bread-in-the-boat", candidateUrl, confirm: true }));
       ok(applied.status === 200 && snapshotCalls > 0, "G3 apply succeeds after a rollback snapshot");
@@ -433,6 +443,12 @@ const main = async () => {
       );
       const newDigest = markSprintFinalReviewDigest(SLUG, after as unknown as ChapterWorkup);
       ok(newDigest !== null, "G3 the applied set has a review identity again (owner re-approves, publish re-verifies)");
+
+      // Duplicate click AFTER success (stale tab): refuse WITHOUT a snapshot,
+      // so no post-apply state ever lands under the rollback label.
+      const snapsAfterApply = snapshotCalls;
+      ok((await adminPost(adminReq({ action: "redo_image_apply", slug: SLUG, kind: "bread-in-the-boat", candidateUrl, confirm: true }))).status === 409, "G3b duplicate apply after success → 409");
+      ok(snapshotCalls === snapsAfterApply, "G3b duplicate apply took NO snapshot (rollback label stays truthful)");
 
       // Reject on a fresh candidate: chapter unchanged, identity restored.
       const pristine = completedWorkup();
@@ -530,6 +546,89 @@ const main = async () => {
       ok(raced !== null, "H4 fresh claim works after release");
       const raced2 = await claimImageRedoJob(store, SLUG, { kind: "bread-in-the-boat", notes: NOTES, bindingDigest: digest3 }).catch((e) => (isChapterMutationError(e) ? e.code : "?"));
       ok(raced2 === "CONFLICT", "H4 concurrent second claim → CONFLICT");
+    }
+
+    // ---------------- I. Adversarial-review fixes (versions × redo, stale claims) ----------------
+    {
+      // I1. Whole-workup version writes refuse while ANY job state is live —
+      // a restore/merge must never erase a paid claim or an unresolved
+      // candidate, and must never clear a blocked (unrecorded-spend) lock.
+      for (const seededState of ["queued", "running", "candidate", "blocked"]) {
+        store.seed(SLUG, "draft", {
+          ...(completedWorkup() as unknown as Record<string, unknown>),
+          [IMAGE_REDO_JOB_KEY]: "99999999-9999-4999-8999-999999999999",
+          [IMAGE_REDO_STATE_KEY]: seededState,
+          [IMAGE_REDO_KIND_KEY]: "peter-confession",
+          [IMAGE_REDO_NOTES_KEY]: NOTES,
+          [IMAGE_REDO_BINDING_DIGEST_KEY]: "b".repeat(64),
+        });
+        ok(
+          (await adminPost(adminReq({ action: "version_restore", slug: SLUG, version: 1 }))).status === 409,
+          `I1 version_restore refuses while redo is ${seededState}`,
+        );
+        ok(
+          (await adminPost(adminReq({ action: "version_apply", slug: SLUG, workup: completedWorkup(), label: "merge" }))).status === 409,
+          `I1 version_apply refuses while redo is ${seededState}`,
+        );
+        ok(
+          store.rows.get(SLUG)!.workup_json[IMAGE_REDO_STATE_KEY] === seededState,
+          `I1 refused version write left the ${seededState} redo intact`,
+        );
+      }
+      store.seed(SLUG, "draft", {
+        ...(completedWorkup() as unknown as Record<string, unknown>),
+        [IMAGE_JOB_KEY]: "job",
+        [IMAGE_JOB_STATE_KEY]: "running",
+      });
+      ok(
+        (await adminPost(adminReq({ action: "version_restore", slug: SLUG, version: 1 }))).status === 409,
+        "I1 version_restore also refuses while a FULL image job is live",
+      );
+
+      // I2. The strip helper removes every job-control key and nothing else —
+      // snapshot/restore/merge route through it, so archives can never carry
+      // or resurrect live claims.
+      const dirty = {
+        title: "Mark 8",
+        images: [],
+        [TEXT_JOB_KEY]: "t",
+        [IMAGE_JOB_KEY]: "i",
+        [IMAGE_JOB_STATE_KEY]: "queued",
+        [IMAGE_REDO_JOB_KEY]: "r",
+        [IMAGE_REDO_STATE_KEY]: "candidate",
+        [IMAGE_REDO_CANDIDATE_URL_KEY]: "https://x",
+      };
+      ok(hasTransientJobControlKeys(dirty), "I2 dirty workup detected");
+      const stripped = stripTransientJobControlKeys(dirty);
+      ok(!hasTransientJobControlKeys(stripped), "I2 strip removes every job-control key");
+      ok(stripped.title === "Mark 8" && Array.isArray(stripped.images), "I2 strip keeps real content");
+      ok(dirty[IMAGE_REDO_JOB_KEY] === "r", "I2 strip is a copy — the input is untouched");
+
+      // I3. Stale-queued dismissal: a queued claim whose row revision predates
+      // the worker-token TTL is provably unconsumable (token expired, consume
+      // is the only path to spend) and may be owner-dismissed. A LIVE queued
+      // claim refuses. This closes the dropped-Netlify-invocation wedge.
+      const staleJson = {
+        ...(completedWorkup() as unknown as Record<string, unknown>),
+        [IMAGE_REDO_JOB_KEY]: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        [IMAGE_REDO_STATE_KEY]: "queued",
+        [IMAGE_REDO_KIND_KEY]: "peter-confession",
+        [IMAGE_REDO_NOTES_KEY]: NOTES,
+        [IMAGE_REDO_BINDING_DIGEST_KEY]: "b".repeat(64),
+      };
+      const staleIso = new Date(Date.now() - JOB_TOKEN_TTL_MS - 60_000).toISOString();
+      store.rows.set(SLUG, { status: "draft", updated_at: staleIso, workup_json: staleJson });
+      ok(await rejectImageRedoCandidate(store, SLUG), "I3 STALE queued claim (token provably expired) can be dismissed");
+      ok(!(IMAGE_REDO_JOB_KEY in store.rows.get(SLUG)!.workup_json), "I3 dismissal cleared the stale claim");
+
+      const liveIso = new Date().toISOString();
+      store.rows.set(SLUG, { status: "draft", updated_at: liveIso, workup_json: { ...staleJson } });
+      ok(!(await rejectImageRedoCandidate(store, SLUG)), "I3 LIVE queued claim refuses dismissal");
+      store.rows.set(SLUG, { status: "draft", updated_at: "T-unparseable", workup_json: { ...staleJson } });
+      ok(!(await rejectImageRedoCandidate(store, SLUG)), "I3 unparseable revision is never stale (fail closed)");
+      const staleRunning = { ...staleJson, [IMAGE_REDO_STATE_KEY]: "running" };
+      store.rows.set(SLUG, { status: "draft", updated_at: staleIso, workup_json: staleRunning });
+      ok(!(await rejectImageRedoCandidate(store, SLUG)), "I3 running claims stay locked even when old (may hide un-recorded spend — needs attention, not dismissal)");
     }
   } finally {
     __setJobStoreForTesting(null);

@@ -938,12 +938,19 @@ async function runImageRedoJobWithinDeadline(
     const msg = isChapterMutationError(error)
       ? `${error.code}: ${error.message}`
       : String((error as Error).message);
-    const released = await releaseImageRedoJob(
+    // Zero spend has happened on every path through this catch, so releasing
+    // is always safe. An AMBIGUOUS consume (write committed but the response
+    // was lost) leaves the row "running" while consumed=false — try the other
+    // state too, pinned to this exact jobId, so the claim can never strand.
+    let released = await releaseImageRedoJob(
       store,
       slug,
       jobId,
       consumed ? "running" : "queued",
     );
+    if (!released && !consumed) {
+      released = await releaseImageRedoJob(store, slug, jobId, "running");
+    }
     console.error(`[selah] image redo pre-spend refusal for ${slug}: ${msg}`);
     await logGenerationAudit({
       action: "image_redo_refused",

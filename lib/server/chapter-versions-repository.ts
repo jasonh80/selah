@@ -5,6 +5,7 @@ import type { ChapterWorkup } from "../types";
 import { getSupabaseAdmin } from "./supabase";
 import { chapterMutationDecision } from "./protected-chapters";
 import type { ChapterRowSnapshot } from "./protected-chapters";
+import { stripTransientJobControlKeys } from "./generation-jobs";
 
 const TABLE = "chapter_workup_versions";
 
@@ -52,7 +53,10 @@ export async function snapshotVersion(slug: string, label?: string): Promise<num
     version: next,
     label: label ?? null,
     status: (cur.data.status as string | null) ?? null,
-    workup_json: cur.data.workup_json,
+    // Job-control keys (text/image/redo claims) describe the LIVE row, never
+    // an archived draft — archiving them would let a later restore resurrect
+    // a dead claim or an already-decided redo candidate.
+    workup_json: stripTransientJobControlKeys(json),
   });
   if (ins.error) {
     console.error(`[selah] snapshotVersion(${slug}) failed:`, ins.error.message);
@@ -137,9 +141,15 @@ async function conditionalDraftWrite(
   workup: ChapterWorkup,
   expected: ChapterRowSnapshot | null,
 ): Promise<{ error: { message: string } | null }> {
+  // Restored archives (written before snapshot-time stripping landed) and
+  // browser-supplied merged drafts must never carry job-control keys into
+  // the live row — they could resurrect a dead claim or a decided candidate.
+  const cleaned = stripTransientJobControlKeys(
+    workup as unknown as Record<string, unknown>,
+  );
   let query = db
     .from("chapter_workups")
-    .update({ workup_json: workup, status: "draft", updated_at: new Date().toISOString() })
+    .update({ workup_json: cleaned, status: "draft", updated_at: new Date().toISOString() })
     .eq("slug", slug)
     .eq("status", expected?.status ?? "draft");
   if (expected?.updatedAt) query = query.eq("updated_at", expected.updatedAt);

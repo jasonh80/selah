@@ -246,6 +246,36 @@ const IMAGE_REDO_METADATA_KEYS = [
   IMAGE_REDO_ERROR_CODE_KEY,
 ] as const;
 
+/**
+ * Every transient job-control key that may live inside workup_json. Version
+ * snapshot/restore strip these (job state is a property of the LIVE row, never
+ * of an archived draft), and whole-workup writers refuse while any is active —
+ * otherwise a restore could erase a live paid claim or resurrect a dead one.
+ */
+export const TRANSIENT_JOB_CONTROL_KEYS = [
+  TEXT_JOB_KEY,
+  TEXT_JOB_STATE_KEY,
+  TEXT_JOB_MANIFEST_DIGEST_KEY,
+  ...IMAGE_JOB_METADATA_KEYS,
+  ...IMAGE_REDO_METADATA_KEYS,
+] as const;
+
+/** True when the row's workup_json carries ANY live job-control key. */
+export function hasTransientJobControlKeys(json: Record<string, unknown>): boolean {
+  return TRANSIENT_JOB_CONTROL_KEYS.some((key) =>
+    Object.prototype.hasOwnProperty.call(json, key),
+  );
+}
+
+/** Pure: a copy of the workup JSON with every job-control key removed. */
+export function stripTransientJobControlKeys(
+  json: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...json };
+  for (const key of TRANSIENT_JOB_CONTROL_KEYS) delete next[key];
+  return next;
+}
+
 const PAID_IMAGE_JOB_STATES = new Set(["queued", "running", "failed", "blocked"]);
 
 /**
@@ -1441,15 +1471,19 @@ export async function applyImageRedoCandidate(
 
 /**
  * Owner REJECTION / DISMISSAL: clear every redo key; the chapter is untouched.
- * Works on a reviewable "candidate" and on a "failed" redo (whose spend is
- * already durably recorded) so a failed attempt can never wedge the chapter.
- * "blocked" (cost not recorded) stays locked. The candidate file stays
- * orphaned in its immutable job directory (auditable, never served). Never
- * throws; false = nothing cleared.
+ * Works on a reviewable "candidate", on a "failed" redo (whose spend is
+ * already durably recorded), and on a STALE "queued" claim — one whose row
+ * revision is older than the worker-token TTL, so its signed token is
+ * provably expired and NO worker can ever consume it (consume is the only
+ * path to spend, so a stale queued claim is provably zero-spend). A live
+ * "queued"/"running" claim and "blocked" (cost not recorded) stay locked.
+ * The candidate file stays orphaned in its immutable job directory
+ * (auditable, never served). Never throws; false = nothing cleared.
  */
 export async function rejectImageRedoCandidate(
   store: JobStorePort,
   slug: string,
+  now = Date.now(),
 ): Promise<boolean> {
   let row: JobRow;
   try {
@@ -1460,7 +1494,18 @@ export async function rejectImageRedoCandidate(
   }
   const jobId = row.workupJson?.[IMAGE_REDO_JOB_KEY];
   const state = row.workupJson?.[IMAGE_REDO_STATE_KEY];
-  if (typeof jobId !== "string" || (state !== "candidate" && state !== "failed")) {
+  // No claim/terminal write between claim-time and now can have happened on a
+  // queued redo (every other claim refuses while it exists), so updated_at IS
+  // the claim time. Unparseable timestamps are never stale (fail closed).
+  const revisionMs = Date.parse(row.updatedAt ?? "");
+  const staleQueued =
+    state === "queued" &&
+    Number.isFinite(revisionMs) &&
+    now - revisionMs > JOB_TOKEN_TTL_MS;
+  if (
+    typeof jobId !== "string" ||
+    (state !== "candidate" && state !== "failed" && !staleQueued)
+  ) {
     return false;
   }
   const json = { ...row.workupJson };
@@ -1472,7 +1517,7 @@ export async function rejectImageRedoCandidate(
       updatedAt: row.updatedAt,
       json: [
         { key: IMAGE_REDO_JOB_KEY, equals: jobId },
-        { key: IMAGE_REDO_STATE_KEY, equals: state },
+        { key: IMAGE_REDO_STATE_KEY, equals: String(state) },
       ],
     },
     { workup_json: json, updated_at: new Date().toISOString() },
