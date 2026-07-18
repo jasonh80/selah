@@ -6,7 +6,8 @@
 // the approved manifest digest minted by the route that took the atomic claim.
 // The chosen generic/protected runner then atomically CONSUMES the claim
 // (queued → running) — a duplicated delivery loses at that conditional write,
-// before any paid model call. Refusals are durably audited, not just logged.
+// before any paid model call. Pre-auth refusals are console-only (IQ-005);
+// post-auth refusals are durably audited, not just logged.
 import {
   CONNECTED_PROTECTED_TEXT_SLUGS,
   generateAndStoreChapter,
@@ -65,6 +66,16 @@ async function auditWorkerRefusal(
   }
 }
 
+// PRE-AUTH refusals log to the console only (IQ-005, same rule as both image
+// workers): the function URL is publicly reachable, so writing durable audit
+// rows before the signature check would hand unauthenticated callers a
+// primitive to flood the audit table and bury the genuine refusal entries the
+// owner reviews. Post-auth refusals stay durably audited via refuse().
+function preAuthRefuse(slug: string, reason: string, status: number): Response {
+  console.error(`[selah] worker_generate refused${slug ? ` (${slug})` : ""}: ${reason}`);
+  return new Response(JSON.stringify({ ok: false, error: reason }), { status });
+}
+
 async function refuse(slug: string, reason: string, status: number): Promise<Response> {
   await auditWorkerRefusal({
     action: "refused:worker_generate",
@@ -117,25 +128,25 @@ async function cleanupProtectedMark8Claim(
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return refuse("", `method ${req.method} not allowed — worker accepts POST only`, 405);
+    return preAuthRefuse("", `method ${req.method} not allowed — worker accepts POST only`, 405);
   }
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const slug = typeof body.slug === "string" ? body.slug : "";
   const jobId = typeof body.job === "string" ? body.job : "";
   const token = typeof body.token === "string" ? body.token : "";
   if (body.approvedManifestDigest !== undefined && typeof body.approvedManifestDigest !== "string") {
-    return refuse(slug, "invalid approved manifest digest — refusing unauthenticated work", 400);
+    return preAuthRefuse(slug, "invalid approved manifest digest — refusing unauthenticated work", 400);
   }
   const approvedManifestDigest = body.approvedManifestDigest as string | undefined;
   if (!slug || !jobId) {
-    return refuse(slug, "missing slug or job id — refusing unclaimed work", 400);
+    return preAuthRefuse(slug, "missing slug or job id — refusing unclaimed work", 400);
   }
   if (
     CONNECTED_PROTECTED_SLUGS.includes(slug) &&
     (approvedManifestDigest === undefined ||
       !LOWERCASE_SHA256.test(approvedManifestDigest))
   ) {
-    return refuse(
+    return preAuthRefuse(
       slug,
       "protected chapters require an exact approved manifest digest",
       400,
@@ -143,7 +154,7 @@ export default async (req: Request) => {
   }
   const auth = verifyJobToken("text", slug, jobId, token, undefined, approvedManifestDigest);
   if (!auth.ok) {
-    return refuse(slug, `job token rejected (${auth.reason}) — refusing unauthenticated work`, 401);
+    return preAuthRefuse(slug, `job token rejected (${auth.reason}) — refusing unauthenticated work`, 401);
   }
 
   // Protected sprint chapters can never fall through to the generic generator.
