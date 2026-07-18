@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 export const THEMES = [
   { id: "air", label: "Air", swatch: "#7e97b5" },
@@ -23,23 +23,32 @@ const ThemeContext = createContext<{
 }>({ theme: DEFAULT_THEME, setTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Lazy init from a saved preference (client) to avoid a theme flash.
-  const [theme, setTheme] = useState<ThemeId>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("selah-theme") as ThemeId | null;
-      if (saved) return saved;
-    }
-    return DEFAULT_THEME;
-  });
+  // IQ-009: the first client render must MATCH the server render, so state
+  // starts at the default on both — a lazy localStorage init here made the
+  // saved theme leak into hydration (header label "Starlight" vs "Garden")
+  // and threw React #425/#418/#423 on every chapter load for anyone with a
+  // saved non-default theme. The pre-hydration inline script in app/layout
+  // already sets <html data-theme> from localStorage BEFORE first paint, so
+  // colors never flash; only the theme *label* updates after mount, exactly
+  // like the version and reading-mode providers already behave.
+  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
 
-  // Restore saved theme (covers any post-mount case)
+  // Restore saved theme after mount (hydration-safe).
   useEffect(() => {
     const saved = localStorage.getItem("selah-theme") as ThemeId | null;
-    if (saved) setTheme(saved);
+    if (saved && THEMES.some((t) => t.id === saved)) setTheme(saved);
   }, []);
 
-  // Reflect to <html data-theme> + persist
+  // Reflect to <html data-theme> + persist — but SKIP the first run: at that
+  // point state is still the default while the inline script already painted
+  // the saved theme; writing here would flash the default over it (and write
+  // the default into localStorage over the saved preference).
+  const reflected = useRef(false);
   useEffect(() => {
+    if (!reflected.current) {
+      reflected.current = true;
+      return;
+    }
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("selah-theme", theme);
   }, [theme]);
