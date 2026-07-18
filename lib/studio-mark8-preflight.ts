@@ -6,7 +6,9 @@ export const MARK_8_STUDIO_SLUG = "mark-8" as const;
 // 2026-07-16) — connection alone authorizes NOTHING: every write still needs
 // the owner's digest-bound receipt, and Mark 9's receipt only exists after he
 // approves the on-screen packet.
-export const CONNECTED_STUDIO_SLUGS = ["mark-8", "mark-7", "mark-9"] as const;
+// Mark 10 is connected the same way (board #29 Codex handoff, 2026-07-18):
+// its receipt only exists after the owner approves the on-screen packet.
+export const CONNECTED_STUDIO_SLUGS = ["mark-8", "mark-7", "mark-9", "mark-10"] as const;
 export type ConnectedStudioSlug = (typeof CONNECTED_STUDIO_SLUGS)[number];
 export function isConnectedStudioSlug(value: string): value is ConnectedStudioSlug {
   return (CONNECTED_STUDIO_SLUGS as readonly string[]).includes(value);
@@ -16,6 +18,7 @@ const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
   "mark-8": 8,
   "mark-7": 7,
   "mark-9": 9,
+  "mark-10": 10,
 };
 
 // Verse-instance totals for each chapter's protected ESV window (the chapter
@@ -29,10 +32,14 @@ const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
 // 138. UNVERIFIED against the live ESV API (no key offline) — the source-load
 // preflight validates the real count before any credit is spent, so a wrong
 // number here fails closed with a plain blocker, never a bad draft.
+// Mark 10's window (Mark 9–11) the same way: Mark 9 = 48 (omits 9:44, 9:46),
+// Mark 10 = 52, Mark 11 = 32 (omits the disputed 11:26) → 132. Equally
+// UNVERIFIED offline; the live preflight validates before any spend.
 const WINDOW_VERSE_INSTANCES: Record<ConnectedStudioSlug, number> = {
   "mark-8": 125,
   "mark-7": 130,
   "mark-9": 138,
+  "mark-10": 132,
 };
 
 export function connectedChapterLabel(slug: ConnectedStudioSlug): string {

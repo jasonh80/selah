@@ -274,32 +274,44 @@
         {
           "id": "M10-M01",
           "startVerse": 1,
-          "endVerse": 12
+          "endVerse": 12,
+          "name": "Marriage from the beginning",
+          "reason": "Pharisees test Jesus on divorce; he points past Moses' concession to God's design from the beginning — 'what God has joined together' (10:9)."
         },
         {
           "id": "M10-M02",
           "startVerse": 13,
-          "endVerse": 16
+          "endVerse": 16,
+          "name": "Let the children come",
+          "reason": "The disciples turn children away; Jesus receives them and makes receiving the kingdom like a child the way in (10:15)."
         },
         {
           "id": "M10-M03",
           "startVerse": 17,
-          "endVerse": 31
+          "endVerse": 31,
+          "name": "The wealthy man's question",
+          "reason": "A wealthy man goes away sorrowful; the astonished disciples hear 'all things are possible with God' (10:27) and of the hundredfold that comes 'with persecutions' (10:30)."
         },
         {
           "id": "M10-M04",
           "startVerse": 32,
-          "endVerse": 34
+          "endVerse": 34,
+          "name": "The third passion prediction",
+          "reason": "On the road up to Jerusalem, Jesus tells the Twelve in the fullest detail yet what awaits the Son of Man (10:33-34)."
         },
         {
           "id": "M10-M05",
           "startVerse": 35,
-          "endVerse": 45
+          "endVerse": 45,
+          "name": "The cup and the ransom",
+          "reason": "James and John ask for the seats of glory; Jesus answers with his cup, servant greatness, and the Son of Man's life given as a ransom for many (10:45)."
         },
         {
           "id": "M10-M06",
           "startVerse": 46,
-          "endVerse": 52
+          "endVerse": 52,
+          "name": "Bartimaeus sees",
+          "reason": "Blind Bartimaeus cries out by the Jericho road and will not be silenced; 'your faith has made you well' (10:52), and he follows Jesus on the way."
         }
       ],
       "manual_guardrails": [
@@ -309,7 +321,37 @@
         "Do not invent the wealthy man's motives, later fate, office, or age.",
         "Do not portray Bartimaeus through fabricated diagnosis or disability spectacle."
       ],
-      "textual_variants": []
+      "textual_variants": [],
+      "locations": [
+        {
+          "name": "Judea and beyond the Jordan",
+          "featureKind": "region",
+          "certainty": "known",
+          "role": "context",
+          "display": "Jesus teaches in the region of Judea and beyond the Jordan (10:1) — broad first-century regional context with an approximate boundary; no pin for any teaching scene, and modern borders are never projected backward."
+        },
+        {
+          "name": "Jericho",
+          "featureKind": "point",
+          "certainty": "known",
+          "role": "event",
+          "display": "Known city on the road up to Jerusalem; Bartimaeus is healed as Jesus leaves it (10:46). The city is a point — the healing roadside itself is not pinned."
+        },
+        {
+          "name": "Jerusalem",
+          "featureKind": "point",
+          "certainty": "known",
+          "role": "context",
+          "display": "The named destination of the road (10:32-33); shown as a point for orientation — nothing in this chapter happens there yet."
+        },
+        {
+          "name": "Road up to Jerusalem",
+          "featureKind": "route",
+          "certainty": "probable",
+          "role": "context",
+          "display": "They were on the road going up to Jerusalem (10:32) — the sequence of places is given by the text but the road is unrecorded, so only a broad stylized corridor is shown, never a precise line, and no event along it is pinned."
+        }
+      ]
     },
     "mark-11": {
       "book": "Mark",

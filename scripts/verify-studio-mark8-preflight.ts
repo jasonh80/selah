@@ -559,10 +559,11 @@ async function main(): Promise<void> {
     assert.equal(unauthorized.status, 401);
     assert.equal(loaderCalls, 0);
 
-    // mark-10 is the non-connected example now that mark-9 joined the
-    // connected flow via the Prepare Chapter screen (owner decision A5).
+    // mark-11 is the non-connected example now that mark-10 joined the
+    // connected flow (board #29 handoff, 2026-07-18; mark-9 joined via owner
+    // decision A5).
     const wrongSlug = await route.POST(
-      adminRequest({ action: "mark_sprint_prepare", slug: "mark-10" }),
+      adminRequest({ action: "mark_sprint_prepare", slug: "mark-11" }),
     );
     assert.equal(wrongSlug.status, 400);
     assert.equal(loaderCalls, 0);
@@ -892,7 +893,15 @@ async function verifyMark7Enablement(): Promise<void> {
       kind: "locked",
     });
 
-    for (const unknownSlug of ["mark-8", "mark-10", "exodus-27"]) {
+    const lockedMark10 = await route.POST(
+      adminRequest({ action: "mark_sprint_setup_status", slug: "mark-10" }),
+    );
+    assert.equal(lockedMark10.status, 200);
+    assert.deepEqual(decideMarkSprintStudioSetup("mark-10", await lockedMark10.json()), {
+      kind: "locked",
+    });
+
+    for (const unknownSlug of ["mark-8", "mark-11", "exodus-27"]) {
       const refusedStatus = await route.POST(
         adminRequest({ action: "mark_sprint_setup_status", slug: unknownSlug }),
       );

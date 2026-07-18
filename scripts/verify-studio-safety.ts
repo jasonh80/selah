@@ -1616,7 +1616,7 @@ const realRouteAndWorkers = async () => {
         // The proposal is read-only, exact, and only for factory chapters.
         const unauth = await adminPost(adminReq({ action: "prepare_chapter_status", slug: "mark-9" }, "wrong-token"));
         ok(unauth.status === 401, "R2e prepare status requires the studio key");
-        for (const refusedSlug of ["mark-10", "mark-11", "exodus-27", "mark-09"]) {
+        for (const refusedSlug of ["mark-11", "exodus-27", "mark-09"]) {
           const res = await adminPost(adminReq({ action: "prepare_chapter_status", slug: refusedSlug }));
           ok(res.status === 400, `R2e ${refusedSlug} has no on-screen preparation`);
         }
@@ -1748,6 +1748,65 @@ const realRouteAndWorkers = async () => {
         store.rows.delete("mark-9");
         lastTrigger = null;
         __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+
+        // R2h (board #29 handoff, 2026-07-18): Mark 10 is connected exactly
+        // like Mark 9 — the same locked → proposal → digest-bound approval →
+        // setup → generate chain, with NOTHING pre-approved in code.
+        {
+          const m10 = buildMarkSprintSetupContract("mark-10");
+          ok(!connectedChapterReceiptApplies("mark-10"), "R2h Mark 10 has no code-literal receipt");
+          ok(!(await connectedChapterReceiptAppliesIncludingStored("mark-10")), "R2h Mark 10 starts unreceipted (locked)");
+
+          const m10Status = await adminPost(adminReq({ action: "prepare_chapter_status", slug: "mark-10" }));
+          ok(m10Status.status === 200, "R2h the Mark 10 proposal is served");
+          const m10Prop = ((await m10Status.json()) as { prepare: Record<string, unknown> }).prepare;
+          ok(m10Prop.approved === false, "R2h Mark 10 starts unapproved");
+          ok(m10Prop.setupDigest === m10.setupDigest, "R2h the Mark 10 proposal carries the exact contract digest");
+          ok(Array.isArray(m10Prop.notes) && m10Prop.notes.length === 10, "R2h the Mark 10 proposal shows all 10 notes");
+          ok(Array.isArray(m10Prop.movements) && m10Prop.movements.length === 6, "R2h the Mark 10 proposal shows all 6 movements");
+          ok(
+            (m10Prop.movements as Array<Record<string, unknown>>).every(
+              (movement) =>
+                typeof movement.name === "string" && movement.name.trim().length > 0 &&
+                typeof movement.reason === "string" && movement.reason.trim().length > 0,
+            ),
+            "R2h every Mark 10 movement card carries a real name and reason — no 'Untitled movement'",
+          );
+
+          const m10Drifted = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-10", confirm: true, setupDigest: "0".repeat(64) }));
+          ok(m10Drifted.status === 409, "R2h Mark 10 approve with a drifted digest → 409");
+          ok(!approvalRows.has("mark-10"), "R2h a refused Mark 10 approval records NO row");
+
+          const m10Approved = await adminPost(adminReq({ action: "prepare_chapter_approve", slug: "mark-10", confirm: true, setupDigest: m10.setupDigest, baseSetupDigest: m10.setupDigest }));
+          ok(m10Approved.status === 500, "R2h Mark 10 offline setup after approval fails closed");
+          ok(approvalRows.has("mark-10"), "R2h the Mark 10 owner approval row was recorded");
+          ok(await connectedChapterReceiptAppliesIncludingStored("mark-10"), "R2h the recorded row IS the Mark 10 receipt");
+          ok(!connectedChapterReceiptApplies("mark-10"), "R2h the sync code-literal gate stays false for Mark 10");
+
+          // Receipted mark-10 queues through the REAL route: allowlisted only
+          // after every check passed, authenticated trigger sent.
+          lastTrigger = null;
+          const m10Queued = await adminPost(adminReq({ action: "generate", slug: "mark-10", confirm: true, approvedManifestDigest: MANIFEST_DIGEST_A }));
+          ok(
+            m10Queued.status === 200 && lastTrigger !== null && store.rows.has("mark-10"),
+            "R2h a stored-receipted Mark 10 queues through the real route",
+          );
+          ok(
+            (await getGenerationSettings()).allowed_slugs.includes("mark-10"),
+            "R2h Mark 10 is allowlisted only after its stored receipt passed",
+          );
+          // A Mark 10 approval can never serve another chapter, and Mark 11
+          // (still unconnected) stays refused with a relabeled approval.
+          const m10Approval = approvalRows.get("mark-10")!;
+          ok(
+            !protectedChapterServeAllowed("mark-11", completedSprintWorkup("mark-11"), { ...m10Approval, slug: "mark-11" } as never),
+            "R2h a Mark 10 approval can never serve Mark 11",
+          );
+          store.rows.delete("mark-10");
+          approvalRows.delete("mark-10");
+          lastTrigger = null;
+          __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+        }
 
         // R2g (PR #40 review, items 5+6): inline note editing. The owner's
         // edited packet is digest-previewed, bound into the approval row, and
@@ -1882,21 +1941,22 @@ const realRouteAndWorkers = async () => {
         }
 
         // The blocker-1 pollution regression, generalized: a chapter with a
-        // stored-looking receipt that is NOT runnable-connected (mark-10) is
-        // refused BEFORE the allowlist write — the refusal leaves settings,
-        // claims, and triggers untouched.
-        __setConnectedReceiptOverridesForTesting({ "mark-10": true });
+        // stored-looking receipt that is NOT runnable-connected (mark-11 now
+        // that mark-10 joined, board #29 handoff 2026-07-18) is refused
+        // BEFORE the allowlist write — the refusal leaves settings, claims,
+        // and triggers untouched.
+        __setConnectedReceiptOverridesForTesting({ "mark-11": true });
         try {
           const pollutionSettings = { ...TEST_SETTINGS, allowed_slugs: [GENERIC_SLUG] };
           __setGenerationTestOverrides({ settings: pollutionSettings, captureAudit: audit });
-          const refusedMark10 = await adminPost(adminReq({ action: "generate", slug: "mark-10", confirm: true, approvedManifestDigest: MANIFEST_DIGEST_A }));
-          ok(refusedMark10.status === 403, "R2e non-runnable mark-10 is refused even with a receipt");
+          const refusedMark11 = await adminPost(adminReq({ action: "generate", slug: "mark-11", confirm: true, approvedManifestDigest: MANIFEST_DIGEST_A }));
+          ok(refusedMark11.status === 403, "R2e non-runnable mark-11 is refused even with a receipt");
           ok(
-            !(await getGenerationSettings()).allowed_slugs.includes("mark-10"),
-            "R2e the pre-write refusal never persists mark-10 in allowed_slugs",
+            !(await getGenerationSettings()).allowed_slugs.includes("mark-11"),
+            "R2e the pre-write refusal never persists mark-11 in allowed_slugs",
           );
           ok(
-            !store.rows.has("mark-10") && lastTrigger === null,
+            !store.rows.has("mark-11") && lastTrigger === null,
             "R2e the pre-write refusal makes no claim and no trigger",
           );
         } finally {
@@ -2232,14 +2292,17 @@ const realRouteAndWorkers = async () => {
       __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
     }
 
-    // R5d. The actual worker refuses unconnected Mark 10–11 before either
-    // generator runs. Mark 9 is runnable-connected now (PR #40 review,
-    // blocker 1) but still stops safely before any generator when its live
-    // permission (allowlist/kill switch) is missing.
+    // R5d. The actual worker refuses unconnected Mark 11 before either
+    // generator runs (Mark 10 is runnable-connected now, board #29 handoff
+    // 2026-07-18: its route chain is R2h, and its worker-level permission
+    // recheck is exercised below alongside Mark 9's). Mark 9 is
+    // runnable-connected (PR #40 review, blocker 1) but still stops safely
+    // before any generator when its live permission (allowlist/kill switch)
+    // is missing.
     {
       const callsBefore = textGeneratorCalls;
       const protectedBefore = protectedRunnerCalls;
-      for (const blockedSlug of ["mark-10", "mark-11"]) {
+      for (const blockedSlug of ["mark-11"]) {
         const job = `offline-${blockedSlug}-job`;
         const token = signJobToken(
           "text",
@@ -2291,6 +2354,42 @@ const realRouteAndWorkers = async () => {
       );
       __setConnectedReceiptOverridesForTesting(null);
       store.rows.delete("mark-9");
+      // mark-10, connected the same way (board #29 handoff 2026-07-18), gets
+      // the SAME worker-level guarantee: the route queues it with a receipt,
+      // and the worker's live permission recheck stops it cold when that
+      // permission is gone — a slug-specific worker regression cannot hide.
+      lastTrigger = null;
+      __setConnectedReceiptOverridesForTesting({ "mark-10": true });
+      __setGenerationTestOverrides({
+        settings: { ...TEST_SETTINGS, allowed_slugs: [GENERIC_SLUG, "mark-8", "mark-10"] },
+        captureAudit: audit,
+      });
+      const queuedMark10 = await adminPost(adminReq({
+        action: "generate",
+        slug: "mark-10",
+        confirm: true,
+        approvedManifestDigest: MANIFEST_DIGEST_A,
+      }));
+      ok(
+        queuedMark10.status === 200 && lastTrigger !== null,
+        "R5d receipted + allowlisted mark-10 queues through the real route",
+      );
+      __setGenerationTestOverrides({ settings: TEST_SETTINGS, captureAudit: audit });
+      const mark10Response = await textWorker(workerReq(
+        "generate-chapter-background",
+        { ...lastTrigger!.body },
+      ));
+      ok(
+        mark10Response.status === 403,
+        "R5d unpermitted mark-10 stops at the worker's live permission recheck",
+      );
+      ok(
+        store.rows.get("mark-10")!.status === "failed",
+        "R5d the unpermitted mark-10 queued claim was safely failed",
+      );
+      __setConnectedReceiptOverridesForTesting(null);
+      store.rows.delete("mark-10");
+      lastTrigger = null;
       ok(textGeneratorCalls === callsBefore, "R5d Mark 9–11 never reached generic generation");
       ok(protectedRunnerCalls === protectedBefore, "R5d Mark 9–11 never reached the Mark 8 runner");
     }
