@@ -315,19 +315,52 @@ export const MARK_7_SETUP_CONTRACT = buildMarkSprintSetupContract("mark-7");
 // manual_guardrails and location entries. NO bound content changed — the
 // exact notes (notes_digest is byte-identical), movements, verse count, and
 // variants the owner approved are unchanged; the projection now additionally
-// freezes the watch-outs it always displayed. This re-mint ships inside PR
+// freezes the watch-outs it always displayed. That re-mint shipped inside PR
 // #40 for Codex re-review and the owner's merge, which is the human approval
 // of the strengthened binding.
+//
+// RE-MINTED 2026-07-17 (maps config lane, PR #41): five honest Mark 7
+// location entries were ADDED to the bound acceptance fixture — bound content
+// DID change. After Codex's PR #41 review rejected the first (compressed)
+// certainty model and its unevidenced approval claim, the corrected two-axis
+// entries (Gennesaret/Tyre/Sidon known context points; Decapolis a known
+// region with approximate boundary and no healing-site pin; the 7:31 route
+// unknown and never drawn) were presented to the owner in plain English in
+// the working session on 2026-07-17 and approved as shown ("Approve as
+// shown"); the approval is memorialized in the PR #41 thread. notes_digest
+// stays byte-identical (no note changed). Codex re-reviews the exact head
+// and the owner takes the rendered-map look before merge.
+//
+// AMENDED same day (owner, 2026-07-17, memorialized on PR #41): the 7:31
+// route entry moved unknown → probable ("broad sweep shown, never a precise
+// line") after the owner asked to SEE rough A→B→C movement — which is what
+// the chapter's own guardrail ("a broad possible route, never a false
+// precise line") always specified. Digests re-minted for that one entry;
+// notes_digest unchanged.
+/**
+ * The moment the BOUND CONTENT of the Mark 7 receipt last changed (the
+ * corridor amendment re-mint, memorialized on PR #41). Whenever a re-mint
+ * changes bound content, update BOTH this constant and `approved_at` below
+ * to the new owner decision — verify:maps-honesty fails if `approved_at`
+ * predates this, so a re-mint can never silently ride an old approval date
+ * (PR #41 review, P1).
+ */
+export const MARK_7_BOUND_CONTENT_CHANGED_AT = "2026-07-17T03:44:41Z";
+
 export const MARK_7_STUDIO_SETUP_APPROVAL: MarkSprintStudioSetupApproval | null = {
   scope: "private_studio_mark7_guidance_and_notes",
   slug: "mark-7",
   approved_by: "Jason Hales (owner)",
-  approved_at: "2026-07-15T17:07:48Z",
+  // The LATEST owner decision this receipt records: the 2026-07-17 in-session
+  // approval of the corrected two-axis entries + the same-day corridor
+  // amendment (memorialized on PR #41). The original 2026-07-15 approval and
+  // the full trail live in the evidence text.
+  approved_at: "2026-07-17T03:44:41Z",
   evidence:
-    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged).",
-  guidance_digest: "db23ddec78f4b960ab0bc13b47b61d3b2ad959c3987eb9ab0c2bce732a1dd865",
+    "Owner approved the Codex-specced Mark 7 movements and guidance before the PR #30 preload, then directed this session to complete the note seeding and record his approval receipt ahead of the authorized one-text-run/one-image-run launch; no guidance or source-policy change beyond admitting Mark 7. Digests re-minted in PR #40 when the projection additionally bound the displayed watch-outs and locations (content unchanged), and again 2026-07-17 when the owner approved the corrected two-axis Mark 7 location entries and, later the same day, the broad-corridor amendment for the 7:31 route (matching the chapter guardrail), both in the working session and memorialized on PR #41 (maps config lane; notes unchanged).",
+  guidance_digest: "023a0fcd01f9a12e9174009cd940123a897688d930b4eb802a55c3ee78f47948",
   notes_digest: "8c404ddcfa1cc3ff834a76fbf4f285f2f472d09c62e8c5366fe8d27c9d262c52",
-  receipt_digest: "895e4c6738ab7c0b19ae1cb2578903608579d53ff014db9b942d6ed0bef2c4e9",
+  receipt_digest: "6ffdce370768aeadae1d15cf935032ef332a4753287c00d876b91b2672467e99",
 };
 
 // ---- connected-chapter receipt gate ------------------------------------------

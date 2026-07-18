@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   PREPARE_NOTE_GROUPS,
+  prepareLocationBadge,
   prepareNotesEdited,
   prepareSummaryLine,
   type PrepareChapterViewModel,
@@ -50,12 +51,6 @@ export function PrepareChapterScreen({
     notes: proposal.notes.filter((note) => note.group === group),
   })).filter((entry) => entry.notes.length > 0);
 
-  const certaintyLabel = (certainty: "known" | "debated" | "none") =>
-    certainty === "known"
-      ? "Known site"
-      : certainty === "debated"
-        ? "Debated area"
-        : "No pin";
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
@@ -190,7 +185,7 @@ export function PrepareChapterScreen({
                   key={location.name}
                   className="rounded-md border bg-card px-3 py-2 text-[13px]"
                 >
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex flex-wrap items-baseline gap-2">
                     <span className="font-semibold text-primary">{location.name}</span>
                     <span
                       className={`rounded-full border px-2 py-0.5 text-[11px] ${
@@ -199,8 +194,13 @@ export function PrepareChapterScreen({
                           : "text-secondary"
                       }`}
                     >
-                      {certaintyLabel(location.certainty)}
+                      {prepareLocationBadge(location)}
                     </span>
+                    {location.role === "context" && (
+                      <span className="rounded-full border px-2 py-0.5 text-[11px] text-secondary">
+                        context
+                      </span>
+                    )}
                   </div>
                   <p className="mt-0.5 text-[12px] leading-relaxed text-secondary">
                     {location.display}

@@ -8,8 +8,13 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 export const PREPARE_NOTE_GROUPS = ["Teaching", "Caution", "Image", "Map"] as const;
 export type PrepareNoteGroupName = (typeof PREPARE_NOTE_GROUPS)[number];
 
-export const PREPARE_LOCATION_CERTAINTIES = ["known", "debated", "none"] as const;
-export type PrepareLocationCertainty = (typeof PREPARE_LOCATION_CERTAINTIES)[number];
+export {
+  PREPARE_CERTAINTIES as PREPARE_LOCATION_CERTAINTIES,
+  prepareLocationBadge,
+  type PrepareCertainty as PrepareLocationCertainty,
+  type PrepareLocation,
+} from "./prepare-locations";
+import { normalizePrepareLocation, type PrepareLocation as PrepareLocationEntry } from "./prepare-locations";
 
 export interface PrepareChapterViewModel {
   slug: string;
@@ -26,11 +31,9 @@ export interface PrepareChapterViewModel {
   notes: Array<{ id: string; text: string; group: PrepareNoteGroupName }>;
   watchouts: string[];
   textualVariants: string[];
-  locations: Array<{
-    name: string;
-    certainty: PrepareLocationCertainty;
-    display: string;
-  }>;
+  // Two-axis location entries (PR #41 review), normalized/validated via
+  // normalizePrepareLocation — the screen renders only allowed combinations.
+  locations: PrepareLocationEntry[];
   proposedBy: {
     packetId: string;
     packetVersion: string;
@@ -105,15 +108,9 @@ export function decidePrepareChapterStatus(
       )
     : [];
   const locations = Array.isArray(p.locations)
-    ? p.locations.filter(
-        (l): l is { name: string; certainty: PrepareLocationCertainty; display: string } =>
-          Boolean(l) &&
-          typeof (l as { name?: unknown }).name === "string" &&
-          (PREPARE_LOCATION_CERTAINTIES as readonly string[]).includes(
-            String((l as { certainty?: unknown }).certainty),
-          ) &&
-          typeof (l as { display?: unknown }).display === "string",
-      )
+    ? p.locations
+        .map((l) => normalizePrepareLocation(l))
+        .filter((l): l is PrepareLocationEntry => l !== null)
     : [];
   if (
     p.slug !== slug ||

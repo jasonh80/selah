@@ -16,6 +16,18 @@ export interface MapPin {
   x: number;
   y: number;
   label: string;
+  /** Name of the digest-bound Prepare location entry this pin renders
+   * (mark-sprint-acceptance fixture). Verified by verify:maps-honesty:
+   * only featureKind "point" (always certainty "known") may carry a pin. */
+  locationName?: string;
+  /** Marks a background/context pin (not a chapter event location). In
+   * chapters with approved location entries, EVERY pin must be classified —
+   * locationName or context — and a context pin may never use an approved
+   * location's name. Enforced by verify:maps-honesty. */
+  context?: boolean;
+  /** Which side of the dot the label renders on (default "right"). Use
+   * "left" to keep close-together pins readable. */
+  labelSide?: "left" | "right";
 }
 export interface MapLabel {
   x: number;
@@ -33,12 +45,25 @@ export interface MapRegion {
   lx?: number;
   ly?: number;
   approx?: boolean;
+  /** Name of the digest-bound Prepare location entry this area renders.
+   * Verified by verify:maps-honesty: only featureKind "region" may carry a
+   * glow area; it must be marked approx and its label must carry the
+   * certainty qualifier (approx./probable/debated). */
+  locationName?: string;
+  /** Marks a background/context area. Same classification rule as MapPin. */
+  context?: boolean;
 }
 export interface MapPath {
   points: [number, number][];
   label?: string;
   lx?: number;
   ly?: number;
+  /** Name of the digest-bound Prepare ROUTE entry this line renders. In
+   * chapters with approved location entries, EVERY path must reference a
+   * featureKind "route" entry with certainty "known" — known endpoints never
+   * make the connecting road known, and an unknown route (e.g. Mark 7:31)
+   * may never be drawn. Enforced by verify:maps-honesty. */
+  locationName?: string;
 }
 // Curated boundary/territory layer. Coordinates are authored in IMAGE space
 // (percent of the base image) for now; the same shape maps cleanly to GeoJSON
@@ -105,6 +130,13 @@ export interface ChapterMapConfig {
   local?: LocalConfig;
   streetView?: StreetViewConfig;
 }
+
+// Event-location treatment derives from the owner-approved TWO-AXIS model in
+// lib/prepare-locations.ts (PR #41 review): featureKind (point/region/route/
+// text-only) decides the shape, certainty (known/probable/debated/unknown)
+// rides the label as an honesty qualifier, and role separates event places
+// from orientation context. A map may never contradict an approved entry —
+// enforced by verify:maps-honesty.
 
 const ESRI = "Imagery © Esri, Maxar, Earthstar Geographics";
 
@@ -306,6 +338,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
       attribution: "Google Street View (official API, planned)",
     },
   },
+
 };
 
 export function getChapterMap(slug: string): ChapterMapConfig | null {

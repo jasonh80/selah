@@ -17,6 +17,10 @@ import { markSprintChapterLabel } from "./mark-sprint-studio-setup";
 import acceptanceArtifact from "../ai/quality/mark-sprint-acceptance.v1.json";
 import guidanceArtifact from "./mark-sprint-guidance.v1.json";
 import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
+import {
+  normalizePrepareLocation,
+  type PrepareLocation,
+} from "../prepare-locations";
 
 interface AcceptanceChapter {
   expected_verse_count: number;
@@ -29,7 +33,9 @@ interface AcceptanceChapter {
   }>;
   manual_guardrails?: string[];
   textual_variants?: string[];
-  locations?: Array<{ name: string; certainty: string; display: string }>;
+  // Raw fixture entries — legacy shape (Mark 9, bound byte-identical) or the
+  // two-axis shape; validated + normalized via normalizePrepareLocation.
+  locations?: Array<Record<string, unknown>>;
 }
 
 const acceptance = acceptanceArtifact as unknown as {
@@ -44,7 +50,7 @@ const guidance = guidanceArtifact as unknown as {
 
 export type PrepareNoteGroup = "Teaching" | "Caution" | "Image" | "Map";
 
-export const LOCATION_CERTAINTIES = ["known", "debated", "none"] as const;
+export { PREPARE_CERTAINTIES as LOCATION_CERTAINTIES } from "../prepare-locations";
 
 export interface PrepareChapterProposal {
   slug: string;
@@ -65,9 +71,11 @@ export interface PrepareChapterProposal {
   notes: Array<{ id: string; text: string; group: PrepareNoteGroup }>;
   watchouts: string[];
   textualVariants: string[];
-  // Honest location entries with the approved certainty model: a "known"
-  // point, a "debated" area, or "none" (no pin) — never an invented pin.
-  locations: Array<{ name: string; certainty: string; display: string }>;
+  // Honest location entries, normalized to the owner-approved two-axis model
+  // (PR #41 review): featureKind (point/region/route/text-only) × certainty
+  // (known/probable/debated/unknown) + role (event/context) — geometry never
+  // derived from certainty alone, never an invented pin.
+  locations: PrepareLocation[];
   // Where this proposal came from (PR #40 review, item 5): the Selah Brain
   // preparation flow — reviewed packet + Brain library — not ad-hoc code.
   proposedBy: {
@@ -113,9 +121,9 @@ export function buildPrepareChapterProposal(
     packetNotes,
   );
   if (contract.notes.length !== contract.expectedNoteCount) return null;
-  const locations = (chapter.locations ?? []).filter((location) =>
-    (LOCATION_CERTAINTIES as readonly string[]).includes(location.certainty),
-  );
+  const locations = (chapter.locations ?? [])
+    .map((location) => normalizePrepareLocation(location))
+    .filter((location): location is PrepareLocation => location !== null);
   if (locations.length !== (chapter.locations ?? []).length) return null;
   return {
     slug,
@@ -140,11 +148,7 @@ export function buildPrepareChapterProposal(
     })),
     watchouts: [...(chapter.manual_guardrails ?? [])],
     textualVariants: [...(chapter.textual_variants ?? [])],
-    locations: locations.map(({ name, certainty, display }) => ({
-      name,
-      certainty,
-      display,
-    })),
+    locations,
     proposedBy: {
       packetId: guidance.packet_id,
       packetVersion: guidance.version,
