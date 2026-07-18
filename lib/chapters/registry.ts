@@ -1,7 +1,10 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { exodus27Workup, LOCAL_SOURCE, type ChapterSource } from "@/lib/chapters/source";
 import { isSupabaseConfigured } from "@/lib/server/supabase";
-import { getChapterWorkupBySlug } from "@/lib/server/chapter-workups-repository";
+import {
+  getChapterWorkupBySlug,
+  listReviewedSlugsNewestFirst,
+} from "@/lib/server/chapter-workups-repository";
 
 /**
  * Resolves a global chapter workup with this priority:
@@ -14,7 +17,10 @@ import { getChapterWorkupBySlug } from "@/lib/server/chapter-workups-repository"
  * No OpenAI / generation here yet.
  */
 
-const TODAY_SLUG = "exodus-27";
+// Guaranteed local fallback when nothing published is servable (Supabase
+// unconfigured, unreachable, or empty). NOT the default any more — /today
+// serves the newest published chapter first (owner decision, 2026-07-17).
+const FALLBACK_SLUG = "exodus-27";
 
 // Known local chapters (seed for fallback + chapter listing).
 const seed = exodus27Workup();
@@ -53,8 +59,25 @@ export async function resolveChapter(slug: string): Promise<ResolvedChapter | nu
 }
 
 export async function resolveTodaysChapter(): Promise<ResolvedChapter> {
+  // Newest published chapter first ("newest" = greatest reviewed_at). Every
+  // candidate resolves through resolveChapter → getChapterWorkupBySlug, which
+  // enforces the protected-chapter serve guard — an unservable row is skipped,
+  // never served. Any failure falls through to the guaranteed local chapter.
+  if (isSupabaseConfigured()) {
+    try {
+      for (const slug of await listReviewedSlugsNewestFirst()) {
+        const resolved = await resolveChapter(slug);
+        if (resolved) return resolved;
+      }
+    } catch (e) {
+      console.warn(
+        "[selah] newest-published lookup failed, falling back:",
+        (e as Error).message,
+      );
+    }
+  }
   // Exodus 27 always exists locally, so this never returns null.
-  return (await resolveChapter(TODAY_SLUG))!;
+  return (await resolveChapter(FALLBACK_SLUG))!;
 }
 
 /** Back-compat: workup only (used where the source isn't needed). */

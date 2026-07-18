@@ -625,6 +625,33 @@ export async function getStudioChapterStatus(slug: string): Promise<StudioChapte
 
 /** Mark a chapter's generation as failed so it can be retried/reviewed. */
 
+/**
+ * Published (status=reviewed) slugs, newest publish first. /today walks this
+ * list through the GUARDED resolver (getChapterWorkupBySlug — which enforces
+ * the protected-chapter serve receipt) so the newest SERVABLE published
+ * chapter wins; slugs alone never bypass a serve guard. Empty when
+ * unconfigured or on error — callers fall back to the local chapter.
+ */
+export async function listReviewedSlugsNewestFirst(): Promise<string[]> {
+  const db = getSupabaseAdmin();
+  if (!db) {
+    warnSupabaseMissing("listReviewedSlugsNewestFirst");
+    return [];
+  }
+  const { data, error } = await db
+    .from(TABLE)
+    .select("slug,reviewed_at")
+    .eq("status", "reviewed")
+    .order("reviewed_at", { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error("[selah] listReviewedSlugsNewestFirst failed:", error.message);
+    return [];
+  }
+  return (data ?? [])
+    .map((row) => row.slug)
+    .filter((slug): slug is string => typeof slug === "string" && slug !== "");
+}
+
 /** All published workups (for browsing/sitemaps). Empty when unconfigured. */
 export async function listReadyChapterWorkups(): Promise<ChapterWorkup[]> {
   const db = getSupabaseAdmin();
