@@ -1,11 +1,10 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { HeroImage } from "@/components/chapter/HeroImage";
 import { MetadataChips } from "@/components/chapter/MetadataChips";
-import { VisualDashboardGrid } from "@/components/chapter/VisualDashboardGrid";
 import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
 import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
-import { InsightCardGrid } from "@/components/chapter/InsightCardGrid";
+import { InsightCards } from "@/components/chapter/InsightCardGrid";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GeoMapSection } from "@/components/chapter/GeoMapSection";
@@ -43,35 +42,44 @@ export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) 
           <ChapterTopControls data={data} />
         </div>
 
+        {/* Owner layout order (2026-07-19 "mix up"): every text box full
+            width; duplicate boxes removed (WMPM card, World-Behind-It card,
+            the Deep Dive rail/header, the half-page dashboard grid). */}
         <div className="space-y-s3">
           <HeroImage data={data} />
           <QuickSummaryCard data={data} />
           <MetadataChips data={data} />
           <CompactPreviewRow data={data} />
-        </div>
-
-        {/* The chapter as a visual walk, with its scene checks attached */}
-        <div className="space-y-s3">
-          <VisualChapterPath data={data} />
+          {/* Scene check(s) not bound to a path image sit right here, under
+              the top block — paired with the hero directly above. */}
           <SceneCheckSection data={data} />
         </div>
 
-        {/* The freshest insights, adjacent (spec §14) */}
-        <div className="space-y-s3">
-          <MostPeopleMissSection data={data} />
-          <WhatPeopleAskSection data={data} />
-        </div>
+        {/* The visual walk: each image with ITS scene check attached */}
+        <VisualChapterPath data={data} />
 
-        <div className="space-y-s3">
-          <VisualDashboardGrid data={data} />
-          <TimelineSection data={data} />
-        </div>
+        <TimelineSection data={data} />
+        <MostPeopleMissSection data={data} />
+        <InsightCards data={data} titles={["Jesus at the Center"]} />
 
-        <AuthorAudienceEvidence data={data} />
-        <InsightCardGrid data={data} />
-        {/* Real-map engine for chapters with geo configs (owner decision
-            2026-07-17); older chapters keep the static maps until migrated. */}
+        {/* Maps, with the expandable Map Notes card directly beneath */}
         {getGeoChapterMap(data.slug) ? <GeoMapSection data={data} /> : <MapsSection data={data} />}
+        <InsightCards data={data} titles={["Map Notes"]} />
+
+        <InsightCards data={data} titles={["Big Idea", "Chapter Flow"]} />
+        <AuthorAudienceEvidence data={data} />
+        <InsightCards
+          data={data}
+          exclude={[
+            "Jesus at the Center",
+            "Map Notes",
+            "Big Idea",
+            "Chapter Flow",
+            "What Most People Miss",
+            "The World Behind It",
+          ]}
+        />
+        <WhatPeopleAskSection data={data} />
         <ChaptersSection data={data} />
 
         <footer className="flex flex-col items-center gap-s2 pt-s2 text-center">

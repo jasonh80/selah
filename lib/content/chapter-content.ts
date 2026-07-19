@@ -175,6 +175,35 @@ export function integratedSceneChecks<T extends { title: string }>(
   return byKind;
 }
 
+/** Owner layout direction (2026-07-19): EVERY scene check pairs with an
+ * image. Kind-matching first (exact), then remaining checks fill scenes
+ * without one, in order; whatever still remains renders standalone directly
+ * under the top block (typically a hero-bound check). Both the path and the
+ * standalone section use THIS one assignment so no check is dropped or
+ * doubled. */
+export function assignSceneChecks<T extends { title: string }>(
+  slug: string,
+  checks: readonly T[],
+  orderedSceneKinds: readonly string[],
+): { forScene: Map<string, T>; standalone: T[] } {
+  const kindSet = new Set(orderedSceneKinds);
+  const forScene = integratedSceneChecks(slug, checks, kindSet);
+  const used = new Set(forScene.values());
+  const leftovers = checks.filter((check) => !used.has(check));
+  const standalone: T[] = [];
+  let i = 0;
+  for (const check of leftovers) {
+    while (i < orderedSceneKinds.length && forScene.has(orderedSceneKinds[i])) i++;
+    if (i < orderedSceneKinds.length) {
+      forScene.set(orderedSceneKinds[i], check);
+      i++;
+    } else {
+      standalone.push(check);
+    }
+  }
+  return { forScene, standalone };
+}
+
 // ---- Verse-by-verse notes --------------------------------------------------
 // Brief, static, Selah-voiced explanations per verse. No generated content.
 export const CHAPTER_VERSE_NOTES: Record<string, Record<number, string>> = {

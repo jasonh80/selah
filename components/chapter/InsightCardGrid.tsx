@@ -2,54 +2,55 @@
 
 import { useEffect, useState } from "react";
 import type { ChapterWorkup, Insight } from "@/lib/types";
-import { SectionHead } from "@/components/chapter/SectionHead";
 import { useReadingMode } from "@/components/ReadingModeProvider";
-import { getChapterMap } from "@/lib/maps/chapter-maps";
 
 // One "Deep Dive" system (layout spec §15): the former "Deeper Study" cards
 // and the former "Go Deeper" topic menu merged. A compact topic rail sits
 // above the study cards; every pill links to a real section on this page.
-type Topic = { icon: string; label: string; href: string; jesus?: boolean };
-
-const TOPICS: Topic[] = [
-  { icon: "📖", label: "Verse by Verse", href: "#chapter" },
-  { icon: "🗺", label: "Maps & Places", href: "#maps" },
-  { icon: "🕰", label: "Where It Fits", href: "#timeline" },
-  { icon: "🔍", label: "What Most People Miss", href: "#most-people-miss" },
-  { icon: "❒", label: "Related Chapters", href: "#chapters" },
-];
-
-export function InsightCardGrid({ data }: { data: ChapterWorkup }) {
-  // Only advertise sections that actually RENDER for this chapter — the Maps
-  // pill mirrors MapsSection's own config condition, never a dead link.
-  const hasMap = Boolean(getChapterMap(data.slug));
-  const topics = TOPICS.filter((topic) => {
-    if (topic.label === "Maps & Places") return hasMap;
-    if (topic.label === "What Most People Miss") return Boolean(data.modernReadersMiss?.trim());
-    return true;
-  });
-
+// Owner layout direction (2026-07-19): the "Deep Dive" section header and
+// topic rail are gone (every pill duplicated a section already on the page),
+// duplicate cards are removed, and the remaining study cards are placed
+// individually through the page in the owner's order — all FULL WIDTH.
+// InsightCards renders a chosen subset: `titles` = ordered include list;
+// `exclude` = drop list with everything else rendering in data order.
+export function InsightCards({
+  data,
+  titles,
+  exclude,
+}: {
+  data: ChapterWorkup;
+  titles?: string[];
+  exclude?: string[];
+}) {
+  const norm = (t: string) => t.trim().toLowerCase();
+  let cards = data.insights;
+  if (titles) {
+    const order = titles.map(norm);
+    cards = cards
+      .filter((i) => order.includes(norm(i.title)))
+      .sort((a, b) => order.indexOf(norm(a.title)) - order.indexOf(norm(b.title)));
+  } else if (exclude) {
+    const drop = exclude.map(norm);
+    // Owner tail order: theology → original language → live it → prayer;
+    // anything unrecognized keeps data order after these.
+    const hint = ["theology principle", "original language", "live it", "practical application", "prayer"];
+    cards = cards
+      .filter((i) => !drop.includes(norm(i.title)))
+      .map((card, dataIndex) => ({ card, dataIndex }))
+      .sort((a, b) => {
+        const ai = hint.indexOf(norm(a.card.title));
+        const bi = hint.indexOf(norm(b.card.title));
+        return (ai === -1 ? hint.length + a.dataIndex : ai) - (bi === -1 ? hint.length + b.dataIndex : bi);
+      })
+      .map((x) => x.card);
+  }
+  if (cards.length === 0) return null;
   return (
-    <section id="deeper-study" className="scroll-mt-20">
-      <SectionHead title="Deep Dive" />
-      <div className="mb-s3 flex flex-wrap gap-s2">
-        {topics.map((topic) => (
-          <a
-            key={topic.label}
-            href={topic.href}
-            className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-[12px] font-medium text-secondary shadow-hair transition hover:border-accent/40 hover:text-primary"
-          >
-            <span aria-hidden>{topic.icon}</span>
-            {topic.label}
-          </a>
-        ))}
-      </div>
-      <div className="grid grid-cols-2 gap-s2">
-        {data.insights.map((insight) => (
-          <InsightCard key={insight.id} insight={insight} />
-        ))}
-      </div>
-    </section>
+    <div className="space-y-s2">
+      {cards.map((insight) => (
+        <InsightCard key={insight.id} insight={insight} />
+      ))}
+    </div>
   );
 }
 
@@ -64,9 +65,7 @@ function InsightCard({ insight }: { insight: Insight }) {
   return (
     <button
       onClick={() => setOpen((v) => !v)}
-      className={`flex flex-col rounded-md border bg-card p-3.5 text-left shadow-hair transition ${
-        open ? "col-span-2" : ""
-      } ${insight.jesus ? "ring-1 ring-[rgba(178,58,58,0.18)]" : ""}`}
+      className={`flex w-full flex-col rounded-md border bg-card p-3.5 text-left shadow-hair transition ${insight.jesus ? "ring-1 ring-[rgba(178,58,58,0.18)]" : ""}`}
     >
       <div className="flex items-start gap-2">
         <span

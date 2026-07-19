@@ -4,7 +4,7 @@ import type { ChapterWorkup } from "@/lib/types";
 import { useReadingMode } from "@/components/ReadingModeProvider";
 import {
   getSceneChecks,
-  integratedSceneChecks,
+  assignSceneChecks,
   type SceneCheck,
 } from "@/lib/content/chapter-content";
 import { supportingImagesFor } from "@/components/chapter/HeroImage";
@@ -22,14 +22,11 @@ export function SceneCheckSection({ data }: { data: ChapterWorkup }) {
   // only; the hero is not on the path). A check bound to the hero scene, or
   // a second check bound to an already-integrated scene, keeps its standalone
   // card so nothing is ever dropped.
-  const rendered = new Set(
-    integratedSceneChecks(
-      data.slug,
-      allChecks,
-      new Set(supportingImagesFor(data).map((image) => image.kind)),
-    ).values(),
+  const { standalone: checks } = assignSceneChecks(
+    data.slug,
+    allChecks,
+    supportingImagesFor(data).map((image) => image.kind),
   );
-  const checks = allChecks.filter((check) => !rendered.has(check));
   if (checks.length === 0) return null;
   const deep = mode === "deep";
 

@@ -5,7 +5,7 @@ import { supportingImagesFor } from "@/components/chapter/HeroImage";
 import {
   getImageTitle,
   getSceneChecks,
-  integratedSceneChecks,
+  assignSceneChecks,
   type SceneCheck,
 } from "@/lib/content/chapter-content";
 
@@ -24,10 +24,10 @@ export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
 
   const checks: SceneCheck[] =
     data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
-  const checkByKind = integratedSceneChecks(
+  const { forScene: checkByKind } = assignSceneChecks(
     data.slug,
     checks,
-    new Set(scenes.map((scene) => scene.kind)),
+    scenes.map((scene) => scene.kind),
   );
 
   return (
