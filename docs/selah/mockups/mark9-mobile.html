@@ -1,0 +1,177 @@
+<title>Selah mobile chapter mockup — Mark 9 (IQ-008)</title>
+<style>
+  /* ————— mockup chrome (not part of the design) ————— */
+  body{margin:0;background:#101512;font-family:-apple-system,"SF Pro Text",Inter,system-ui,sans-serif;
+       display:flex;gap:48px;justify-content:center;align-items:flex-start;padding:40px 20px;flex-wrap:wrap}
+  .device{background:#0c0f0d;border:1px solid #2a332c;border-radius:32px;padding:12px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  .device h6{margin:0 0 8px;text-align:center;color:#7d8a7f;font-size:11px;font-weight:600;letter-spacing:.08em}
+  .screen{border-radius:22px;overflow:hidden;background:var(--bg);height:820px;overflow-y:auto;scrollbar-width:none}
+  .screen::-webkit-scrollbar{display:none}
+  .w390 .screen{width:390px}
+  .w320 .screen{width:320px}
+
+  /* ————— the design system under test (brief: 3 sizes, 1 box level) —————
+     type: 40/44 title · 18/28 reading · 13/18 support
+     spacing: 8pt grid (tokens s1=8 s2=16 s3=24 s4=40)
+     boxes: ONLY interactive surfaces get borders */
+  .screen{--bg:#151b17;--surface:#1c231e;--line:#2c352e;--ink:#eef2ec;--ink2:#9fac9f;
+          --accent:#9db98a;--accent-strong:#5f7153;color:var(--ink)}
+  .page{padding:0 20px 96px}
+  .t-title{font-size:40px;line-height:44px;font-weight:650;letter-spacing:-.01em;margin:0}
+  .t-read{font-size:18px;line-height:28px;font-weight:400;margin:0;color:var(--ink)}
+  .t-sup{font-size:13px;line-height:18px;font-weight:500;margin:0;color:var(--ink2)}
+  .t-eyebrow{font-size:13px;line-height:18px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin:0}
+
+  /* app header — the ONLY chrome row on screen */
+  .top{position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);
+       backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:space-between;
+       padding:14px 20px;z-index:5}
+  .brand{font-size:13px;font-weight:700;letter-spacing:.28em}
+  .top .t-sup{display:flex;gap:16px}
+
+  .hero{margin:8px -20px 0;position:relative}
+  .hero img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}
+  .hero .scrim{position:absolute;inset:auto 0 0;padding:56px 20px 14px;
+       background:linear-gradient(transparent,rgba(12,15,13,.85))}
+
+  .headerblock{padding-top:24px}
+  .headerblock .t-sup{margin-top:8px}
+
+  /* ONE control cluster: segmented read-mode + inline scripture pill */
+  .controls{display:flex;gap:8px;margin-top:24px;flex-wrap:wrap}
+  .seg{display:flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface)}
+  .seg button{all:unset;padding:8px 16px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink2);cursor:pointer}
+  .seg .on{background:var(--accent-strong);color:#fff}
+  .pill{all:unset;display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;
+        padding:8px 16px;font-size:13px;font-weight:600;background:var(--surface);cursor:pointer}
+
+  /* scripture preview — interactive, so it MAY carry a border (the one box) */
+  .scripture{margin-top:24px;border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:16px;cursor:pointer}
+  .scripture .t-read{font-size:18px;line-height:28px;font-style:italic;color:var(--ink)}
+
+  /* content sits on the page surface — NO boxes, spacing only */
+  section{margin-top:40px}
+  section>.t-eyebrow{margin-bottom:12px}
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:12px}
+  .facts .t-sup b{color:var(--ink);font-weight:600}
+
+  .path{list-style:none;margin:12px 0 0;padding:0}
+  .path li{display:flex;gap:14px;padding:10px 0;align-items:baseline}
+  .path .n{font-size:13px;font-weight:650;color:var(--accent);min-width:44px}
+  .path .t-read{font-size:18px;line-height:26px}
+  .path .t-sup{margin-top:2px}
+
+  .rule{border:0;border-top:1px solid var(--line);margin:40px 0 0}
+
+  /* expandable rows (interactive → hairline separators, not boxes) */
+  .faq{margin:0;padding:0;list-style:none}
+  .faq li{border-top:1px solid var(--line);padding:14px 0;display:flex;justify-content:space-between;gap:12px;cursor:pointer}
+  .faq li:first-child{border-top:0}
+  .faq .t-read{font-size:18px;line-height:26px}
+  .faq span{color:var(--ink2)}
+
+  .tabbar{position:sticky;bottom:0;margin:0 -20px;background:color-mix(in srgb,var(--bg) 92%,transparent);
+       backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 0 18px}
+  .tabbar .t-sup{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tabbar .on{color:var(--accent)}
+
+  @media (max-width:840px){body{gap:24px}}
+</style>
+
+
+<template id="page">
+  <div class="top">
+    <span class="brand">SELAH</span>
+    <p class="t-sup"><span>ESV ▾</span><span>◉ Focus</span></p>
+  </div>
+  <div class="page">
+    <div class="hero">
+      <div style="aspect-ratio:3/2;background:
+           radial-gradient(120% 90% at 70% 10%,rgba(238,242,236,.22),transparent 55%),
+           linear-gradient(150deg,#4a5c45,#232b24 70%);display:flex;align-items:center;justify-content:center">
+        <span class="t-sup" style="color:rgba(238,242,236,.55)">chapter hero · 3:2 full-bleed</span>
+      </div>
+      <div class="scrim"><p class="t-eyebrow">Mark 9 · ESV</p></div>
+    </div>
+
+    <div class="headerblock">
+      <h1 class="t-title">Glory on the Mountain, Mercy in the Mess</h1>
+      <p class="t-sup" style="margin-top:10px">c. AD 30 · Mount of Transfiguration → Capernaum</p>
+    </div>
+
+    <div class="controls">
+      <div class="seg"><button class="on">Quick</button><button>Deep</button></div>
+      <button class="pill">Read Mark 9 ⌄</button>
+    </div>
+
+    <div class="scripture">
+      <p class="t-eyebrow" style="margin-bottom:8px">Mark 9 · ESV</p>
+      <p class="t-read">“And he said to them, ‘Truly, I say to you, there are some standing here who will not
+      taste death until they see the kingdom of God after it has come with power.’ …”</p>
+    </div>
+
+    <section>
+      <p class="t-eyebrow">Quick summary</p>
+      <p class="t-read">Mark 9 moves from dazzling revelation to ordinary failure: Jesus is shown in glory,
+      then descends into argument, helplessness, fear, and status-grabbing discipleship. The chapter teaches
+      that Jesus is the beloved Son to be heard — on the mountain and in the mess.</p>
+      <div class="facts">
+        <p class="t-sup"><b>When</b> · c. AD 30</p>
+        <p class="t-sup"><b>Where</b> · Galilee &amp; Capernaum</p>
+        <p class="t-sup"><b>Theme</b> · Listening to the Son</p>
+        <p class="t-sup"><b>Jesus</b> · The glorious, descending Son</p>
+      </div>
+    </section>
+
+    <section>
+      <p class="t-eyebrow">The path through Mark 9</p>
+      <ol class="path">
+        <li><span class="n">1</span><div><p class="t-read">The hinge saying</p></div></li>
+        <li><span class="n">2–8</span><div><p class="t-read">The Transfiguration</p><p class="t-sup">Jesus transfigured with Moses and Elijah; “listen to him.”</p></div></li>
+        <li><span class="n">9–13</span><div><p class="t-read">Coming down: the Elijah question</p></div></li>
+        <li><span class="n">14–29</span><div><p class="t-read">The suffering boy and his father</p><p class="t-sup">“I believe; help my unbelief!”</p></div></li>
+        <li><span class="n">30–32</span><div><p class="t-read">The second passion prediction</p></div></li>
+        <li><span class="n">33–37</span><div><p class="t-read">Greatness and the child</p></div></li>
+        <li><span class="n">38–41</span><div><p class="t-read">The outsider in Jesus’ name</p></div></li>
+        <li><span class="n">42–50</span><div><p class="t-read">Stumbling, salt, and peace</p></div></li>
+      </ol>
+    </section>
+
+    <hr class="rule">
+
+    <section>
+      <p class="t-eyebrow">What most people miss</p>
+      <p class="t-read">It is tempting to split Mark 9 into favorite scenes: the Transfiguration for awe, the
+      father’s prayer for comfort, the child for humility, the hard sayings for seriousness. But Mark has
+      stitched them together tightly — the glorious Son descends into the place where faith is mixed and a
+      family suffers.</p>
+    </section>
+
+    <hr class="rule">
+
+    <section>
+      <p class="t-eyebrow">What people ask</p>
+      <ul class="faq">
+        <li><p class="t-read">Did the disciples see the kingdom come with power?</p><span>＋</span></li>
+        <li><p class="t-read">Why couldn’t the disciples cast the spirit out?</p><span>＋</span></li>
+        <li><p class="t-read">What does “salted with fire” mean?</p><span>＋</span></li>
+      </ul>
+    </section>
+
+    <div class="tabbar">
+      <p class="t-sup on">◈<br>Today</p>
+      <p class="t-sup">▤<br>Chapters</p>
+      <p class="t-sup">◎<br>Journey</p>
+      <p class="t-sup">⚙<br>Settings</p>
+    </div>
+  </div>
+</template>
+
+<div class="device w390"><h6>390 × 844</h6><div class="screen" data-frame></div></div>
+<div class="device w320"><h6>320 × 693</h6><div class="screen" data-frame style="height:693px"></div></div>
+
+<script>
+  const t=document.getElementById('page');
+  document.querySelectorAll('[data-frame]').forEach(f=>f.append(t.content.cloneNode(true)));
+</script>
+
