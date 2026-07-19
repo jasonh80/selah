@@ -1,5 +1,6 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { getTimelineNote } from "@/lib/content/chapter-content";
+import { chapterYear } from "@/lib/chapter-year";
 
 // "Where It Fits" — the Big Story rail. Markers are evenly spaced for a clean,
 // compact, mobile-friendly rail (no huge empty gaps); the chapter PIN is placed
@@ -34,30 +35,12 @@ function pinPosForYear(year: number): number {
   return posForIndex(MARKERS.length - 1);
 }
 
-function parseYear(raw?: string): number | null {
-  if (!raw) return null;
-  const s = raw.toLowerCase();
-  const isBC = /\bb\.?c\.?(e)?\b/.test(s);
-  const cent = s.match(/(\d+)(?:st|nd|rd|th)\s+century/);
-  if (cent) {
-    const mid = (parseInt(cent[1], 10) - 1) * 100 + 50;
-    return isBC ? -mid : mid;
-  }
-  const nums = s.match(/\d{1,4}/g);
-  if (!nums) return null;
-  const avg = Math.round(nums.map(Number).reduce((a, b) => a + b, 0) / nums.length);
-  return isBC ? -avg : avg;
-}
-
 const fmtYear = (y: number) => (y < 0 ? `${-y} BC` : `AD ${y}`);
 
 export function TimelineSection({ data }: { data: ChapterWorkup }) {
   const bt = data.biblicalTimeline;
   const range = bt?.dateRange;
-  const year =
-    bt?.estimatedYear ??
-    (range ? Math.round((range.startYear + range.endYear) / 2) : null) ??
-    parseYear(data.estimatedDate);
+  const year = chapterYear(data);
   const pinPos = year != null ? pinPosForYear(year) : null;
   const rangeText = range
     ? `${fmtYear(range.startYear)} – ${fmtYear(range.endYear)}`
