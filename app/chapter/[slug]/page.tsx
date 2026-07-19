@@ -4,6 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
 import { GeneratingChapterState } from "@/components/chapter/GeneratingChapterState";
 import { resolveChapter } from "@/lib/chapters/registry";
+import { heroImageFor } from "@/components/chapter/HeroImage";
 import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
 import { getChapterStatus } from "@/lib/server/chapter-workups-repository";
 
@@ -23,8 +24,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = `${w.reference} — ${w.subtitle} · Selah`;
   const description = (w.quickSummary || `${w.reference}, made visual, simple, and personal.`).slice(0, 300);
   const canonical = `${SITE_URL}/chapter/${w.slug}`;
-  const heroSrc = w.images?.[0]?.src;
-  const image = heroSrc && /^https?:\/\//.test(heroSrc) ? heroSrc : undefined;
+  // The SAME hero the page renders (heroKind + overrides + fallback via
+  // heroImageFor) — the social preview must never disagree with the visible
+  // hero (Codex #61 review: Mark 6 overrides its hero to walking-water).
+  const hero = heroImageFor(w);
+  const image = hero?.src && /^https?:\/\//.test(hero.src) ? hero.src : undefined;
+  const imageAlt = image ? hero?.alt : undefined;
   return {
     title,
     description,
@@ -35,7 +40,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       url: canonical,
       type: "article",
       siteName: "Selah",
-      ...(image ? { images: [{ url: image }] } : {}),
+      ...(image ? { images: [{ url: image, ...(imageAlt ? { alt: imageAlt } : {}) }] } : {}),
     },
     twitter: {
       card: image ? "summary_large_image" : "summary",
