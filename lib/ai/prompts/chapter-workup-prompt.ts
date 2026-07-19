@@ -226,7 +226,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "whatHappens": "<what happens in the chapter>",
   "whatPeopleMiss": "<what a modern reader misunderstands or overlooks>",
   "jesusConnection": {
-    "short": "<one short phrase>",
+    "short": "<ONE plain-spoken line a first-time reader instantly gets — what Jesus actually DOES in or through this chapter, concrete, no church jargon (never phrases like 'makes the unclean whole'); it will display beside a cross icon, so do NOT start with the word Jesus followed by a colon>",
     "full": "<a full paragraph connecting the chapter to Jesus>",
     "relatedPassages": ["<Book c:v>", "<Book c:v>"]
   },

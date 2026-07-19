@@ -106,11 +106,13 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
   });
 
   // Metadata chips (date · location · theme · Jesus).
+  // Owner decision 2026-07-19: the theme chip is gone (the subtitle carries
+  // the thesis) and the Jesus chip drops its "Jesus:" prefix — the sentence
+  // itself names Him, so the prefix read doubled ("Jesus: Jesus makes…").
   const metaChips = [
     { icon: "📅", text: g.estimatedDate },
     { icon: "📍", text: g.estimatedLocation },
-    { icon: "✦", text: g.theme },
-    { icon: "✝", text: `Jesus: ${g.jesusConnection.short}`, jesus: true },
+    { icon: "✝", text: g.jesusConnection.short, jesus: true },
   ];
 
   // Dashboard nav cards (key object · key person · Jesus).
