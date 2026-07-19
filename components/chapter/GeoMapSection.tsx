@@ -146,9 +146,11 @@ function addOverlays(map: maplibregl.Map, cfg: GeoChapterMap): void {
   };
   map.addSource("corridors", { type: "geojson", data: corridors });
   // A broad, soft, blurred band — reads as "they moved this general way",
-  // deliberately nothing like a surveyed road line.
-  map.addLayer({ id: "corridor-halo", type: "line", source: "corridors", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffd98a", "line-width": 30, "line-opacity": 0.3, "line-blur": 12 } });
-  map.addLayer({ id: "corridor-core", type: "line", source: "corridors", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffe4a8", "line-width": 8, "line-opacity": 0.55, "line-blur": 3 } });
+  // deliberately nothing like a surveyed road line. Purple core over a dark
+  // neutral halo (owner request, 2026-07-18): clearly visible on satellite
+  // greens/tans while the blur/width keep the uncertainty styling.
+  map.addLayer({ id: "corridor-halo", type: "line", source: "corridors", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#1c1a24", "line-width": 30, "line-opacity": 0.38, "line-blur": 12 } });
+  map.addLayer({ id: "corridor-core", type: "line", source: "corridors", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#a78bfa", "line-width": 8, "line-opacity": 0.7, "line-blur": 3 } });
 
   const pins = {
     type: "FeatureCollection" as const,
@@ -236,6 +238,26 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.slug]);
+
+  // Pin colors follow the ACTIVE theme: when <html data-theme> changes, the
+  // pin bitmaps are rebuilt from the new --accent-strong so the map and the
+  // legend can never disagree (Codex #59 review).
+  useEffect(() => {
+    if (!ready) return;
+    const observer = new MutationObserver(() => {
+      const map = mapObj.current;
+      if (!map) return;
+      const colors = themeColors();
+      const eventPin = pinImage(colors.event);
+      const contextPin = pinImage(colors.context);
+      if (map.hasImage("selah-pin-event")) map.removeImage("selah-pin-event");
+      if (map.hasImage("selah-pin-context")) map.removeImage("selah-pin-context");
+      map.addImage("selah-pin-event", eventPin.data, { pixelRatio: eventPin.pixelRatio });
+      map.addImage("selah-pin-context", contextPin.data, { pixelRatio: contextPin.pixelRatio });
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, [ready]);
 
   // borders & cities (default on)
   useEffect(() => {
@@ -388,7 +410,7 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
                 <span
                   aria-hidden="true"
                   className="inline-block h-[5px] w-4 rounded-full"
-                  style={{ background: "linear-gradient(90deg, rgba(255,217,138,.35), rgba(255,228,168,.75))" }}
+                  style={{ background: "linear-gradient(90deg, rgba(28,26,36,.55), rgba(167,139,250,.85))" }}
                 />
                 {c.label}
               </li>
