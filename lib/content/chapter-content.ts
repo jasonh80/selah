@@ -206,6 +206,27 @@ export function assignSceneChecks<T extends { title: string; imageKind?: string 
   return { forScene, standalone: checks.filter((check) => !used.has(check)) };
 }
 
+/** Canonical "What Most People Miss" content (Codex #64, finding 3): when
+ * the two-layer authored insight card exists it IS the canonical source and
+ * BOTH its layers render (cardSummary as the intro line, fullContent as the
+ * body) — nothing is discarded by dedupe. The legacy top-level field renders
+ * only when no card exists. */
+export function mostPeopleMissContent(data: {
+  modernReadersMiss?: string;
+  insights?: { id: string; type?: string; title: string; preview: string; body: string }[];
+}): { intro?: string; body: string } | null {
+  const card = data.insights?.find(
+    (i) => (i.type ?? (i.id === "miss" ? "what_most_people_miss" : "")) === "what_most_people_miss",
+  );
+  if (card) {
+    const intro = card.preview.trim();
+    const body = card.body.trim();
+    if (body) return { intro: intro && intro !== body ? intro : undefined, body };
+  }
+  const field = data.modernReadersMiss?.trim();
+  return field ? { body: field } : null;
+}
+
 // ---- Verse-by-verse notes --------------------------------------------------
 // Brief, static, Selah-voiced explanations per verse. No generated content.
 export const CHAPTER_VERSE_NOTES: Record<string, Record<number, string>> = {

@@ -12,33 +12,47 @@ import type { ChapterWorkup, Insight } from "@/lib/types";
 // individually through the page in the owner's order — all FULL WIDTH.
 // InsightCards renders a chosen subset: `titles` = ordered include list;
 // `exclude` = drop list with everything else rendering in data order.
+// Route by the STABLE section type (generated workups) with a legacy-id
+// fallback (older workups: context/miss/jesus/theology/application/prayer) —
+// display titles are free to vary without misrouting cards (Codex #64).
+const LEGACY_ID_TYPE: Record<string, string> = {
+  context: "historical_world",
+  miss: "what_most_people_miss",
+  jesus: "jesus_connection",
+  theology: "theology",
+  application: "application",
+  prayer: "prayer",
+};
+function insightType(i: { type?: string; id: string }): string {
+  return i.type ?? LEGACY_ID_TYPE[i.id] ?? "custom";
+}
+
 export function InsightCards({
   data,
-  titles,
-  exclude,
+  types,
+  excludeTypes,
 }: {
   data: ChapterWorkup;
-  titles?: string[];
-  exclude?: string[];
+  /** Ordered include list of stable section types. */
+  types?: string[];
+  /** Drop list; everything else renders in the canonical tail order. */
+  excludeTypes?: string[];
 }) {
-  const norm = (t: string) => t.trim().toLowerCase();
   let cards = data.insights;
-  if (titles) {
-    const order = titles.map(norm);
+  if (types) {
     cards = cards
-      .filter((i) => order.includes(norm(i.title)))
-      .sort((a, b) => order.indexOf(norm(a.title)) - order.indexOf(norm(b.title)));
-  } else if (exclude) {
-    const drop = exclude.map(norm);
-    // Owner tail order: theology → original language → live it → prayer;
-    // anything unrecognized keeps data order after these.
-    const hint = ["theology principle", "original language", "live it", "practical application", "disciple it", "prayer"];
+      .filter((i) => types.includes(insightType(i)))
+      .sort((a, b) => types.indexOf(insightType(a)) - types.indexOf(insightType(b)));
+  } else if (excludeTypes) {
+    // Owner tail order by TYPE: theology → original language → live it →
+    // disciple it → prayer; unrecognized types keep data order after these.
+    const hint = ["theology", "original_language", "application", "discipleship", "prayer"];
     cards = cards
-      .filter((i) => !drop.includes(norm(i.title)))
+      .filter((i) => !excludeTypes.includes(insightType(i)))
       .map((card, dataIndex) => ({ card, dataIndex }))
       .sort((a, b) => {
-        const ai = hint.indexOf(norm(a.card.title));
-        const bi = hint.indexOf(norm(b.card.title));
+        const ai = hint.indexOf(insightType(a.card));
+        const bi = hint.indexOf(insightType(b.card));
         return (ai === -1 ? hint.length + a.dataIndex : ai) - (bi === -1 ? hint.length + b.dataIndex : bi);
       })
       .map((x) => x.card);

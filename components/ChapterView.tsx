@@ -10,6 +10,7 @@ import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GeoMapSection } from "@/components/chapter/GeoMapSection";
 import { getGeoChapterMap } from "@/lib/maps/geo-chapter-maps";
+import { getChapterContext } from "@/lib/content/chapter-content";
 import { ChapterTopControls } from "@/components/chapter/ChapterTopControls";
 import { CompactPreviewRow } from "@/components/chapter/CompactPreviewRow";
 import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSection";
@@ -62,23 +63,28 @@ export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) 
         <TimelineSection data={data} />
         <KeyPersonCard data={data} />
         <MostPeopleMissSection data={data} />
-        <InsightCards data={data} titles={["Jesus at the Center"]} />
+        <InsightCards data={data} types={["jesus_connection"]} />
 
         {/* Maps, with the expandable Map Notes card directly beneath */}
         {getGeoChapterMap(data.slug) ? <GeoMapSection data={data} /> : <MapsSection data={data} />}
-        <InsightCards data={data} titles={["Map Notes"]} />
+        <InsightCards data={data} types={["map_notes"]} />
 
-        <InsightCards data={data} titles={["Big Idea", "Chapter Flow"]} />
+        <InsightCards data={data} types={["big_idea", "chapter_flow"]} />
         <AuthorAudienceEvidence data={data} />
         <InsightCards
           data={data}
-          exclude={[
-            "Jesus at the Center",
-            "Map Notes",
-            "Big Idea",
-            "Chapter Flow",
-            "What Most People Miss",
-            "The World Behind It",
+          excludeTypes={[
+            "jesus_connection",
+            "map_notes",
+            "big_idea",
+            "chapter_flow",
+            "what_most_people_miss",
+            // The world/context card is excluded ONLY when Behind-the-Chapter
+            // actually renders and carries it (canonical mapping) — a legacy
+            // chapter without that section keeps its context card.
+            ...((data.behindTheChapter?.length ?? 0) > 0 || getChapterContext(data.slug)
+              ? ["historical_world"]
+              : []),
           ]}
         />
         <WhatPeopleAskSection data={data} />

@@ -12,15 +12,16 @@ type AAECard = { category: string; title: string; body: string; media?: ContextM
 // Media renders only when a real asset exists — never an empty placeholder.
 export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
   // Prefer generated cards; fall back to static config (e.g. Psalm 23).
-  // The "The World Behind It" INSIGHT card (removed from the card stack as a
-  // duplicate of the historical-world card here) can carry richer text —
-  // merge it in when longer, so dedupe never discards content (Codex #64).
+  // CANONICAL source rule (Codex #64, finding 3): when the two-layer
+  // "historical_world" insight exists, its fullContent IS the historical-
+  // world card body here (deterministic — not longest-wins); the removed
+  // duplicate card therefore loses nothing.
   const worldInsight = data.insights?.find(
-    (i) => i.title.trim().toLowerCase() === "the world behind it",
+    (i) => (i.type ?? (i.id === "context" ? "historical_world" : "")) === "historical_world",
   );
   const enrich = (card: AAECard): AAECard => {
     const isWorld = /historical world|world behind/i.test(`${card.category} ${card.title}`);
-    if (isWorld && worldInsight && worldInsight.body.trim().length > card.body.trim().length) {
+    if (isWorld && worldInsight && worldInsight.body.trim()) {
       return { ...card, body: worldInsight.body };
     }
     return card;

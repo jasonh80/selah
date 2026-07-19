@@ -94,6 +94,9 @@ export interface TimelineMini {
 
 export interface Insight {
   id: string;
+  /** Stable section type (generated workups) — routing/order key; display
+   * titles are free to vary. Legacy workups route by id. */
+  type?: string;
   icon: string;
   title: string;
   subtitle?: string; // e.g. "Holiness" under "Theology Principle"

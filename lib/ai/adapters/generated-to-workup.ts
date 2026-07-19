@@ -158,6 +158,7 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
         .sort((a, b) => a.priority - b.priority)
         .map((s) => ({
           id: s.id,
+          type: s.type,
           icon: SECTION_ICON[s.type] ?? "✦",
           title: s.title,
           preview: s.cardSummary,
@@ -330,6 +331,13 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
       body: s.body,
       relatedVerses: s.relatedVerses,
       visualAccuracyNotes: s.visualAccuracyNotes,
+      // Explicit image binding survives ONLY when it names a real planned/
+      // generated image kind — an invalid binding is dropped so the check
+      // renders standalone, never under an unrelated image (Codex #64).
+      imageKind:
+        s.imageKind && g.generatedImages.some((image) => image.type === s.imageKind)
+          ? s.imageKind
+          : undefined,
     })),
     behindTheChapter: g.behindTheChapter
       ? [
