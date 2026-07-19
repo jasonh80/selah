@@ -112,7 +112,12 @@ function storeLookup(store: FakeJobStore) {
 // Honors the same predicate + partial-unique-index semantics the real table has.
 class FakeLaneStore implements PublishedRedoStore {
   rows = new Map<string, Record<string, unknown>>();
+  failNextLatest = false; // simulates a storage outage on the next latest() read
   async latest(slug: string): Promise<PublishedRedoLookup> {
+    if (this.failNextLatest) {
+      this.failNextLatest = false;
+      return { kind: "error", message: "simulated lane outage" };
+    }
     const all = [...this.rows.values()].filter((r) => r.slug === slug);
     if (!all.length) return { kind: "missing" };
     return { kind: "row", row: all[all.length - 1] };
@@ -237,10 +242,12 @@ const main = async () => {
   });
   __setCostCaptureForTesting(costs);
   __setImageTestOverrides({ configBypass: true, modelProbe: async (model) => ({ ok: true, model }) });
+  let generateGate: Promise<void> | null = null;
   __setImageDepsForTesting({
     db: db as never,
     generateBytes: async () => {
       generateCalls++;
+      if (generateGate) await generateGate;
       return Buffer.from("fake-png-bytes");
     },
   });
@@ -469,6 +476,64 @@ const main = async () => {
       const images = (store.rows.get(SLUG)!.workup_json as Record<string, unknown>).images as Record<string, unknown>[];
       ok(images.find((i) => i.kind === "ephphatha")!.src === baseSrc, "F2 the pre-redo source is restored exactly");
       ok(lane.rows.get(job3)?.status === "rolled_back", "F2 lane row settled as rolled_back");
+    }
+
+    // ---------------- H. Adversarial-review repairs (2026-07-19) ----------------
+    {
+      // H1. Duplicate delivery DURING the winner's generation window must not
+      // touch the winner's running claim (the mid-spend clobber finding).
+      const pf = await json(await adminPost(adminReq({ action: "published_redo_preflight", slug: SLUG, kind: "ephphatha", notes: NOTES })));
+      const digestH = String((pf.redo as Record<string, unknown>).bindingDigest);
+      const created = await json(await adminPost(adminReq({ action: "published_redo", slug: SLUG, kind: "ephphatha", notes: NOTES, bindingDigest: digestH, confirm: true })));
+      const jobH = String(created.jobId);
+      const trigBody = lastTrigger!.body as Record<string, unknown>;
+      const generateBefore = generateCalls;
+      const costsBefore = costs.length;
+      let releaseGate!: () => void;
+      generateGate = new Promise<void>((resolve) => (releaseGate = resolve));
+      const winner = publishedRedoWorker(workerReq(trigBody));
+      while (generateCalls === generateBefore) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      ok(lane.rows.get(jobH)?.status === "running", "H1 winner consumed the claim and is mid-generation");
+      const loser = await publishedRedoWorker(workerReq(trigBody));
+      ok(loser.status === 500, "H1 duplicate delivery refuses");
+      ok(lane.rows.get(jobH)?.status === "running", "H1 the winner's RUNNING claim is untouched by the duplicate");
+      ok(costs.length === costsBefore, "H1 the duplicate spent nothing");
+      releaseGate();
+      generateGate = null;
+      const winnerRes = await winner;
+      ok(winnerRes.status === 200, "H1 the winner completes normally after the duplicate");
+      const rowH = lane.rows.get(jobH)!;
+      ok(rowH.status === "candidate" && rowH.spent_count === 1, "H1 winner's candidate recorded with its real spend");
+      ok(generateCalls === generateBefore + 1 && costs.length === costsBefore + 1, "H1 exactly one model request, one cost row");
+      // H2. A reject that races (or follows a lost settle of) an apply heals
+      // the lane row to the truth instead of stranding the rollback path.
+      const candH = String(rowH.candidate_url);
+      const applied = await adminPost(adminReq({ action: "published_redo_apply", slug: SLUG, jobId: jobH, kind: "ephphatha", candidateUrl: candH, confirm: true }));
+      ok(applied.status === 200, "H2 setup: candidate applied to the live chapter");
+      lane.rows.get(jobH)!.status = "candidate"; // simulate the lost/raced settle
+      const rejectRes = await adminPost(adminReq({ action: "published_redo_reject", slug: SLUG }));
+      const rejectBody = await json(rejectRes);
+      ok(rejectRes.status === 409 && /already on the live chapter/.test(String(rejectBody.error)), "H2 reject refuses a live candidate with the honest explanation");
+      ok(lane.rows.get(jobH)?.status === "applied", "H2 lane bookkeeping healed to applied — the rollback path survives");
+      // H3. Rollback is idempotent when its own lane settle was lost.
+      const rolledBack = await adminPost(adminReq({ action: "published_redo_rollback", slug: SLUG, jobId: jobH, confirm: true }));
+      ok(rolledBack.status === 200, "H3 setup: rollback restored the pre-redo source");
+      lane.rows.get(jobH)!.status = "applied"; // simulate the lost settle
+      const liveBefore = snapshotOf(store, SLUG);
+      const again = await adminPost(adminReq({ action: "published_redo_rollback", slug: SLUG, jobId: jobH, confirm: true }));
+      const againBody = await json(again);
+      ok(again.status === 200 && againBody.alreadyRolledBack === true, "H3 duplicate rollback settles idempotently");
+      ok(snapshotOf(store, SLUG) === liveBefore, "H3 no second chapter write");
+      ok(lane.rows.get(jobH)?.status === "rolled_back", "H3 lane row settled as rolled_back");
+      // H4. The FREE status poll never writes durable audit rows on a lane
+      // outage (the audit-flood finding).
+      const auditBefore = audit.length;
+      lane.failNextLatest = true;
+      const outage = await adminPost(adminReq({ action: "published_redo_status", slug: SLUG }));
+      ok(outage.status === 503, "H4 lane outage answers 503");
+      ok(audit.length === auditBefore, "H4 the failed poll wrote NO durable audit rows");
     }
 
     // ---------------- G. Reject + blocked stay-locked ----------------

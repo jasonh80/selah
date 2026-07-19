@@ -1317,18 +1317,39 @@ async function runPublishedImageRedoJobWithinDeadline(
     const msg = isChapterMutationError(error)
       ? `${error.code}: ${error.message}`
       : String((error as Error).message);
-    // Zero spend has happened on every path through this catch. If the claim
-    // was consumed (running), mark it failed; if not, it is either still
-    // queued (mark failed so it cannot strand) or already terminally marked
-    // by consumePublishedRedoClaim's stale path.
-    const settled = await markPublishedRedoTerminalFailure(slug, jobId, "failed", 0, "pre_spend_refusal");
+    // Zero spend has happened THIS invocation on every path through this
+    // catch. A definitively-LOST consume (CONFLICT while not consumed —
+    // changed-row count 0, so another worker provably owns the claim) must
+    // not touch the lane row at all: closing the winner's live "running" row
+    // would discard its possibly-paid in-flight run while recording "no
+    // spend" (adversarial-review finding, 2026-07-19). Otherwise the terminal
+    // write is pinned to exactly the state this invocation can own: "running"
+    // only after OUR consume committed, "queued" only before it.
+    const definitivelyLost =
+      !consumed && isChapterMutationError(error) && error.code === "CONFLICT";
+    const settled = definitivelyLost
+      ? false
+      : await markPublishedRedoTerminalFailure(
+          slug,
+          jobId,
+          "failed",
+          0,
+          "pre_spend_refusal",
+          consumed ? ["running"] : ["queued"],
+        );
     console.error(`[selah] published image redo pre-spend refusal for ${slug}: ${msg}`);
     await logGenerationAudit({
       action: "published_redo_refused",
       slug,
       model,
       status: "failed",
-      message: `${msg} (no spend occurred; ${settled ? "claim closed" : "claim already terminal or owned elsewhere"})`.slice(0, 300),
+      message: `${msg} (no spend by this delivery; ${
+        definitivelyLost
+          ? "claim owned by another worker — left untouched"
+          : settled
+            ? "claim closed"
+            : "claim already terminal or owned elsewhere"
+      })`.slice(0, 300),
     });
     return { ok: false, slug, model, error: msg };
   }
@@ -1405,6 +1426,7 @@ async function runPublishedImageRedoJobWithinDeadline(
             ? "image_run_deadline"
             : "image_run_failed"
           : "cost_record_failed",
+        ["running"],
       );
       await logGenerationAudit({
         action: costRecorded ? "published_redo_failed" : "published_redo_blocked",
@@ -1429,7 +1451,7 @@ async function runPublishedImageRedoJobWithinDeadline(
       };
     }
     // Provably pre-dispatch (the model request was never sent): true no-spend.
-    const settled = await markPublishedRedoTerminalFailure(slug, jobId, "failed", 0, "pre_dispatch_failure");
+    const settled = await markPublishedRedoTerminalFailure(slug, jobId, "failed", 0, "pre_dispatch_failure", ["running"]);
     await logGenerationAudit({
       action: "published_redo_failed",
       slug,
@@ -1461,7 +1483,7 @@ async function runPublishedImageRedoJobWithinDeadline(
       },
     });
   } catch {
-    const terminal = await markPublishedRedoTerminalFailure(slug, jobId, "blocked", 1, "cost_record_failed");
+    const terminal = await markPublishedRedoTerminalFailure(slug, jobId, "blocked", 1, "cost_record_failed", ["running"]);
     await logGenerationAudit({
       action: "published_redo_blocked",
       slug,
@@ -1480,7 +1502,7 @@ async function runPublishedImageRedoJobWithinDeadline(
   } catch (e) {
     const msg = isChapterMutationError(e) ? `${e.code}: ${e.message}` : String((e as Error).message);
     console.error(`[selah] published image redo candidate for ${slug} not recorded — ${msg}`);
-    await markPublishedRedoTerminalFailure(slug, jobId, "failed", 1, "completion_conflict");
+    await markPublishedRedoTerminalFailure(slug, jobId, "failed", 1, "completion_conflict", ["running"]);
     await logGenerationAudit({
       action: "published_redo_conflict",
       slug,

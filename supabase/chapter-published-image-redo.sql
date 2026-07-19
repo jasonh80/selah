@@ -9,10 +9,13 @@
 -- chapter row — it lives here, one row per attempt, append-only except the
 -- status transitions
 --   queued      -> running     (atomic worker consume, BEFORE any spend)
---   queued      -> failed      (failed trigger: worker provably never invoked,
---                               or provably-stale claim dismissed by the owner)
+--   queued      -> failed      (failed trigger: worker provably never invoked)
+--   queued      -> rejected    (owner dismisses a provably-stale claim — older
+--                               than the worker-token TTL, so zero spend)
 --   running     -> candidate | failed | blocked
 --   candidate   -> applied | rejected
+--   rejected    -> applied     (repair only: a reject that raced an apply is
+--                               settled back to the truth — the candidate IS live)
 --   failed      -> rejected    (owner dismisses; spend already durably recorded)
 --   applied     -> rolled_back (owner-confirmed, revision-bound rollback)
 -- enforced by conditional writes in lib/server/published-image-redo.ts.

@@ -1593,7 +1593,12 @@ export async function POST(req: Request) {
           : null,
       });
     } catch (error) {
-      return mapMutationError(slug, "published_redo_status", error);
+      // FREE poll — a storage outage (or the table not existing yet) must not
+      // write a durable refused: audit row on every 6-second tick; that would
+      // let the poll itself bury the genuine refusal entries. Console only.
+      const msg = String((error as Error).message ?? error).slice(0, 200);
+      console.error(`[selah] published_redo_status (${slug}): ${msg}`);
+      return NextResponse.json({ ok: false, error: msg }, { status: 503 });
     }
   }
   if (action === "published_redo_preflight") {
@@ -1762,9 +1767,26 @@ export async function POST(req: Request) {
   }
   if (action === "published_redo_reject") {
     const slug = String(body.slug ?? "");
-    // Lane-table write only — the live chapter row is never touched here.
-    const rejected = await rejectPublishedRedo(slug);
-    if (!rejected) {
+    // Lane-table write only — the live chapter row is never touched here. A
+    // candidate the live chapter already uses is NOT rejectable: the lane row
+    // is repaired to "applied" instead, so the audit stays true and the
+    // owner's rollback path survives.
+    const outcome = await rejectPublishedRedo(slug);
+    if (outcome === "healed_applied") {
+      await logGenerationAudit({
+        action: "published_redo_applied",
+        slug,
+        status: "succeeded",
+        message: "reject found this candidate already live — lane bookkeeping settled as applied; use Roll back to undo it",
+      });
+      return refuse(
+        slug,
+        "published_redo_reject",
+        "This candidate is already on the live chapter, so it was recorded as applied instead of rejected. Use “Roll back to the previous image” if you want it undone.",
+        409,
+      );
+    }
+    if (outcome === "none") {
       return refuse(
         slug,
         "published_redo_reject",
@@ -1794,9 +1816,11 @@ export async function POST(req: Request) {
         action: "published_redo_rolled_back",
         slug,
         status: "succeeded",
-        message: `published image restored to its pre-redo source (rollback snapshot v${result.snapshotVersion})`,
+        message: result.alreadyRolledBack
+          ? "published image was already back on its pre-redo source — duplicate rollback settled without a second write"
+          : `published image restored to its pre-redo source (rollback snapshot v${result.snapshotVersion})`,
       });
-      return NextResponse.json({ ok: true, slug });
+      return NextResponse.json({ ok: true, slug, alreadyRolledBack: result.alreadyRolledBack === true });
     } catch (e) {
       return mapMutationError(slug, "published_redo_rollback", e);
     }

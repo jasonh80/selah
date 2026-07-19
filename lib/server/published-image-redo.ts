@@ -444,7 +444,8 @@ export async function consumePublishedRedoClaim(
   // the claim dies pre-spend (terminal failure, zero credit used).
   const binding = await derivePublishedRedoBinding(slug, row.kind, row.notes, action);
   if (binding.digest !== bindingDigest || binding.baseRevision !== row.baseRevision) {
-    await markPublishedRedoTerminalFailure(slug, jobId, "failed", 0, "stale_binding");
+    // We own the "running" state here — the consume above committed.
+    await markPublishedRedoTerminalFailure(slug, jobId, "failed", 0, "stale_binding", ["running"]);
     throw new ChapterMutationError(
       "CONFLICT",
       action,
@@ -481,17 +482,24 @@ export async function completePublishedRedoCandidate(
   }
 }
 
+/**
+ * Terminal failure, pinned to the exact states THIS caller can own. A worker
+ * that never consumed the claim must pass ["queued"] only — a definitively
+ * lost consume means ANOTHER worker owns the "running" row, and closing it
+ * from here would discard that worker's (possibly paid) in-flight run while
+ * recording "no spend" (adversarial-review finding, 2026-07-19).
+ */
 export async function markPublishedRedoTerminalFailure(
   slug: string,
   jobId: string,
   state: "failed" | "blocked",
   spentCount: number,
   errorCode: string,
+  expectedStates: readonly ("queued" | "running")[],
 ): Promise<boolean> {
   const lane = laneStore();
   if (!lane) return false;
-  // The claim may be "queued" (pre-consume refusal) or "running".
-  for (const expected of ["running", "queued"] as const) {
+  for (const expected of expectedStates) {
     const changed = await lane.conditionalUpdate(jobId, expected, {
       status: state,
       spent_count: Math.max(0, Math.floor(spentCount)),
@@ -696,15 +704,19 @@ export async function applyPublishedRedoCandidate(
   return { applied: true, alreadyApplied: false, snapshotVersion: version };
 }
 
+/** Lane bookkeeping for a candidate that IS live. Normally candidate→applied;
+ * if a racing reject flipped the row first, rejected→applied repairs it so the
+ * owner's rollback path is never lost (adversarial-review finding). */
 async function settleApplied(lane: PublishedRedoStore, jobId: string): Promise<void> {
-  const changed = await lane.conditionalUpdate(jobId, "candidate", {
-    status: "applied",
-    applied_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
-  if (typeof changed === "object" || changed !== 1) {
-    console.error(`[selah] published redo ${jobId}: applied on the live row but lane bookkeeping did not settle`);
+  for (const expected of ["candidate", "rejected"] as const) {
+    const changed = await lane.conditionalUpdate(jobId, expected, {
+      status: "applied",
+      applied_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    if (typeof changed === "number" && changed === 1) return;
   }
+  console.error(`[selah] published redo ${jobId}: applied on the live row but lane bookkeeping did not settle`);
 }
 
 /**
@@ -716,10 +728,19 @@ async function settleApplied(lane: PublishedRedoStore, jobId: string): Promise<v
 export async function rollbackPublishedRedo(
   slug: string,
   jobId: string,
-): Promise<{ snapshotVersion: number }> {
+): Promise<{ snapshotVersion: number | null; alreadyRolledBack?: boolean }> {
   const action = "applyPublishedImageRedo";
   const lane = requireLaneStore(slug, action);
   const lookup = await lane.byId(jobId);
+  if (lookup.kind === "error") {
+    // A storage outage is never an owner error (fail closed, honest code).
+    throw new ChapterMutationError(
+      "WRITE_FAILED",
+      action,
+      slug,
+      `published-redo storage read failed: ${lookup.message}`,
+    );
+  }
   const row = lookup.kind === "row" ? parseRow(lookup.row) : null;
   if (!row || row.slug !== slug || row.status !== "applied" || !row.candidateUrl) {
     throw new ChapterMutationError(
@@ -731,6 +752,24 @@ export async function rollbackPublishedRedo(
   }
   const chapterStore = requireJobStore(slug, action);
   const live = await readLiveReviewedChapter(chapterStore, slug, action);
+  // Idempotent duplicate rollback: if the live image is already back on the
+  // pre-redo source (a prior rollback's lane write was lost), settle the
+  // bookkeeping and report success without another chapter write.
+  const liveTarget = Array.isArray(live.json.images)
+    ? ((live.json.images as unknown[]).find(
+        (image) => (image as Record<string, unknown>)?.kind === row.kind,
+      ) as Record<string, unknown> | undefined)
+    : undefined;
+  if (liveTarget?.src === row.baseSrc) {
+    const settled = await lane.conditionalUpdate(jobId, "applied", {
+      status: "rolled_back",
+      updated_at: new Date().toISOString(),
+    });
+    if (typeof settled === "object" || settled !== 1) {
+      console.error(`[selah] published redo ${jobId}: rollback settle did not land`);
+    }
+    return { snapshotVersion: null, alreadyRolledBack: true };
+  }
   const nextJson = swapExactlyOneSrc(live.json, row.kind, row.candidateUrl, row.baseSrc, slug, action);
   await assertNextWorkupServesClean(slug, nextJson as unknown as ChapterWorkup, action);
   const version = await snapshotVersion(slug, "before-published-image-redo-rollback");
@@ -777,24 +816,54 @@ export async function rollbackPublishedRedo(
  * locked. The candidate file stays orphaned in its immutable directory
  * (never deleted — owner decision IQ-010). Never throws; false = nothing cleared.
  */
-export async function rejectPublishedRedo(slug: string, now = Date.now()): Promise<boolean> {
+export type PublishedRedoRejectOutcome = "rejected" | "healed_applied" | "none";
+
+export async function rejectPublishedRedo(
+  slug: string,
+  now = Date.now(),
+): Promise<PublishedRedoRejectOutcome> {
   const lane = laneStore();
-  if (!lane) return false;
+  if (!lane) return "none";
   let row: PublishedRedoRow | null;
   try {
     row = await latestParsed(lane, slug, "rejectPublishedRedo");
   } catch (e) {
     console.error(`[selah] rejectPublishedRedo(${slug}): ${(e as Error).message}`);
-    return false;
+    return "none";
   }
-  if (!row) return false;
+  if (!row) return "none";
+  // A candidate the live chapter ALREADY uses is not rejectable — an apply
+  // committed on the live row (its lane settle may have raced or been lost).
+  // Repair the bookkeeping to "applied" instead, so the audit line stays true
+  // and the owner's rollback path survives (adversarial-review finding).
+  if (row.status === "candidate" && row.candidateUrl) {
+    try {
+      const chapterRow = await requireJobStore(slug, "rejectPublishedRedo").read(slug);
+      if (chapterRow && !("error" in chapterRow)) {
+        const images = chapterRow.workupJson?.images;
+        const target = Array.isArray(images)
+          ? (images.find((image) => (image as Record<string, unknown>)?.kind === row!.kind) as
+              | Record<string, unknown>
+              | undefined)
+          : undefined;
+        if (target?.src === row.candidateUrl) {
+          await settleApplied(lane, row.id);
+          return "healed_applied";
+        }
+      }
+      // An unreadable live row falls through: rejecting is lane-only and the
+      // conditional write below still refuses if anything moved meanwhile.
+    } catch (e) {
+      console.error(`[selah] rejectPublishedRedo(${slug}) live check: ${(e as Error).message}`);
+    }
+  }
   const revisionMs = Date.parse(row.updatedAt || row.createdAt || "");
   const staleQueued =
     row.status === "queued" && Number.isFinite(revisionMs) && now - revisionMs > JOB_TOKEN_TTL_MS;
-  if (row.status !== "candidate" && row.status !== "failed" && !staleQueued) return false;
+  if (row.status !== "candidate" && row.status !== "failed" && !staleQueued) return "none";
   const changed = await lane.conditionalUpdate(row.id, row.status, {
     status: "rejected",
     updated_at: new Date().toISOString(),
   });
-  return typeof changed === "number" && changed === 1;
+  return typeof changed === "number" && changed === 1 ? "rejected" : "none";
 }
