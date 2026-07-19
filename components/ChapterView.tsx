@@ -5,7 +5,6 @@ import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
 import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
 import { InsightCards } from "@/components/chapter/InsightCardGrid";
-import { KeyPersonCard } from "@/components/chapter/VisualDashboardGrid";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GeoMapSection } from "@/components/chapter/GeoMapSection";
@@ -57,19 +56,20 @@ export function ChapterView({
             the Deep Dive rail/header, the half-page dashboard grid). */}
         <div className="space-y-s3">
           <HeroImage data={data} />
+          {/* Scene check(s) not bound to a path image — the hero's check —
+              sit DIRECTLY under the hero, photo-and-caption style (owner
+              direction 2026-07-19: "think a photo and caption on Instagram"). */}
+          <SceneCheckSection data={data} />
           <QuickSummaryCard data={data} />
           <MetadataChips data={data} />
           <CompactPreviewRow data={data} />
-          {/* Scene check(s) not bound to a path image sit right here, under
-              the top block — paired with the hero directly above. */}
-          <SceneCheckSection data={data} />
         </div>
 
         {/* The visual walk: each image with ITS scene check attached */}
         <VisualChapterPath data={data} />
 
+        {/* Owner direction 2026-07-19: no Key Person card after the timeline. */}
         <TimelineSection data={data} />
-        <KeyPersonCard data={data} />
         <MostPeopleMissSection data={data} />
         <InsightCards data={data} types={["jesus_connection"]} />
 
@@ -77,8 +77,11 @@ export function ChapterView({
         {getGeoChapterMap(data.slug) ? <GeoMapSection data={data} /> : <MapsSection data={data} />}
         <InsightCards data={data} types={["map_notes"]} />
 
-        <InsightCards data={data} types={["big_idea", "chapter_flow"]} />
+        <InsightCards data={data} types={["big_idea"]} />
         <AuthorAudienceEvidence data={data} />
+        {/* Owner direction 2026-07-19: Chapter Flow reads best right after
+            Behind the Chapter. */}
+        <InsightCards data={data} types={["chapter_flow"]} />
         <InsightCards
           data={data}
           excludeTypes={[
