@@ -77,13 +77,22 @@ class FakeJobStore implements JobStorePort {
   seed(slug: string, status: string, json: Record<string, unknown>): void {
     this.rows.set(slug, { status, updated_at: this.now(), workup_json: json });
   }
+  /** PostgreSQL serializes timestamptz reads as "+00:00", not the "Z" form a
+   * JS writer stored (Codex #66 final review) — mirror that here so revision
+   * comparisons are proven against real read-back representations. */
+  private pgSerialize(value: string | null): string | null {
+    if (value === null || !Number.isFinite(Date.parse(value))) return value;
+    return new Date(value).toISOString().replace(/Z$/u, "+00:00");
+  }
   async read(slug: string): Promise<JobRow | null | { error: string }> {
     if (this.failNextRead) {
       this.failNextRead = false;
       return { error: "simulated read failure" };
     }
     const r = this.rows.get(slug);
-    return r ? { status: r.status, updatedAt: r.updated_at, workupJson: r.workup_json } : null;
+    return r
+      ? { status: r.status, updatedAt: this.pgSerialize(r.updated_at), workupJson: r.workup_json }
+      : null;
   }
   async insert(): Promise<"ok" | "duplicate" | { error: string }> {
     return { error: "insert unused in this gate" };
@@ -92,7 +101,15 @@ class FakeJobStore implements JobStorePort {
     const r = this.rows.get(slug);
     if (!r) return 0;
     if (r.status !== p.status) return 0;
-    if (p.updatedAt !== undefined && p.updatedAt !== null && r.updated_at !== p.updatedAt) return 0;
+    // Postgres compares parsed instants, never raw strings — a "+00:00"
+    // predicate matches a stored "Z" write. Unparseable ticks compare exactly.
+    if (p.updatedAt !== undefined && p.updatedAt !== null) {
+      const stored = r.updated_at ?? "";
+      const wanted = p.updatedAt;
+      const bothParse = Number.isFinite(Date.parse(stored)) && Number.isFinite(Date.parse(wanted));
+      const match = bothParse ? Date.parse(stored) === Date.parse(wanted) : stored === wanted;
+      if (!match) return 0;
+    }
     for (const check of p.json ?? []) {
       const actual = r.workup_json?.[check.key];
       if (check.equals === null && actual !== undefined && actual !== null) return 0;
@@ -618,6 +635,25 @@ const main = async () => {
       ok(lane.rows.get(jobI4)?.status === "candidate", "I4 the candidate row is untouched by the refused reject");
       const rej4b = await adminPost(adminReq({ action: "published_redo_reject", slug: SLUG }));
       ok(rej4b.status === 200 && lane.rows.get(jobI4)?.status === "rejected", "I4 reject lands once an authoritative read proves the candidate is not live");
+
+      // I5 (final review): timestamptz representation round-trip — the apply
+      // stores its written "Z"-form revision, the live read serializes as
+      // "+00:00", and rollback must still match (parsed-instant equality),
+      // while genuine drift (I2 above) still refuses.
+      const pf5 = await json(await adminPost(adminReq({ action: "published_redo_preflight", slug: SLUG, kind: "ephphatha", notes: NOTES })));
+      const digestI5 = String((pf5.redo as Record<string, unknown>).bindingDigest);
+      const created5 = await json(await adminPost(adminReq({ action: "published_redo", slug: SLUG, kind: "ephphatha", notes: NOTES, bindingDigest: digestI5, confirm: true })));
+      const jobI5 = String(created5.jobId);
+      await publishedRedoWorker(workerReq(lastTrigger!.body as Record<string, unknown>));
+      const candI5 = String(lane.rows.get(jobI5)!.candidate_url);
+      const applied5 = await adminPost(adminReq({ action: "published_redo_apply", slug: SLUG, jobId: jobI5, kind: "ephphatha", candidateUrl: candI5, confirm: true }));
+      ok(applied5.status === 200, "I5 setup: applied");
+      const storedRev = String(lane.rows.get(jobI5)!.applied_revision);
+      const readBack = (await store.read(SLUG)) as { updatedAt: string };
+      ok(/Z$/u.test(storedRev) && /\+00:00$/u.test(readBack.updatedAt) && storedRev !== readBack.updatedAt,
+        "I5 the write-form and read-form revisions genuinely differ as strings");
+      const rb5 = await adminPost(adminReq({ action: "published_redo_rollback", slug: SLUG, jobId: jobI5, confirm: true }));
+      ok(rb5.status === 200, "I5 rollback matches across timestamptz serializations (parsed instants, not raw strings)");
     }
 
     // ---------------- G. Reject + blocked stay-locked ----------------

@@ -212,6 +212,24 @@ function parseRow(raw: Record<string, unknown>): PublishedRedoRow | null {
 
 const ACTIVE: readonly PublishedRedoStatus[] = ["queued", "running", "candidate", "blocked"];
 
+/**
+ * Revision equality across serializations (Codex #66 final review):
+ * chapter_workups.updated_at is timestamptz — the value we WRITE is a JS ISO
+ * string ("…Z") but reads come back in PostgreSQL's serialization
+ * ("…+00:00"). Comparing raw strings would refuse valid rollbacks. Postgres
+ * itself compares parsed instants (the conditional-write predicates are
+ * representation-insensitive), so this comparison must be too: exact string
+ * match, else both sides parse to the same instant. Unparseable or missing
+ * values never match (fail closed).
+ */
+export function sameRevision(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const pa = Date.parse(a);
+  const pb = Date.parse(b);
+  return Number.isFinite(pa) && Number.isFinite(pb) && pa === pb;
+}
+
 // ---------------------------------------------------------------------------
 // Live-row context: one read, guarded by the DEDICATED action.
 // ---------------------------------------------------------------------------
@@ -451,7 +469,7 @@ export async function consumePublishedRedoClaim(
   // stranded "running" row would hold the one-active-per-slug lock forever.
   try {
     const binding = await derivePublishedRedoBinding(slug, row.kind, row.notes, action);
-    if (binding.digest !== bindingDigest || binding.baseRevision !== row.baseRevision) {
+    if (binding.digest !== bindingDigest || !sameRevision(binding.baseRevision, row.baseRevision)) {
       throw new ChapterMutationError(
         "CONFLICT",
         action,
@@ -684,7 +702,7 @@ export async function applyPublishedRedoCandidate(
   // (Codex #66 P1-1): even if the target image itself is unchanged, any
   // other change to the live row since generation refuses — the owner
   // reviewed a candidate against a chapter that no longer exists.
-  if (live.revision !== row.baseRevision) {
+  if (!sameRevision(live.revision, row.baseRevision)) {
     throw new ChapterMutationError(
       "CONFLICT",
       action,
@@ -814,7 +832,7 @@ export async function rollbackPublishedRedo(
   // Rollback is bound to the EXACT revision the apply wrote (Codex #66 P1-2):
   // any later change to the live row — even one leaving the candidate src in
   // place — refuses, instead of restoring base_src over unknown state.
-  if (!row.appliedRevision || live.revision !== row.appliedRevision) {
+  if (!sameRevision(live.revision, row.appliedRevision)) {
     throw new ChapterMutationError(
       "CONFLICT",
       action,
