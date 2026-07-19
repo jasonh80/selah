@@ -179,25 +179,26 @@ fallback) since r101.
 - **Spend honesty** (PRs #51/#53): any post-dispatch failure records possible
   spend (`billingUncertain`), claims lock instead of silently releasing;
   public workers keep pre-auth refusals console-only (audit-flood fix).
-- **Shared improvement queue** (`docs/selah/improvement-queue.yml`): 10
-  entries on main, 16 pending PR #55. Both AIs read it on "catch up".
+- **Shared improvement queue** (`docs/selah/improvement-queue.yml`): 16
+  entries on main (PR #55 merged). Both AIs read it on "catch up".
 - **Self-serve Prepare (IQ-011)** built (PR #58, pending review): any
   non-protected chapter can be proposed/validated/approved on-screen; one
   bounded confirmed model call; fail-closed everywhere; Codex audits
   post-hoc. The `chapter_prepare_proposals` table SQL was run 2026-07-18.
 - **Hydration fix** (PR #57, merged + verified on production): theme provider
   no longer mismatches server/client on saved non-default themes.
-- Pending PRs at write time: #55 queue · #56 320px wrap · #58 self-serve
-  Prepare · #59 maps UX · #60 published-neighbor nav (IQ-012) · #61 chapter
-  metadata (IQ-016).
+- Merged same-day: #55 queue (16 entries) · #56 320px wrap · #60
+  published-neighbor nav (IQ-012). Pending at write time: #58 self-serve
+  Prepare · #59 maps UX · #61 chapter metadata (IQ-016).
 
 ## Next up
 
 - **Layout via Figma (IQ-008, owner-confirmed):** Codex owns the editable
   Mark 9 mobile mockup; Claude implements only after the owner approves the
-  design. Goal: reduce visual competition (~87 bordered boxes today), one
-  box level, ≤3 text sizes. (#33's newspaper draft is superseded by this
-  lane.)
+  design. Approved principle: reduced visual competition, with the live page
+  as the measured baseline. (The ~87-box count, one-box-level, and ≤3-text-
+  sizes targets are Claude's measured proposals on the board, not recorded
+  owner constraints.) #33's newspaper draft is superseded by this lane.
 - **Navigation (IQ-007, owner decision):** remove the visible "Today"
   concept; canonical `/chapter/{slug}` everywhere; `/today` becomes a quiet
   redirect. Sequenced with the layout pass.
@@ -205,8 +206,9 @@ fallback) since r101.
   on-screen Prepare receipt (or, once #58 merges, any OTHER chapter through
   the self-serve lane).
 - **Kelly's characters:** People/Connections uses Kelly's system as the
-  canonical cast (owner direction 2026-07-18); spec day proposed for Mon
-  2026-07-21, awaiting the owner's confirm.
+  canonical cast (owner direction 2026-07-18); spec work starts early the week of
+  2026-07-20 (owner said "Monday"; Jul 21 is a Tuesday — exact day being
+  pinned with him).
 
 ## Cost reference (Mark 6 actuals, logged estimates)
 
