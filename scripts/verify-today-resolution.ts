@@ -8,7 +8,9 @@
 import assert from "node:assert/strict";
 import {
   resolveTodaysChapterWith,
+  listNavigableSlugsWith,
   type TodaysChapterDeps,
+  type NavigableSlugsDeps,
 } from "../lib/chapters/registry";
 import type { ChapterWorkup } from "../lib/types";
 
@@ -110,7 +112,51 @@ const main = async () => {
     ok(unconfigured.workup.slug === "exodus-27" && !listed, "3. unconfigured Supabase never queries and falls back");
   }
 
-  console.log(`verify:today ✓ ${checks} checks passed (newest servable published chapter wins; local fallback only after every candidate is exhausted)`);
+  // 4. Title-as-navigation slug list (Codex #67 P1): every database candidate
+  //    passes the GUARDED public reader — a reviewed-but-unservable protected
+  //    row must stay greyed, never linked to a 404.
+  {
+    const navDeps = (overrides: Partial<NavigableSlugsDeps>): NavigableSlugsDeps => ({
+      supabaseConfigured: () => true,
+      listReviewedSlugsNewestFirst: async () => [],
+      readPublishedChapter: async () => null,
+      localSlugs: () => ["exodus-27"],
+      ...overrides,
+    });
+    const guarded = await listNavigableSlugsWith(navDeps({
+      // mark-7 reviewed but serve-refused (receipt drift): reader returns null.
+      listReviewedSlugsNewestFirst: async () => ["mark-9", "mark-7"],
+      readPublishedChapter: async (slug) =>
+        slug === "mark-9" || slug === "psalm-23" ? workupFor(slug) : null,
+    }));
+    ok(guarded.includes("mark-9") && guarded.includes("psalm-23") && guarded.includes("exodus-27"),
+      "4. servable reviewed chapters, psalm-23, and local fixtures link");
+    ok(!guarded.includes("mark-7"),
+      "4. a reviewed-but-unservable row stays greyed (guarded reader is the authority)");
+
+    const erroring = await listNavigableSlugsWith(navDeps({
+      listReviewedSlugsNewestFirst: async () => ["mark-9"],
+      readPublishedChapter: async (slug) => {
+        if (slug === "mark-9") throw new Error("row unreadable");
+        return null;
+      },
+    }));
+    ok(!erroring.includes("mark-9") && erroring.includes("exodus-27"),
+      "4. an erroring candidate stays greyed; locals still link");
+
+    let queried = false;
+    const offline = await listNavigableSlugsWith(navDeps({
+      supabaseConfigured: () => false,
+      readPublishedChapter: async () => {
+        queried = true;
+        return null;
+      },
+    }));
+    ok(offline.length === 1 && offline[0] === "exodus-27" && !queried,
+      "4. unconfigured Supabase links only local fixtures, no queries");
+  }
+
+  console.log(`verify:today ✓ ${checks} checks passed (newest servable published chapter wins; local fallback only after every candidate is exhausted; nav slugs pass the guarded reader)`);
 };
 
 main().catch((error) => {
