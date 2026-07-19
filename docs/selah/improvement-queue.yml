@@ -76,12 +76,13 @@ entries:
       source landscape; images 2-3 portrait sources cropped into the 3:2
       frame.
     priority_trigger: >-
-      owner-gated paid regeneration — needs Jason's explicit go (image
-      credit). OWNER DECISION 2026-07-18: the redo tool is draft-only
-      (published chapters refuse via the mutation guard), so the first redo
-      test happens naturally on Mark 10's draft images; Mark 9's two
-      portrait sources stay queued until a published-chapter refresh lane
-      exists (its own owner decision).
+      AUTHORIZED AND READY 2026-07-19 (no run started yet): the
+      published-redo lane shipped (#66) and Jason created its table and
+      authorized both ~$0.17 candidates in-session ("figure it out and get
+      it done"). Neither AI holds the Studio key (Codex confirmed on board
+      #29, no secrets accessed), so Jason's authenticated Studio session is
+      the executor - his staged two-tap checklist is on the board. Rollback
+      stays available after any apply.
     status: queued
     completion_pr: null
 
@@ -99,8 +100,10 @@ entries:
       left untouched (frozen path).
     priority_trigger: next Studio-safety pass (small bounded fix; free; no
       behavior change for authenticated flows)
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "direct commit ad6964c (2026-07-18) - console-only
+      pre-auth refusals in BOTH public image workers; queue entry reconciled
+      2026-07-19"
 
   - id: IQ-006
     area: workers
@@ -118,8 +121,10 @@ entries:
       (lib/server/images.ts spend envelope).
     priority_trigger: before the next paid full image run (protects real
       money; owner-gated path, so fix + gate first)
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "direct commit ad6964c (2026-07-18) - any post-dispatch
+      failure records possible spend (max(generated, started), billingUncertain,
+      blocked on unrecordable cost); queue entry reconciled 2026-07-19"
 
   - id: IQ-007
     area: navigation
@@ -177,8 +182,9 @@ entries:
       before any map interaction.
     priority_trigger: next runtime/layout pass (free; diagnose first —
       the fix must not touch chapter content)
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "#57 hydration-safe ThemeProvider (merged 2026-07-18);
+      Claude live-check 2026-07-19: no console errors on published chapter loads"
 
   - id: IQ-010
     area: images
@@ -239,8 +245,9 @@ entries:
     priority_trigger: next Studio feature lane, after Mark 10's supervised
       launch validates the current flow end to end; design note from Codex
       first, then one focused build PR
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "#58 self-serve Prepare (merged 2026-07-19; owner ran the
+      SQL same day) - first live walkthrough still pending with Jason"
 
   - id: IQ-012
     area: navigation
@@ -267,8 +274,8 @@ entries:
     evidence: >-
       Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
     priority_trigger: owner-gated paid redo (~$0.17 each); Jason's explicit
-      go; draft-only tool means these ride the next Mark 10 revision lane
-      or a future published-chapter refresh lane
+      go per image. UNBLOCKED 2026-07-19 - the published-redo lane (#66)
+      now covers live Mark 10; ready whenever Jason confirms the spends
     status: queued
     completion_pr: null
 
@@ -281,8 +288,11 @@ entries:
       Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
     priority_trigger: the Figma-driven layout pass (IQ-008; Codex owns the
       editable mockup, Claude implements after Jason approves the design)
-    status: queued
-    completion_pr: null
+    status: declined
+    completion_pr: "superseded by the owner layout decisions 2026-07-19:
+      Quick Dive itself was retired in #64 (one scrollable page, essentials
+      first by ORDER, FAQs collapsed at the bottom) - the intent is
+      satisfied structurally"
 
   - id: IQ-015
     area: mark-10-wording
@@ -304,8 +314,8 @@ entries:
     evidence: >-
       Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
     priority_trigger: next navigation/metadata pass (free)
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "#61 chapter-specific metadata (merged 2026-07-19)"
 
   - id: IQ-017
     area: maps
