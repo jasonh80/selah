@@ -175,6 +175,120 @@ export function integratedSceneChecks<T extends { title: string }>(
   return byKind;
 }
 
+/** Owner layout direction (2026-07-19): EVERY scene check pairs with an
+ * image. Kind-matching first (exact), then remaining checks fill scenes
+ * without one, in order; whatever still remains renders standalone directly
+ * under the top block (typically a hero-bound check). Both the path and the
+ * standalone section use THIS one assignment so no check is dropped or
+ * doubled. */
+export function assignSceneChecks<T extends { title: string; imageKind?: string }>(
+  slug: string,
+  checks: readonly T[],
+  orderedSceneKinds: readonly string[],
+): { forScene: Map<string, T>; standalone: T[] } {
+  const kindSet = new Set(orderedSceneKinds);
+  // 1) EXPLICIT validated binding (generated checks carry imageKind bound to
+  //    a planned image kind); 2) the static title→kind map (hand-curated).
+  //    NEVER positional guessing — an unbound check renders standalone
+  //    rather than pairing with an unrelated image (Codex #64, finding 3).
+  const forScene = new Map<string, T>();
+  for (const check of checks) {
+    if (check.imageKind && kindSet.has(check.imageKind) && !forScene.has(check.imageKind)) {
+      forScene.set(check.imageKind, check);
+    }
+  }
+  for (const check of checks) {
+    if ([...forScene.values()].includes(check)) continue;
+    const kind = getSceneCheckImageKind(slug, check.title);
+    if (kind && kindSet.has(kind) && !forScene.has(kind)) forScene.set(kind, check);
+  }
+  const used = new Set(forScene.values());
+  return { forScene, standalone: checks.filter((check) => !used.has(check)) };
+}
+
+/** ONE shared insight-type normalizer (Codex #64 final round): stable
+ * section `type` when present; else the REAL ids stored in published rows
+ * (prompt ids like "big-idea"/"what-most-miss" AND the older legacy aliases);
+ * else — legacy rows only — an exact display-title fallback. */
+const INSIGHT_ID_TYPE: Record<string, string> = {
+  // real prompt ids (published Mark 7–10 rows)
+  "big-idea": "big_idea",
+  "chapter-flow": "chapter_flow",
+  "historical-world": "historical_world",
+  "what-most-miss": "what_most_people_miss",
+  "map-notes": "map_notes",
+  "original-language": "original_language",
+  "image-plan": "image_plan",
+  // older legacy aliases (Exodus 27-era)
+  context: "historical_world",
+  miss: "what_most_people_miss",
+  // shared ids
+  jesus: "jesus_connection",
+  theology: "theology",
+  application: "application",
+  discipleship: "discipleship",
+  prayer: "prayer",
+};
+const INSIGHT_TITLE_TYPE: Record<string, string> = {
+  "big idea": "big_idea",
+  "chapter flow": "chapter_flow",
+  "the world behind it": "historical_world",
+  "historical context": "historical_world",
+  "what most people miss": "what_most_people_miss",
+  "map notes": "map_notes",
+  "original language": "original_language",
+  "jesus at the center": "jesus_connection",
+  "theology principle": "theology",
+  "live it": "application",
+  "practical application": "application",
+  "disciple it": "discipleship",
+  prayer: "prayer",
+};
+export function insightTypeOf(insight: { type?: string; id: string; title: string }): string {
+  if (insight.type) return insight.type;
+  return (
+    INSIGHT_ID_TYPE[insight.id] ??
+    INSIGHT_TITLE_TYPE[insight.title.trim().toLowerCase()] ??
+    "custom"
+  );
+}
+
+/** Two trimmed texts carry DISTINCT authored material when neither contains
+ * the other. */
+export function distinctText(a: string | undefined, b: string | undefined): boolean {
+  const x = (a ?? "").trim();
+  const y = (b ?? "").trim();
+  if (!x || !y) return false;
+  return !x.includes(y) && !y.includes(x);
+}
+
+/** Canonical "What Most People Miss" content (Codex #64, finding 3): when
+ * the two-layer authored insight card exists it IS the canonical source and
+ * BOTH its layers render (cardSummary as the intro line, fullContent as the
+ * body) — nothing is discarded by dedupe. The legacy top-level field renders
+ * only when no card exists. */
+export function mostPeopleMissContent(data: {
+  modernReadersMiss?: string;
+  insights?: { id: string; type?: string; title: string; preview: string; body: string }[];
+}): { intro?: string; body: string; extra?: string } | null {
+  const card = data.insights?.find((i) => insightTypeOf(i) === "what_most_people_miss");
+  const field = data.modernReadersMiss?.trim();
+  if (card) {
+    const intro = card.preview.trim();
+    const body = card.body.trim();
+    if (body) {
+      return {
+        intro: intro && distinctText(intro, body) ? intro : undefined,
+        body,
+        // Independently authored legacy field text survives too — every
+        // distinct layer renders in the same box (Codex #64 final round).
+        extra: field && distinctText(field, body) && distinctText(field, intro) ? field : undefined,
+      };
+    }
+  }
+  return field ? { body: field } : null;
+}
+
 // ---- Verse-by-verse notes --------------------------------------------------
 // Brief, static, Selah-voiced explanations per verse. No generated content.
 export const CHAPTER_VERSE_NOTES: Record<string, Record<number, string>> = {
@@ -327,6 +441,7 @@ export interface SceneCheck {
   body: string;
   relatedVerses?: string[];
   visualAccuracyNotes?: string[];
+  imageKind?: string; // explicit binding to one planned image kind
 }
 
 export const CHAPTER_SCENE_CHECKS: Record<string, SceneCheck[]> = {

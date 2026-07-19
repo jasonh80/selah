@@ -2,22 +2,18 @@
 
 import { useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
-import { useReadingMode, type ReadingMode } from "@/components/ReadingModeProvider";
 import { useVersion } from "@/components/VersionProvider";
 import { useEsvText } from "@/components/chapter/useEsvText";
 import { ScriptureReader } from "@/components/chapter/ScriptureReader";
 
 // The chapter header (layout spec §2/§3; owner decision A2, 2026-07-16):
-// title left with the control row — [ Read Mark 6 ] [ Quick Dive ]
-// [ Deep Dive ] — on the SAME row at md+ (wrapping below when the title
-// needs the width), and a tight controls row directly below the title on
-// phones. Below that, a collapsed Scripture preview (first words of the
+// title left with the control row — [ Read Mark 6 ] (Quick/Deep Dive is
+// retired, owner decision 2026-07-19: one scrollable page, cards expanded). Below that, a collapsed Scripture preview (first words of the
 // selected translation). "Read Mark 6" expands the FULL chapter inline right
 // here — content pushes down, no jump to a lower section. Expanded, the
 // control reads "Hide Mark 6". Selah Focus lives in the app header beside
 // the version/theme controls.
 export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
-  const { mode, setMode } = useReadingMode();
   const { version } = useVersion();
   const [scriptureOpen, setScriptureOpen] = useState(false);
   const esv = useEsvText(data.reference, version === "ESV");
@@ -25,8 +21,6 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
   const base =
     "flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium transition sm:px-4";
 
-  const modeBtn = (m: ReadingMode) =>
-    `${base} ${mode === m ? "bg-accent-strong text-white shadow-hair" : "border bg-card text-secondary hover:text-primary"}`;
 
   // The preview labels ONLY what it is actually showing: real ESV words get
   // the ESV tag (attribution at a glance); anything else is Selah's own
@@ -56,12 +50,6 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
               <span aria-hidden className={`text-secondary transition-transform ${scriptureOpen ? "rotate-180" : ""}`}>
                 ⌄
               </span>
-            </button>
-            <button onClick={() => setMode("quick")} aria-pressed={mode === "quick"} className={modeBtn("quick")}>
-              Quick Dive
-            </button>
-            <button onClick={() => setMode("deep")} aria-pressed={mode === "deep"} className={modeBtn("deep")}>
-              Deep Dive
             </button>
           </div>
         </div>

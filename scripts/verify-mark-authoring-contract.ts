@@ -12,6 +12,7 @@ import {
   type GeneratedChapterWorkup,
 } from "../lib/ai/schemas/chapter-workup-schema";
 import { generatedToRenderWorkup } from "../lib/ai/adapters/generated-to-workup";
+import { mostPeopleMissContent, insightTypeOf } from "../lib/content/chapter-content";
 import {
   heroImageFor,
   supportingImagesFor,
@@ -47,6 +48,7 @@ export function passingDraft(slug: string): GeneratedChapterWorkup {
     "jesus_connection",
     "theology",
     "application",
+    "discipleship",
     "prayer",
   ];
   const imageKinds = [
@@ -570,6 +572,126 @@ assert.deepEqual(
     .filter((kind) => kind !== fiveImagePlan.heroKind),
 );
 assert.ok((renderedFiveImagePlan.images[0].description?.length ?? 0) > 30);
+
+// Scene-check image bindings survive the adapter ONLY when they name a real
+// generated image kind (Codex #64 layout review, finding 1) — an invalid
+// binding drops to standalone rather than pairing with an unrelated image.
+{
+  const withBindings = {
+    ...base,
+    sceneChecks: [
+      { title: "Bound check", body: "Corrects one scene.", imageKind: base.generatedImages[1].type },
+      { title: "Unbound check", body: "Corrects the chapter broadly.", imageKind: "not-a-real-kind" },
+    ],
+  };
+  const parsedBindings = parseChapterWorkupJson(JSON.stringify(withBindings));
+  const renderedBindings = generatedToRenderWorkup(parsedBindings);
+  assert.equal(
+    renderedBindings.sceneChecks?.[0]?.imageKind,
+    base.generatedImages[1].type,
+    "a valid scene-check image binding must survive the adapter",
+  );
+  assert.equal(
+    renderedBindings.sceneChecks?.[1]?.imageKind,
+    undefined,
+    "an invalid scene-check image binding must be dropped (standalone render)",
+  );
+}
+
+// Canonical dedupe never discards authored content (Codex #64, finding 3):
+// with NON-OVERLAPPING card and field text, the canonical source is the
+// two-layer card and BOTH its layers survive.
+{
+  const nonOverlap = generatedToRenderWorkup(parseChapterWorkupJson(JSON.stringify(base)));
+  const cardBody = "Entirely distinct card teaching, absent from the field.";
+  const cardIntro = "Distinct one-line summary.";
+  const doctored = {
+    ...nonOverlap,
+    modernReadersMiss: "Field-only text with different teaching.",
+    insights: nonOverlap.insights.map((i) =>
+      (i.type ?? "") === "what_most_people_miss" ? { ...i, preview: cardIntro, body: cardBody } : i,
+    ),
+  };
+  const picked = mostPeopleMissContent(doctored);
+  assert.equal(picked?.body, cardBody, "the two-layer card is the canonical WMPM body");
+  assert.equal(picked?.intro, cardIntro, "the cardSummary layer renders too — nothing discarded");
+  const fieldOnly = { ...doctored, insights: doctored.insights.filter((i) => (i.type ?? "") !== "what_most_people_miss") };
+  assert.equal(mostPeopleMissContent(fieldOnly)?.body, "Field-only text with different teaching.", "the legacy field renders only when no card exists");
+}
+
+// Insights carry the STABLE section type through the adapter (Codex #64,
+// finding 2): routing is by type, so a variant display title cannot misroute.
+{
+  const retitled = {
+    ...base,
+    sections: base.sections.map((sec) =>
+      sec.type === "discipleship" ? { ...sec, title: "Walk It Out Together" } : sec,
+    ),
+  };
+  const renderedRetitled = generatedToRenderWorkup(parseChapterWorkupJson(JSON.stringify(retitled)));
+  const disciple = renderedRetitled.insights.find((i) => i.type === "discipleship");
+  assert.ok(disciple && disciple.title === "Walk It Out Together", "type survives a variant display title");
+}
+
+// Published Mark 7–10 rows predate Insight.type and store the REAL prompt
+// ids (big-idea / chapter-flow / historical-world / what-most-miss …): the
+// shared normalizer must classify a fully type-STRIPPED stored workup so
+// live cards keep their placements (Codex #64 final round).
+{
+  // Exactly the id shapes stored in published Mark 7–10 rows (prompt ids,
+  // no type field at all).
+  const storedPublished = [
+    { id: "big-idea", title: "Big Idea" },
+    { id: "chapter-flow", title: "Chapter Flow" },
+    { id: "historical-world", title: "The World Behind It" },
+    { id: "what-most-miss", title: "What Most People Miss" },
+    { id: "map-notes", title: "Map Notes" },
+    { id: "original-language", title: "Original Language" },
+    { id: "jesus", title: "Jesus at the Center" },
+    { id: "theology", title: "Theology Principle" },
+    { id: "application", title: "Live It" },
+    { id: "prayer", title: "Prayer" },
+  ];
+  const expectType: Record<string, string> = {
+    "big-idea": "big_idea",
+    "chapter-flow": "chapter_flow",
+    "historical-world": "historical_world",
+    "what-most-miss": "what_most_people_miss",
+    "map-notes": "map_notes",
+    "original-language": "original_language",
+    jesus: "jesus_connection",
+    theology: "theology",
+    application: "application",
+    prayer: "prayer",
+  };
+  for (const insight of storedPublished) {
+    assert.equal(
+      insightTypeOf(insight as never),
+      expectType[insight.id],
+      `stored published id ${insight.id} normalizes correctly`,
+    );
+  }
+  assert.equal(
+    insightTypeOf({ id: "mystery", title: "Live It" } as never),
+    "application",
+    "legacy-only title fallback classifies an unknown id",
+  );
+}
+
+// ALL independently authored layers survive dedupe: genuinely non-overlapping
+// strings in the field, cardSummary, and fullContent must every one render.
+{
+  const doc = {
+    modernReadersMiss: "ALPHA field-only teaching.",
+    insights: [
+      { id: "what-most-miss", title: "What Most People Miss", icon: "🔍", preview: "BETA summary teaching.", body: "GAMMA full teaching." },
+    ],
+  };
+  const picked = mostPeopleMissContent(doc as never);
+  assert.equal(picked?.body, "GAMMA full teaching.");
+  assert.equal(picked?.intro, "BETA summary teaching.", "cardSummary layer survives");
+  assert.equal(picked?.extra, "ALPHA field-only teaching.", "the distinct legacy field survives too — nothing discarded");
+}
 
 const swappedImageOrder = {
   ...base,

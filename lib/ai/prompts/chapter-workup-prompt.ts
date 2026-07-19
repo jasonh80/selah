@@ -3,7 +3,7 @@
 import { MARK_SPRINT_PROMPT_MINIMA } from "@/lib/ai/quality/mark-sprint-quality";
 import markSprintAcceptance from "../quality/mark-sprint-acceptance.v1.json";
 
-export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v6";
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v7";
 
 export type GenerationSourceSectionRole =
   | "context_before"
@@ -226,7 +226,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "whatHappens": "<what happens in the chapter>",
   "whatPeopleMiss": "<what a modern reader misunderstands or overlooks>",
   "jesusConnection": {
-    "short": "<one short phrase>",
+    "short": "<ONE plain-spoken line a first-time reader instantly gets — what Jesus actually DOES in or through this chapter, concrete, no church jargon (never phrases like 'makes the unclean whole'); it will display beside a cross icon, so do NOT start with the word Jesus followed by a colon>",
     "full": "<a full paragraph connecting the chapter to Jesus>",
     "relatedPassages": ["<Book c:v>", "<Book c:v>"]
   },
@@ -282,7 +282,8 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     { "id": "jesus", "title": "Jesus at the Center", "type": "jesus_connection", "priority": 5, "isCore": true, "cardSummary": "<short>", "fullContent": "<rich, careful Christ connection>" },
     { "id": "theology", "title": "Theology Principle", "type": "theology", "priority": 6, "isCore": true, "cardSummary": "<short>", "fullContent": "<the principle, started simple>" },
     { "id": "application", "title": "Live It", "type": "application", "priority": 7, "isCore": true, "cardSummary": "<short>", "fullContent": "<practical, invitational, no moralism>" },
-    { "id": "prayer", "title": "Prayer", "type": "prayer", "priority": 8, "isCore": true, "cardSummary": "<short>", "fullContent": "<a fuller prayer>" },
+    { "id": "discipleship", "title": "Disciple It", "type": "discipleship", "priority": 8, "isCore": true, "cardSummary": "<short>", "fullContent": "<THIS chapter's discipleship lesson in two movements: first FOLLOW — how this chapter trains someone to follow Jesus more closely; then MULTIPLY — how a reader helps someone ELSE follow Him (and equips them to pass it on again). Exponential multiplication is the goal. Concrete and invitational, drawn only from this chapter — never guilt, never a program pitch>" },
+    { "id": "prayer", "title": "Prayer", "type": "prayer", "priority": 9, "isCore": true, "cardSummary": "<short>", "fullContent": "<a fuller prayer>" },
     { "id": "image-plan", "title": "Image Plan", "type": "image_plan", "priority": 20, "isCore": false, "cardSummary": "<short>", "fullContent": "<describe why these 3 or 5 chapter-specific images reveal this chapter>" }
   ],
   "biblicalTimeline": {
@@ -296,7 +297,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     "placementReason": "<why you placed it here>"
   },
   "sceneChecks": [
-    { "title": "<short, vivid>", "body": "<warm, conversational correction of a common WRONG mental image — confident, lightly witty when it fits, never academic>", "relatedVerses": ["<c:v>"], "visualAccuracyNotes": ["<a concrete visual correction that will steer future image generation, e.g. 'tabernacle tent, not a stone temple' or 'wrapped linen turban, not a crown'>"] }
+    { "title": "<short, vivid>", "body": "<warm, conversational correction of a common WRONG mental image — confident, lightly witty when it fits, never academic>", "relatedVerses": ["<c:v>"], "visualAccuracyNotes": ["<a concrete visual correction that will steer future image generation, e.g. 'tabernacle tent, not a stone temple' or 'wrapped linen turban, not a crown'>"], "imageKind": "<EXACTLY one kind from your imagePlan that this check corrects — the check renders under that image; omit imageKind if the check corrects the chapter broadly rather than one scene>" }
   ],
   "behindTheChapter": {
     "author": { "title": "<who likely wrote it>", "body": "<short, confident, honest about debate where real>" },
@@ -347,7 +348,7 @@ Shepherd). Let those topics shape the sections. Do NOT fill the same generic
 sections for every chapter.
 
 SECTION DEPTH (this is the heart of Selah)
-- Include all 8 core sections above (isCore true). Also add helpful non-core
+- Include all 9 core sections above (isCore true). Also add helpful non-core
   sections when the passage warrants: "verse_by_verse" (movement through the
   chapter), "original_language" (only when a Hebrew/Greek word genuinely
   illuminates), "map_notes" (when geography matters), "custom" (a chapter-specific

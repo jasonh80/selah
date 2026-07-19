@@ -2,38 +2,50 @@
 
 import type { ChapterWorkup } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
-import { useReadingMode } from "@/components/ReadingModeProvider";
-import { getChapterContext, type ContextMedia } from "@/lib/content/chapter-content";
+import { getChapterContext, insightTypeOf, distinctText, type ContextMedia } from "@/lib/content/chapter-content";
 
 type AAECard = { category: string; title: string; body: string; media?: ContextMedia };
 
 // Author, Audience & Evidence — who wrote it, who first heard it, the world they
 // lived in, and the manuscripts/inscriptions/landscape that ground it.
-// Quick Dive: compact, skimmable cards. Deep Dive: fuller, roomier paragraphs.
+// Single-column, full-width cards (Quick/Deep retired 2026-07-19).
 // Media renders only when a real asset exists — never an empty placeholder.
 export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
-  const { mode } = useReadingMode();
   // Prefer generated cards; fall back to static config (e.g. Psalm 23).
+  // Every DISTINCT authored layer survives in the same full-width card
+  // (Codex #64 final round): the Behind-the-Chapter body stays, and the
+  // removed historical_world insight's summary/full text append when they
+  // carry material the body doesn't already contain.
+  const worldInsight = data.insights?.find((i) => insightTypeOf(i) === "historical_world");
+  const enrich = (card: AAECard): AAECard => {
+    const isWorld = /historical world|world behind/i.test(`${card.category} ${card.title}`);
+    if (!isWorld || !worldInsight) return card;
+    const layers = [card.body];
+    if (distinctText(worldInsight.preview, card.body)) layers.push(worldInsight.preview);
+    if (distinctText(worldInsight.body, card.body) && distinctText(worldInsight.body, worldInsight.preview)) {
+      layers.push(worldInsight.body);
+    }
+    return { ...card, body: layers.join("\n\n") };
+  };
   const cards: AAECard[] =
     data.behindTheChapter && data.behindTheChapter.length > 0
       ? data.behindTheChapter
       : getChapterContext(data.slug) ?? [];
   if (cards.length === 0) return null;
-  const deep = mode === "deep";
 
   return (
     <section id="author-audience-evidence" className="scroll-mt-20">
       <SectionHead title="Behind the Chapter" />
-      <div className={deep ? "space-y-2.5" : "grid gap-2.5 sm:grid-cols-2"}>
+      <div className="space-y-2.5">
         {cards.map((c, i) => (
-          <Card key={i} card={c} deep={deep} />
+          <Card key={i} card={enrich(c)} />
         ))}
       </div>
     </section>
   );
 }
 
-function Card({ card, deep }: { card: AAECard; deep: boolean }) {
+function Card({ card }: { card: AAECard }) {
   return (
     <div className="flex flex-col rounded-md border bg-card p-3.5 shadow-hair">
       <p className="text-eyebrow">{card.category}</p>
@@ -49,7 +61,7 @@ function Card({ card, deep }: { card: AAECard; deep: boolean }) {
         </figure>
       )}
 
-      <p className={`mt-2 text-secondary ${deep ? "text-[13px] leading-relaxed" : "text-[12px] leading-relaxed"}`}>
+      <p className={"mt-2 whitespace-pre-line text-[13px] leading-relaxed text-secondary"}>
         {card.body}
       </p>
     </div>

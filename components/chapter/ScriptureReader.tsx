@@ -39,7 +39,30 @@ export function ScriptureReader({
   const esv = sharedEsv ?? ownEsv;
 
   const showEsv = version === "ESV" && esv.found && Boolean(esv.text);
-  const verseNotes = getVerseNotes(data.slug);
+  // Verse-by-verse guidance: prefer the chapter's OWN reviewed verseByVerse
+  // content (generated with the workup, owner-reviewed before publish —
+  // Mark 9/10 style); fall back to the older hand-authored static notes
+  // (Psalm 23 / Mark 6). Each range's explanation sits under its FIRST verse.
+  const verseNotes = (() => {
+    // PROTECTED hand-authored notes (Psalm 23 / Mark 6) always win — a row
+    // that later carries generated verse-by-verse data must never silently
+    // replace curated notes (Codex #64 review, finding 6).
+    const curated = getVerseNotes(data.slug);
+    if (curated) return curated;
+    const flow = data.verseByVerse;
+    if (flow && flow.length > 0) {
+      const notes: Record<number, string> = {};
+      for (const item of flow) {
+        const at = item.startVerse ?? parseInt(item.rangeLabel, 10);
+        if (!Number.isFinite(at) || notes[at]) continue;
+        notes[at] = item.jesusConnection
+          ? `${item.title} — ${item.explanation} ${item.jesusConnection}`
+          : `${item.title} — ${item.explanation}`;
+      }
+      if (Object.keys(notes).length > 0) return notes;
+    }
+    return null;
+  })();
 
   return (
     <section id={embedded ? undefined : "chapter"} className="scroll-mt-20 space-y-s3">
@@ -108,8 +131,9 @@ export function ScriptureReader({
   );
 }
 
-// Verse-by-verse: the real ESV text (parsed from the licensed API response) with
-// a brief, static Selah explanation under each verse. No generated content.
+// Verse-by-verse: the real ESV text (parsed from the licensed API response)
+// with a brief Selah explanation under each verse — the chapter's reviewed
+// verseByVerse content when it exists, else the static notes.
 function parseEsvVerses(text: string): { num: number; text: string }[] {
   const out: { num: number; text: string }[] = [];
   const re = /\[(\d+)\]\s*([\s\S]*?)(?=\s*\[\d+\]|$)/g;

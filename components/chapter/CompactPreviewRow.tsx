@@ -1,10 +1,10 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { getChapterMap } from "@/lib/maps/chapter-maps";
-import { getTimelineNote } from "@/lib/content/chapter-content";
 
-// Compact top previews (layout spec §13): People · Where It Fits · Maps &
-// Places surface near the top as one-line cards; the full teaching sections
-// stay lower on the page. Only previews with real content render.
+// Compact top previews (layout spec §13; owner trim 2026-07-19: the
+// Where-It-Fits one-liner is gone — the large timeline below carries it):
+// People · Maps & Places as one-line cards. Only previews with real content
+// render, and the People value clamps to one line.
 export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
   const previews: { icon: string; label: string; value: string; href: string }[] = [];
 
@@ -19,13 +19,8 @@ export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
         .slice(0, 3)
         .map((person) => person.name)
         .join(" · ") + (people.length > 3 ? " · …" : ""),
-      href: "#deeper-study",
+      href: "#people",
     });
-  }
-
-  const timelineValue = getTimelineNote(data.slug) ?? data.estimatedDate;
-  if (timelineValue) {
-    previews.push({ icon: "🕰", label: "Where It Fits", value: timelineValue, href: "#timeline" });
   }
 
   // The Maps preview exists ONLY when MapsSection itself will render (same
@@ -55,7 +50,7 @@ export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
             <span aria-hidden>{preview.icon}</span>
             {preview.label}
           </span>
-          <span className="line-clamp-2 text-[12px] leading-snug text-secondary">{preview.value}</span>
+          <span className="truncate text-[12px] leading-snug text-secondary">{preview.value}</span>
         </a>
       ))}
     </div>

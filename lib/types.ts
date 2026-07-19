@@ -94,6 +94,9 @@ export interface TimelineMini {
 
 export interface Insight {
   id: string;
+  /** Stable section type (generated workups) — routing/order key; display
+   * titles are free to vary. Legacy workups route by id. */
+  type?: string;
   icon: string;
   title: string;
   subtitle?: string; // e.g. "Holiness" under "Theology Principle"
@@ -201,6 +204,9 @@ export interface ChapterWorkup {
     body: string;
     relatedVerses?: string[];
     visualAccuracyNotes?: string[];
+    /** Explicit binding to ONE planned image kind (validated); a check with
+     * no valid binding renders standalone, never positionally guessed. */
+    imageKind?: string;
   }[];
   behindTheChapter?: { category: string; title: string; body: string }[];
 

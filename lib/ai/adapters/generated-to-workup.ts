@@ -16,6 +16,7 @@ const SECTION_ICON: Record<WorkupSection["type"], string> = {
   jesus_connection: "✝",
   theology: "🛡",
   application: "🌱",
+  discipleship: "👣",
   prayer: "🙏",
   map_notes: "🗺",
   image_plan: "🎨",
@@ -105,11 +106,13 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
   });
 
   // Metadata chips (date · location · theme · Jesus).
+  // Owner decision 2026-07-19: the theme chip is gone (the subtitle carries
+  // the thesis) and the Jesus chip drops its "Jesus:" prefix — the sentence
+  // itself names Him, so the prefix read doubled ("Jesus: Jesus makes…").
   const metaChips = [
     { icon: "📅", text: g.estimatedDate },
     { icon: "📍", text: g.estimatedLocation },
-    { icon: "✦", text: g.theme },
-    { icon: "✝", text: `Jesus: ${g.jesusConnection.short}`, jesus: true },
+    { icon: "✝", text: g.jesusConnection.short, jesus: true },
   ];
 
   // Dashboard nav cards (key object · key person · Jesus).
@@ -155,6 +158,7 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
         .sort((a, b) => a.priority - b.priority)
         .map((s) => ({
           id: s.id,
+          type: s.type,
           icon: SECTION_ICON[s.type] ?? "✦",
           title: s.title,
           preview: s.cardSummary,
@@ -327,6 +331,13 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
       body: s.body,
       relatedVerses: s.relatedVerses,
       visualAccuracyNotes: s.visualAccuracyNotes,
+      // Explicit image binding survives ONLY when it names a real planned/
+      // generated image kind — an invalid binding is dropped so the check
+      // renders standalone, never under an unrelated image (Codex #64).
+      imageKind:
+        s.imageKind && g.generatedImages.some((image) => image.type === s.imageKind)
+          ? s.imageKind
+          : undefined,
     })),
     behindTheChapter: g.behindTheChapter
       ? [
