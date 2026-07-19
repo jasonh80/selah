@@ -7,7 +7,7 @@ export function KeyPersonCard({ data }: { data: ChapterWorkup }) {
   const person = data.navCards?.find((c) => c.id === "key-person");
   if (!person) return null;
   return (
-    <div className="w-full rounded-md border bg-card p-3.5 shadow-hair">
+    <div id="people" className="w-full scroll-mt-20 rounded-md border bg-card p-3.5 shadow-hair">
       <p className="text-eyebrow">Key Person</p>
       <p className="mt-1 text-card-title text-primary">{person.support}</p>
     </div>

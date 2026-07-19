@@ -214,6 +214,9 @@ const SceneCheckGenSchema = z.object({
   body: z.string(),
   relatedVerses: z.array(z.string()).optional(),
   visualAccuracyNotes: z.array(z.string()).optional(),
+  // Explicit binding to ONE planned image kind — the UI only pairs a check
+  // with an image when this matches; no positional guessing.
+  imageKind: z.string().optional(),
 });
 
 // Behind the Chapter — author / first audience / historical world / evidence.

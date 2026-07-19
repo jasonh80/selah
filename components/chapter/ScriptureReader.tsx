@@ -44,6 +44,11 @@ export function ScriptureReader({
   // Mark 9/10 style); fall back to the older hand-authored static notes
   // (Psalm 23 / Mark 6). Each range's explanation sits under its FIRST verse.
   const verseNotes = (() => {
+    // PROTECTED hand-authored notes (Psalm 23 / Mark 6) always win — a row
+    // that later carries generated verse-by-verse data must never silently
+    // replace curated notes (Codex #64 review, finding 6).
+    const curated = getVerseNotes(data.slug);
+    if (curated) return curated;
     const flow = data.verseByVerse;
     if (flow && flow.length > 0) {
       const notes: Record<number, string> = {};
@@ -56,7 +61,7 @@ export function ScriptureReader({
       }
       if (Object.keys(notes).length > 0) return notes;
     }
-    return getVerseNotes(data.slug);
+    return null;
   })();
 
   return (

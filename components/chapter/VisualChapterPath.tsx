@@ -1,5 +1,4 @@
 import type { ChapterWorkup, ChapterImage } from "@/lib/types";
-import { SectionHead } from "@/components/chapter/SectionHead";
 import { ExpandableImage } from "@/components/chapter/ExpandableImage";
 import { supportingImagesFor } from "@/components/chapter/HeroImage";
 import {
@@ -30,9 +29,10 @@ export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
     scenes.map((scene) => scene.kind),
   );
 
+  // Owner decision 2026-07-19: no "Path" header and no number badges — the
+  // scenes simply flow with their captions and attached checks.
   return (
     <section>
-      <SectionHead title={`The Path Through ${data.reference}`} />
       <div className="space-y-s4">
         {scenes.map((scene, position) => (
           <PathScene
@@ -65,12 +65,6 @@ function PathScene({
         <div className="aspect-[3/2] w-full bg-card-soft">
           <ExpandableImage src={scene.src} alt={scene.alt} className="h-full w-full object-cover" />
         </div>
-        <span
-          aria-hidden
-          className="absolute left-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(16,16,20,0.55)] text-[11px] font-semibold text-white backdrop-blur"
-        >
-          {position + 1}
-        </span>
         <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(16,16,20,0.78)] via-[rgba(16,16,20,0.04)] to-transparent" />
         <figcaption className="absolute inset-x-s3 bottom-s3">
           <span className="block text-[13px] font-semibold leading-snug text-white sm:text-[14px]">{title}</span>

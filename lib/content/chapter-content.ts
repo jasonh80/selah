@@ -181,27 +181,29 @@ export function integratedSceneChecks<T extends { title: string }>(
  * under the top block (typically a hero-bound check). Both the path and the
  * standalone section use THIS one assignment so no check is dropped or
  * doubled. */
-export function assignSceneChecks<T extends { title: string }>(
+export function assignSceneChecks<T extends { title: string; imageKind?: string }>(
   slug: string,
   checks: readonly T[],
   orderedSceneKinds: readonly string[],
 ): { forScene: Map<string, T>; standalone: T[] } {
   const kindSet = new Set(orderedSceneKinds);
-  const forScene = integratedSceneChecks(slug, checks, kindSet);
-  const used = new Set(forScene.values());
-  const leftovers = checks.filter((check) => !used.has(check));
-  const standalone: T[] = [];
-  let i = 0;
-  for (const check of leftovers) {
-    while (i < orderedSceneKinds.length && forScene.has(orderedSceneKinds[i])) i++;
-    if (i < orderedSceneKinds.length) {
-      forScene.set(orderedSceneKinds[i], check);
-      i++;
-    } else {
-      standalone.push(check);
+  // 1) EXPLICIT validated binding (generated checks carry imageKind bound to
+  //    a planned image kind); 2) the static title→kind map (hand-curated).
+  //    NEVER positional guessing — an unbound check renders standalone
+  //    rather than pairing with an unrelated image (Codex #64, finding 3).
+  const forScene = new Map<string, T>();
+  for (const check of checks) {
+    if (check.imageKind && kindSet.has(check.imageKind) && !forScene.has(check.imageKind)) {
+      forScene.set(check.imageKind, check);
     }
   }
-  return { forScene, standalone };
+  for (const check of checks) {
+    if ([...forScene.values()].includes(check)) continue;
+    const kind = getSceneCheckImageKind(slug, check.title);
+    if (kind && kindSet.has(kind) && !forScene.has(kind)) forScene.set(kind, check);
+  }
+  const used = new Set(forScene.values());
+  return { forScene, standalone: checks.filter((check) => !used.has(check)) };
 }
 
 // ---- Verse-by-verse notes --------------------------------------------------
@@ -356,6 +358,7 @@ export interface SceneCheck {
   body: string;
   relatedVerses?: string[];
   visualAccuracyNotes?: string[];
+  imageKind?: string; // explicit binding to one planned image kind
 }
 
 export const CHAPTER_SCENE_CHECKS: Record<string, SceneCheck[]> = {

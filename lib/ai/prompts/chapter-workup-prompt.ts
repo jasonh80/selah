@@ -3,7 +3,7 @@
 import { MARK_SPRINT_PROMPT_MINIMA } from "@/lib/ai/quality/mark-sprint-quality";
 import markSprintAcceptance from "../quality/mark-sprint-acceptance.v1.json";
 
-export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v6";
+export const CHAPTER_WORKUP_PROMPT_REVISION = "chapter-workup-json-v7";
 
 export type GenerationSourceSectionRole =
   | "context_before"
@@ -297,7 +297,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     "placementReason": "<why you placed it here>"
   },
   "sceneChecks": [
-    { "title": "<short, vivid>", "body": "<warm, conversational correction of a common WRONG mental image — confident, lightly witty when it fits, never academic>", "relatedVerses": ["<c:v>"], "visualAccuracyNotes": ["<a concrete visual correction that will steer future image generation, e.g. 'tabernacle tent, not a stone temple' or 'wrapped linen turban, not a crown'>"] }
+    { "title": "<short, vivid>", "body": "<warm, conversational correction of a common WRONG mental image — confident, lightly witty when it fits, never academic>", "relatedVerses": ["<c:v>"], "visualAccuracyNotes": ["<a concrete visual correction that will steer future image generation, e.g. 'tabernacle tent, not a stone temple' or 'wrapped linen turban, not a crown'>"], "imageKind": "<EXACTLY one kind from your imagePlan that this check corrects — the check renders under that image; omit imageKind if the check corrects the chapter broadly rather than one scene>" }
   ],
   "behindTheChapter": {
     "author": { "title": "<who likely wrote it>", "body": "<short, confident, honest about debate where real>" },
@@ -348,7 +348,7 @@ Shepherd). Let those topics shape the sections. Do NOT fill the same generic
 sections for every chapter.
 
 SECTION DEPTH (this is the heart of Selah)
-- Include all 8 core sections above (isCore true). Also add helpful non-core
+- Include all 9 core sections above (isCore true). Also add helpful non-core
   sections when the passage warrants: "verse_by_verse" (movement through the
   chapter), "original_language" (only when a Hebrew/Greek word genuinely
   illuminates), "map_notes" (when geography matters), "custom" (a chapter-specific

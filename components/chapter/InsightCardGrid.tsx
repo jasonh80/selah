@@ -32,7 +32,7 @@ export function InsightCards({
     const drop = exclude.map(norm);
     // Owner tail order: theology → original language → live it → prayer;
     // anything unrecognized keeps data order after these.
-    const hint = ["theology principle", "original language", "live it", "practical application", "prayer"];
+    const hint = ["theology principle", "original language", "live it", "practical application", "disciple it", "prayer"];
     cards = cards
       .filter((i) => !drop.includes(norm(i.title)))
       .map((card, dataIndex) => ({ card, dataIndex }))

@@ -8,10 +8,23 @@ type AAECard = { category: string; title: string; body: string; media?: ContextM
 
 // Author, Audience & Evidence — who wrote it, who first heard it, the world they
 // lived in, and the manuscripts/inscriptions/landscape that ground it.
-// Quick Dive: compact, skimmable cards. Deep Dive: fuller, roomier paragraphs.
+// Single-column, full-width cards (Quick/Deep retired 2026-07-19).
 // Media renders only when a real asset exists — never an empty placeholder.
 export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
   // Prefer generated cards; fall back to static config (e.g. Psalm 23).
+  // The "The World Behind It" INSIGHT card (removed from the card stack as a
+  // duplicate of the historical-world card here) can carry richer text —
+  // merge it in when longer, so dedupe never discards content (Codex #64).
+  const worldInsight = data.insights?.find(
+    (i) => i.title.trim().toLowerCase() === "the world behind it",
+  );
+  const enrich = (card: AAECard): AAECard => {
+    const isWorld = /historical world|world behind/i.test(`${card.category} ${card.title}`);
+    if (isWorld && worldInsight && worldInsight.body.trim().length > card.body.trim().length) {
+      return { ...card, body: worldInsight.body };
+    }
+    return card;
+  };
   const cards: AAECard[] =
     data.behindTheChapter && data.behindTheChapter.length > 0
       ? data.behindTheChapter
@@ -23,7 +36,7 @@ export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
       <SectionHead title="Behind the Chapter" />
       <div className="space-y-2.5">
         {cards.map((c, i) => (
-          <Card key={i} card={c} />
+          <Card key={i} card={enrich(c)} />
         ))}
       </div>
     </section>

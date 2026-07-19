@@ -47,6 +47,7 @@ export function passingDraft(slug: string): GeneratedChapterWorkup {
     "jesus_connection",
     "theology",
     "application",
+    "discipleship",
     "prayer",
   ];
   const imageKinds = [
