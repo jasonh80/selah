@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/shell/AppShell";
 import { ChapterView } from "@/components/ChapterView";
 import { GeneratingChapterState } from "@/components/chapter/GeneratingChapterState";
-import { resolveChapter } from "@/lib/chapters/registry";
+import { resolveChapter, listNavigableSlugs } from "@/lib/chapters/registry";
 import { heroImageFor } from "@/components/chapter/HeroImage";
 import { generationAllowed, parseSlug } from "@/lib/server/generate-chapter-workup";
 import { getChapterStatus } from "@/lib/server/chapter-workups-repository";
@@ -57,9 +57,11 @@ export default async function ChapterPage({ params }: { params: { slug: string }
   // 1) Already available (Supabase ready/reviewed, or a local chapter)?
   const resolved = await resolveChapter(slug);
   if (resolved) {
+    // Title-as-navigation needs the published set (unpublished stays greyed).
+    const publishedSlugs = await listNavigableSlugs();
     return (
       <AppShell>
-        <ChapterView data={resolved.workup} source={resolved.source} />
+        <ChapterView data={resolved.workup} source={resolved.source} publishedSlugs={publishedSlugs} />
       </AppShell>
     );
   }

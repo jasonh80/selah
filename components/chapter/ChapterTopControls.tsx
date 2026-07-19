@@ -5,6 +5,7 @@ import type { ChapterWorkup } from "@/lib/types";
 import { useVersion } from "@/components/VersionProvider";
 import { useEsvText } from "@/components/chapter/useEsvText";
 import { ScriptureReader } from "@/components/chapter/ScriptureReader";
+import { TitleNav } from "@/components/chapter/TitleNav";
 
 // The chapter header (layout spec §2/§3; owner decision A2, 2026-07-16):
 // title left with the control row — [ Read Mark 6 ] (Quick/Deep Dive is
@@ -13,7 +14,13 @@ import { ScriptureReader } from "@/components/chapter/ScriptureReader";
 // here — content pushes down, no jump to a lower section. Expanded, the
 // control reads "Hide Mark 6". Selah Focus lives in the app header beside
 // the version/theme controls.
-export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
+export function ChapterTopControls({
+  data,
+  publishedSlugs,
+}: {
+  data: ChapterWorkup;
+  publishedSlugs?: string[];
+}) {
   const { version } = useVersion();
   const [scriptureOpen, setScriptureOpen] = useState(false);
   const esv = useEsvText(data.reference, version === "ESV");
@@ -35,7 +42,14 @@ export function ChapterTopControls({ data }: { data: ChapterWorkup }) {
     <div id="chapter" className="scroll-mt-20 space-y-s3">
       <div className="pt-2">
         <div className="flex flex-col gap-s3 md:flex-row md:flex-wrap md:items-center md:justify-between">
-          <h1 className="text-title text-primary lg:text-[48px]">{data.title}</h1>
+          {/* Title-as-navigation (owner approval 2026-07-19): "Mark ⌄ 9 ⌄" —
+              the H1 is the chapter picker. Without the published list (draft
+              previews), it renders as the plain title. */}
+          {publishedSlugs && publishedSlugs.length > 0 ? (
+            <TitleNav slug={data.slug} title={data.title} publishedSlugs={publishedSlugs} />
+          ) : (
+            <h1 className="text-title text-primary lg:text-[48px]">{data.title}</h1>
+          )}
           {/* flex-wrap (IQ-003): at a true 320px content viewport the three
               pills measure ~330.6px, so Deep Dive must be allowed to wrap to
               a second line instead of overflowing an 11px sliver. Wrapping

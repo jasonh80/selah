@@ -46,6 +46,55 @@ export async function chapterLinkable(slug: string): Promise<boolean> {
   return (await resolveChapter(slug)) !== null;
 }
 
+/**
+ * Every slug the title-as-navigation dropdowns may LINK (owner approval,
+ * 2026-07-19): published chapters, the legacy psalm-23 exception, and local
+ * fixtures. EVERY database candidate — reviewed list included — passes
+ * through the GUARDED public reader before it may link (Codex #67 P1: a
+ * reviewed protected row whose serve receipt is missing/mismatched refuses
+ * at /chapter/{slug}, so it must stay greyed here too). Fail-quiet: any
+ * error just leaves that chapter greyed — nothing linkable can 404 (IQ-012).
+ * Injectable core so verify:today can prove it without Supabase.
+ */
+export interface NavigableSlugsDeps {
+  supabaseConfigured(): boolean;
+  listReviewedSlugsNewestFirst(): Promise<string[]>;
+  /** GUARDED, DATABASE-ONLY published read: null = unservable/missing. */
+  readPublishedChapter(slug: string): Promise<ChapterWorkup | null>;
+  localSlugs(): string[];
+}
+
+export async function listNavigableSlugsWith(deps: NavigableSlugsDeps): Promise<string[]> {
+  const slugs = new Set<string>(deps.localSlugs());
+  if (deps.supabaseConfigured()) {
+    let reviewed: string[] = [];
+    try {
+      reviewed = await deps.listReviewedSlugsNewestFirst();
+    } catch (e) {
+      console.warn("[selah] navigable-slug lookup failed:", (e as Error).message);
+    }
+    for (const slug of [...reviewed, "psalm-23"]) {
+      if (slugs.has(slug)) continue;
+      try {
+        if (await deps.readPublishedChapter(slug)) slugs.add(slug);
+      } catch (e) {
+        // quiet: this chapter simply stays greyed
+        console.warn(`[selah] navigable candidate ${slug} unreadable:`, (e as Error).message);
+      }
+    }
+  }
+  return [...slugs];
+}
+
+export async function listNavigableSlugs(): Promise<string[]> {
+  return listNavigableSlugsWith({
+    supabaseConfigured: isSupabaseConfigured,
+    listReviewedSlugsNewestFirst,
+    readPublishedChapter: getChapterWorkupBySlug,
+    localSlugs: listChapterSlugs,
+  });
+}
+
 export async function resolveChapter(slug: string): Promise<ResolvedChapter | null> {
   // 1) Supabase read-through (ready/reviewed only).
   if (isSupabaseConfigured()) {
