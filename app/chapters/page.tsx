@@ -27,7 +27,7 @@ export default function ChaptersPage() {
         {/* Reading list */}
         <div className="mt-6 overflow-hidden rounded-md border bg-card shadow-hair">
           <ChapterRow label="Exodus 26" sub="The Tabernacle" tag="Previous" />
-          <ChapterRow label="Exodus 27" sub="The Bronze Altar, the Courtyard, and the Lamp" tag="Today" href="/chapter/exodus-27" active />
+          <ChapterRow label="Exodus 27" sub="The Bronze Altar, the Courtyard, and the Lamp" tag="Newest" href="/chapter/exodus-27" active />
           <ChapterRow label="Exodus 28" sub="The Priestly Garments" tag="Next" />
         </div>
       </PageBody>

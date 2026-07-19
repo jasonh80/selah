@@ -6,18 +6,6 @@ export type NavItem = {
   icon: (props: { className?: string }) => JSX.Element;
 };
 
-const SunIcon = ({ className = "" }) => (
-  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.6" />
-    <path
-      d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
 const BookIcon = ({ className = "" }) => (
   <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
     <path
@@ -48,14 +36,19 @@ const GearIcon = ({ className = "" }) => (
   </svg>
 );
 
+// IQ-007 (owner direction, board #29 2026-07-18): the prescribed-daily
+// framing is retired — no visible Today tab. Selah is choose-what-you-study;
+// a chapter page lights up Chapters. ("Continue Reading" joins later, once
+// reading history exists.)
 export const NAV: NavItem[] = [
-  { href: "/today", label: "Today", icon: SunIcon },
   { href: "/chapters", label: "Chapters", icon: BookIcon },
   { href: "/journey", label: "Journey", icon: CompassIcon },
   { href: "/settings", label: "Settings", icon: GearIcon },
 ];
 
 export function isActive(pathname: string, href: string): boolean {
-  if (href === "/today") return pathname === "/" || pathname.startsWith("/today") || pathname.startsWith("/chapter");
+  if (href === "/chapters") {
+    return pathname === "/" || pathname.startsWith("/chapters") || pathname.startsWith("/chapter");
+  }
   return pathname.startsWith(href);
 }
