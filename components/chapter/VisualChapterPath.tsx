@@ -13,8 +13,9 @@ import {
 // treatment). The chapter's scenes in narrative order as a photo essay on
 // every breakpoint: each scene 3:2, full column width, one per row — the
 // varied-size desktop mosaic is retired ("mixed sizes feel weird").
-// Scene Checks that belong to a scene render with it (short title on the
-// image, body below as tap-to-expand — never paragraphs over the picture).
+// Scene Checks that belong to a scene render with it, photo-and-caption
+// style: always open, directly under the picture (owner direction
+// 2026-07-19) — never paragraphs over the picture itself.
 export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
   // The hero already anchors the top of the page — the path carries the
   // REMAINING scenes in narrative order, so no image ever appears twice.
@@ -71,12 +72,14 @@ function PathScene({
         </figcaption>
       </div>
 
+      {/* Owner direction 2026-07-19: the scene check reads like an Instagram
+          caption — always open, bigger, directly under its photo. */}
       {check && (
-        <details className="group mt-s2 rounded-md border bg-card shadow-hair" style={{ borderLeft: "3px solid var(--accent-strong)" }}>
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 px-s3 py-s2">
+        <div className="mt-s2 rounded-md border bg-card px-s3 py-s3 shadow-hair" style={{ borderLeft: "3px solid var(--accent-strong)" }}>
+          <div className="flex items-center gap-2">
             <svg
               viewBox="0 0 24 24"
-              className="h-3.5 w-3.5 shrink-0 text-accent-strong"
+              className="h-4 w-4 shrink-0 text-accent-strong"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
@@ -87,12 +90,11 @@ function PathScene({
               <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
               <circle cx="12" cy="12" r="2.5" />
             </svg>
-            <span className="flex-1 text-[12px] font-semibold leading-snug text-primary">{check.title}</span>
-            <span aria-hidden className="text-secondary transition group-open:rotate-180">⌄</span>
-          </summary>
+            <span className="text-[15px] font-semibold leading-snug text-primary">{check.title}</span>
+          </div>
           {/* visualAccuracyNotes are production guardrails — never rendered. */}
-          <p className="border-t px-s3 py-s2 text-[13px] leading-relaxed text-secondary">{check.body}</p>
-        </details>
+          <p className="mt-1.5 text-[14px] leading-relaxed text-secondary">{check.body}</p>
+        </div>
       )}
     </figure>
   );
