@@ -2,7 +2,7 @@
 
 // Self-serve Prepare card (IQ-011, owner decision 2026-07-18). Renders in
 // Step 2 for every chapter OUTSIDE the protected Mark lane that has no draft
-// yet: create one preparation proposal (exact max cost, one confirmation, no
+// yet: create one preparation proposal (estimated conservative ceiling shown, one confirmation, no
 // auto-retry), review it calmly — Passage flow · What Selah should notice ·
 // Watch-outs · Places (hidden when not useful) — then Approve & set up
 // (digest-bound) or Reject. Approval alone unlocks the separate, separately
@@ -281,7 +281,7 @@ export function PrepareProposalCard({
       {confirming ? (
         <div className="mt-2.5">
           <p className="text-[13px] text-primary">
-            Create one preparation proposal for {chapterLabel}? Maximum cost about ${state.maxCostUsd.toFixed(2)} —
+            Create one preparation proposal for {chapterLabel}? Estimated conservative ceiling about ${state.maxCostUsd.toFixed(2)} —
             exactly one request, no automatic retry. It cannot draft, image, or publish anything.
           </p>
           <div className="mt-2 flex gap-2">

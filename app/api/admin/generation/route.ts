@@ -542,7 +542,7 @@ export async function POST(req: Request) {
       return refuse(slug, "prepare_proposal", eligibility.reason ?? "not eligible", 400);
     }
     if (body.confirm !== true) {
-      return refuse(slug, "prepare_proposal", "confirmation required — the exact maximum cost is shown first", 400);
+      return refuse(slug, "prepare_proposal", "confirmation required — the estimated conservative ceiling is shown first", 400);
     }
     // The one text-spend kill switch covers this lane too (adversarial
     // pre-review finding: a paid model call must not sidestep it).
@@ -557,7 +557,7 @@ export async function POST(req: Request) {
       const status = err.code === "CONFLICT" ? 409 : err.code === "REFUSED" ? 403 : 500;
       return refuse(slug, "prepare_proposal", err.message, status);
     }
-    await logGenerationAudit({ action: "prepare_proposal", slug, status: "started", message: `job ${jobId} (max $${proposalMaxCostUsd().toFixed(2)})` });
+    await logGenerationAudit({ action: "prepare_proposal", slug, status: "started", message: `job ${jobId} (est. ceiling $${proposalMaxCostUsd().toFixed(2)})` });
     const triggered = await triggerBackgroundPrepareProposal(slug, new URL(req.url).host, jobId);
     if (!triggered.ok) {
       // The claim row must not strand as 'generating' after a failed trigger.

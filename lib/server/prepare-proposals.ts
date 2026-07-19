@@ -574,16 +574,17 @@ export function proposalLaneEligible(slug: string): ProposalEligibility {
 export const PROPOSAL_PROMPT_MAX_CHARS = 120_000;
 const PROPOSAL_INPUT_TOKEN_CEILING = Math.ceil(PROPOSAL_PROMPT_MAX_CHARS / 4);
 
-/** The disclosed maximum cost: the hard input bound + the full completion
- * cap. The worker refuses pre-dispatch any prompt that exceeds the bound, so
- * this number is a true ceiling, not an assumption. */
+/** The disclosed ESTIMATED CONSERVATIVE CEILING: the hard input char bound
+ * (converted at a stated ~4 chars/token assumption — not tokenized) + the
+ * full completion cap. The worker refuses pre-dispatch any prompt exceeding
+ * the char bound, and every uncertain outcome records at least this number. */
 export function proposalMaxCostUsd(): number {
   const estimate = estimateChapterWorkupCost({
     inputTokens: PROPOSAL_INPUT_TOKEN_CEILING,
     cachedInputTokens: 0,
     outputTokens: 6_000,
   });
-  // Ceil, never round down — the shown number is a MAXIMUM.
+  // Ceil, never round down — the shown estimate is the conservative ceiling.
   return Math.ceil(estimate.textEstimateUsd * 100) / 100;
 }
 
@@ -884,7 +885,7 @@ export async function runPrepareProposalJob(slug: string, jobId: string): Promis
   const assembledPrompt = proposalPrompt(identity.book, identity.chapter, passage.text, markers, brainRules);
   if (assembledPrompt.length > PROPOSAL_PROMPT_MAX_CHARS) {
     return failRow(
-      `this chapter's assembled prompt (${assembledPrompt.length} chars) exceeds the bounded maximum (${PROPOSAL_PROMPT_MAX_CHARS}) — refusing before dispatch so the shown ceiling stays true`,
+      `this chapter's assembled prompt (${assembledPrompt.length} chars) exceeds the bounded maximum (${PROPOSAL_PROMPT_MAX_CHARS}) — refusing before dispatch so the shown estimated ceiling is never exceeded by input growth`,
     );
   }
 

@@ -638,9 +638,21 @@ async function main() {
       ok(l14?.status === "proposed", "W1 fixture proposes");
       const target = proposals.rows.find((r) => r.id === l14!.id)!;
       const realModel = String(target.model);
-      target.model = "swapped-model";
+      // The swap happens BETWEEN the route's read and the store's conditional
+      // write: the read sees the real model and passes; the WRITE must lose on
+      // its model predicate (this is the actual race, not a pre-read reject).
+      const realCU = proposals.conditionalUpdate.bind(proposals);
+      let swapped = false;
+      proposals.conditionalUpdate = async (id, expected, next, extraEquals) => {
+        if (!swapped && id === l14!.id) {
+          swapped = true;
+          target.model = "swapped-model";
+        }
+        return realCU(id, expected, next, extraEquals);
+      };
       const raced = await adminPost({ action: "prepare_proposal_approve", slug: "luke-14", confirm: true, proposalDigest: String(l14!.proposal_digest) });
-      ok(raced.status !== 200 && target.status !== "approved", "W1 a model swap between read and write cannot be approved (model bound in the predicate)");
+      proposals.conditionalUpdate = realCU;
+      ok(swapped && raced.status !== 200 && target.status !== "approved", "W1 a model swapped AFTER the read loses at the conditional WRITE's model predicate");
       target.model = realModel;
       // W2: uncertain post-dispatch spend records AT LEAST the displayed max.
       __setProposalModelForTesting(async () => {
