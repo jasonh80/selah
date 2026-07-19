@@ -206,6 +206,62 @@ export function assignSceneChecks<T extends { title: string; imageKind?: string 
   return { forScene, standalone: checks.filter((check) => !used.has(check)) };
 }
 
+/** ONE shared insight-type normalizer (Codex #64 final round): stable
+ * section `type` when present; else the REAL ids stored in published rows
+ * (prompt ids like "big-idea"/"what-most-miss" AND the older legacy aliases);
+ * else — legacy rows only — an exact display-title fallback. */
+const INSIGHT_ID_TYPE: Record<string, string> = {
+  // real prompt ids (published Mark 7–10 rows)
+  "big-idea": "big_idea",
+  "chapter-flow": "chapter_flow",
+  "historical-world": "historical_world",
+  "what-most-miss": "what_most_people_miss",
+  "map-notes": "map_notes",
+  "original-language": "original_language",
+  "image-plan": "image_plan",
+  // older legacy aliases (Exodus 27-era)
+  context: "historical_world",
+  miss: "what_most_people_miss",
+  // shared ids
+  jesus: "jesus_connection",
+  theology: "theology",
+  application: "application",
+  discipleship: "discipleship",
+  prayer: "prayer",
+};
+const INSIGHT_TITLE_TYPE: Record<string, string> = {
+  "big idea": "big_idea",
+  "chapter flow": "chapter_flow",
+  "the world behind it": "historical_world",
+  "historical context": "historical_world",
+  "what most people miss": "what_most_people_miss",
+  "map notes": "map_notes",
+  "original language": "original_language",
+  "jesus at the center": "jesus_connection",
+  "theology principle": "theology",
+  "live it": "application",
+  "practical application": "application",
+  "disciple it": "discipleship",
+  prayer: "prayer",
+};
+export function insightTypeOf(insight: { type?: string; id: string; title: string }): string {
+  if (insight.type) return insight.type;
+  return (
+    INSIGHT_ID_TYPE[insight.id] ??
+    INSIGHT_TITLE_TYPE[insight.title.trim().toLowerCase()] ??
+    "custom"
+  );
+}
+
+/** Two trimmed texts carry DISTINCT authored material when neither contains
+ * the other. */
+export function distinctText(a: string | undefined, b: string | undefined): boolean {
+  const x = (a ?? "").trim();
+  const y = (b ?? "").trim();
+  if (!x || !y) return false;
+  return !x.includes(y) && !y.includes(x);
+}
+
 /** Canonical "What Most People Miss" content (Codex #64, finding 3): when
  * the two-layer authored insight card exists it IS the canonical source and
  * BOTH its layers render (cardSummary as the intro line, fullContent as the
@@ -214,16 +270,22 @@ export function assignSceneChecks<T extends { title: string; imageKind?: string 
 export function mostPeopleMissContent(data: {
   modernReadersMiss?: string;
   insights?: { id: string; type?: string; title: string; preview: string; body: string }[];
-}): { intro?: string; body: string } | null {
-  const card = data.insights?.find(
-    (i) => (i.type ?? (i.id === "miss" ? "what_most_people_miss" : "")) === "what_most_people_miss",
-  );
+}): { intro?: string; body: string; extra?: string } | null {
+  const card = data.insights?.find((i) => insightTypeOf(i) === "what_most_people_miss");
+  const field = data.modernReadersMiss?.trim();
   if (card) {
     const intro = card.preview.trim();
     const body = card.body.trim();
-    if (body) return { intro: intro && intro !== body ? intro : undefined, body };
+    if (body) {
+      return {
+        intro: intro && distinctText(intro, body) ? intro : undefined,
+        body,
+        // Independently authored legacy field text survives too — every
+        // distinct layer renders in the same box (Codex #64 final round).
+        extra: field && distinctText(field, body) && distinctText(field, intro) ? field : undefined,
+      };
+    }
   }
-  const field = data.modernReadersMiss?.trim();
   return field ? { body: field } : null;
 }
 

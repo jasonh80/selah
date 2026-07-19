@@ -12,7 +12,7 @@ import {
   type GeneratedChapterWorkup,
 } from "../lib/ai/schemas/chapter-workup-schema";
 import { generatedToRenderWorkup } from "../lib/ai/adapters/generated-to-workup";
-import { mostPeopleMissContent } from "../lib/content/chapter-content";
+import { mostPeopleMissContent, insightTypeOf } from "../lib/content/chapter-content";
 import {
   heroImageFor,
   supportingImagesFor,
@@ -631,6 +631,66 @@ assert.ok((renderedFiveImagePlan.images[0].description?.length ?? 0) > 30);
   const renderedRetitled = generatedToRenderWorkup(parseChapterWorkupJson(JSON.stringify(retitled)));
   const disciple = renderedRetitled.insights.find((i) => i.type === "discipleship");
   assert.ok(disciple && disciple.title === "Walk It Out Together", "type survives a variant display title");
+}
+
+// Published Mark 7–10 rows predate Insight.type and store the REAL prompt
+// ids (big-idea / chapter-flow / historical-world / what-most-miss …): the
+// shared normalizer must classify a fully type-STRIPPED stored workup so
+// live cards keep their placements (Codex #64 final round).
+{
+  // Exactly the id shapes stored in published Mark 7–10 rows (prompt ids,
+  // no type field at all).
+  const storedPublished = [
+    { id: "big-idea", title: "Big Idea" },
+    { id: "chapter-flow", title: "Chapter Flow" },
+    { id: "historical-world", title: "The World Behind It" },
+    { id: "what-most-miss", title: "What Most People Miss" },
+    { id: "map-notes", title: "Map Notes" },
+    { id: "original-language", title: "Original Language" },
+    { id: "jesus", title: "Jesus at the Center" },
+    { id: "theology", title: "Theology Principle" },
+    { id: "application", title: "Live It" },
+    { id: "prayer", title: "Prayer" },
+  ];
+  const expectType: Record<string, string> = {
+    "big-idea": "big_idea",
+    "chapter-flow": "chapter_flow",
+    "historical-world": "historical_world",
+    "what-most-miss": "what_most_people_miss",
+    "map-notes": "map_notes",
+    "original-language": "original_language",
+    jesus: "jesus_connection",
+    theology: "theology",
+    application: "application",
+    prayer: "prayer",
+  };
+  for (const insight of storedPublished) {
+    assert.equal(
+      insightTypeOf(insight as never),
+      expectType[insight.id],
+      `stored published id ${insight.id} normalizes correctly`,
+    );
+  }
+  assert.equal(
+    insightTypeOf({ id: "mystery", title: "Live It" } as never),
+    "application",
+    "legacy-only title fallback classifies an unknown id",
+  );
+}
+
+// ALL independently authored layers survive dedupe: genuinely non-overlapping
+// strings in the field, cardSummary, and fullContent must every one render.
+{
+  const doc = {
+    modernReadersMiss: "ALPHA field-only teaching.",
+    insights: [
+      { id: "what-most-miss", title: "What Most People Miss", icon: "🔍", preview: "BETA summary teaching.", body: "GAMMA full teaching." },
+    ],
+  };
+  const picked = mostPeopleMissContent(doc as never);
+  assert.equal(picked?.body, "GAMMA full teaching.");
+  assert.equal(picked?.intro, "BETA summary teaching.", "cardSummary layer survives");
+  assert.equal(picked?.extra, "ALPHA field-only teaching.", "the distinct legacy field survives too — nothing discarded");
 }
 
 const swappedImageOrder = {

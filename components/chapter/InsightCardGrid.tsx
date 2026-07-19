@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ChapterWorkup, Insight } from "@/lib/types";
+import { insightTypeOf } from "@/lib/content/chapter-content";
 
 // One "Deep Dive" system (layout spec §15): the former "Deeper Study" cards
 // and the former "Go Deeper" topic menu merged. A compact topic rail sits
@@ -12,21 +13,6 @@ import type { ChapterWorkup, Insight } from "@/lib/types";
 // individually through the page in the owner's order — all FULL WIDTH.
 // InsightCards renders a chosen subset: `titles` = ordered include list;
 // `exclude` = drop list with everything else rendering in data order.
-// Route by the STABLE section type (generated workups) with a legacy-id
-// fallback (older workups: context/miss/jesus/theology/application/prayer) —
-// display titles are free to vary without misrouting cards (Codex #64).
-const LEGACY_ID_TYPE: Record<string, string> = {
-  context: "historical_world",
-  miss: "what_most_people_miss",
-  jesus: "jesus_connection",
-  theology: "theology",
-  application: "application",
-  prayer: "prayer",
-};
-function insightType(i: { type?: string; id: string }): string {
-  return i.type ?? LEGACY_ID_TYPE[i.id] ?? "custom";
-}
-
 export function InsightCards({
   data,
   types,
@@ -38,21 +24,22 @@ export function InsightCards({
   /** Drop list; everything else renders in the canonical tail order. */
   excludeTypes?: string[];
 }) {
-  let cards = data.insights;
+  // image_plan is production guidance, never a reader card.
+  let cards = data.insights.filter((i) => insightTypeOf(i) !== "image_plan");
   if (types) {
     cards = cards
-      .filter((i) => types.includes(insightType(i)))
-      .sort((a, b) => types.indexOf(insightType(a)) - types.indexOf(insightType(b)));
+      .filter((i) => types.includes(insightTypeOf(i)))
+      .sort((a, b) => types.indexOf(insightTypeOf(a)) - types.indexOf(insightTypeOf(b)));
   } else if (excludeTypes) {
     // Owner tail order by TYPE: theology → original language → live it →
     // disciple it → prayer; unrecognized types keep data order after these.
     const hint = ["theology", "original_language", "application", "discipleship", "prayer"];
     cards = cards
-      .filter((i) => !excludeTypes.includes(insightType(i)))
+      .filter((i) => !excludeTypes.includes(insightTypeOf(i)))
       .map((card, dataIndex) => ({ card, dataIndex }))
       .sort((a, b) => {
-        const ai = hint.indexOf(insightType(a.card));
-        const bi = hint.indexOf(insightType(b.card));
+        const ai = hint.indexOf(insightTypeOf(a.card));
+        const bi = hint.indexOf(insightTypeOf(b.card));
         return (ai === -1 ? hint.length + a.dataIndex : ai) - (bi === -1 ? hint.length + b.dataIndex : bi);
       })
       .map((x) => x.card);

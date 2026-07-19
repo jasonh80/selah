@@ -2,7 +2,7 @@
 
 import type { ChapterWorkup } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
-import { getChapterContext, type ContextMedia } from "@/lib/content/chapter-content";
+import { getChapterContext, insightTypeOf, distinctText, type ContextMedia } from "@/lib/content/chapter-content";
 
 type AAECard = { category: string; title: string; body: string; media?: ContextMedia };
 
@@ -12,19 +12,20 @@ type AAECard = { category: string; title: string; body: string; media?: ContextM
 // Media renders only when a real asset exists — never an empty placeholder.
 export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
   // Prefer generated cards; fall back to static config (e.g. Psalm 23).
-  // CANONICAL source rule (Codex #64, finding 3): when the two-layer
-  // "historical_world" insight exists, its fullContent IS the historical-
-  // world card body here (deterministic — not longest-wins); the removed
-  // duplicate card therefore loses nothing.
-  const worldInsight = data.insights?.find(
-    (i) => (i.type ?? (i.id === "context" ? "historical_world" : "")) === "historical_world",
-  );
+  // Every DISTINCT authored layer survives in the same full-width card
+  // (Codex #64 final round): the Behind-the-Chapter body stays, and the
+  // removed historical_world insight's summary/full text append when they
+  // carry material the body doesn't already contain.
+  const worldInsight = data.insights?.find((i) => insightTypeOf(i) === "historical_world");
   const enrich = (card: AAECard): AAECard => {
     const isWorld = /historical world|world behind/i.test(`${card.category} ${card.title}`);
-    if (isWorld && worldInsight && worldInsight.body.trim()) {
-      return { ...card, body: worldInsight.body };
+    if (!isWorld || !worldInsight) return card;
+    const layers = [card.body];
+    if (distinctText(worldInsight.preview, card.body)) layers.push(worldInsight.preview);
+    if (distinctText(worldInsight.body, card.body) && distinctText(worldInsight.body, worldInsight.preview)) {
+      layers.push(worldInsight.body);
     }
-    return card;
+    return { ...card, body: layers.join("\n\n") };
   };
   const cards: AAECard[] =
     data.behindTheChapter && data.behindTheChapter.length > 0
@@ -60,7 +61,7 @@ function Card({ card }: { card: AAECard }) {
         </figure>
       )}
 
-      <p className={"mt-2 text-[13px] leading-relaxed text-secondary"}>
+      <p className={"mt-2 whitespace-pre-line text-[13px] leading-relaxed text-secondary"}>
         {card.body}
       </p>
     </div>

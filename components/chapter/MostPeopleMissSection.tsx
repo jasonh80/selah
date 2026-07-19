@@ -19,6 +19,9 @@ export function MostPeopleMissSection({ data }: { data: ChapterWorkup }) {
         <p className="mt-s2 text-[14px] font-medium leading-relaxed text-primary">{content.intro}</p>
       )}
       <p className="mt-s2 text-[14px] leading-relaxed text-primary">{content.body}</p>
+      {content.extra && (
+        <p className="mt-s2 border-t pt-s2 text-[14px] leading-relaxed text-primary">{content.extra}</p>
+      )}
     </section>
   );
 }
