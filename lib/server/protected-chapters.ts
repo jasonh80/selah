@@ -29,7 +29,8 @@ export type MutationAction =
   | "markChapterWorkupFailed"
   | "restoreVersion"
   | "applyMergedDraft"
-  | "publishChapter";
+  | "publishChapter"
+  | "applyPublishedImageRedo";
 
 // What each mutation may act on. `allowMissing` = the action may create the row.
 const TRANSITIONS: Record<MutationAction, { allowed: readonly string[]; allowMissing: boolean }> = {
@@ -46,6 +47,11 @@ const TRANSITIONS: Record<MutationAction, { allowed: readonly string[]; allowMis
   // Publishing promotes exactly a draft. Legacy "ready" rows deliberately do NOT
   // pass here — their path is the PR 3 validated publisher.
   publishChapter: { allowed: ["draft"], allowMissing: false },
+  // The ONE dedicated action that may touch a published row (Codex-approved
+  // published single-image redo lane, board #29 2026-07-19). It acts on
+  // "reviewed" and NOTHING else — drafts use the existing redo lane — and
+  // every generic action above still refuses "reviewed" unchanged.
+  applyPublishedImageRedo: { allowed: ["reviewed"], allowMissing: false },
 };
 
 export interface ChapterRowSnapshot {
@@ -87,7 +93,12 @@ export function decideMutation(action: MutationAction, slug: string, lookup: Row
   }
 
   const status = lookup.row.status;
-  if (status === "reviewed") return refuse(`"${slug}" is published (reviewed) and immutable`);
+  // "reviewed" stays immutable to every action whose transition does not name
+  // it explicitly — today that is only applyPublishedImageRedo. The refusal
+  // string is unchanged for every generic action.
+  if (status === "reviewed" && !transition.allowed.includes("reviewed")) {
+    return refuse(`"${slug}" is published (reviewed) and immutable`);
+  }
   if (status === "ready") {
     return refuse(`"${slug}" is a quarantined legacy "ready" row — it must pass the validated publish gate first`);
   }

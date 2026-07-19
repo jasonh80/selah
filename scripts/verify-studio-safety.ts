@@ -114,6 +114,35 @@ for (const action of ACTIONS) {
   }
 }
 
+// ---------- 6b. applyPublishedImageRedo: the ONE dedicated reviewed-row action ----------
+// (Codex-approved published single-image redo lane, board #29 2026-07-19.)
+// It acts on "reviewed" and NOTHING else; every generic action above keeps
+// refusing "reviewed" byte-for-byte unchanged (section 2 proves that).
+{
+  const action: MutationAction = "applyPublishedImageRedo";
+  for (const slug of PROTECTED_SLUGS) {
+    for (const status of STATUSES) {
+      ok(!decideMutation(action, slug, row(status)).allowed, `${slug} ${action} ${status} refused`);
+    }
+    ok(!decideMutation(action, slug, { kind: "missing" }).allowed, `${slug} ${action} missing refused`);
+  }
+  const allowed = decideMutation(action, "mark-9", row("reviewed"));
+  ok(
+    allowed.allowed && allowed.expected?.status === "reviewed" && allowed.expected.updatedAt !== null,
+    `${action} allowed ONLY on reviewed, with a pinned revision token`,
+  );
+  for (const status of ["draft", "generating", "failed"] as const) {
+    ok(!decideMutation(action, "mark-9", row(status)).allowed, `${action} refused on ${status}`);
+  }
+  const ready = decideMutation(action, "mark-9", row("ready"));
+  ok(!ready.allowed && /quarantined/i.test(ready.reason), `${action} keeps the ready quarantine`);
+  const nullRev = decideMutation(action, "mark-9", row("reviewed", null));
+  ok(!nullRev.allowed && /updated_at|revision/i.test(nullRev.reason), `${action} refuses a NULL revision (fail closed)`);
+  ok(!decideMutation(action, "mark-9", { kind: "missing" }).allowed, `${action} refused on missing row`);
+  ok(!decideMutation(action, "mark-9", { kind: "error", message: "boom" }).allowed, `db error refuses ${action}`);
+  ok(!decideMutation(action, "mark-9", { kind: "unconfigured" }).allowed, `unconfigured refuses ${action}`);
+}
+
 // ---------- 7. Conditional-write semantics (fake store honoring the predicates) ----------
 interface FakeRow {
   slug: string;
