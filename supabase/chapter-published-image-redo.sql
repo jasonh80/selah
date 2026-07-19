@@ -41,7 +41,11 @@ create table if not exists chapter_published_image_redo (
   error_code text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  applied_at timestamptz
+  applied_at timestamptz,
+  -- The exact chapter_workups.updated_at value the apply wrote. Rollback is
+  -- bound to it: any later change to the live row refuses the rollback
+  -- (fail closed) instead of restoring over unknown state.
+  applied_revision text
 );
 
 create unique index if not exists chapter_published_image_redo_one_active

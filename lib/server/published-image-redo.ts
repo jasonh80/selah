@@ -34,6 +34,7 @@ import {
 import {
   decideMutation,
   ChapterMutationError,
+  isChapterMutationError,
   type MutationDecision,
 } from "./protected-chapters";
 import { requireJobStore, JOB_TOKEN_TTL_MS, newJobId, type JobStorePort } from "./generation-jobs";
@@ -76,6 +77,8 @@ export interface PublishedRedoRow {
   errorCode: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The live row revision the apply wrote — rollback is pinned to it. */
+  appliedRevision: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +206,7 @@ function parseRow(raw: Record<string, unknown>): PublishedRedoRow | null {
     errorCode: typeof raw.error_code === "string" ? raw.error_code : null,
     createdAt: typeof raw.created_at === "string" ? raw.created_at : "",
     updatedAt: typeof raw.updated_at === "string" ? raw.updated_at : "",
+    appliedRevision: typeof raw.applied_revision === "string" ? raw.applied_revision : null,
   };
 }
 
@@ -439,21 +443,35 @@ export async function consumePublishedRedoClaim(
       "redo claim already consumed or superseded — refusing duplicate delivery",
     );
   }
-  // Consumed. Now revalidate the FULL binding against the live chapter — a
-  // published-row change between route and worker makes the digest drift and
-  // the claim dies pre-spend (terminal failure, zero credit used).
-  const binding = await derivePublishedRedoBinding(slug, row.kind, row.notes, action);
-  if (binding.digest !== bindingDigest || binding.baseRevision !== row.baseRevision) {
-    // We own the "running" state here — the consume above committed.
-    await markPublishedRedoTerminalFailure(slug, jobId, "failed", 0, "stale_binding", ["running"]);
-    throw new ChapterMutationError(
-      "CONFLICT",
-      action,
+  // Consumed — we own "running" from here. Revalidate the FULL binding
+  // against the live chapter; a published-row change between route and
+  // worker makes the digest drift and the claim dies pre-spend. ANY failure
+  // in this block (including an unreadable live row — Codex #66 P1-3) must
+  // close the running claim before rethrowing: no spend has happened, and a
+  // stranded "running" row would hold the one-active-per-slug lock forever.
+  try {
+    const binding = await derivePublishedRedoBinding(slug, row.kind, row.notes, action);
+    if (binding.digest !== bindingDigest || binding.baseRevision !== row.baseRevision) {
+      throw new ChapterMutationError(
+        "CONFLICT",
+        action,
+        slug,
+        "the published chapter changed after this redo was confirmed — no credit was used",
+      );
+    }
+    return { row, binding };
+  } catch (error) {
+    const stale = isChapterMutationError(error) && error.code === "CONFLICT";
+    await markPublishedRedoTerminalFailure(
       slug,
-      "the published chapter changed after this redo was confirmed — no credit was used",
+      jobId,
+      "failed",
+      0,
+      stale ? "stale_binding" : "post_consume_refusal",
+      ["running"],
     );
+    throw error;
   }
-  return { row, binding };
 }
 
 export async function completePublishedRedoCandidate(
@@ -658,8 +676,21 @@ export async function applyPublishedRedoCandidate(
       ) as Record<string, unknown> | undefined)
     : undefined;
   if (liveTarget?.src === expected.candidateUrl) {
-    await settleApplied(lane, row.id);
+    await settleApplied(lane, row.id, live.revision);
     return { applied: true, alreadyApplied: true, snapshotVersion: null };
+  }
+
+  // The candidate is bound to the EXACT revision it was generated from
+  // (Codex #66 P1-1): even if the target image itself is unchanged, any
+  // other change to the live row since generation refuses — the owner
+  // reviewed a candidate against a chapter that no longer exists.
+  if (live.revision !== row.baseRevision) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      action,
+      slug,
+      "the published chapter changed after this candidate was created — create a fresh candidate",
+    );
   }
 
   const nextJson = swapExactlyOneSrc(
@@ -682,10 +713,13 @@ export async function applyPublishedRedoCandidate(
     );
   }
 
+  // The exact revision the apply writes — stored in the lane row so rollback
+  // can pin itself to it (Codex #66 P1-2).
+  const appliedRevision = new Date().toISOString();
   const changed = await chapterStore.update(
     slug,
     { status: "reviewed", updatedAt: live.revision, json: [] },
-    { workup_json: nextJson, updated_at: new Date().toISOString() },
+    { workup_json: nextJson, updated_at: appliedRevision },
   );
   if (typeof changed === "object") {
     throw new ChapterMutationError("WRITE_FAILED", action, slug, changed.error);
@@ -700,18 +734,25 @@ export async function applyPublishedRedoCandidate(
   }
   // Lane bookkeeping AFTER the live write. If this write loses, the live
   // change stands; a later duplicate apply settles it idempotently above.
-  await settleApplied(lane, row.id);
+  await settleApplied(lane, row.id, appliedRevision);
   return { applied: true, alreadyApplied: false, snapshotVersion: version };
 }
 
 /** Lane bookkeeping for a candidate that IS live. Normally candidate→applied;
  * if a racing reject flipped the row first, rejected→applied repairs it so the
- * owner's rollback path is never lost (adversarial-review finding). */
-async function settleApplied(lane: PublishedRedoStore, jobId: string): Promise<void> {
+ * owner's rollback path is never lost (adversarial-review finding). The
+ * applied revision — the exact live-row revision the candidate now sits on —
+ * is recorded so rollback can pin itself to it. */
+async function settleApplied(
+  lane: PublishedRedoStore,
+  jobId: string,
+  appliedRevision: string,
+): Promise<void> {
   for (const expected of ["candidate", "rejected"] as const) {
     const changed = await lane.conditionalUpdate(jobId, expected, {
       status: "applied",
       applied_at: new Date().toISOString(),
+      applied_revision: appliedRevision,
       updated_at: new Date().toISOString(),
     });
     if (typeof changed === "number" && changed === 1) return;
@@ -769,6 +810,17 @@ export async function rollbackPublishedRedo(
       console.error(`[selah] published redo ${jobId}: rollback settle did not land`);
     }
     return { snapshotVersion: null, alreadyRolledBack: true };
+  }
+  // Rollback is bound to the EXACT revision the apply wrote (Codex #66 P1-2):
+  // any later change to the live row — even one leaving the candidate src in
+  // place — refuses, instead of restoring base_src over unknown state.
+  if (!row.appliedRevision || live.revision !== row.appliedRevision) {
+    throw new ChapterMutationError(
+      "CONFLICT",
+      action,
+      slug,
+      "the published chapter changed after this redo was applied — rollback refused (fail closed)",
+    );
   }
   const nextJson = swapExactlyOneSrc(live.json, row.kind, row.candidateUrl, row.baseSrc, slug, action);
   await assertNextWorkupServesClean(slug, nextJson as unknown as ChapterWorkup, action);
@@ -835,8 +887,12 @@ export async function rejectPublishedRedo(
   // A candidate the live chapter ALREADY uses is not rejectable — an apply
   // committed on the live row (its lane settle may have raced or been lost).
   // Repair the bookkeeping to "applied" instead, so the audit line stays true
-  // and the owner's rollback path survives (adversarial-review finding).
+  // and the owner's rollback path survives. FAIL CLOSED (Codex #66 P1-4): a
+  // candidate may be rejected only after an AUTHORITATIVE live read proves
+  // its URL is not live — an unreadable/missing live row refuses, because
+  // rejecting blind could hide an applied candidate's rollback path.
   if (row.status === "candidate" && row.candidateUrl) {
+    let provenNotLive = false;
     try {
       const chapterRow = await requireJobStore(slug, "rejectPublishedRedo").read(slug);
       if (chapterRow && !("error" in chapterRow)) {
@@ -847,15 +903,15 @@ export async function rejectPublishedRedo(
               | undefined)
           : undefined;
         if (target?.src === row.candidateUrl) {
-          await settleApplied(lane, row.id);
+          await settleApplied(lane, row.id, chapterRow.updatedAt ?? "");
           return "healed_applied";
         }
+        if (typeof target?.src === "string") provenNotLive = true;
       }
-      // An unreadable live row falls through: rejecting is lane-only and the
-      // conditional write below still refuses if anything moved meanwhile.
     } catch (e) {
       console.error(`[selah] rejectPublishedRedo(${slug}) live check: ${(e as Error).message}`);
     }
+    if (!provenNotLive) return "none";
   }
   const revisionMs = Date.parse(row.updatedAt || row.createdAt || "");
   const staleQueued =

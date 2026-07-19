@@ -69,6 +69,7 @@ const TEST_SETTINGS: GenerationSettings = {
 
 class FakeJobStore implements JobStorePort {
   rows = new Map<string, { status: string; updated_at: string | null; workup_json: Record<string, unknown> }>();
+  failNextRead = false; // simulates an unreadable live row on the next read
   private tick = 0;
   now(): string {
     return `T${++this.tick}`;
@@ -77,6 +78,10 @@ class FakeJobStore implements JobStorePort {
     this.rows.set(slug, { status, updated_at: this.now(), workup_json: json });
   }
   async read(slug: string): Promise<JobRow | null | { error: string }> {
+    if (this.failNextRead) {
+      this.failNextRead = false;
+      return { error: "simulated read failure" };
+    }
     const r = this.rows.get(slug);
     return r ? { status: r.status, updatedAt: r.updated_at, workupJson: r.workup_json } : null;
   }
@@ -95,7 +100,9 @@ class FakeJobStore implements JobStorePort {
     }
     if ("status" in next) r.status = String(next.status);
     if ("workup_json" in next) r.workup_json = next.workup_json as Record<string, unknown>;
-    r.updated_at = this.now();
+    // Mirror the real adapter: `next` is applied verbatim, so a written
+    // updated_at IS the row's new revision (applied_revision binding).
+    r.updated_at = "updated_at" in next ? String(next.updated_at) : this.now();
     return 1;
   }
 }
@@ -433,15 +440,16 @@ const main = async () => {
       const res = await adminPost(adminReq({ action: "published_redo_apply", slug: SLUG, jobId: job2, kind: "washing-dispute", candidateUrl: cand2, confirm: true }));
       ok(res.status === 409, "E5 apply refuses when the live image is no longer the candidate's base");
       ok(snapshotOf(store, SLUG) === beforeState, "E5 the live row is untouched by the refused apply");
-      // Validation failure: break the live workup (2 images = invalid plan).
+      // Validation failure: break the live workup (2 images = invalid plan)
+      // WITHOUT moving updated_at — the revision must still equal the
+      // candidate's base_revision so ONLY validation can be the refuser.
+      const baseRevision = String((lane.rows.get(job2) as Record<string, unknown>).base_revision);
       const broken = JSON.parse(JSON.stringify(live.workup_json)) as Record<string, unknown>;
       (broken.images as unknown[]).pop();
-      live.workup_json = broken;
-      live.updated_at = store.now();
-      // restore the candidate's base so ONLY validation can refuse:
-      (live.workup_json.images as Record<string, unknown>[]).find((i) => i.kind === "washing-dispute")!.src =
+      (broken.images as Record<string, unknown>[]).find((i) => i.kind === "washing-dispute")!.src =
         (lane.rows.get(job2) as Record<string, unknown>).base_src as string;
-      live.updated_at = store.now();
+      live.workup_json = broken;
+      live.updated_at = baseRevision;
       const beforeBroken = snapshotOf(store, SLUG);
       const res2 = await adminPost(adminReq({ action: "published_redo_apply", slug: SLUG, jobId: job2, kind: "washing-dispute", candidateUrl: cand2, confirm: true }));
       const body2 = await json(res2);
@@ -534,6 +542,82 @@ const main = async () => {
       const outage = await adminPost(adminReq({ action: "published_redo_status", slug: SLUG }));
       ok(outage.status === 503, "H4 lane outage answers 503");
       ok(audit.length === auditBefore, "H4 the failed poll wrote NO durable audit rows");
+    }
+
+    // ---------------- I. Codex #66 exact-head fixes (198cbff review) ----------------
+    {
+      // I1 (P1-1): apply is bound to the candidate's BASE revision — an
+      // unrelated live-row change that leaves the target image untouched
+      // still refuses the apply.
+      const pf = await json(await adminPost(adminReq({ action: "published_redo_preflight", slug: SLUG, kind: "ephphatha", notes: NOTES })));
+      const digestI = String((pf.redo as Record<string, unknown>).bindingDigest);
+      const created = await json(await adminPost(adminReq({ action: "published_redo", slug: SLUG, kind: "ephphatha", notes: NOTES, bindingDigest: digestI, confirm: true })));
+      const jobI = String(created.jobId);
+      await publishedRedoWorker(workerReq(lastTrigger!.body as Record<string, unknown>));
+      const candI = String(lane.rows.get(jobI)!.candidate_url);
+      const liveI = store.rows.get(SLUG)!;
+      liveI.updated_at = store.now(); // unrelated revision bump; target src unchanged
+      const beforeI1 = snapshotOf(store, SLUG);
+      const res1 = await adminPost(adminReq({ action: "published_redo_apply", slug: SLUG, jobId: jobI, kind: "ephphatha", candidateUrl: candI, confirm: true }));
+      const body1 = await json(res1);
+      ok(res1.status === 409 && /changed after this candidate was created/.test(String(body1.error)), "I1 apply refuses when the live revision drifted, even with the target image unchanged");
+      ok(snapshotOf(store, SLUG) === beforeI1, "I1 the live row is untouched by the refused apply");
+      const rejI = await adminPost(adminReq({ action: "published_redo_reject", slug: SLUG }));
+      ok(rejI.status === 200, "I1 cleanup: stale candidate rejected");
+
+      // I2 (P1-2): rollback is bound to the exact revision the apply wrote —
+      // a later live-row change (candidate src still in place) refuses.
+      const pf2 = await json(await adminPost(adminReq({ action: "published_redo_preflight", slug: SLUG, kind: "ephphatha", notes: NOTES })));
+      const digestI2 = String((pf2.redo as Record<string, unknown>).bindingDigest);
+      const created2 = await json(await adminPost(adminReq({ action: "published_redo", slug: SLUG, kind: "ephphatha", notes: NOTES, bindingDigest: digestI2, confirm: true })));
+      const jobI2 = String(created2.jobId);
+      await publishedRedoWorker(workerReq(lastTrigger!.body as Record<string, unknown>));
+      const candI2 = String(lane.rows.get(jobI2)!.candidate_url);
+      const applied2 = await adminPost(adminReq({ action: "published_redo_apply", slug: SLUG, jobId: jobI2, kind: "ephphatha", candidateUrl: candI2, confirm: true }));
+      ok(applied2.status === 200, "I2 setup: applied");
+      ok(typeof lane.rows.get(jobI2)!.applied_revision === "string", "I2 lane row records the exact applied revision");
+      const liveI2 = store.rows.get(SLUG)!;
+      liveI2.updated_at = store.now(); // unrelated post-apply change; candidate still live
+      const beforeI2 = snapshotOf(store, SLUG);
+      const res2 = await adminPost(adminReq({ action: "published_redo_rollback", slug: SLUG, jobId: jobI2, confirm: true }));
+      const body2 = await json(res2);
+      ok(res2.status === 409 && /changed after this redo was applied/.test(String(body2.error)), "I2 rollback refuses when the live revision moved after apply");
+      ok(snapshotOf(store, SLUG) === beforeI2, "I2 the live row is untouched by the refused rollback");
+      // restore for later sections: put the applied revision back and roll back cleanly
+      liveI2.updated_at = String(lane.rows.get(jobI2)!.applied_revision);
+      const rb2 = await adminPost(adminReq({ action: "published_redo_rollback", slug: SLUG, jobId: jobI2, confirm: true }));
+      ok(rb2.status === 200, "I2 cleanup: rollback lands once the revision matches again");
+
+      // I3 (P1-3): a post-consume binding read failure closes the running
+      // claim (zero spend) instead of stranding the one-active-per-slug lock.
+      const pf3 = await json(await adminPost(adminReq({ action: "published_redo_preflight", slug: SLUG, kind: "ephphatha", notes: NOTES })));
+      const digestI3 = String((pf3.redo as Record<string, unknown>).bindingDigest);
+      const created3 = await json(await adminPost(adminReq({ action: "published_redo", slug: SLUG, kind: "ephphatha", notes: NOTES, bindingDigest: digestI3, confirm: true })));
+      const jobI3 = String(created3.jobId);
+      const genBefore3 = generateCalls;
+      const costsBefore3 = costs.length;
+      store.failNextRead = true; // the consume-time live re-derive fails
+      const res3 = await publishedRedoWorker(workerReq(lastTrigger!.body as Record<string, unknown>));
+      ok(res3.status === 500, "I3 worker refuses when the post-consume read fails");
+      ok(generateCalls === genBefore3 && costs.length === costsBefore3, "I3 no model request, no cost row");
+      const rowI3 = lane.rows.get(jobI3)!;
+      ok(rowI3.status === "failed" && rowI3.spent_count === 0 && rowI3.error_code === "post_consume_refusal", "I3 running claim closed with zero spend — never stranded");
+      const pf3b = await adminPost(adminReq({ action: "published_redo_preflight", slug: SLUG, kind: "ephphatha", notes: NOTES }));
+      ok(pf3b.status === 200, "I3 the lane is immediately usable again");
+
+      // I4 (P1-4): rejecting a candidate FAILS CLOSED when the live row is
+      // unreadable — only an authoritative not-live read permits rejection.
+      const digestI4 = String(((await json(pf3b)).redo as Record<string, unknown>).bindingDigest);
+      const created4 = await json(await adminPost(adminReq({ action: "published_redo", slug: SLUG, kind: "ephphatha", notes: NOTES, bindingDigest: digestI4, confirm: true })));
+      const jobI4 = String(created4.jobId);
+      await publishedRedoWorker(workerReq(lastTrigger!.body as Record<string, unknown>));
+      ok(lane.rows.get(jobI4)?.status === "candidate", "I4 setup: candidate exists");
+      store.failNextRead = true;
+      const rej4 = await adminPost(adminReq({ action: "published_redo_reject", slug: SLUG }));
+      ok(rej4.status === 409, "I4 reject refuses while the live row is unreadable (fail closed)");
+      ok(lane.rows.get(jobI4)?.status === "candidate", "I4 the candidate row is untouched by the refused reject");
+      const rej4b = await adminPost(adminReq({ action: "published_redo_reject", slug: SLUG }));
+      ok(rej4b.status === 200 && lane.rows.get(jobI4)?.status === "rejected", "I4 reject lands once an authoritative read proves the candidate is not live");
     }
 
     // ---------------- G. Reject + blocked stay-locked ----------------
