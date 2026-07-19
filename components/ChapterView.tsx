@@ -34,14 +34,22 @@ import { EsvAttribution } from "@/components/chapter/EsvAttribution";
  * each quotation, and the full official notice + esv.org link ONCE per page,
  * here in the footer (its copyright page).
  */
-export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) {
+export function ChapterView({
+  data,
+  publishedSlugs,
+}: {
+  data: ChapterWorkup;
+  source?: string;
+  /** Published chapter slugs for title-as-navigation; omitted on draft previews. */
+  publishedSlugs?: string[];
+}) {
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
       <main className="min-w-0 space-y-s6 pb-s12 pt-s2 lg:pt-s4">
         {/* Above the fold: title + controls on one header row (owner decision
             A2), subtitle below, inline Scripture, key image. */}
         <div className="space-y-s3">
-          <ChapterTopControls data={data} />
+          <ChapterTopControls data={data} publishedSlugs={publishedSlugs} />
         </div>
 
         {/* Owner layout order (2026-07-19 "mix up"): every text box full

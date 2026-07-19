@@ -46,6 +46,32 @@ export async function chapterLinkable(slug: string): Promise<boolean> {
   return (await resolveChapter(slug)) !== null;
 }
 
+/**
+ * Every slug the title-as-navigation dropdowns may LINK (owner approval,
+ * 2026-07-19): published (reviewed) chapters, the legacy psalm-23 exception
+ * (verified through the guarded reader, never assumed), and local fixtures.
+ * Fail-quiet: a storage error just returns the local set — the title then
+ * greys everything unpublished, linking nothing that could 404 (IQ-012).
+ */
+export async function listNavigableSlugs(): Promise<string[]> {
+  const slugs = new Set<string>(LOCAL.keys());
+  if (isSupabaseConfigured()) {
+    try {
+      for (const slug of await listReviewedSlugsNewestFirst()) slugs.add(slug);
+    } catch (e) {
+      console.warn("[selah] navigable-slug lookup failed:", (e as Error).message);
+    }
+    try {
+      if (!slugs.has("psalm-23") && (await getChapterWorkupBySlug("psalm-23"))) {
+        slugs.add("psalm-23");
+      }
+    } catch {
+      // quiet: psalm-23 simply stays greyed
+    }
+  }
+  return [...slugs];
+}
+
 export async function resolveChapter(slug: string): Promise<ResolvedChapter | null> {
   // 1) Supabase read-through (ready/reviewed only).
   if (isSupabaseConfigured()) {
