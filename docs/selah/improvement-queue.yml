@@ -252,8 +252,9 @@ entries:
       Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
     priority_trigger: next navigation pass (small bounded fix; free; pairs
       with IQ-007)
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "#60 — neighbors render only when their page actually
+      serves (chapterLinkable), bounded by the book's real chapter count"
 
   - id: IQ-013
     area: mark-10-images
@@ -313,7 +314,9 @@ entries:
       borders and city names FROM THE CHAPTER'S ERA (c. AD 30) — a curated
       Selah overlay (approximate tetrarchy boundaries + period place names,
       labeled "estimated"; no free tile service carries honest
-      first-century borders). SWAP, never overlay: ancient mode shows ONLY
+      first-century borders; the SWAP mechanism is built once, but each
+      biblical era needs its own curated dataset — c. AD 30 is the first,
+      Gospel-era one). SWAP, never overlay: ancient mode shows ONLY
       period names (modern Esri reference hidden); unchecked shows only
       today's names. Then/now pairs (Lake Tiberias <-> Sea of Galilee) are
       discovered by toggling, not shown together. Codex specs the
@@ -338,8 +341,10 @@ entries:
       7/8/9 only), so self-serve chapter launches get NO chapter-specific
       map. Generate the geo config from the approved Prepare proposal's
       location entries (three-axis honesty model already validated there),
-      with coordinates resolved through an owner-reviewed gazetteer step —
-      never model-invented coordinates. Closes the last hand-coded
+      with coordinates resolved AUTOMATICALLY from a curated, owner-reviewed
+      gazetteer (reviewed once as data, not per chapter — Studio stays
+      self-serve; never model-invented coordinates). Claude implements after
+      #58; Codex reviews and spec-validates. Closes the last hand-coded
       per-chapter artifact.
     evidence: >-
       Owner question, in-session 2026-07-19: "is this something that will
