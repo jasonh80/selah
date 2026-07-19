@@ -244,6 +244,68 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     caption:
       "Mark 9 runs from an unnamed high mountain down through Galilee to a house in Capernaum. Only Capernaum earns a pin — the mountain and the route are honestly uncertain and stay unpinned.",
   },
+
+  // Mark 10 renders its owner-approved fixture entries (owner report
+  // 2026-07-19: published Mark 10 had no map because configs were hand-built
+  // only through Mark 9; IQ-018 automates this later). Real places (WGS84):
+  // Jericho (Tell es-Sultan) 31.8711N 35.4442E · Jerusalem Old City
+  // 31.7784N 35.2354E. The chapter moves south: Judea and beyond the Jordan
+  // (10:1), the road up to Jerusalem (10:32), Bartimaeus at Jericho (10:46).
+  "mark-10": {
+    views: {
+      local: { center: [35.34, 31.83], zoom: 10.2 },
+      big: { center: [35.45, 31.72], zoom: 8.2 },
+    },
+    pins: [
+      { lng: 35.4442, lat: 31.8711, label: "Jericho", locationName: "Jericho" },
+      { lng: 35.2354, lat: 31.7784, label: "Jerusalem", locationName: "Jerusalem", labelSide: "left" },
+    ],
+    areas: [
+      {
+        locationName: "Judea and beyond the Jordan",
+        label: "Judea & beyond the Jordan · approx.",
+        polygon: [
+          [35.05, 31.95], [35.45, 32.08], [35.75, 32.02],
+          [35.85, 31.65], [35.6, 31.35], [35.15, 31.45],
+        ],
+        labelAt: [35.66, 31.85],
+      },
+    ],
+    corridors: [
+      {
+        locationName: "Road up to Jerusalem",
+        label: "Approx. road up",
+        waypoints: [
+          [35.4442, 31.8711], [35.38, 31.845], [35.31, 31.815], [35.2354, 31.7784],
+        ],
+        labelAt: [35.36, 31.87],
+      },
+    ],
+    tour: [
+      {
+        center: [35.55, 31.8], zoom: 8.6, pitch: 30,
+        title: "Judea and beyond the Jordan",
+        caption: "Jesus leaves Galilee for the region of Judea and beyond the Jordan (10:1), teaching the crowds again. The region is real; its boundary is approximate, and no teaching scene gets a pin.",
+      },
+      {
+        center: [35.34, 31.83], zoom: 10.8, pitch: 55, bearing: -35,
+        title: "The road up to Jerusalem",
+        caption: "They were on the road, going up to Jerusalem, Jesus walking ahead (10:32). From Jericho the climb rises about 3,400 feet — the sequence is given, the exact road is not, so only a broad sweep is shown.",
+      },
+      {
+        center: [35.4442, 31.8711], zoom: 12, pitch: 50,
+        title: "Jericho",
+        caption: "As Jesus leaves Jericho, blind Bartimaeus calls out from the roadside and follows him on the way (10:46–52). The city is certain; the roadside spot is not pinned.",
+      },
+      {
+        center: [35.2354, 31.7784], zoom: 11.5, pitch: 55, bearing: 15,
+        title: "Jerusalem ahead",
+        caption: "The destination Jesus has named three times now (10:33–34) — where the Son of Man came not to be served but to serve, and to give his life as a ransom for many (10:45). Nothing in this chapter happens there yet.",
+      },
+    ],
+    caption:
+      "Mark 10 turns south: Judea and beyond the Jordan, then the climb from Jericho toward Jerusalem. The two cities carry pins; the region's boundary is approximate; the road appears only as a broad sweep because the exact route is unrecorded.",
+  },
 };
 
 export function getGeoChapterMap(slug: string): GeoChapterMap | null {
