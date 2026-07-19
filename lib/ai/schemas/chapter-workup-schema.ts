@@ -181,6 +181,7 @@ export const SECTION_TYPES = [
   "jesus_connection",
   "theology",
   "application",
+  "discipleship",
   "prayer",
   "map_notes",
   "image_plan",

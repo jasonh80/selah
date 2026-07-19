@@ -5,6 +5,7 @@ import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
 import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
 import { InsightCards } from "@/components/chapter/InsightCardGrid";
+import { KeyPersonCard } from "@/components/chapter/VisualDashboardGrid";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GeoMapSection } from "@/components/chapter/GeoMapSection";
@@ -59,6 +60,7 @@ export function ChapterView({ data }: { data: ChapterWorkup; source?: string }) 
         <VisualChapterPath data={data} />
 
         <TimelineSection data={data} />
+        <KeyPersonCard data={data} />
         <MostPeopleMissSection data={data} />
         <InsightCards data={data} titles={["Jesus at the Center"]} />
 

@@ -16,6 +16,7 @@ const SECTION_ICON: Record<WorkupSection["type"], string> = {
   jesus_connection: "✝",
   theology: "🛡",
   application: "🌱",
+  discipleship: "👣",
   prayer: "🙏",
   map_notes: "🗺",
   image_plan: "🎨",

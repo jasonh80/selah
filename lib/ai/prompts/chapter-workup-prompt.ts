@@ -282,7 +282,8 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
     { "id": "jesus", "title": "Jesus at the Center", "type": "jesus_connection", "priority": 5, "isCore": true, "cardSummary": "<short>", "fullContent": "<rich, careful Christ connection>" },
     { "id": "theology", "title": "Theology Principle", "type": "theology", "priority": 6, "isCore": true, "cardSummary": "<short>", "fullContent": "<the principle, started simple>" },
     { "id": "application", "title": "Live It", "type": "application", "priority": 7, "isCore": true, "cardSummary": "<short>", "fullContent": "<practical, invitational, no moralism>" },
-    { "id": "prayer", "title": "Prayer", "type": "prayer", "priority": 8, "isCore": true, "cardSummary": "<short>", "fullContent": "<a fuller prayer>" },
+    { "id": "discipleship", "title": "Disciple It", "type": "discipleship", "priority": 8, "isCore": true, "cardSummary": "<short>", "fullContent": "<THIS chapter's discipleship lesson in two movements: first FOLLOW — how this chapter trains someone to follow Jesus more closely; then MULTIPLY — how a reader helps someone ELSE follow Him (and equips them to pass it on again). Exponential multiplication is the goal. Concrete and invitational, drawn only from this chapter — never guilt, never a program pitch>" },
+    { "id": "prayer", "title": "Prayer", "type": "prayer", "priority": 9, "isCore": true, "cardSummary": "<short>", "fullContent": "<a fuller prayer>" },
     { "id": "image-plan", "title": "Image Plan", "type": "image_plan", "priority": 20, "isCore": false, "cardSummary": "<short>", "fullContent": "<describe why these 3 or 5 chapter-specific images reveal this chapter>" }
   ],
   "biblicalTimeline": {
