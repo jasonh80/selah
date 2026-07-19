@@ -206,9 +206,8 @@ fallback) since r101.
   on-screen Prepare receipt (or, once #58 merges, any OTHER chapter through
   the self-serve lane).
 - **Kelly's characters:** People/Connections uses Kelly's system as the
-  canonical cast (owner direction 2026-07-18); spec work starts early the week of
-  2026-07-20 (owner said "Monday"; Jul 21 is a Tuesday — exact day being
-  pinned with him).
+  canonical cast (owner direction 2026-07-18); spec work starts **Monday
+  2026-07-20** (owner-confirmed).
 
 ## Cost reference (Mark 6 actuals, logged estimates)
 
