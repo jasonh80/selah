@@ -153,3 +153,31 @@ export async function triggerBackgroundImageRedo(
   };
   return triggerOverride ? triggerOverride(req) : post(req);
 }
+
+/** PUBLISHED-chapter single-image redo worker trigger (dedicated lane,
+ * board #29 2026-07-19). Same signed-token discipline, dedicated purpose. */
+export async function triggerBackgroundPublishedImageRedo(
+  slug: string,
+  host: string,
+  jobId: string,
+  redo: { bindingDigest: string; kind: string; model: string },
+): Promise<TriggerResult> {
+  let token: string;
+  try {
+    token = signJobToken("published-image-redo", slug, jobId).token;
+  } catch (e) {
+    return { ok: false, error: String((e as Error).message).slice(0, 200) };
+  }
+  const req: TriggerRequest = {
+    url: `${baseUrl(host)}/.netlify/functions/published-redo-image-background`,
+    body: {
+      slug,
+      job: jobId,
+      token,
+      redoBindingDigest: redo.bindingDigest,
+      redoKind: redo.kind,
+      imageModel: redo.model,
+    },
+  };
+  return triggerOverride ? triggerOverride(req) : post(req);
+}

@@ -54,13 +54,23 @@ import {
   triggerBackgroundPrepareProposal,
   triggerBackgroundImageGeneration,
   triggerBackgroundImageRedo,
+  triggerBackgroundPublishedImageRedo,
 } from "@/lib/server/trigger-generation";
 import {
   imageGenAllowed,
   checkImageModel,
   prepareImageJobBinding,
   prepareImageRedoBinding,
+  preparePublishedImageRedoBinding,
 } from "@/lib/server/images";
+import {
+  claimPublishedImageRedo,
+  applyPublishedRedoCandidate,
+  rejectPublishedRedo,
+  rollbackPublishedRedo,
+  releasePublishedRedoClaim,
+  publishedRedoStatusFor,
+} from "@/lib/server/published-image-redo";
 import {
   deriveMarkSprintImagePlan,
   markSprintFinalReviewDigest,
@@ -1528,6 +1538,268 @@ export async function POST(req: Request) {
       message: "candidate rejected; the chapter is unchanged (file stays orphaned in its job directory)",
     });
     return NextResponse.json({ ok: true, slug });
+  }
+
+  // ---- PUBLISHED-chapter single-image redo (Codex conditions, board #29 2026-07-19) ----
+  // The dedicated lane: candidate state lives in chapter_published_image_redo,
+  // never the live row. FREE preflight (exact price, digest bound to the live
+  // revision) → ONE paid candidate (no auto-retry) → the owner's SECOND
+  // confirmation ("Use on live chapter") applies exactly one src after full
+  // revalidation — or Reject leaves the live page untouched. Psalm 23 and
+  // Mark 6 refuse inside the mutation guard before anything runs.
+  if (action === "published_redo_status") {
+    const slug = String(body.slug ?? "");
+    try {
+      const row = await publishedRedoStatusFor(slug);
+      // The live image list for the kind picker + side-by-side preview.
+      // Read-only; only reviewed rows reach the card, and the route is
+      // admin-authed. Unreadable storage just renders an empty picker.
+      let images: { kind: string; label: string; src: string }[] = [];
+      try {
+        const store = requireJobStore(slug, "published_redo_status");
+        const chapterRow = await store.read(slug);
+        if (chapterRow && !("error" in chapterRow) && chapterRow.status === "reviewed") {
+          const list = chapterRow.workupJson?.images;
+          if (Array.isArray(list)) {
+            images = list
+              .map((image) => image as Record<string, unknown>)
+              .filter((image) => typeof image?.kind === "string" && typeof image?.src === "string")
+              .map((image) => ({
+                kind: String(image.kind),
+                label: typeof image.label === "string" ? image.label : String(image.kind),
+                src: String(image.src),
+              }));
+          }
+        }
+      } catch {
+        // fail quiet: the picker stays empty and preflight remains the authority
+      }
+      return NextResponse.json({
+        ok: true,
+        slug,
+        images,
+        redo: row
+          ? {
+              jobId: row.id,
+              status: row.status,
+              kind: row.kind,
+              notes: row.notes,
+              candidateUrl: row.candidateUrl,
+              baseSrc: row.baseSrc,
+              errorCode: row.errorCode,
+              spentCount: row.spentCount,
+              createdAt: row.createdAt,
+            }
+          : null,
+      });
+    } catch (error) {
+      return mapMutationError(slug, "published_redo_status", error);
+    }
+  }
+  if (action === "published_redo_preflight") {
+    const slug = String(body.slug ?? "");
+    const kind = String(body.kind ?? "");
+    const notes = typeof body.notes === "string" ? body.notes : "";
+    const blocked = await guardOrRefuse(slug, "published_redo_preflight", "applyPublishedImageRedo");
+    if (blocked) return blocked;
+    if (!(await imageGenAllowed(slug))) {
+      return refuse(
+        slug,
+        "published_redo_preflight",
+        "Image generation not allowed — needs Image Generation ON and the chapter allowlisted.",
+        403,
+      );
+    }
+    if (
+      isMarkSprintSlug(slug) &&
+      !(await connectedChapterReceiptAppliesIncludingStored(slug))
+    ) {
+      return refuse(
+        slug,
+        "published_redo_preflight",
+        `blocked — ${markSprintChapterLabel(slug)}'s exact owner setup receipt is missing or changed`,
+        403,
+      );
+    }
+    try {
+      const active = await publishedRedoStatusFor(slug);
+      if (active && ["queued", "running", "candidate", "blocked"].includes(active.status)) {
+        return refuse(
+          slug,
+          "published_redo_preflight",
+          "a published-image redo is already in progress or awaiting your decision — resolve it first",
+          409,
+        );
+      }
+      const redo = await preparePublishedImageRedoBinding(slug, kind, notes);
+      return NextResponse.json({
+        ok: true,
+        slug,
+        redo: {
+          kind: redo.kind,
+          index: redo.index,
+          label: redo.label,
+          currentSrc: redo.currentSrc,
+          notes: redo.notes,
+          model: redo.model,
+          size: redo.size,
+          estimatedCostUsd: redo.estimatedCostUsd,
+          bindingDigest: redo.bindingDigest,
+          baseRevision: redo.baseRevision,
+        },
+      });
+    } catch (error) {
+      return mapMutationError(slug, "published_redo_preflight", error);
+    }
+  }
+  if (action === "published_redo") {
+    const slug = String(body.slug ?? "");
+    const kind = String(body.kind ?? "");
+    const notes = typeof body.notes === "string" ? body.notes : "";
+    const bindingDigest = typeof body.bindingDigest === "string" ? body.bindingDigest : "";
+    if (body.confirm !== true) {
+      return refuse(slug, "published_redo", "confirmation required", 400);
+    }
+    const blocked = await guardOrRefuse(slug, "published_redo", "applyPublishedImageRedo");
+    if (blocked) return blocked;
+    if (!(await imageGenAllowed(slug))) {
+      return refuse(
+        slug,
+        "published_redo",
+        "Image generation not allowed — needs Image Generation ON and the chapter allowlisted.",
+        403,
+      );
+    }
+    if (
+      isMarkSprintSlug(slug) &&
+      !(await connectedChapterReceiptAppliesIncludingStored(slug))
+    ) {
+      return refuse(
+        slug,
+        "published_redo",
+        `blocked — ${markSprintChapterLabel(slug)}'s exact owner setup receipt is missing or changed; no image credit was used`,
+        403,
+      );
+    }
+    let fresh: Awaited<ReturnType<typeof preparePublishedImageRedoBinding>>;
+    try {
+      fresh = await preparePublishedImageRedoBinding(slug, kind, notes);
+    } catch (error) {
+      return mapMutationError(slug, "published_redo", error);
+    }
+    if (fresh.bindingDigest !== bindingDigest) {
+      return refuse(
+        slug,
+        "published_redo",
+        "The live chapter or your redo request changed after you reviewed its cost. Check it again before spending credit.",
+        409,
+      );
+    }
+    const probe = await checkImageModel(fresh.model);
+    if (!probe.ok) {
+      return refuse(slug, "published_redo", `image model "${probe.model}" unavailable: ${probe.error}`, 502);
+    }
+    let redoJobId: string;
+    try {
+      const claim = await claimPublishedImageRedo(slug, { kind, notes, bindingDigest });
+      redoJobId = claim.jobId;
+    } catch (e) {
+      return mapMutationError(slug, "published_redo", e);
+    }
+    await logGenerationAudit({
+      action: "published_redo",
+      slug,
+      status: "started",
+      message: `job ${redoJobId} — one candidate for published "${fresh.kind}" (live chapter untouched until second confirmation)`,
+    });
+    const triggered = await triggerBackgroundPublishedImageRedo(slug, new URL(req.url).host, redoJobId, {
+      bindingDigest,
+      kind: fresh.kind,
+      model: fresh.model,
+    });
+    if (!triggered.ok) {
+      const released = await releasePublishedRedoClaim(slug, redoJobId);
+      return refuse(
+        slug,
+        "published_redo",
+        `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ` +
+          (released
+            ? "redo claim closed (worker provably never invoked, no spend)"
+            : "redo claim could NOT be closed; it may still hold the lane"),
+        released ? 502 : 500,
+      );
+    }
+    return NextResponse.json({ ok: true, triggered: true, slug, jobId: redoJobId });
+  }
+  if (action === "published_redo_apply") {
+    const slug = String(body.slug ?? "");
+    const jobId = typeof body.jobId === "string" ? body.jobId : "";
+    const kind = String(body.kind ?? "");
+    const candidateUrl = typeof body.candidateUrl === "string" ? body.candidateUrl : "";
+    // The SECOND explicit owner confirmation (Codex condition).
+    if (body.confirm !== true) {
+      return refuse(slug, "published_redo_apply", "confirmation required", 400);
+    }
+    const blocked = await guardOrRefuse(slug, "published_redo_apply", "applyPublishedImageRedo");
+    if (blocked) return blocked;
+    try {
+      // Snapshot, full public revalidation, serve check, and the atomic
+      // revision-pinned one-src write all happen inside — fail-closed, the
+      // live page unchanged unless the final conditional write commits.
+      const result = await applyPublishedRedoCandidate(slug, { jobId, kind, candidateUrl });
+      await logGenerationAudit({
+        action: "published_redo_applied",
+        slug,
+        status: "succeeded",
+        message: result.alreadyApplied
+          ? `"${kind}" already used this candidate — duplicate apply settled without a second write`
+          : `published "${kind}" now uses the approved candidate (rollback snapshot v${result.snapshotVersion})`,
+      });
+      return NextResponse.json({ ok: true, slug, kind, src: candidateUrl, alreadyApplied: result.alreadyApplied });
+    } catch (e) {
+      return mapMutationError(slug, "published_redo_apply", e);
+    }
+  }
+  if (action === "published_redo_reject") {
+    const slug = String(body.slug ?? "");
+    // Lane-table write only — the live chapter row is never touched here.
+    const rejected = await rejectPublishedRedo(slug);
+    if (!rejected) {
+      return refuse(
+        slug,
+        "published_redo_reject",
+        "Nothing was cleared — the candidate may already be resolved, the request may still be live, or the redo needs attention (blocked spend stays locked).",
+        409,
+      );
+    }
+    await logGenerationAudit({
+      action: "published_redo_rejected",
+      slug,
+      status: "succeeded",
+      message: "published-redo candidate rejected; the live chapter is unchanged (file stays orphaned in its job directory)",
+    });
+    return NextResponse.json({ ok: true, slug });
+  }
+  if (action === "published_redo_rollback") {
+    const slug = String(body.slug ?? "");
+    const jobId = typeof body.jobId === "string" ? body.jobId : "";
+    if (body.confirm !== true) {
+      return refuse(slug, "published_redo_rollback", "confirmation required", 400);
+    }
+    const blocked = await guardOrRefuse(slug, "published_redo_rollback", "applyPublishedImageRedo");
+    if (blocked) return blocked;
+    try {
+      const result = await rollbackPublishedRedo(slug, jobId);
+      await logGenerationAudit({
+        action: "published_redo_rolled_back",
+        slug,
+        status: "succeeded",
+        message: `published image restored to its pre-redo source (rollback snapshot v${result.snapshotVersion})`,
+      });
+      return NextResponse.json({ ok: true, slug });
+    } catch (e) {
+      return mapMutationError(slug, "published_redo_rollback", e);
+    }
   }
 
   // ---- Selah Brain approved examples ----

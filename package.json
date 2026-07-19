@@ -5,7 +5,7 @@
   "description": "Selah — your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run verify:studio-safety && npm run verify:studio-preview-access && npm run verify:studio-mark8-preflight && npm run verify:studio-polish && npm run verify:esv-attribution && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark && npm run verify:diagnostics-display && npm run verify:maps-honesty && npm run verify:image-redo && npm run verify:today && npm run verify:prepare-proposals && npm run verify:chapter-year",
+    "prebuild": "npm run verify:studio-safety && npm run verify:studio-preview-access && npm run verify:studio-mark8-preflight && npm run verify:studio-polish && npm run verify:esv-attribution && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark && npm run verify:diagnostics-display && npm run verify:maps-honesty && npm run verify:image-redo && npm run verify:published-redo && npm run verify:today && npm run verify:prepare-proposals && npm run verify:chapter-year",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -29,6 +29,7 @@
     "verify:diagnostics-display": "node --import tsx scripts/verify-overlap-diagnostics-display.ts",
     "verify:maps-honesty": "node --import tsx scripts/verify-maps-honesty.ts",
     "verify:image-redo": "node --import tsx scripts/verify-image-redo.ts",
+    "verify:published-redo": "node --import tsx scripts/verify-published-image-redo.ts",
     "verify:today": "node --import tsx scripts/verify-today-resolution.ts",
     "verify:prepare-proposals": "node --import tsx scripts/verify-prepare-proposals.ts",
     "verify:chapter-year": "node --import tsx scripts/verify-chapter-year.ts"

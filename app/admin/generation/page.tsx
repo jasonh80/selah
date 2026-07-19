@@ -1,6 +1,7 @@
 "use client";
 
 import { PrepareProposalCard } from "./PrepareProposalCard";
+import { PublishedRedoCard } from "./PublishedRedoCard";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BIBLE_BOOKS, chapterCount, slugFor } from "@/lib/bible/books";
@@ -1924,9 +1925,23 @@ export default function SelahStudioPage() {
           </div>
         )}
         {published ? (
-          <a href={`/chapter/${slug}`} target="_blank" rel="noreferrer" className="text-[13px] text-primary underline">
-            View live chapter ↗
-          </a>
+          <>
+            <a href={`/chapter/${slug}`} target="_blank" rel="noreferrer" className="text-[13px] text-primary underline">
+              View live chapter ↗
+            </a>
+            {/* Published single-image redo — the dedicated Codex-approved lane
+                (board #29 2026-07-19). Candidate work never touches the live
+                row; "Use on live chapter" is a second explicit confirmation. */}
+            {connectedSlug && (
+              <PublishedRedoCard
+                slug={slug}
+                chapterLabel={chapterLabel}
+                api={api}
+                imagesOff={imagesOff}
+                onApplied={() => void loadChapterInfo(slug)}
+              />
+            )}
+          </>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={previewDraft} disabled={!draftReady} className={ghost}>
