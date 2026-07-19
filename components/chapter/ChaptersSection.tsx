@@ -1,18 +1,30 @@
 import Link from "next/link";
 import type { ChapterWorkup } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
+import { chapterLinkable } from "@/lib/chapters/registry";
+import { chapterCount } from "@/lib/bible/books";
 
-// Previous / current / next, derived from the current chapter. Neighbours link
-// normally; if a neighbour hasn't been generated yet (generation off), it 404s —
-// which is acceptable for now. No auto-generation.
-export function ChaptersSection({ data }: { data: ChapterWorkup }) {
+// Previous / current / next, derived from the current chapter — but a
+// neighbour renders ONLY when its page actually exists (servable published
+// row or local fixture). Published Mark 10 must never advertise a 404
+// "Next: Mark 11" (IQ-012, Codex post-launch audit 2026-07-18). Server
+// component: the two existence checks run at render time.
+export async function ChaptersSection({ data }: { data: ChapterWorkup }) {
   const base = data.slug.replace(/-\d+$/, "");
   const ch = data.chapter;
+  const lastChapter = chapterCount(data.book) || Number.MAX_SAFE_INTEGER;
+
+  const prevSlug = ch > 1 ? `${base}-${ch - 1}` : null;
+  const nextSlug = ch < lastChapter ? `${base}-${ch + 1}` : null;
+  const [prevOk, nextOk] = await Promise.all([
+    prevSlug ? chapterLinkable(prevSlug) : Promise.resolve(false),
+    nextSlug ? chapterLinkable(nextSlug) : Promise.resolve(false),
+  ]);
 
   const rows: { label: string; sub: string; href?: string; active?: boolean }[] = [];
-  if (ch > 1) rows.push({ label: `${data.book} ${ch - 1}`, sub: "Previous", href: `/chapter/${base}-${ch - 1}` });
+  if (prevSlug && prevOk) rows.push({ label: `${data.book} ${ch - 1}`, sub: "Previous", href: `/chapter/${prevSlug}` });
   rows.push({ label: `${data.book} ${ch}`, sub: data.subtitle || "Current chapter", active: true });
-  rows.push({ label: `${data.book} ${ch + 1}`, sub: "Next", href: `/chapter/${base}-${ch + 1}` });
+  if (nextSlug && nextOk) rows.push({ label: `${data.book} ${ch + 1}`, sub: "Next", href: `/chapter/${nextSlug}` });
 
   return (
     <section id="chapters" className="scroll-mt-20">

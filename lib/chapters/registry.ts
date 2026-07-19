@@ -39,6 +39,13 @@ export interface ResolvedChapter {
   source: ChapterSource;
 }
 
+/** True when /chapter/<slug> would actually render (a servable published
+ * row or a local fixture) — chapter navigation must only link PUBLISHED
+ * neighbors (IQ-012: published Mark 10 linked a 404 "Next: Mark 11"). */
+export async function chapterLinkable(slug: string): Promise<boolean> {
+  return (await resolveChapter(slug)) !== null;
+}
+
 export async function resolveChapter(slug: string): Promise<ResolvedChapter | null> {
   // 1) Supabase read-through (ready/reviewed only).
   if (isSupabaseConfigured()) {
