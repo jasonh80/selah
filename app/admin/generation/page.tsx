@@ -1,5 +1,7 @@
 "use client";
 
+import { PrepareProposalCard } from "./PrepareProposalCard";
+
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BIBLE_BOOKS, chapterCount, slugFor } from "@/lib/bible/books";
 import {
@@ -1759,6 +1761,16 @@ export default function SelahStudioPage() {
           <p className="mb-2.5 text-[13px] font-medium text-accent-strong">
             ✓ Selah Brain and {chapterLabel} notes are ready
           </p>
+        )}
+        {!isProtectedChapter && !draftReady && !published && phase !== "generating" && (
+          <div className="mb-3">
+            <PrepareProposalCard
+              slug={slug}
+              chapterLabel={chapterLabel}
+              api={api}
+              onApproved={() => void loadChapterStatus(slug)}
+            />
+          </div>
         )}
         {mark8SetupReady && (statusProblem ? (
           <button type="button" onClick={() => void loadChapterStatus(slug)} className={ghost}>

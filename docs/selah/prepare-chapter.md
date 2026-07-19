@@ -85,3 +85,27 @@ alter table chapter_setup_approvals enable row level security;
   unnamed Transfiguration mountain, the unrecorded Galilee route get no pin).
   Map rendering still rides a later config-only pass; the screen states each
   entry honestly today.
+
+## Self-serve Prepare proposals (IQ-011, 2026-07-18)
+
+One-time table creation (Supabase SQL editor) — run `supabase/chapter-prepare-proposals.sql`
+ONCE. Until the table exists, the self-serve Prepare lane fails closed: no
+proposals can be created and nothing else changes. Service-role access only
+(RLS enabled, no policies), like the other tables.
+
+The lane serves every chapter OUTSIDE the protected Mark fixture flow: one
+explicitly-confirmed bounded model call proposes movements, guidance,
+watch-outs, and honest three-axis locations only when useful; the current
+Selah Brain rules ride into the proposal prompt and their digest is stored
+as provenance; server validation is fail-closed; the owner's digest-bound
+"Approve & set up" unlocks the separately confirmed generic draft flow,
+whose prompt loads exactly the approved proposal (fail-closed at draft time
+too). Codex reviews completed launches after the fact; it is not a
+pre-launch gate.
+
+Not built yet (v1, deliberate): on-screen editing of a proposal — reject and
+regenerate instead. Also deliberate in v1: textual-variant claims are omitted
+entirely (shape validation cannot prove a manuscript claim), and a proposed
+place must be named by the chapter's own text — unsupported claims are
+dropped, never offered for the owner to catch. A stale generating claim past the worker's maximum
+lifetime is cleared honestly by the next create attempt.

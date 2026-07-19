@@ -47,9 +47,11 @@ import {
   IMAGE_REDO_STATE_KEY,
   ALLOW_DISCARD_COMPLETED_IMAGES,
   hasTransientJobControlKeys,
+  newJobId,
 } from "@/lib/server/generation-jobs";
 import {
   triggerBackgroundGeneration,
+  triggerBackgroundPrepareProposal,
   triggerBackgroundImageGeneration,
   triggerBackgroundImageRedo,
 } from "@/lib/server/trigger-generation";
@@ -65,6 +67,17 @@ import {
   MARK_8_IMAGE_ESTIMATED_COST_USD,
   MARK_8_IMAGE_MODEL,
 } from "@/lib/server/mark8-image-plan";
+import {
+  proposalLaneEligible,
+  proposalMaxCostUsd,
+  readLatestProposal,
+  claimPrepareProposal,
+  failClaimedPrepareProposal,
+  approvePrepareProposal,
+  rejectPrepareProposal,
+  approvedProposalApplies,
+  ProposalClaimError,
+} from "@/lib/server/prepare-proposals";
 import {
   chapterMutationDecision,
   isChapterMutationError,
@@ -488,6 +501,105 @@ export async function POST(req: Request) {
         { status },
       );
     }
+  }
+
+  // ---- Self-serve Prepare proposals (IQ-011, owner decision 2026-07-18) ----
+  // The lane for every chapter OUTSIDE the protected Mark fixture flow: one
+  // explicitly-confirmed model call produces a structured proposal, validated
+  // fail-closed and stored immutably; only the owner's digest-bound approval
+  // unlocks the (separately confirmed) generic draft flow.
+  if (action === "prepare_proposal_status") {
+    // FREE read/check: nothing is spent, nothing changes.
+    const slug = String(body.slug ?? "");
+    const eligibility = proposalLaneEligible(slug);
+    if (!eligibility.eligible) {
+      return NextResponse.json({ ok: false, error: eligibility.reason }, { status: 400 });
+    }
+    let row;
+    try {
+      row = await readLatestProposal(slug);
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "proposal storage could not be read — try again (fail-closed, nothing changed)" },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      slug,
+      status: row?.status ?? "none",
+      proposal: row?.proposal_json ?? null,
+      proposalDigest: row?.proposal_digest ?? null,
+      error: row?.error ?? null,
+      approvedBy: row?.approved_by ?? null,
+      maxCostUsd: proposalMaxCostUsd(),
+    });
+  }
+  if (action === "prepare_proposal_create") {
+    const slug = String(body.slug ?? "");
+    const eligibility = proposalLaneEligible(slug);
+    if (!eligibility.eligible) {
+      return refuse(slug, "prepare_proposal", eligibility.reason ?? "not eligible", 400);
+    }
+    if (body.confirm !== true) {
+      return refuse(slug, "prepare_proposal", "confirmation required — the estimated conservative ceiling is shown first", 400);
+    }
+    // The one text-spend kill switch covers this lane too (adversarial
+    // pre-review finding: a paid model call must not sidestep it).
+    if (!(await getGenerationSettings()).text_generation_enabled) {
+      return refuse(slug, "prepare_proposal", "Text Generation is OFF — turn it on in Advanced Settings.", 403);
+    }
+    const jobId = newJobId();
+    try {
+      await claimPrepareProposal(slug, jobId);
+    } catch (e) {
+      const err = e as ProposalClaimError;
+      const status = err.code === "CONFLICT" ? 409 : err.code === "REFUSED" ? 403 : 500;
+      return refuse(slug, "prepare_proposal", err.message, status);
+    }
+    await logGenerationAudit({ action: "prepare_proposal", slug, status: "started", message: `job ${jobId} (est. ceiling $${proposalMaxCostUsd().toFixed(2)})` });
+    const triggered = await triggerBackgroundPrepareProposal(slug, new URL(req.url).host, jobId);
+    if (!triggered.ok) {
+      // The claim row must not strand as 'generating' after a failed trigger.
+      const failed = await failClaimedPrepareProposal(slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+      return refuse(
+        slug,
+        "prepare_proposal",
+        `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ${failed ? "the claim was marked failed (nothing spent)" : "the claim could NOT be cleared; it may still show generating"}`,
+        failed ? 502 : 500,
+      );
+    }
+    return NextResponse.json({ ok: true, triggered: true, slug, jobId, maxCostUsd: proposalMaxCostUsd() });
+  }
+  if (action === "prepare_proposal_approve" || action === "prepare_proposal_reject") {
+    const slug = String(body.slug ?? "");
+    const digest = String(body.proposalDigest ?? "");
+    if (!LOWERCASE_SHA256.test(digest)) {
+      return refuse(slug, "prepare_proposal", "the exact reviewed proposal digest is required", 400);
+    }
+    if (action === "prepare_proposal_approve" && body.confirm !== true) {
+      return refuse(slug, "prepare_proposal", "confirmation required", 400);
+    }
+    const decision =
+      action === "prepare_proposal_approve"
+        ? await approvePrepareProposal(slug, digest, "Jason Hales (owner)", "approved on the Prepare screen")
+        : await rejectPrepareProposal(slug, digest);
+    if (!decision.ok) {
+      const status =
+        decision.code === "DIGEST_MISMATCH" || decision.code === "CONFLICT"
+          ? 409
+          : decision.code === "NOT_FOUND"
+            ? 404
+            : 500;
+      return refuse(slug, "prepare_proposal", decision.reason, status);
+    }
+    await logGenerationAudit({
+      action: "prepare_proposal",
+      slug,
+      status: "succeeded",
+      message: `${action === "prepare_proposal_approve" ? "approved" : "rejected"} ${digest.slice(0, 12)}…`,
+    });
+    return NextResponse.json({ ok: true, slug });
   }
 
   // ---- Prepare Chapter screen (owner decision A5, board #29, 2026-07-16) ----
@@ -1645,6 +1757,21 @@ export async function POST(req: Request) {
     const status = await getChapterStatus(slug);
     if (status === "generating") {
       return NextResponse.json({ ok: false, error: "already generating — wait for it to finish" });
+    }
+    // IQ-011 gate: a chapter that was never authorized before (not in
+    // allowed_slugs) needs the owner's digest-bound APPROVED preparation
+    // proposal before any paid draft — the picker alone no longer unlocks
+    // generation for new chapters. Previously-authorized chapters keep their
+    // prior regeneration behavior, still guarded by the Issue #8 mutation
+    // rules above. A failed or unapproved proposal unlocks nothing
+    // (fail-closed).
+    if (!settings.allowed_slugs.includes(slug) && !(await approvedProposalApplies(slug))) {
+      return refuse(
+        slug,
+        "generate",
+        "blocked — prepare this chapter first: review and approve its preparation proposal on the Prepare screen (nothing was spent)",
+        403,
+      );
     }
     // Temporarily allow the picked slug server-side (so the picker drives the
     // allowlist — no manual typing). Persists in allowed_slugs. Only writes

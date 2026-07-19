@@ -9,6 +9,7 @@ const TABLE = "cost_events";
 
 export type CostRequestType =
   | "chapter_workup_text"
+  | "prepare_proposal"
   | "image_prompt_generation"
   | "image_generation"
   | "chapter_image_generation"
