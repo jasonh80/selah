@@ -76,13 +76,14 @@ entries:
       source landscape; images 2-3 portrait sources cropped into the 3:2
       frame.
     priority_trigger: >-
-      IN EXECUTION 2026-07-19: the published-redo lane shipped (#66, table
-      created by Jason same day) and the owner authorized both ~$0.17
-      candidates in-session ("figure it out and get it done"), handed to
-      Codex on board #29 for execution + taste-check because neither AI
-      holds the Studio key on Claude's machine. Rollback stays available;
-      Jason reviews the result.
-    status: working
+      AUTHORIZED AND READY 2026-07-19 (no run started yet): the
+      published-redo lane shipped (#66) and Jason created its table and
+      authorized both ~$0.17 candidates in-session ("figure it out and get
+      it done"). Neither AI holds the Studio key (Codex confirmed on board
+      #29, no secrets accessed), so Jason's authenticated Studio session is
+      the executor - his staged two-tap checklist is on the board. Rollback
+      stays available after any apply.
+    status: queued
     completion_pr: null
 
   - id: IQ-005
