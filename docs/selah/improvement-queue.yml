@@ -252,8 +252,9 @@ entries:
       Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
     priority_trigger: next navigation pass (small bounded fix; free; pairs
       with IQ-007)
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "#60 — neighbors render only when their page actually
+      serves (chapterLinkable), bounded by the book's real chapter count"
 
   - id: IQ-013
     area: mark-10-images
@@ -303,5 +304,53 @@ entries:
     evidence: >-
       Codex post-launch audit of published Mark 10, board #29 (2026-07-18).
     priority_trigger: next navigation/metadata pass (free)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-017
+    area: maps
+    improvement: >-
+      OWNER REQUEST (2026-07-19): a second checkbox for the known/estimated
+      borders and city names FROM THE CHAPTER'S ERA (c. AD 30) — a curated
+      Selah overlay (approximate tetrarchy boundaries + period place names,
+      labeled "estimated"; no free tile service carries honest
+      first-century borders; the SWAP mechanism is built once, but each
+      biblical era needs its own curated dataset — c. AD 30 is the first,
+      Gospel-era one). SWAP, never overlay: ancient mode shows ONLY
+      period names (modern Esri reference hidden); unchecked shows only
+      today's names. Then/now pairs (Lake Tiberias <-> Sea of Galilee) are
+      discovered by toggling, not shown together. Codex specs the
+      historical data (honesty treatment: estimated/debated boundaries);
+      Claude builds the layer.
+    evidence: >-
+      Owner direction, in-session 2026-07-19, after approving the merged
+      maps UX (#59): "add another checkbox for the known (estimated)
+      borders and cities from the time of the chapter... i do not want to
+      see both old and new names at same time."
+    priority_trigger: next maps pass, after Codex's period-data spec; the
+      base layer is built ONCE and then appears on every chapter map
+      automatically, including self-serve launches
+    status: queued
+    completion_pr: null
+
+  - id: IQ-018
+    area: maps
+    improvement: >-
+      Studio-generated chapter map configs: pins/areas/corridors are
+      hand-coded per chapter today (lib/maps/geo-chapter-maps.ts — Mark
+      7/8/9 only), so self-serve chapter launches get NO chapter-specific
+      map. Generate the geo config from the approved Prepare proposal's
+      location entries (three-axis honesty model already validated there),
+      with coordinates resolved AUTOMATICALLY from a curated, owner-reviewed
+      gazetteer (reviewed once as data, not per chapter — Studio stays
+      self-serve; never model-invented coordinates). Claude implements after
+      #58; Codex reviews and spec-validates. Closes the last hand-coded
+      per-chapter artifact.
+    evidence: >-
+      Owner question, in-session 2026-07-19: "is this something that will
+      be incorporated into an unassisted chapter launch through selah
+      studio?" — the honest answer was "not yet"; this entry makes it yes.
+    priority_trigger: after IQ-011 (#58) merges and the first self-serve
+      chapters exist; design rides with IQ-017's maps pass
     status: queued
     completion_pr: null
