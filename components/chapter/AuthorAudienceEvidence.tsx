@@ -2,7 +2,6 @@
 
 import type { ChapterWorkup } from "@/lib/types";
 import { SectionHead } from "@/components/chapter/SectionHead";
-import { useReadingMode } from "@/components/ReadingModeProvider";
 import { getChapterContext, type ContextMedia } from "@/lib/content/chapter-content";
 
 type AAECard = { category: string; title: string; body: string; media?: ContextMedia };
@@ -12,28 +11,26 @@ type AAECard = { category: string; title: string; body: string; media?: ContextM
 // Quick Dive: compact, skimmable cards. Deep Dive: fuller, roomier paragraphs.
 // Media renders only when a real asset exists — never an empty placeholder.
 export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
-  const { mode } = useReadingMode();
   // Prefer generated cards; fall back to static config (e.g. Psalm 23).
   const cards: AAECard[] =
     data.behindTheChapter && data.behindTheChapter.length > 0
       ? data.behindTheChapter
       : getChapterContext(data.slug) ?? [];
   if (cards.length === 0) return null;
-  const deep = mode === "deep";
 
   return (
     <section id="author-audience-evidence" className="scroll-mt-20">
       <SectionHead title="Behind the Chapter" />
-      <div className={deep ? "space-y-2.5" : "grid gap-2.5 sm:grid-cols-2"}>
+      <div className="space-y-2.5">
         {cards.map((c, i) => (
-          <Card key={i} card={c} deep={deep} />
+          <Card key={i} card={c} />
         ))}
       </div>
     </section>
   );
 }
 
-function Card({ card, deep }: { card: AAECard; deep: boolean }) {
+function Card({ card }: { card: AAECard }) {
   return (
     <div className="flex flex-col rounded-md border bg-card p-3.5 shadow-hair">
       <p className="text-eyebrow">{card.category}</p>
@@ -49,7 +46,7 @@ function Card({ card, deep }: { card: AAECard; deep: boolean }) {
         </figure>
       )}
 
-      <p className={`mt-2 text-secondary ${deep ? "text-[13px] leading-relaxed" : "text-[12px] leading-relaxed"}`}>
+      <p className={"mt-2 text-[13px] leading-relaxed text-secondary"}>
         {card.body}
       </p>
     </div>

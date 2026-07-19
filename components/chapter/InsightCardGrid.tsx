@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ChapterWorkup, Insight } from "@/lib/types";
-import { useReadingMode } from "@/components/ReadingModeProvider";
 
 // One "Deep Dive" system (layout spec §15): the former "Deeper Study" cards
 // and the former "Go Deeper" topic menu merged. A compact topic rail sits
@@ -55,13 +54,9 @@ export function InsightCards({
 }
 
 function InsightCard({ insight }: { insight: Insight }) {
-  const { mode } = useReadingMode();
-  // Deep Dive opens every card; Quick Dive collapses them. Switching mode resets
-  // all cards, but the user can still open/close individual cards within a mode.
-  const [open, setOpen] = useState(mode === "deep");
-  useEffect(() => {
-    setOpen(mode === "deep");
-  }, [mode]);
+  // Owner decision 2026-07-19: every study card starts EXPANDED (one
+  // scrollable page); a tap still collapses it. FAQs stay collapsed.
+  const [open, setOpen] = useState(true);
   return (
     <button
       onClick={() => setOpen((v) => !v)}
