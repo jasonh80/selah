@@ -342,6 +342,13 @@ export type ProposalValidation =
 
 const PLACEHOLDER = /\b(todo|tbd|placeholder|lorem ipsum|fill in|xxx)\b/i;
 
+/** Whole-token/phrase place-name match: boundaries are any non-letter, so
+ * "Ai" matches "to Ai," but never the inside of "said". */
+export function placeNamedInText(name: string, lowerText: string): boolean {
+  const escaped = name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\p{L}])${escaped}([^\\p{L}]|$)`, "u").test(lowerText);
+}
+
 function cleanString(value: unknown, max: number): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -506,9 +513,10 @@ export function validateProposalContent(
         return { ok: false, reason: "a location display text is unbounded or placeholder" };
       }
       // v1 grounding (Codex #58): a place may only be proposed when its name
-      // literally appears in the loaded chapter text — unsupported claims are
-      // omitted, not offered for review.
-      if (sourceLower !== null && !sourceLower.includes(normalized.name.toLowerCase())) {
+      // appears in the loaded chapter text as a whole word/phrase — raw
+      // substring matching would let "Ai" hide inside "said". Unsupported
+      // claims are omitted, not offered for review.
+      if (sourceLower !== null && !placeNamedInText(normalized.name, sourceLower)) {
         return { ok: false, reason: `location "${normalized.name}" is not named in this chapter's text — v1 proposes only places the chapter itself names` };
       }
       locations.push(normalized);
@@ -558,9 +566,11 @@ export function proposalLaneEligible(slug: string): ProposalEligibility {
 }
 
 // The prompt is HARD-BOUNDED: a request whose assembled prompt exceeds this
-// character count refuses BEFORE dispatch, so the disclosed ceiling can never
-// be exceeded (Codex #58 P1-8). ~4 chars/token conservative → ≤ 30k input
-// tokens; output is capped at 6k by max_completion_tokens.
+// character count refuses BEFORE dispatch. The token ceiling derives from a
+// ~4 chars/token ASSUMPTION over that hard char bound — a conservative
+// estimate for prose (stated, not proven; we do not tokenize the input) —
+// and the displayed number is used as the recorded maximum for every
+// uncertain outcome, so the ledger never shows less than Studio showed.
 export const PROPOSAL_PROMPT_MAX_CHARS = 120_000;
 const PROPOSAL_INPUT_TOKEN_CEILING = Math.ceil(PROPOSAL_PROMPT_MAX_CHARS / 4);
 
@@ -904,10 +914,10 @@ export async function runPrepareProposalJob(slug: string, jobId: string): Promis
     // response. Record it durably, then fail the row.
     let costUsd: number | undefined;
     try {
-      // Conservative ceiling: the aborted request may have billed the full
-      // completion cap — never undercount possible spend.
-      const estimate = estimateChapterWorkupCost({ inputTokens: 16_000, cachedInputTokens: 0, outputTokens: 6_000 });
-      costUsd = estimate.textEstimateUsd;
+      // ONE ceiling everywhere: an uncertain post-dispatch outcome records
+      // the SAME conservative maximum Studio displayed before the confirm —
+      // never a smaller number (Codex #58 re-review).
+      costUsd = proposalMaxCostUsd();
       await recordCostEventStrict({
         requestType: "prepare_proposal",
         provider: "openai",
@@ -1039,7 +1049,7 @@ export async function approvePrepareProposal(
   if (
     !SHA256.test(row.source_digest ?? "") ||
     !SHA256.test(row.brain_digest ?? "") ||
-    !row.model ||
+    row.model !== CHAPTER_WORKUP_TEXT_MODEL ||
     row.schema_version !== PREPARE_PROPOSAL_SCHEMA_VERSION
   ) {
     return { ok: false, code: "NOT_FOUND", reason: "the proposal is missing its source/Brain/model/schema provenance — it cannot be approved" };
@@ -1058,6 +1068,7 @@ export async function approvePrepareProposal(
       job_id: row.job_id,
       source_digest: row.source_digest!,
       brain_digest: row.brain_digest!,
+      model: row.model!,
       schema_version: PREPARE_PROPOSAL_SCHEMA_VERSION,
     },
   );

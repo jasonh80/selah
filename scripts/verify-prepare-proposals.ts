@@ -622,6 +622,62 @@ async function main() {
       target.proposal_digest = realDigest;
     }
 
+    // W. Re-review regressions (Codex #58 second round).
+    {
+      // W1: model swapped between read and conditional write loses atomically.
+      __setProposalModelForTesting(async ({ slug: s7, book, chapter, esvText }) => {
+        modelCalls += 1;
+        const m7 = esvVerseMarkers(esvText);
+        return { content: JSON.stringify(proposalFor(s7, book, chapter, m7[m7.length - 1], [])), inputTokens: 200, outputTokens: 100 };
+      });
+      ESV["Luke 14"] = ESV["John 3"];
+      lastTrigger = null;
+      await adminPost({ action: "prepare_proposal_create", slug: "luke-14", confirm: true });
+      await prepareWorker(workerReq({ slug: "luke-14", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
+      const l14 = await readLatestProposal("luke-14");
+      ok(l14?.status === "proposed", "W1 fixture proposes");
+      const target = proposals.rows.find((r) => r.id === l14!.id)!;
+      const realModel = String(target.model);
+      target.model = "swapped-model";
+      const raced = await adminPost({ action: "prepare_proposal_approve", slug: "luke-14", confirm: true, proposalDigest: String(l14!.proposal_digest) });
+      ok(raced.status !== 200 && target.status !== "approved", "W1 a model swap between read and write cannot be approved (model bound in the predicate)");
+      target.model = realModel;
+      // W2: uncertain post-dispatch spend records AT LEAST the displayed max.
+      __setProposalModelForTesting(async () => {
+        throw new Error("socket hang up (connection lost after dispatch)");
+      });
+      const costsBefore2 = costs.length;
+      lastTrigger = null;
+      ESV["Luke 15"] = ESV["John 3"];
+      await adminPost({ action: "prepare_proposal_create", slug: "luke-15", confirm: true });
+      await prepareWorker(workerReq({ slug: "luke-15", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
+      const uncertain2 = costs.slice(costsBefore2).find((c) => (c.metadata as { billingUncertain?: boolean })?.billingUncertain === true);
+      ok(
+        Boolean(uncertain2) && (uncertain2!.estimatedCostUsd ?? 0) >= proposalMaxCostUsd(),
+        "W2 an uncertain outcome records at least the displayed maximum — one ceiling everywhere",
+      );
+      // W3: whole-token grounding — "Ai" never matches inside "said".
+      const j5w = await readLatestProposal("john-5");
+      const aiInSaid = validateProposalContent(
+        { ...(j5w!.proposal_json as object), locations: [
+          { name: "Ai", featureKind: "point", certainty: "known", role: "context", display: "A town." },
+        ] },
+        "john-5",
+        [1, 2, 4, 5],
+        "[1] And he said to them all manner of things.",
+      );
+      ok(!aiInSaid.ok, "W3 'Ai' does not ground inside 'said' (whole-token match)");
+      const aiReal = validateProposalContent(
+        { ...(j5w!.proposal_json as object), locations: [
+          { name: "Ai", featureKind: "point", certainty: "known", role: "context", display: "A town." },
+        ] },
+        "john-5",
+        [1, 2, 4, 5],
+        "[1] They went up to Ai, near the camp.",
+      );
+      ok(aiReal.ok, "W3b a genuinely named 'Ai' still grounds");
+    }
+
     // K. A failed trigger clears its claim (nothing stranded generating).
     __setTriggerTransportForTesting(async () => ({ ok: false, status: 502, error: "offline" }));
     const triggerFail = await adminPost({ action: "prepare_proposal_create", slug: "luke-9", confirm: true });
