@@ -4,8 +4,9 @@
 > `studio-workflow.md` for how chapters get made. Keep this file updated at
 > every milestone (publish, system change, model change).
 
-_Last updated: 2026-07-15 (live build r96; Mark 8 and Mark 7 are published;
-Mark 9–11 remain fail-closed pending their own owner receipts)._
+_Last updated: 2026-07-18 (visible build stamp r101 — later merges deploy
+without bumping the stamp, so verify deploys by behavior, not stamp; Mark
+7–10 are published; Mark 11+ remain fail-closed)._
 
 ## What Selah is
 
@@ -27,11 +28,14 @@ through Scripture.** Tagline: *Pause. Reflect. Elevate.* Principle:
 | **Psalm 23** | Published | Original showcase chapter. 3-image set (gpt-image-1). Do not regenerate. |
 | **Mark 6** | Published (2026-07-03) | **First chapter through the full Selah Brain + Selah Studio pipeline.** v6 copy (gpt-5.5), five-image set (gpt-image-2), FAQ, verse notes, Galilee map. The quality benchmark. |
 | **Mark 8** | Published (2026-07-14) | First protected-sprint chapter (fail-closed manifest v3, owner receipts, per-run confirmation). gpt-5.5 copy, 3-image gpt-image-2 set. Took ten runs; the root causes were fixed the same day (PRs #18–#28). |
-| **Mark 7** | Published (2026-07-15) | Second protected chapter — **first-try success on both the text and image runs** via the preload receipts + movement boundaries in the prompt (PRs #32/#34). gpt-5.5 copy, 3-image gpt-image-2 set. No map config yet. |
+| **Mark 7** | Published (2026-07-15) | Second protected chapter — **first-try success on both runs** via preload receipts + movement boundaries (PRs #32/#34). Real MapLibre map since r100. |
+| **Mark 9** | Published (2026-07-17) | First chapter prepared ON-SCREEN (digest-bound stored approval, PR #40 flow). First-try runs. Real MapLibre map. |
+| **Mark 10** | Published (2026-07-18) | **First-try launch driven end-to-end under owner-delegated Studio control**, incl. the FIRST single-image redo (one candidate, $0.17, swapped with rollback snapshot). Landscape 3:2 images. No map config yet. |
 
-All other `/chapter/*` slugs 404 publicly (verified: `mark-9` and alias forms
-like `mark-09` fail closed at both publish and public read). Drafts stay
-hidden until Publish Final.
+All other `/chapter/*` slugs 404 publicly; alias forms (`mark-09`) fail
+closed at publish and public read. Drafts stay hidden until Publish Final.
+`/today` serves the NEWEST PUBLISHED chapter (Exodus 27 is the guaranteed
+fallback) since r101.
 
 ## Generation state — CHECK BEFORE ASSUMING
 
@@ -49,6 +53,9 @@ hidden until Publish Final.
   (it rejects `"minimal"`); ~160s/run; ~$0.11. Produced the Mark 6 v6 voice.
   `gpt-4o` is kept as the idle default but could NOT match the Daily-Rundown
   voice (proven across v2–v5) — don't iterate voice on it.
+  **Check the live selection in Studio**: the info panel showed `gpt-4o`
+  selected during the 2026-07-18 Mark 10 launch — the selected model is a
+  Studio setting, not this doc.
 - **Images: `gpt-image-2`** — access confirmed. `checkImageModel` probes
   availability before every run; **no silent fallback** to gpt-image-1.
 
@@ -157,24 +164,56 @@ hidden until Publish Final.
   the authority policy and current state; see
   `docs/selah/benchmark-quality-review.md`.
 
+## Changes since 2026-07-15 (the launch-week sprint)
+
+- **Prepare Chapter screen** (PR #40 flow): owner approval is a digest-bound
+  Supabase row (`chapter_setup_approvals`), not a PR. Mark 9 and Mark 10 were
+  both prepared on-screen.
+- **Maps**: MapLibre engine live for Mark 7/8/9 (r100) — 3-D terrain, journey
+  tour, honest uncertainty treatments. Owner UX review (2026-07-18) drove PR
+  #59 (pending): whole-scene default frame, themed legend below the map,
+  native terrain-aware pins (fixes drag desync), Compare removed for rethink.
+- **Single-image redo** (PR #51): draft-only, one candidate, one confirmed
+  spend, in-chapter candidate preview, rollback-snapshot swap. Used in anger
+  on Mark 10 launch day.
+- **Spend honesty** (PRs #51/#53): any post-dispatch failure records possible
+  spend (`billingUncertain`), claims lock instead of silently releasing;
+  public workers keep pre-auth refusals console-only (audit-flood fix).
+- **Shared improvement queue** (`docs/selah/improvement-queue.yml`): 10
+  entries on main, 16 pending PR #55. Both AIs read it on "catch up".
+- **Self-serve Prepare (IQ-011)** built (PR #58, pending review): any
+  non-protected chapter can be proposed/validated/approved on-screen; one
+  bounded confirmed model call; fail-closed everywhere; Codex audits
+  post-hoc. The `chapter_prepare_proposals` table SQL was run 2026-07-18.
+- **Hydration fix** (PR #57, merged + verified on production): theme provider
+  no longer mismatches server/client on saved non-default themes.
+- Pending PRs at write time: #55 queue · #56 320px wrap · #58 self-serve
+  Prepare · #59 maps UX · #60 published-neighbor nav (IQ-012) · #61 chapter
+  metadata (IQ-016).
+
 ## Next up
 
-- **Layout spec v1 (#33, draft):** owner-directed newspaper treatment (photo
-  essay / editorial mosaic, no carousels), to be validated on real Mark
-  6/7/8 + an OT chapter before any release. Owner taste-pass gates the merge.
-- **Studio polish + cost ledger:** owner-requested launch progress bar and
-  per-chapter info panel (last launch, build, text/image model versions);
-  key persistence; single confirmations; real gpt-5.5/gpt-image-2 rates.
-- **Mark 9–11:** NO owner receipts exist yet — they remain fail-closed
-  (unsetupable, ungeneratable, unpublishable, unservable). When the owner is
-  ready, each becomes a small change: guidance/acceptance fixture entries +
-  his exact receipt via the setup-contract factory, then per-run approvals as
-  always.
-- **Kelly's 9 approved character fixes** + Herod-family profiles; finish
-  `quality-notes-save-for-review` before the next generation sprint.
+- **Layout via Figma (IQ-008, owner-confirmed):** Codex owns the editable
+  Mark 9 mobile mockup; Claude implements only after the owner approves the
+  design. Goal: reduce visual competition (~87 bordered boxes today), one
+  box level, ≤3 text sizes. (#33's newspaper draft is superseded by this
+  lane.)
+- **Navigation (IQ-007, owner decision):** remove the visible "Today"
+  concept; canonical `/chapter/{slug}` everywhere; `/today` becomes a quiet
+  redirect. Sequenced with the layout pass.
+- **Mark 11:** publishable whenever the owner wants — fixture entries + the
+  on-screen Prepare receipt (or, once #58 merges, any OTHER chapter through
+  the self-serve lane).
+- **Kelly's characters:** People/Connections uses Kelly's system as the
+  canonical cast (owner direction 2026-07-18); spec day proposed for Mon
+  2026-07-21, awaiting the owner's confirm.
 
 ## Cost reference (Mark 6 actuals, logged estimates)
 
 ~$0.75 total: ~5 gpt-4o drafts (~$0.30) + one gpt-5.5 draft ($0.11) + 3
 gpt-image-1 (~$0.12) + 5 gpt-image-2 (~$0.20 at placeholder rate; real
 gpt-image-2 pricing may be higher — check the OpenAI dashboard).
+
+Mark 10 (2026-07-18) actuals: ≈ $0.77 — one text draft (~$0.10) + 3
+gpt-image-2 at $0.165 each ($0.50 est) + one redo candidate ($0.17 max).
+Every spend passed a Studio confirm; rows in Spend history.
