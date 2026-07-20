@@ -143,6 +143,40 @@ export const CHAPTER_SCENE_CHECK_IMAGE_HINTS: Record<string, Record<string, stri
     storm: "walking-water",
     boat: "walking-water",
   },
+  // Published Mark 7–10 rows predate the generated imageKind binding (#64),
+  // so their stored checks bind here instead (owner direction 2026-07-19:
+  // every photo insight sits below ITS photo). Titles verified against the
+  // live rows the same day. A check that binds to the HERO stays in the
+  // standalone card under the hero — same placement, correct photo.
+  "mark-7": {
+    sink: "purity-dispute-table",
+    hygiene: "purity-dispute-table",
+    wash: "purity-dispute-table",
+    // Codex #71 review: the second stored check ("The Tyre scene is indoors
+    // and the daughter stays offstage") pairs with the mother's scene.
+    tyre: "syrophoenician-mother",
+    daughter: "syrophoenician-mother",
+  },
+  "mark-8": {
+    picnic: "seven-baskets-after-feeding",
+    basket: "seven-baskets-after-feeding",
+    feeding: "seven-baskets-after-feeding",
+    // "Bethsaida is not a magic-stage moment" → the two-stage healing scene.
+    bethsaida: "bethsaida-partial-sight",
+  },
+  "mark-9": {
+    mountain: "transfiguration-mountain",
+    boy: "restored-by-the-hand",
+    child: "child-among-disciples",
+  },
+  "mark-10": {
+    needle: "wealthy-man-grieved",
+    camel: "wealthy-man-grieved",
+    wealthy: "wealthy-man-grieved",
+    // "No throne-room brothers" (James & John's request) → the road scene.
+    "throne-room": "jesus-walking-ahead",
+    brothers: "jesus-walking-ahead",
+  },
 };
 
 export function getSceneCheckImageKind(slug: string, checkTitle: string): string | null {
