@@ -582,3 +582,50 @@ entries:
       components as the owner defines them
     status: queued
     completion_pr: null
+
+  - id: IQ-030
+    area: studio
+    improvement: >-
+      "Chapter Checkup" board inside Studio: the per-chapter status table
+      (text/Mega, photos, map, FAQs, next step) as an easily visible
+      Studio screen with clear checkmarks when complete - the owner
+      should see at a glance where every chapter stands without asking.
+      Same truth the AIs track (Mega earned only after rundown
+      comparison; photo/map/FAQ state), rendered as simple green checks.
+    evidence: >-
+      Owner, in-session 2026-07-20: "'chapter checkup' is the graph you
+      created earlier. something similar should be available for the
+      Studio - easily visible check marks when complete." Explicitly
+      DO NOT START YET - saved for later on owner instruction.
+      ADDITIONS (owner, same day): (a) a per-chapter GRADE "may be
+      interesting"; (b) user data on the same screen - clicks, time on
+      chapter, photo downloads. NOTE for the spec: no analytics
+      collection exists in the app today, so (b) is a new system with
+      privacy + tooling decisions the owner makes at spec time; OWNER DECISION (same day, softened
+      in follow-up): no download button FOR NOW - owner may revisit; any
+      near-term downloads metric measures organic saves only (long-press
+      etc.).
+    priority_trigger: owner says go; pairs with IQ-021 (Studio button
+      states) and the IQ-028/029 Studio pass
+    status: queued
+    completion_pr: null
+
+  - id: IQ-031
+    area: accessibility
+    improvement: >-
+      Text-size scaling ("do we need a way for users to change text size,
+      or do they just do that on their device?"): today the app sets
+      fixed pixel sizes (text-[13px] etc.), so browser/OS page zoom works
+      but the device's text-size preference (Dynamic Type / font-size
+      setting) largely does not. Phase 1 (foundation, no UI): move reader-
+      facing type to rem-based scaling so every device text setting just
+      works - especially for older readers. Phase 2 (only if readers ask):
+      an in-app text-size control in Settings, the pattern Bible apps
+      commonly carry.
+    evidence: >-
+      Owner question, in-session 2026-07-20. Fixed-px audit observation
+      from the same day's component work.
+    priority_trigger: phase 1 rides the next layout/typography pass
+      (bounded, visual-parity at default settings); phase 2 owner-gated
+    status: queued
+    completion_pr: null
