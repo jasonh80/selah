@@ -3,6 +3,35 @@
 import { useState } from "react";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { VERSIONS, useVersion } from "@/components/VersionProvider";
+import { useReadingMode, type ReadingMode } from "@/components/ReadingModeProvider";
+
+// Study mode preference (owner direction 2026-07-20: default Quick; the user
+// chooses their own default here). Writes the SAME persisted mode the chapter
+// pills use — one source of truth, effective immediately everywhere.
+export function StudyModePicker() {
+  const { mode, setMode } = useReadingMode();
+  const options: { id: ReadingMode; label: string; hint: string }[] = [
+    { id: "quick", label: "Quick Study", hint: "the essentials, tap to go deeper" },
+    { id: "deep", label: "Deep Study", hint: "everything open, just scroll" },
+  ];
+  return (
+    <div className="space-y-2">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => setMode(o.id)}
+          aria-pressed={mode === o.id}
+          className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left transition ${
+            mode === o.id ? "bg-tint text-primary" : "bg-card text-secondary hover:text-primary"
+          }`}
+        >
+          <span className={`text-sm ${mode === o.id ? "font-medium" : ""}`}>{o.label}</span>
+          <span className="text-[11px] text-secondary">{o.hint}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 // Theme picker: reuse the inline 6-swatch switcher.
 export function ThemePicker() {
