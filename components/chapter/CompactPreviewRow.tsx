@@ -41,17 +41,19 @@ export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
 
   if (previews.length === 0) return null;
 
+  // Owner fix (2026-07-20, live Mark 6 review): these previews were rendering
+  // as FULL-WIDTH bars ("chips are too wide. their size should be
+  // restricted") — they are chips, so they size to their content with a hard
+  // cap and truncate, wrapping side by side wherever they fit.
   const cardClass =
-    "flex flex-col gap-1 rounded-md border bg-card p-s3 shadow-hair transition";
+    "inline-flex min-w-0 max-w-[260px] flex-col gap-1 rounded-md border bg-card px-s3 py-2 shadow-hair transition";
 
-  // No swipe strips anywhere (owner direction): stacked on mobile, a row on
-  // small screens and up.
   return (
-    <div className="grid gap-s2 sm:grid-cols-3">
+    <div className="flex flex-wrap gap-s2">
       {previews.map((preview) =>
         preview.href ? (
           <a key={preview.label} href={preview.href} className={`${cardClass} hover:border-accent/40`}>
-            <span className="flex items-center gap-1.5 text-eyebrow">
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-eyebrow">
               <span aria-hidden>{preview.icon}</span>
               {preview.label}
             </span>
@@ -59,7 +61,7 @@ export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
           </a>
         ) : (
           <div key={preview.label} className={cardClass}>
-            <span className="flex items-center gap-1.5 text-eyebrow">
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-eyebrow">
               <span aria-hidden>{preview.icon}</span>
               {preview.label}
             </span>
