@@ -360,8 +360,13 @@ entries:
       Owner question, in-session 2026-07-19: "is this something that will
       be incorporated into an unassisted chapter launch through selah
       studio?" — the honest answer was "not yet"; this entry makes it yes.
-    priority_trigger: after IQ-011 (#58) merges and the first self-serve
-      chapters exist; design rides with IQ-017's maps pass
+    priority_trigger: >-
+      PRIORITY BUMPED by owner (2026-07-20, "how did we miss that? come on
+      team"): Mark 11 launched into exactly this hole — connected with no
+      map until a manual same-day config (#81). Codex specs next; until it
+      ships, "geo map config exists" is an explicit line on every launch
+      checklist, and the launch flow should surface a visible "no map yet"
+      notice rather than silently omitting the section.
     status: queued
     completion_pr: null
 
