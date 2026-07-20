@@ -366,17 +366,17 @@ export const CHAPTER_FAQ: Record<string, FaqItem[]> = {
     {
       question: "Is “the valley of the shadow of death” about dying?",
       answer:
-        "About dying — and about more than dying. The Hebrew phrase means deep darkness (many Bibles footnote it exactly that way): the kind a sheep meets in a narrow ravine where it cannot see what is waiting. Dying is the darkest valley, but David's words cover every stretch where the light disappears — the diagnosis, the grief, the long night. And notice what changes there: David stops talking about the shepherd and starts talking to Him. “You are with me.” The psalm never promises a valley-free life. It promises company in every valley.",
+        "It can include dying, but the Hebrew phrase is broader: deep darkness (many Bibles footnote it exactly that way) — the kind a sheep meets in a narrow ravine where it cannot see what is waiting. Dying may be the darkest valley, but David's words cover every stretch where the light disappears — the diagnosis, the grief, the long night. And notice what changes there: David stops talking about the shepherd and starts talking to Him. “You are with me.” The psalm never promises a valley-free life. It promises company in every valley.",
     },
     {
       question: "Did David really know shepherding, or is this just a nice image?",
       answer:
-        "The heading says “A Psalm of David,” and David kept his father's flock in these same dry hills before anyone knew his name — he told Saul he had fought off lions and bears to protect the sheep (1 Samuel 17). So “The LORD is my shepherd” is not a greeting card; it is a job description he had lived. Finding grass and water in scarce country, guiding through ravines, standing between the flock and things with teeth — David knew exactly what he was asking God to be. He wrote it from the sheep's side.",
+        "The heading says “A Psalm of David,” and David kept his father's flock in the hills near Bethlehem before anyone knew his name — he told Saul he had fought off lions and bears to protect the sheep (1 Samuel 17). So “The LORD is my shepherd” is not a greeting card; it is a job description he had lived. Finding grass and water in scarce country, guiding through ravines, standing between the flock and things with teeth — David knew exactly what he was asking God to be. He wrote it from the sheep's side.",
     },
     {
       question: "What are the rod and the staff for — and why would they comfort anyone?",
       answer:
-        "Two tools, two jobs. The rod was a club for whatever threatened the sheep; the staff was the long crook for the sheep itself — guiding it, counting it, pulling it back from an edge. So the comfort here is not softness. It is armed protection and personal attention in dangerous country. The sheep is not calm because the hills are safe. The sheep is calm because the shepherd is not unarmed.",
+        "Two tools, two jobs. The rod was a club — the shepherd's protection and authority against whatever threatened the sheep; the staff was the long crook for the sheep itself — guiding it, steadying it, pulling it back from an edge. So the comfort here is not softness. It is armed protection and personal attention in dangerous country. The sheep is not calm because the hills are safe. The sheep is calm because the shepherd is not unarmed.",
     },
     {
       question: "Does “goodness and mercy shall follow me” promise an easy life?",
