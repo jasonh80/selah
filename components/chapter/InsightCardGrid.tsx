@@ -91,11 +91,16 @@ function InsightCard({ insight }: { insight: Insight }) {
         </p>
       )}
 
-      <p className="mt-1.5 flex-1 text-[13px] leading-relaxed text-secondary">
-        {open ? insight.body : insight.preview}
+      {/* Owner ask (2026-07-20, live Mark 9 review): the lone "›" hid that a
+          full explanation exists AND cost a whole padded row. The cue now
+          flows INLINE at the end of the text — labeled, accent-colored, same
+          affordance as "Read <ref> ⌄" — and the card gets shorter. */}
+      <p className="mt-1.5 text-[13px] leading-relaxed text-secondary">
+        {open ? insight.body : insight.preview}{" "}
+        <span aria-hidden className="whitespace-nowrap text-[11px] font-medium text-accent-strong">
+          {open ? "Less ⌃" : "More ⌄"}
+        </span>
       </p>
-
-      <span className="mt-2 self-end text-secondary">{open ? "⌃" : "›"}</span>
     </button>
   );
 }
