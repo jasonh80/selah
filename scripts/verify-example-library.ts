@@ -8,7 +8,11 @@ import {
   seedExamplesFromLibrary,
 } from "../lib/server/selah-example-library";
 import { genreForSlug } from "../lib/server/selah-brain";
-import { TEXT_EXAMPLE_TYPES } from "../lib/server/selah-examples";
+import {
+  GLOBAL_VOICE_GENRE,
+  TEXT_EXAMPLE_TYPES,
+  selectRelevantExamples,
+} from "../lib/server/selah-examples";
 import { buildChapterWorkupPrompt } from "../lib/ai/prompts/chapter-workup-prompt";
 
 let checks = 0;
@@ -21,7 +25,10 @@ function ok(cond: boolean, label: string): void {
 const titles = new Set(EXAMPLE_LIBRARY.map((e) => e.title));
 ok(titles.size === EXAMPLE_LIBRARY.length, "titles are unique (title is the idempotency key)");
 for (const e of EXAMPLE_LIBRARY) {
-  ok(e.content.trim().length >= 80 && e.content.length <= 1200, `${e.title}: content is substantial but bounded`);
+  // Voice packs are multi-line excerpt sets, so they get a larger (still
+  // bounded) budget; everything else keeps the original bound.
+  const maxLen = e.example_type === "voice" ? 1600 : 1200;
+  ok(e.content.trim().length >= 80 && e.content.length <= maxLen, `${e.title}: content is substantial but bounded`);
   ok(e.source_title.length > 0, `${e.title}: names its owner-approved source`);
   ok(
     ["voice", "structure", "scene_check", "application", "image_direction"].includes(e.example_type),
@@ -30,14 +37,18 @@ for (const e of EXAMPLE_LIBRARY) {
 }
 
 // 2. Genres must be REACHABLE — every library genre must be one genreForSlug
-//    can actually produce, or retrieval will never surface the example.
+//    can actually produce (or the "global" voice sentinel, which retrieval
+//    surfaces for EVERY chapter), or the example would never be retrieved.
 const reachable = new Set(
   ["mark-9", "psalm-23", "exodus-27", "genesis-12", "exodus-3", "exodus-21", "exodus-24", "leviticus-1", "genesis-5", "genesis-40"]
     .map((slug) => genreForSlug(slug))
     .filter(Boolean),
 );
 for (const e of EXAMPLE_LIBRARY) {
-  ok(reachable.has(e.genre), `${e.title}: genre "${e.genre}" is produced by genreForSlug`);
+  ok(
+    reachable.has(e.genre) || (e.genre === GLOBAL_VOICE_GENRE && e.example_type === "voice"),
+    `${e.title}: genre "${e.genre}" is reachable (genreForSlug or the global voice sentinel)`,
+  );
 }
 
 // 3. Coverage: gospel narrative carries structure AND scene_check; poetry/
@@ -50,13 +61,43 @@ ok(byGenre("poetry/psalm", "scene_check"), "poetry/psalm has a scene_check examp
 ok(EXAMPLE_LIBRARY.some((e) => e.example_type === "image_direction"), "an image_direction example exists");
 ok(EXAMPLE_LIBRARY.some((e) => TEXT_EXAMPLE_TYPES.includes(e.example_type)), "text-prompt examples exist");
 
-// 3b. OWNER VOICE NOTE (2026-07-19, "teachery… not like a buddy"): the library
-//     must carry NO voice examples until the owner picks buddy-register
-//     exemplars — seeding current-chapter voice would lock the wrong register.
+// 3b. VOICE SOURCE RULE (Codex source audit + owner acceptance, board #29,
+//     2026-07-20, superseding the 2026-07-19 no-voice hold): voice packs must
+//     exist, must be chat/board-derived, and must NEVER cite published
+//     chapter prose (published copy is a QA target, not voice training).
+const voicePacks = EXAMPLE_LIBRARY.filter((e) => e.example_type === "voice");
+ok(voicePacks.length >= 2, "voice packs exist (global + at least one genre companion)");
 ok(
-  !EXAMPLE_LIBRARY.some((e) => e.example_type === "voice"),
-  "no voice examples seeded (owner voice-register decision, 2026-07-19)",
+  voicePacks.some((e) => e.genre === GLOBAL_VOICE_GENRE),
+  "a GLOBAL voice pack exists (the every-chapter fallback)",
 );
+const CHAT_PROVENANCE = /Daily Rundown|Daily Workup|Selah Style|voice acceptance|source audit/i;
+for (const e of voicePacks) {
+  ok(CHAT_PROVENANCE.test(e.source_title), `${e.title}: provenance names the approved-voice chats/board record`);
+  ok(!/published/i.test(e.source_title), `${e.title}: voice provenance never cites published chapter prose`);
+}
+
+// 3c. Owner line-usage rules (board #29, 2026-07-20): the app-personality
+//     exemplar must carry the full relational/self-aware turn — the weaker
+//     standalone "leftovers" line must never be featured without it.
+const allVoiceText = voicePacks.map((e) => e.content).join("\n");
+ok(
+  allVoiceText.includes("You humans, you’re remarkably consistent."),
+  "app-personality exemplar keeps the owner's full two-sentence form",
+);
+ok(
+  !allVoiceText.split("\n").some(
+    (line) => line.includes("holding leftovers and still missing the point") && !line.includes("You humans"),
+  ),
+  "the weaker standalone leftovers line is never featured alone",
+);
+for (const required of [
+  "Mark 6 keeps putting people close to Jesus—and showing how easy it is to miss Him.",
+  "You can grow up around Jesus, listen to truth about Jesus, work for Jesus and receive from Jesus—and still miss who He is.",
+  "Their faith is unfinished. Their Shepherd is not.",
+]) {
+  ok(allVoiceText.includes(required), `owner central-register line present verbatim: "${required.slice(0, 40)}…"`);
+}
 
 // 4. Digest is stable and content-bound.
 const d1 = exampleLibraryDigest();
@@ -168,7 +209,63 @@ const main = async () => {
   } as never);
   ok(!formOnly.includes("APPROVED VOICE EXAMPLE"), "with no voice example there is NO voice-mimic block at all");
 
-  console.log(`verify:example-library ✓ ${checks} checks passed (curated library shape, reachable genres, coverage, fail-closed idempotent seed, voice-lane separation)`);
+  // 6b. CANONICAL VOICE BRIEF (owner acceptance, board #29, 2026-07-20): the
+  //     brief renders in EVERY prompt — even with zero retrieved packs — and
+  //     encodes the owner's register rules.
+  const bare = buildChapterWorkupPrompt({ book: "Mark", chapter: 99, examples: [] } as never);
+  for (const [p, label] of [
+    ["SELAH VOICE — CANONICAL BRIEF", "brief header"],
+    ["wise, funny, thoughtful, caring friend", "buddy identity"],
+    ["arise from the passage", "zinger criteria"],
+    ["never make the sufferer the joke", "zinger safety"],
+    ["Familiarity can feel like understanding. It isn't.", "plain-vocabulary example"],
+    ["at most once per chapter", "app-personality bound"],
+    ["INFERENCE", "text/inference/unknown distinction"],
+  ] as const) {
+    ok(bare.includes(p) && prompt.includes(p), `canonical brief always present: ${label}`);
+  }
+
+  // 7. RETRIEVAL INVENTORY (Codex handoff, board #29, 2026-07-20): prove which
+  //    voice packs a chapter actually retrieves once the library is seeded —
+  //    Mark 9 gets global + gospel companion; exodus-34 (which has NO genre
+  //    today) still gets the global fallback. Budget caps: ≤2 voice, ≤1 form.
+  // Newest-first, matching the production query's created_at DESC contract.
+  const seededRows = EXAMPLE_LIBRARY.map((e, i) => ({
+    title: e.title,
+    genre: e.genre,
+    example_type: e.example_type,
+    content: e.content,
+    created_at: `2026-07-20T00:00:${String(i).padStart(2, "0")}Z`,
+  })).reverse();
+  const inventory: string[] = [];
+  for (const slug of ["mark-9", "exodus-34", "exodus-27", "psalm-23"]) {
+    const genre = genreForSlug(slug);
+    const picked = selectRelevantExamples(seededRows, genre, { types: TEXT_EXAMPLE_TYPES });
+    const voice = picked.filter((p) => p.exampleType === "voice");
+    const form = picked.filter((p) => p.exampleType !== "voice");
+    ok(voice.length >= 1 && voice.length <= 2, `${slug}: 1–2 voice packs retrieved`);
+    ok(form.length <= 1, `${slug}: at most one form example retrieved`);
+    ok(voice.some((v) => v.title === "Selah Global Voice Pack"), `${slug}: global voice fallback always present`);
+    inventory.push(
+      `  ${slug} (genre: ${genre ?? "NONE"}) → voice: [${voice.map((v) => v.title).join(", ")}] · form: [${form
+        .map((f) => f.title)
+        .join(", ") || "—"}]`,
+    );
+  }
+  const mark9 = selectRelevantExamples(seededRows, genreForSlug("mark-9"), { types: TEXT_EXAMPLE_TYPES });
+  ok(
+    mark9.some((p) => p.title === "Gospel Narrative Voice Pack"),
+    "mark-9 retrieves the gospel genre voice companion",
+  );
+  const ex34 = selectRelevantExamples(seededRows, genreForSlug("exodus-34"), { types: TEXT_EXAMPLE_TYPES });
+  ok(
+    ex34.length === 1 && ex34[0].title === "Selah Global Voice Pack",
+    "exodus-34 (no genre) still gets exactly the global voice fallback",
+  );
+
+  console.log("voice retrieval inventory (seeded library):");
+  for (const line of inventory) console.log(line);
+  console.log(`verify:example-library ✓ ${checks} checks passed (curated library shape, chat-derived voice packs, global fallback retrieval, canonical brief, fail-closed idempotent seed, voice-lane separation)`);
 };
 
 main().catch((error) => {

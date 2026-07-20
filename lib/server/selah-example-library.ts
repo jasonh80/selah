@@ -24,14 +24,54 @@ export interface LibraryExample {
   content: string;
 }
 
-// OWNER VOICE NOTE (2026-07-19): Jason flagged the published chapters as
-// sounding "very teachery… not like a buddy." VOICE examples from those
-// chapters are therefore deliberately EXCLUDED — seeding them would lock the
-// teachery register in. The buddy-voice fix is its own queued item: voice
-// exemplars the owner picks (the hand-added Mark 6 voice example stays the
-// only active one until then). Structure, scene-check, and image-direction
-// registers below are unaffected by that concern.
+// VOICE SOURCE RULE (Codex source audit + owner acceptance, board #29,
+// 2026-07-20, superseding the 2026-07-19 "no voice examples" hold): the
+// authoritative voice source is the Daily Rundown / Daily Workup / Selah
+// Style chats and Jason's reactions there — NEVER published chapter prose
+// (published copy is a QA target; the owner flagged it "teachery… not like
+// a buddy"). Voice packs below quote owner-approved lines VERBATIM with
+// per-line provenance. They teach REGISTER; generated copy must never reuse
+// the lines themselves. Retrieval budget: ONE global pack for every chapter
+// + at most ONE genre companion (see selectRelevantExamples).
 export const EXAMPLE_LIBRARY: readonly LibraryExample[] = [
+  // ---- voice (global fallback — every chapter, every genre) -----------------
+  {
+    title: "Selah Global Voice Pack",
+    source_title:
+      "Owner-approved lines from the Daily Rundown / Daily Workup / Selah Style chats — Codex source audit + owner voice acceptance, board #29 (2026-07-20). Verbatim; register only.",
+    genre: "global",
+    example_type: "voice",
+    content:
+      "Central register (owner-approved, Mark 6 rundown lane):\n" +
+      "“Mark 6 keeps putting people close to Jesus—and showing how easy it is to miss Him.”\n" +
+      "“You can grow up around Jesus, listen to truth about Jesus, work for Jesus and receive from Jesus—and still miss who He is.”\n" +
+      "“Here is the good news. Jesus sees the disciples straining before they understand Him. He comes toward them in the dark—not after they pass a theology exam. Their faith is unfinished. Their Shepherd is not.”\n" +
+      "From the Exodus 34 rundown (owner-approved):\n" +
+      "“Success without God’s presence is just a prettier wilderness.”\n" +
+      "“God is not jealous because He is lacking attention. He is jealous because idols are stealing His children.”\n" +
+      "Gentle self-aware app personality (occasional, never about suffering):\n" +
+      "“The disciples are holding leftovers and still missing the point. You humans, you’re remarkably consistent.”",
+  },
+  {
+    title: "Gospel Narrative Voice Pack",
+    source_title:
+      "Owner-approved lines from the Mark 5, Mark 9, and Mark 10 Daily Rundown chats — Codex source audit, board #29 (2026-07-20). Verbatim; register only.",
+    genre: "gospel narrative",
+    example_type: "voice",
+    content:
+      "From the Mark 5 rundown (owner-approved):\n" +
+      "“Sometimes people prefer a familiar bondage over a holy disruption.”\n" +
+      "“To the crowd, she may be an interruption. To Jesus, she is family.”\n" +
+      "“Jesus does not merely fix problems. He gives people back their life.”\n" +
+      "From the Mark 9 rundown (owner-approved):\n" +
+      "“You may meet God in glory on the mountain, but you follow Jesus back into the mess.”\n" +
+      "“Faith does not have to be loud to be real.”\n" +
+      "“They are debating greatness. Jesus gives them a kid.”\n" +
+      "From the Mark 10 rundown (owner-approved):\n" +
+      "“The disciples wanted seats. Jesus was walking toward nails.”\n" +
+      "“Jesus is not building a room full of celebrities. He is forming servants who can love when nobody claps.”\n" +
+      "“Money starts answering questions only God should answer.”",
+  },
   // ---- gospel narrative -----------------------------------------------------
   {
     title: "Mark 7 Movement Structure Example",
