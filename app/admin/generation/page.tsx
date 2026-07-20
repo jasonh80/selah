@@ -253,6 +253,7 @@ export default function SelahStudioPage() {
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
   const [rules, setRules] = useState<Rule[] | null>(null);
   const [examples, setExamples] = useState<Example[] | null>(null);
+  const [exampleSeedMsg, setExampleSeedMsg] = useState("");
   // undefined = loading · null = read failed (never shown as real facts)
   const [chapterInfo, setChapterInfo] = useState<StudioChapterInfo | null | undefined>(undefined);
   // undefined = not loaded yet · null = load failed · value = loaded
@@ -2534,6 +2535,27 @@ export default function SelahStudioPage() {
             <details className="border-t pt-3">
               <summary className="cursor-pointer text-[13px] font-medium text-primary">Approved examples</summary>
               <div className="mt-1.5 space-y-1.5">
+                {/* Owner gap report 2026-07-19: seed the curated library —
+                    verbatim texts from already-approved chapters; additive
+                    only, existing rows never touched. */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const j = (await api("POST", { action: "examples_seed" })) as Record<string, unknown>;
+                      setExampleSeedMsg(
+                        j.ok
+                          ? `Seeded: ${j.inserted} added, ${j.skippedExisting} already present.`
+                          : `Seed incomplete: ${j.failed ?? "?"} failed — check Recent activity.`,
+                      );
+                      void loadExamples();
+                    }}
+                    className="rounded-full border px-2.5 py-1 text-[11px] text-primary hover:border-accent/40"
+                  >
+                    Seed from published chapters
+                  </button>
+                  {exampleSeedMsg && <span className="text-[11px] text-secondary">{exampleSeedMsg}</span>}
+                </div>
                 {examples === null ? (
                   <p className="text-[12px] text-secondary">Loading…</p>
                 ) : examples.length === 0 ? (

@@ -109,6 +109,10 @@ import {
   getRelevantExamples,
   TEXT_EXAMPLE_TYPES,
 } from "@/lib/server/selah-examples";
+import {
+  seedExamplesFromLibrary,
+  EXAMPLE_LIBRARY_VERSION,
+} from "@/lib/server/selah-example-library";
 import { getAuditLog } from "@/lib/server/selah-feedback";
 import {
   submitReview,
@@ -1024,6 +1028,18 @@ export async function POST(req: Request) {
   if (action === "rules_seed") {
     const result = await seedFromLibrary();
     return NextResponse.json({ ok: !result.error, ...result, counts: await getRuleCounts() });
+  }
+  // Seed the curated example library (idempotent, additive-only — existing
+  // rows are never touched). Owner gap report 2026-07-19: only 2 examples
+  // existed; the library carries verbatim texts from owner-approved chapters.
+  if (action === "examples_seed") {
+    const result = await seedExamplesFromLibrary();
+    await logGenerationAudit({
+      action: "examples_seed",
+      status: result.failed > 0 ? "failed" : "succeeded",
+      message: `library ${EXAMPLE_LIBRARY_VERSION} digest ${result.digest.slice(0, 12)}…: ${result.inserted} inserted, ${result.skippedExisting} already present, ${result.failed} failed`,
+    });
+    return NextResponse.json({ ok: result.failed === 0, ...result });
   }
   // Preview which rules would be retrieved for a chapter (no generation).
   if (action === "rules_select") {
