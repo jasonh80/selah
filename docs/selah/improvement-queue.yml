@@ -212,7 +212,10 @@ entries:
       used or discarded." Claude verified the append-only storage claims
       against lib/server/images.ts the same day.
     priority_trigger: after the current safety work (IQ-005/IQ-006) and
-      Mark 10; pairs naturally with the People/gallery direction
+      Mark 10; pairs naturally with the People/gallery direction. Owner
+      interest re-voiced 2026-07-20 mid-launch ("it will be interesting
+      one day to look at the outtakes folder of images unused") — the day
+      produced two rejected Humble King candidates, both preserved
     status: queued
     completion_pr: null
 
@@ -366,7 +369,216 @@ entries:
       Owner question, in-session 2026-07-19: "is this something that will
       be incorporated into an unassisted chapter launch through selah
       studio?" — the honest answer was "not yet"; this entry makes it yes.
-    priority_trigger: after IQ-011 (#58) merges and the first self-serve
-      chapters exist; design rides with IQ-017's maps pass
+    priority_trigger: >-
+      PRIORITY BUMPED by owner (2026-07-20, "how did we miss that? come on
+      team"): Mark 11 launched into exactly this hole — connected with no
+      map until a manual same-day config (#81). Codex specs next; until it
+      ships, "geo map config exists" is an explicit line on every launch
+      checklist, and the launch flow should surface a visible "no map yet"
+      notice rather than silently omitting the section.
+    status: queued
+    completion_pr: null
+
+  - id: IQ-019
+    area: content-schema
+    improvement: >-
+      New chapter section type(s) beyond today's schema — owner floated a
+      "discipleship" section (what following Jesus asks of the reader in
+      this chapter) as a candidate for FUTURE chapters. Needs its own spec:
+      schema addition, renderer, prompt/gate coverage, and a decision on
+      whether/when older published chapters backfill it. Explicitly NOT
+      part of the Mega Mark 6 text revision (owner deferred it there,
+      2026-07-20: "maybe that should wait").
+    evidence: >-
+      Owner suggestion, in-session 2026-07-20, during Mega Mark 6 scoping;
+      deferred by owner in the same exchange. (Entry originally rode PR #77,
+      which closes unmerged - re-landed here.)
+    priority_trigger: owner-initiated design pass; spec (Codex) before any
+      build; no backfill of published chapters without explicit owner go
+    status: queued
+    completion_pr: null
+
+  - id: IQ-020
+    area: content-schema
+    improvement: >-
+      "Gospel Comparison" section: how THIS chapter's telling differs
+      across Matthew/Mark/Luke/John — e.g. Mark 11's two-day temple telling
+      and leafy branches vs. Matthew's same-day + Zechariah, Luke's
+      cloaks-only + weeping, John's palms. Rides the existing honesty
+      model: each difference labeled by which Gospel says what, never
+      blended. OWNER SPINE (2026-07-20): Selah Brain/voice commentary on
+      the similarities AND differences and possible reasons why — "always
+      pointing to even greater evidence of the truth of the Gospels."
+      HONESTY BOUND (Codex review): similarities and differences can fit
+      the texture of real testimony and purposeful Gospel writing, but
+      Selah never claims independence or eyewitness vantage where the
+      evidence does not establish it. Possible reasons include authorial
+      purpose, audience, arrangement, and source selection; eyewitness
+      perspective is offered only where warranted and clearly labeled as
+      evidence or inference. Agreement on the core strengthens confidence
+      without turning every variation into proof. Needs a spec:
+      schema, renderer, prompt/gate coverage, per-genre applicability
+      (Gospels only), backfill decision.
+    evidence: >-
+      Owner idea, in-session 2026-07-20, mid Mark 11 launch, sparked by the
+      cross-Gospel guardrail ("OOOHHHH!!!! that should be another section
+      !!!! gospel comparison").
+    priority_trigger: owner-initiated design pass; Codex spec first (pairs
+      naturally with the Kelly-characters spec session); build after the
+      Mark 6-10 polish batch
+    status: queued
+    completion_pr: null
+
+  - id: IQ-021
+    area: studio-ux
+    improvement: >-
+      Studio generation screens make it hard to tell which buttons are
+      currently available vs. unavailable ("it is difficult to tell which
+      buttons are available and which buttons are unavailable in studio
+      when generating a page"). Give disabled/waiting controls an
+      unmistakable state (dimmed + not-allowed cursor + reason tooltip or
+      inline label like "waiting for draft"), and the active next step a
+      single clear emphasis.
+    evidence: >-
+      Owner observation, in-session 2026-07-20, mid Mark 11 launch. Second
+      concrete case same session: after approving the draft, the filled
+      "Ready" toggle under Preview Draft reads as a live call-to-action —
+      "do i need to click ready again? it looks highlighted even though it
+      is already approved." Selected-state must look DONE (checkmark +
+      muted), never like the next button to press.
+    priority_trigger: next Studio UX pass (free); pairs with the self-serve
+      launch flow polish
+    status: queued
+    completion_pr: null
+
+  - id: IQ-022
+    area: architecture
+    improvement: >-
+      Retire the remaining hand-coded per-chapter lanes (owner direction
+      2026-07-20: "are there any more hand coded lanes in this thing? we
+      are trying to get rid of them"). Inventory: (a) geo map configs -
+      covered by IQ-018; (b) the slug-keyed config layer in
+      lib/content/chapter-content.ts (FAQs, image titles, scene-check
+      hints, hero overrides for mark-6/psalm-23, plus #71's added hints) -
+      each chapter refresh/Mega pass must absorb its config into the
+      stored workup rather than adding new config, until the layer is
+      empty; (c) per-chapter launch code (packets/receipts/sprint slug
+      list) - closing via self-serve Prepare, Mark 12 is the proof run;
+      (d) genreForSlug hand ranges with holes (exodus-34 = no genre) -
+      complete the map or derive genre at Prepare time and store it on the
+      row.
+    evidence: >-
+      Owner direction, in-session 2026-07-20, after the Mark 11 no-map
+      miss. Exodus-34 genre hole documented in PR #73's fallback work.
+    priority_trigger: "(b) rides every Mega/refresh pass from now on; (c)
+      proves out with Mark 12; (d) small bounded fix, next brain/voice
+      pass; no new slug-keyed config may be added without a queue note
+      saying why"
+    status: queued
+    completion_pr: null
+
+  - id: IQ-023
+    area: images
+    improvement: >-
+      Image identity disparity: storage/kind slugs (purity-dispute-table)
+      diverge from owner-facing display titles ("The Question at the
+      Meal"), which caused a real mid-session mismatch when staging photo
+      redos. Fix for future generations: derive the image kind/file slug
+      FROM the display title at generation time (one slugify rule), and
+      every owner-facing surface (Studio cards, redo screens, audit rows)
+      shows the display title with the slug only as small print. Published
+      chapters keep their existing slugs (never rename stored URLs -
+      IQ-010 append-only rule).
+    evidence: >-
+      Owner, in-session 2026-07-20, staging the Mark 7 redos: "can we fix
+      this disparity for future?"
+    priority_trigger: next generation-pipeline pass; Codex folds the
+      slugify rule into the image-stage spec
+    status: queued
+    completion_pr: null
+
+  - id: IQ-024
+    area: content
+    improvement: >-
+      Exodus 27 still serves its storage-era pilot content: placeholder
+      images, placeholder maps, pre-voice text ("it is only showing
+      placeholders" - owner, 2026-07-20). Do not patch it piecemeal:
+      RELAUNCH it through the self-serve Prepare lane as the second
+      chapter-agnostic proof (after Mark 12) - fresh generation with voice
+      packs, landscape images, honest map treatment. Doubles as the first
+      non-Mark, non-narrative-genre live test (tabernacle/priesthood).
+      The local Exodus 27 fixture stays untouched as the offline fallback.
+    evidence: >-
+      Owner, in-session 2026-07-20: "it is only showing placeholders and
+      may have basic text placeholders. what should we do with it?"
+    priority_trigger: after the Mark 12 self-serve proof; owner-gated
+      spends as always
+    status: queued
+    completion_pr: null
+
+  - id: IQ-025
+    area: content
+    improvement: >-
+      Psalm 23 modernization ("and psalm?" - owner, 2026-07-20): (a) geo
+      map on the real engine (curated entries, Mark 6 pattern - shepherd
+      country as honest regions: Bethlehem hill country, Judean
+      wilderness; a psalm names no event sites, so no event pins); (b)
+      Mega-style text pass at the tail of the Mark 7-10 queue, applied via
+      the protected snapshot-first script (psalm-23 is hard-frozen like
+      mark-6 was); (c) the long-queued legacy "ready" status migration
+      rides whenever the validated publisher path is ready; (d) kill the
+      last placeholder ref on the page.
+    evidence: >-
+      Owner, in-session 2026-07-20. Live check same session: 3 real
+      images, FAQs live (#79), static map only, 1 placeholder ref.
+    priority_trigger: geo map now (free, Claude); text pass after the
+      Mark 7-10 Megas; status migration on the publisher lane
+    status: queued
+    completion_pr: null
+
+  - id: IQ-026
+    area: images
+    improvement: >-
+      Visual cohesion + a house look, timed with the characters work:
+      when the Kelly-characters lane lands, image generation should also
+      develop a consistent Selah visual identity across chapters (light,
+      palette, lens feel, recurring faces once characters exist) instead
+      of per-image one-offs. Owner named the current Mark 10
+      jesus-walking-ahead road shot as the register he likes (golden
+      hour, believable, cinematic-but-honest) - a STYLE reference only;
+      that image itself is direction-flawed for its verse and gets redone.
+    evidence: >-
+      Owner, in-session 2026-07-20 (also told Codex directly): "when we
+      start to implement characters i want to start having more cohesion
+      in our images generated. and to develop our own look... i really
+      like this shot. make sure we address this at the right time."
+    priority_trigger: rides the Kelly-characters spec (Codex) - the spec
+      must cover visual continuity/style, not only character identity;
+      no build before that spec
+    status: queued
+    completion_pr: null
+
+  - id: IQ-027
+    area: architecture
+    improvement: >-
+      THE SELAH ANATOMY (owner definition, 2026-07-20, verbatim): "Selah
+      Mind... to know Him / Selah Voice... to speak Him / Selah Heart...
+      to love Him / Selah Eyes... to see Him / Selah Ears... to hear Him /
+      Selah Hands... to serve Him / Selah Feet... to lead others to do
+      the same. These components will be the core of Selah." Mapping
+      today: Mind = the rules/learning layer currently named "Selah
+      Brain" (rename surfaces + docs to Mind; storage/table names may
+      keep aliases to avoid migration risk - Codex call); Voice = the
+      #73 voice system (already named right); Eyes = the visual style
+      guide (PR #85). Heart, Ears, Hands, Feet are unbuilt - their
+      functional definitions are OWNER conversations first, specs second;
+      nothing gets invented on their behalf.
+    evidence: >-
+      Owner, in-session 2026-07-20: "we are about to rename the parts of
+      selah's anatomy - instead of brain its mind... These components
+      will be the core of Selah."
+    priority_trigger: Brain-to-Mind surface rename = next docs/UI pass
+      (bounded, no schema churn without Codex design); remaining
+      components as the owner defines them
     status: queued
     completion_pr: null
