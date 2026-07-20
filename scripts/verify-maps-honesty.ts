@@ -393,7 +393,13 @@ function checkGeoChapter(
 
 const fixtureSlugs = Object.keys(acceptance.chapters);
 for (const slug of fixtureSlugs) {
-  const raw = acceptance.chapters[slug].locations ?? [];
+  // Digest-bound packet entries first; a packet WITHOUT location entries
+  // (mark-11) falls back to the curated set so its geo config is still
+  // enforced — never checked against an empty list (which would fail every
+  // overlay) and never skipped.
+  const raw = (acceptance.chapters[slug].locations?.length
+    ? acceptance.chapters[slug].locations
+    : GEO_CURATED_LOCATIONS[slug]) ?? [];
   const locations = raw
     .map((entry) => normalizePrepareLocation(entry))
     .filter((entry): entry is PrepareLocation => entry !== null);

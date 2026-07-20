@@ -306,6 +306,73 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     caption:
       "Mark 10 turns south: Judea and beyond the Jordan, then the climb from Jericho toward Jerusalem. The two cities carry pins; the region's boundary is approximate; the road appears only as a broad sweep because the exact route is unrecorded.",
   },
+  // Mark 11 (launched 2026-07-20): its acceptance packet carries movements
+  // but no location entries, so the map uses CURATED entries
+  // (GEO_CURATED_LOCATIONS) — same two-axis honesty model, same enforcement.
+  "mark-11": {
+    views: {
+      local: { center: [35.2465, 31.7765], zoom: 13.2 },
+      big: { center: [35.33, 31.8], zoom: 9.6 },
+    },
+    pins: [
+      { lng: 35.2354, lat: 31.7784, label: "Jerusalem", locationName: "Jerusalem", labelSide: "left" },
+      { lng: 35.261, lat: 31.7717, label: "Bethany", locationName: "Bethany" },
+    ],
+    areas: [
+      {
+        locationName: "Mount of Olives",
+        label: "Mount of Olives · approx.",
+        polygon: circlePolygon(35.245, 31.778, 1.2),
+        labelAt: [35.245, 31.792],
+      },
+      {
+        locationName: "Bethphage",
+        label: "Bethphage · site debated",
+        polygon: circlePolygon(35.2469, 31.7752, 0.7),
+        labelAt: [35.263, 31.783],
+      },
+    ],
+    corridors: [
+      {
+        locationName: "Road from Bethany",
+        label: "Approx. daily road",
+        waypoints: [
+          [35.261, 31.7717], [35.2469, 31.7752], [35.2361, 31.778],
+        ],
+        labelAt: [35.256, 31.769],
+      },
+    ],
+    tour: [
+      {
+        center: [35.2469, 31.7752], zoom: 14, pitch: 50,
+        title: "Bethphage and Bethany, at the Mount of Olives",
+        caption: "The colt is fetched near Bethphage and Bethany (11:1–7) and Jesus rides toward the city over cloaks and leafy branches cut from the fields (11:8) — the palm branches people picture are John's detail, not Mark's.",
+      },
+      {
+        center: [35.2354, 31.7781], zoom: 14.5, pitch: 55, bearing: -25,
+        title: "Into the temple — and out again",
+        caption: "Jesus enters Jerusalem, goes into the temple, looks around at everything — and leaves, because it is already late (11:11). Mark tells the temple in two days, not one.",
+      },
+      {
+        center: [35.25, 31.774], zoom: 13.8, pitch: 45,
+        title: "The road and the fig tree",
+        caption: "On the next morning's walk in from Bethany, Jesus curses a fig tree in leaf without fruit (11:12–14); they pass it withered the morning after (11:20–21). The road is drawn as a broad band; the tree's spot is unrecorded.",
+      },
+      {
+        center: [35.2354, 31.7781], zoom: 14.5, pitch: 55,
+        title: "The temple courts cleared",
+        caption: "Jesus drives out the sellers and buyers and overturns the money-changers' tables — 'a house of prayer for all the nations' (11:15–17). Mark names no whip; that detail belongs to John's account.",
+      },
+      {
+        center: [35.2354, 31.7784], zoom: 14, pitch: 50, bearing: 20,
+        title: "By what authority?",
+        caption: "Walking in the temple again, the chief priests, scribes, and elders demand His credentials (11:27–33). Jesus answers their question with John's baptism — and they refuse to answer at all.",
+      },
+    ],
+    caption:
+      "Mark 11 lives on two miles of road: Bethany and the Mount of Olives, the ride into Jerusalem, and the temple told across two days. Jerusalem and Bethany carry pins; Bethphage is a debated site; the daily road appears only as a broad band.",
+  },
+
   // Mark 6 (owner request 2026-07-20: bring the pre-sprint benchmark chapter
   // onto the real-map engine). Locations are the CURATED entries below
   // (GEO_CURATED_LOCATIONS) — same two-axis honesty model, enforced by
@@ -412,6 +479,45 @@ export const GEO_CURATED_LOCATIONS: Record<
     display: string;
   }[]
 > = {
+  // Mark 11's acceptance packet has movements but no location entries, so
+  // the map's entries are curated here (reviewed as data in the PR).
+  "mark-11": [
+    {
+      name: "Jerusalem",
+      featureKind: "point",
+      certainty: "known",
+      role: "event",
+      display: "The city Jesus enters riding the colt; the temple He clears (11:1–19)",
+    },
+    {
+      name: "Bethany",
+      featureKind: "point",
+      certainty: "known",
+      role: "event",
+      display: "The village where Jesus lodges each night (11:11–12); traditional site al-Eizariya",
+    },
+    {
+      name: "Bethphage",
+      featureKind: "region",
+      certainty: "debated",
+      role: "event",
+      display: "Where the colt is fetched (11:1–7) — the traditional Mount of Olives site is debated",
+    },
+    {
+      name: "Mount of Olives",
+      featureKind: "region",
+      certainty: "known",
+      role: "event",
+      display: "The ridge east of the city where the approach begins (11:1)",
+    },
+    {
+      name: "Road from Bethany",
+      featureKind: "route",
+      certainty: "probable",
+      role: "event",
+      display: "The daily walk in and out of the city — the fig tree stands somewhere along it (11:12–14, 20–21)",
+    },
+  ],
   "mark-6": [
     {
       name: "Nazareth",
