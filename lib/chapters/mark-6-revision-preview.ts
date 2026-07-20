@@ -30,16 +30,22 @@ export function mark6RevisionPreviewWorkup(): ChapterWorkup {
   return cached;
 }
 
+/** Netlify's CONTEXT baked at build (next.config.mjs env). This MUST be a
+ * literal `process.env.<KEY>` expression — Next's bundler inlines only
+ * literal reads; a dynamic `env["SELAH_DEPLOY_CONTEXT"]` lookup stays
+ * undefined at runtime, which is exactly why the first fix still 404'd on
+ * the deploy preview (Codex #77 P1). */
+const BAKED_DEPLOY_CONTEXT = process.env.SELAH_DEPLOY_CONTEXT || "";
+
 /** True only where the review preview may serve: local dev and Netlify
  * deploy/branch previews. Unknown contexts (including a missing context in
- * production) stay CLOSED. Reads SELAH_DEPLOY_CONTEXT — Netlify's CONTEXT
- * baked in at build time via next.config.mjs, because the raw CONTEXT var is
- * not reliably present in the SSR runtime (Codex #77 P1: the preview 404'd
- * on the actual deploy preview). Raw CONTEXT remains a fallback. */
+ * production) stay CLOSED. Order: injected env (tests) → baked build-time
+ * context (real deploys) — the raw runtime CONTEXT is never trusted alone
+ * because Netlify's SSR runtime doesn't expose it. */
 export function mark6RevisionPreviewEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   if (env.NODE_ENV === "development") return true;
-  const context = env.SELAH_DEPLOY_CONTEXT || env.CONTEXT || "";
+  const context = env.SELAH_DEPLOY_CONTEXT || env.CONTEXT || BAKED_DEPLOY_CONTEXT;
   return context === "deploy-preview" || context === "branch-deploy";
 }
