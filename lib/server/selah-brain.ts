@@ -133,16 +133,21 @@ export function genreForSlug(slug: string): string | null {
   if (["psalm", "job", "proverbs", "ecclesiastes", "song-of-solomon", "lamentations"].includes(book))
     return "poetry/psalm";
   if (book === "exodus") {
-    if (ch >= 1 && ch <= 15) return "oppression/deliverance";
+    // IQ-022(d): the old ranges left 16–19 and 31–36 with NO genre at all —
+    // exodus-34 famously retrieved zero voice/form examples until the global
+    // fallback (#73). Every Exodus chapter now lands somewhere honest.
+    if (ch >= 1 && ch <= 18) return "oppression/deliverance";
+    if (ch === 19 || ch === 24 || (ch >= 31 && ch <= 34)) return "covenant/ritual";
     if (ch >= 20 && ch <= 23) return "law";
-    if (ch === 24) return "covenant/ritual";
-    if ((ch >= 25 && ch <= 30) || (ch >= 37 && ch <= 40)) return "tabernacle/priesthood";
+    if ((ch >= 25 && ch <= 30) || (ch >= 35 && ch <= 40)) return "tabernacle/priesthood";
   }
   if (book === "leviticus") return ch >= 8 && ch <= 9 ? "tabernacle/priesthood" : "covenant/ritual";
   if (book === "genesis") {
     if ([5, 10, 11, 36].includes(ch)) return "genealogy";
     if (ch >= 37) return "dream/providence narrative";
     if (ch >= 12) return "patriarchal narrative";
+    // Genesis 1–11 (minus the genealogies above): creation through Babel.
+    return "primeval narrative";
   }
   if (["deuteronomy", "numbers"].includes(book)) return "law";
   return null;
