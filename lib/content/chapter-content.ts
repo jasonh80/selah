@@ -152,11 +152,17 @@ export const CHAPTER_SCENE_CHECK_IMAGE_HINTS: Record<string, Record<string, stri
     sink: "purity-dispute-table",
     hygiene: "purity-dispute-table",
     wash: "purity-dispute-table",
+    // Codex #71 review: the second stored check ("The Tyre scene is indoors
+    // and the daughter stays offstage") pairs with the mother's scene.
+    tyre: "syrophoenician-mother",
+    daughter: "syrophoenician-mother",
   },
   "mark-8": {
     picnic: "seven-baskets-after-feeding",
     basket: "seven-baskets-after-feeding",
     feeding: "seven-baskets-after-feeding",
+    // "Bethsaida is not a magic-stage moment" → the two-stage healing scene.
+    bethsaida: "bethsaida-partial-sight",
   },
   "mark-9": {
     mountain: "transfiguration-mountain",
@@ -167,6 +173,9 @@ export const CHAPTER_SCENE_CHECK_IMAGE_HINTS: Record<string, Record<string, stri
     needle: "wealthy-man-grieved",
     camel: "wealthy-man-grieved",
     wealthy: "wealthy-man-grieved",
+    // "No throne-room brothers" (James & John's request) → the road scene.
+    "throne-room": "jesus-walking-ahead",
+    brothers: "jesus-walking-ahead",
   },
 };
 
