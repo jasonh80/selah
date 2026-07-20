@@ -84,7 +84,7 @@
 > And when Jesus calls for cross-bearing, receive it carefully and seriously. Follow Him when faithfulness costs approval, comfort, status, or control. But do not confuse His call with staying in harm that He never commanded you to endure. The Good Shepherd does not ask His sheep to call wolves “sanctification.” Costly discipleship is allegiance to Jesus, not permission for destruction.
 
 **Proposed:**
-> Start with your memory. Name one specific place Jesus carried, corrected, forgave, or provided for you. The disciples had leftovers in the boat and still acted like Jesus had no track record. We do the same: “Lord, You got me through that impossible thing last month, but I am pretty sure this Tuesday is where You run out of options.” Come on, Peter. Come on, me. Come on, all of us.
+> Start with your memory. Name one specific place Jesus carried, corrected, forgave, or provided for you. The disciples had leftovers in the boat and still acted like Jesus had no track record. We do the same: “Lord, You got me through that impossible thing last month, but I am pretty sure this Tuesday is where You run out of options.” Come on, Peter. Come on, my own heart. Come on, all of us.
 > 
 > Then ask where your sight is still blurry. Comfort? Control? Approval? Hurry? Pray: “Jesus, touch my eyes again. Help me see You clearly—not vaguely, culturally, or only as useful.”
 > 

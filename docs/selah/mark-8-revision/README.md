@@ -19,6 +19,6 @@ a tightening pass, −357 words. Everything else byte-identical (gate-proven).
 Codex's exact-head editorial recheck is the copy gate; apply rides the
 batched snapshot-first script with the 7→10 queue.
 
-Flags: (1) RESOLVED by owner: "Come on, Jason" became "Come on, me." — the reader says it about themselves (escalation kept: Peter → me → all of us).
+Flags: (1) RESOLVED by owner: "Come on, Jason" became "Come on, my own heart." (owner safety catch: "come on me" without the comma is a misread we never risk).
 (2) RESOLVED: the duplicated "You humans…" line became the owner-supplied
 variation "Humans… predictable." (no recycled jokes rule, 2026-07-20).
