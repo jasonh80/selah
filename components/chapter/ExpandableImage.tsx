@@ -13,14 +13,23 @@ function isExpandableSrc(src: string): boolean {
   return src.startsWith("/") || src.startsWith("https://");
 }
 
+export interface ImageCaption {
+  title: string;
+  body: string;
+}
+
 export function ExpandableImage({
   src,
   alt,
   className,
+  caption,
 }: {
   src: string;
   alt: string;
   className?: string;
+  /** Scene-check caption shown at the bottom of the full-size viewer (owner
+   * direction 2026-07-20); hidden while zoomed in so it never covers detail. */
+  caption?: ImageCaption;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLImageElement | null>(null);
@@ -53,6 +62,7 @@ export function ExpandableImage({
         <ImageViewer
           src={src}
           alt={alt}
+          caption={caption}
           onClose={() => {
             setOpen(false);
             triggerRef.current?.focus();
@@ -66,10 +76,12 @@ export function ExpandableImage({
 function ImageViewer({
   src,
   alt,
+  caption,
   onClose,
 }: {
   src: string;
   alt: string;
+  caption?: ImageCaption;
   onClose: () => void;
 }) {
   const [scale, setScale] = useState(1);
@@ -231,6 +243,17 @@ function ImageViewer({
           }`}
         />
       </div>
+
+      {/* The photo's scene-check caption rides the bottom of the viewer while
+          the image is at rest; zooming hides it so nothing covers detail. */}
+      {caption && scale === MIN_SCALE && (
+        <div className="pointer-events-none fixed inset-x-4 bottom-20 mx-auto max-w-[64ch] rounded-md bg-[rgba(10,9,14,0.78)] px-4 py-3 backdrop-blur">
+          <p className="text-[14px] font-semibold leading-snug text-white">{caption.title}</p>
+          <p className="mt-1 max-h-28 overflow-y-auto text-[13px] leading-relaxed text-white/80 [pointer-events:auto]">
+            {caption.body}
+          </p>
+        </div>
+      )}
 
       <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2">
         <ViewerButton label="Zoom out" onClick={() => applyScale(scale * 0.8)}>

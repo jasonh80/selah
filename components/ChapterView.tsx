@@ -13,7 +13,6 @@ import { getChapterContext } from "@/lib/content/chapter-content";
 import { ChapterTopControls } from "@/components/chapter/ChapterTopControls";
 import { CompactPreviewRow } from "@/components/chapter/CompactPreviewRow";
 import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSection";
-import { SceneCheckSection } from "@/components/chapter/SceneCheckSection";
 import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
 import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection";
 import { EsvAttribution } from "@/components/chapter/EsvAttribution";
@@ -55,11 +54,10 @@ export function ChapterView({
             width; duplicate boxes removed (WMPM card, World-Behind-It card,
             the Deep Dive rail/header, the half-page dashboard grid). */}
         <div className="space-y-s3">
+          {/* The hero photo carries its scene check(s) as an attached caption
+              INSIDE its frame (owner direction 2026-07-20: Instagram photo +
+              caption below, Selah style), with Quick Summary right after. */}
           <HeroImage data={data} />
-          {/* Scene check(s) not bound to a path image — the hero's check —
-              sit DIRECTLY under the hero, photo-and-caption style (owner
-              direction 2026-07-19: "think a photo and caption on Instagram"). */}
-          <SceneCheckSection data={data} />
           <QuickSummaryCard data={data} />
           <MetadataChips data={data} />
           <CompactPreviewRow data={data} />

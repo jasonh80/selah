@@ -1,5 +1,5 @@
-import type { ChapterWorkup, ChapterImage } from "@/lib/types";
-import { ExpandableImage } from "@/components/chapter/ExpandableImage";
+import type { ChapterWorkup } from "@/lib/types";
+import { CaptionedImage } from "@/components/chapter/CaptionedImage";
 import { supportingImagesFor } from "@/components/chapter/HeroImage";
 import {
   getImageTitle,
@@ -31,71 +31,26 @@ export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
   );
 
   // Owner decision 2026-07-19: no "Path" header and no number badges — the
-  // scenes simply flow with their captions and attached checks.
+  // scenes simply flow with their captions and attached checks. Owner
+  // direction 2026-07-20: each check is an Instagram-style caption INSIDE the
+  // photo's frame (see CaptionedImage) — title line in Quick Study, full body
+  // in Deep Study.
   return (
     <section>
       <div className="space-y-s4">
-        {scenes.map((scene, position) => (
-          <PathScene
-            key={scene.kind}
-            scene={scene}
-            position={position}
-            title={getImageTitle(data.slug, scene.kind, scene.label)}
-            check={checkByKind.get(scene.kind)}
-          />
-        ))}
+        {scenes.map((scene) => {
+          const check = checkByKind.get(scene.kind);
+          return (
+            <CaptionedImage
+              key={scene.kind}
+              src={scene.src}
+              alt={scene.alt}
+              overlayTitle={getImageTitle(data.slug, scene.kind, scene.label)}
+              checks={check ? [check] : []}
+            />
+          );
+        })}
       </div>
     </section>
-  );
-}
-
-function PathScene({
-  scene,
-  position,
-  title,
-  check,
-}: {
-  scene: ChapterImage;
-  position: number;
-  title: string;
-  check?: SceneCheck;
-}) {
-  return (
-    <figure className="flex flex-col">
-      <div className="relative overflow-hidden rounded-md border shadow-hair">
-        <div className="aspect-[3/2] w-full bg-card-soft">
-          <ExpandableImage src={scene.src} alt={scene.alt} className="h-full w-full object-cover" />
-        </div>
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(16,16,20,0.78)] via-[rgba(16,16,20,0.04)] to-transparent" />
-        <figcaption className="absolute inset-x-s3 bottom-s3">
-          <span className="block text-[13px] font-semibold leading-snug text-white sm:text-[14px]">{title}</span>
-        </figcaption>
-      </div>
-
-      {/* Owner direction 2026-07-19: the scene check reads like an Instagram
-          caption — always open, bigger, directly under its photo. */}
-      {check && (
-        <div className="mt-s2 rounded-md border bg-card px-s3 py-s3 shadow-hair" style={{ borderLeft: "3px solid var(--accent-strong)" }}>
-          <div className="flex items-center gap-2">
-            <svg
-              viewBox="0 0 24 24"
-              className="h-4 w-4 shrink-0 text-accent-strong"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-              <circle cx="12" cy="12" r="2.5" />
-            </svg>
-            <span className="text-[15px] font-semibold leading-snug text-primary">{check.title}</span>
-          </div>
-          {/* visualAccuracyNotes are production guardrails — never rendered. */}
-          <p className="mt-1.5 text-[14px] leading-relaxed text-secondary">{check.body}</p>
-        </div>
-      )}
-    </figure>
   );
 }

@@ -164,8 +164,10 @@ entries:
     priority_trigger: next product-design session (owner said "tomorrow's
       product-design work", i.e. from 2026-07-19); mockup precedes any
       layout code
-    status: queued
-    completion_pr: null
+    status: declined
+    completion_pr: "owner decision 2026-07-20: no Figma — design is decided
+      in conversation and shipped as PRs the owner reviews visually on the
+      deploy preview / live site; Canva stays for marketing graphics"
 
   - id: IQ-009
     area: runtime-health

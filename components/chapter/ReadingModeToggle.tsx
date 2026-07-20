@@ -2,14 +2,16 @@
 
 import { useReadingMode, type ReadingMode } from "@/components/ReadingModeProvider";
 
-// Segmented Quick Dive / Deep Dive control. Deep Dive expands the study cards
-// for a continuous read; it does not force open Transparency or affect the
-// theme/version selectors or the Read tab.
+// Segmented Quick Study / Deep Study control (returned 2026-07-20, owner
+// direction). Deep Study expands every study card and scene-check caption for
+// a zero-click continuous read; Quick Study compacts them to their authored
+// title/preview lines. It never affects the theme/version selectors, the
+// Read control, or FAQs (always collapsed).
 export function ReadingModeToggle() {
   const { mode, setMode } = useReadingMode();
   const options: { id: ReadingMode; label: string }[] = [
-    { id: "quick", label: "Quick Dive" },
-    { id: "deep", label: "Deep Dive" },
+    { id: "quick", label: "Quick Study" },
+    { id: "deep", label: "Deep Study" },
   ];
   return (
     <div className="inline-flex gap-1 rounded-full border bg-card p-1 shadow-hair">
