@@ -306,6 +306,57 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     caption:
       "Mark 10 turns south: Judea and beyond the Jordan, then the climb from Jericho toward Jerusalem. The two cities carry pins; the region's boundary is approximate; the road appears only as a broad sweep because the exact route is unrecorded.",
   },
+
+  // Psalm 23 (owner modernization, IQ-025): the first POETRY map. The psalm
+  // names NO places, so every overlay is CONTEXT — the world its imagery
+  // comes from, never an event site. Curated entries below; the caption and
+  // every tour stop say so plainly.
+  "psalm-23": {
+    views: {
+      local: { center: [35.21, 31.7], zoom: 10.3 },
+      big: { center: [35.25, 31.62], zoom: 8.4 },
+    },
+    pins: [
+      { lng: 35.2354, lat: 31.7784, label: "Jerusalem", locationName: "Jerusalem", labelSide: "left" },
+    ],
+    areas: [
+      {
+        locationName: "Bethlehem hill country",
+        label: "Bethlehem hill country · approx.",
+        polygon: circlePolygon(35.2, 31.705, 4),
+        labelAt: [35.14, 31.68],
+      },
+      {
+        locationName: "Judean wilderness",
+        label: "Judean wilderness · approx.",
+        polygon: [
+          [35.28, 31.85], [35.42, 31.78], [35.45, 31.55],
+          [35.35, 31.42], [35.24, 31.55], [35.25, 31.72],
+        ],
+        labelAt: [35.42, 31.64],
+      },
+    ],
+    corridors: [],
+    tour: [
+      {
+        center: [35.2, 31.705], zoom: 11.5, pitch: 45,
+        title: "Shepherd country",
+        caption: "We know David kept his father's flock in the hills around Bethlehem (1 Samuel 16–17). Green pasture here is seasonal and scarce — a shepherd who finds it is a provider. The psalm never says where it was written; this is simply the countryside David knew.",
+      },
+      {
+        center: [35.38, 31.66], zoom: 10.5, pitch: 55, bearing: -30,
+        title: "The dark valley",
+        caption: "We know ravines like these cut the desert east of the hills — deep, shadowed, and dangerous for sheep. Our smart guess: dark valleys like this are what the psalm's 'valley of deep darkness' would bring to mind. We don't know any single canyon the psalm means — it names none.",
+      },
+      {
+        center: [35.2354, 31.7784], zoom: 12, pitch: 50,
+        title: "The house of the LORD",
+        caption: "The psalm's last line turns homeward: 'I shall dwell in the house of the LORD forever.' We know that in David's day the sanctuary was a tent he pitched for the ark in Jerusalem (2 Samuel 6) — the temple came later. Jerusalem is marked as the city connected with his worship, not as a scene from the psalm.",
+      },
+    ],
+    caption:
+      "Psalm 23 never names a place. These locations help us picture David's world: shepherd hills near Bethlehem, dry ravines east of them, and Jerusalem, the city connected with his worship. This is helpful background — not the psalm's exact setting.",
+  },
   // Mark 11 (launched 2026-07-20): renders the DIGEST-BOUND packet entries
   // that landed with #75 — Jerusalem known point · Mount of Olives known
   // region · Bethany and Bethphage probable region · Road into Jerusalem
@@ -480,6 +531,31 @@ export const GEO_CURATED_LOCATIONS: Record<
     display: string;
   }[]
 > = {
+  // Psalm 23 (IQ-025): poetry names no places — every entry is CONTEXT,
+  // the world the imagery comes from.
+  "psalm-23": [
+    {
+      name: "Jerusalem",
+      featureKind: "point",
+      certainty: "known",
+      role: "context",
+      display: "The city connected with David's worship — in his day the sanctuary was a tent, not yet the temple (2 Samuel 6)",
+    },
+    {
+      name: "Bethlehem hill country",
+      featureKind: "region",
+      certainty: "known",
+      role: "context",
+      display: "We know David shepherded these hills (1 Samuel 16-17). The psalm never names a place — this is the countryside he knew",
+    },
+    {
+      name: "Judean wilderness",
+      featureKind: "region",
+      certainty: "known",
+      role: "context",
+      display: "Dark desert ravines east of the hills — the kind of valley the psalm's deep-darkness line brings to mind; no single canyon is meant",
+    },
+  ],
   "mark-6": [
     {
       name: "Nazareth",
