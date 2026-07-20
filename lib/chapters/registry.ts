@@ -1,5 +1,9 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { exodus27Workup, LOCAL_SOURCE, type ChapterSource } from "@/lib/chapters/source";
+import {
+  revisionPreviewsEnabled,
+  revisionPreviewWorkups,
+} from "@/lib/chapters/revision-previews";
 import { isSupabaseConfigured } from "@/lib/server/supabase";
 import {
   getChapterWorkupBySlug,
@@ -25,6 +29,16 @@ const FALLBACK_SLUG = "exodus-27";
 // Known local chapters (seed for fallback + chapter listing).
 const seed = exodus27Workup();
 const LOCAL = new Map<string, ChapterWorkup>([[seed.slug, seed]]);
+
+// Mega revision previews (review-only artifacts for the 7→10 queue): served
+// under their own "<slug>-revision-preview" slugs, dev + Netlify previews
+// ONLY — fail-closed, production can never register them. Protects Jason:
+// live rows stay untouched while Codex reviews proposed copy.
+if (revisionPreviewsEnabled()) {
+  for (const workup of revisionPreviewWorkups()) {
+    LOCAL.set(workup.slug, workup);
+  }
+}
 
 export function localChapterBySlug(slug: string): ChapterWorkup | null {
   return LOCAL.get(slug) ?? null;

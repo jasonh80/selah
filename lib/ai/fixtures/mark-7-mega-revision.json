@@ -1,0 +1,523 @@
+{
+  "book": "Mark",
+  "slug": "mark-7",
+  "theme": "Jesus exposes the heart and opens mercy beyond expected borders",
+  "title": "Mark 7",
+  "images": [
+    {
+      "alt": "Jesus sits at a simple meal while Pharisees and scribes question Him near ritual washing vessels.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-7/e6d3d45a-570a-4cc6-b984-79774cdcb607/purity-dispute-table.png",
+      "kind": "purity-dispute-table",
+      "index": 1,
+      "label": "The Question at the Meal",
+      "prompt": "Photorealistic historical-documentary scene in first-century Galilee, a modest courtyard meal setting with worn stone, clay bowls, low table area, and several Jewish men in simple linen and wool garments. Jesus, a Jewish man in his early thirties with dark hair and beard, plain earth-toned tunic and mantle, sits calmly while Pharisees and scribes from Jerusalem question Him with serious expressions. Include ordinary disciples nearby eating simple bread, with ritual washing vessels visible but not oversized. Natural daylight, lived-in textures, historically plausible clothing and architecture. No halos or glow, no pristine costumes, no theatrical posing, no modern objects, no text or lettering, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "The dispute begins with washing customs, but Jesus presses the question deeper: What has authority over the heart?",
+      "description": "This scene helps readers see that the opening conflict is about ritual purity traditions and authority, not soap, germs, or a casual etiquette complaint."
+    },
+    {
+      "alt": "A Gentile mother kneels before Jesus inside a modest house near Tyre.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-7/e6d3d45a-570a-4cc6-b984-79774cdcb607/syrophoenician-mother.png",
+      "kind": "syrophoenician-mother",
+      "index": 2,
+      "label": "A Mother at Jesus' Feet",
+      "prompt": "Photorealistic historical-documentary interior of a modest first-century house in the region near Tyre, coastal Levant setting, plastered walls, woven mats, clay lamp, rough wooden doorway. Jesus, consistent Jewish man in early thirties with dark hair and beard, plain earth-toned tunic and mantle, stands or sits with composed seriousness. A Syrophoenician Gentile woman in simple local clothing kneels respectfully before Him, pleading without theatrical exaggeration. Keep the daughter offscreen to avoid inventing details beyond the text. Natural muted light, believable worn materials. No halos or glow, no pristine costumes, no theatrical posing, no modern objects, no text or lettering, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "A hard exchange becomes a window into mercy moving beyond Israel's borders.",
+      "description": "This image captures the boundary-crossing tension of a Gentile woman seeking mercy for her daughter in the region of Tyre."
+    },
+    {
+      "alt": "Jesus privately heals a deaf man near the Sea of Galilee while others remain at a distance.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-7/e6d3d45a-570a-4cc6-b984-79774cdcb607/ephphatha-healing.png",
+      "kind": "ephphatha-healing",
+      "index": 3,
+      "label": "Be Opened",
+      "prompt": "Photorealistic historical-documentary scene near the Sea of Galilee in the Decapolis region, outdoors away from a crowd. Jesus, same Jewish man in early thirties with dark hair and beard, plain earth-toned tunic and mantle, gently faces a deaf man with a speech difficulty, treating him with dignity and privacy. Show Jesus close enough for the described personal healing action, with a small group blurred at a respectful distance. Dry hills, lake light, simple first-century garments, dust, worn sandals, natural late afternoon light. No halos or glow, no pristine costumes, no theatrical posing, no modern objects, no text or lettering, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "Jesus takes the man aside, restores him personally, and opens what had been closed.",
+      "description": "This scene matters because Jesus heals the deaf man privately and personally, showing compassion without turning the man into a spectacle."
+    }
+  ],
+  "prayer": "Lord Jesus, search my heart without crushing me. Free me from using good things as cover for disobedience. Teach me to honor Your word, receive Your mercy, and speak with a life You have opened. Amen.",
+  "status": "draft",
+  "verses": [],
+  "chapter": 7,
+  "context": "The washing dispute is not about germs or modern hygiene. It concerns ritual purity and inherited practices that many Pharisees treated as safeguards for faithful obedience. Mark explains these customs for readers who may not know them well. Jesus does not attack Jewish life or all tradition; He confronts the moment when human tradition is used to sidestep God's command. The later movement toward Tyre, Sidon, and the Decapolis matters because those regions were associated with Gentile populations and mixed cultural life. Mark is showing the kingdom of God pressing beyond expected borders without denying the real order of salvation history: Israel first, and then the nations.",
+  "summary": "Jesus has been healing crowds around Galilee, and His reputation has drawn attention from religious leaders in Jerusalem. Mark now places a conflict about purity beside two encounters in largely Gentile territory, so the reader feels the tension: Who is truly clean, and how wide is Jesus' mercy?",
+  "tagline": "Pause. Reflect. Elevate.",
+  "version": "1",
+  "heroKind": "ephphatha-healing",
+  "insights": [
+    {
+      "id": "big-idea",
+      "body": "This chapter starts with a question that sounds small: Why do some of Jesus' disciples eat without following the traditional washing practice? But Jesus treats it as a doorway into something much larger. The real issue is not dirt on skin. It is whether religious habits are helping people obey God or helping them avoid Him with better vocabulary.\n\nJesus goes straight for the heart. He names the danger of honoring God with correct words while the inner life is far away. Then He gives the Corban example, and suddenly the debate is not abstract anymore. A person can sound devoted to God while refusing ordinary love to aging parents. That is not holiness. That is disobedience wearing a name tag.\n\nThen Mark does something brilliant. After Jesus teaches that uncleanness comes from within, He enters Gentile-associated territory and meets people many would have considered outside the clean center of religious life. A desperate mother receives mercy. A deaf man is restored. The chapter is not merely tearing down false purity; it is showing what true holiness does when it walks into an unclean world. It does not panic. It heals.",
+      "icon": "💡",
+      "jesus": false,
+      "title": "Big Idea",
+      "preview": "Mark 7 moves from washed hands to exposed hearts, then from exposed hearts to mercy crossing borders."
+    },
+    {
+      "id": "chapter-flow",
+      "body": "Verses 1–5 open with a dispute about ritual washing—not soap, germs, or lazy disciples. Pharisees and scribes ask why Jesus’ disciples do not follow the inherited practice.\n\nIn verses 6–13, Jesus brings the conversation out of theory. A Corban vow could sound devoted while helping someone avoid caring for aging parents. Religious language can hide ordinary disobedience. Apparently humans can turn almost anything into a loophole.\n\nIn verses 14–23, Jesus calls the crowd closer and moves the problem from the meal to the heart. Food is not the deepest threat. The greed, deceit, pride, cruelty, and foolishness coming from within us are.\n\nIn verses 24–30, a Gentile mother asks Jesus to free her daughter. The exchange is hard, and Mark does not explain every motive. What he does show is her bold trust and Jesus’ mercy reaching her home.\n\nIn verses 31–37, people bring Jesus a deaf man with a speech difficulty. Jesus takes him away from the crowd, touches him, sighs, and says, “Ephphatha”—“Be opened.” The chapter that exposed hidden hearts ends with personal dignity and restoration.",
+      "icon": "🧭",
+      "jesus": false,
+      "title": "Chapter Flow",
+      "preview": "Five movements carry the chapter: dispute, rebuke, teaching, Gentile deliverance, and Decapolis healing."
+    },
+    {
+      "id": "historical-world",
+      "body": "Second Temple Jewish life cared deeply about holiness. Purity practices were not random fussiness. They grew from a desire to live as God's covenant people in a world filled with compromise, occupation, and pressure. The Pharisees were not cartoon villains twirling religious mustaches. They were part of a serious movement trying to preserve faithfulness.\n\nThat makes Jesus' critique more serious, not less. He is not mocking devotion. He is confronting distortion. When a tradition meant to protect obedience becomes a way to excuse disobedience, it has stopped serving God and started managing appearances.\n\nThe geography matters too. Tyre and Sidon were coastal Phoenician cities north of Galilee, associated with Gentile populations and old biblical memories that were not always friendly to Israel. The Decapolis was a network of Greco-Roman cities, mostly east and southeast of the Sea of Galilee. Mark's route in verse 31 is unusual, and interpreters discuss exactly how to map it. But the broad movement is clear: after teaching about purity, Jesus moves through places many Jewish readers would not treat as the center of clean covenant life. That is not an accident.",
+      "icon": "🏛",
+      "jesus": false,
+      "title": "The World Behind It",
+      "preview": "Purity customs, family duty, and Gentile geography all shape the force of Mark 7."
+    },
+    {
+      "id": "what-most-miss",
+      "body": "A modern reader can flatten Mark 7 into something like, 'Jesus disliked religious rules.' That misses the target. Jesus quotes Scripture, appeals to Moses, and upholds God's command with fierce clarity. He is not replacing obedience with vibes. Please do not build a theology on vibes; they are terrible load-bearing walls.\n\nThe overlooked detail is Corban. Jesus does not stay in the realm of theory. He names a practice where a person could use dedication language to avoid caring for parents. That is what false religion often does: it gives our selfishness a polished religious accent.\n\nThen Jesus presses deeper. External contact is not the root problem. The heart produces the very things that ruin people and communities: deceit, greed, sexual sin, violence, slander, arrogance, folly. Jesus is not saying the outside world has no influence. He is saying the evil we most need saving from is not merely out there. It has a home address inside us.\n\nThat is humbling, but it is also hopeful. If the problem is the heart, then surface performance will never be enough. And if Jesus has come for the heart, then no honest confession is beyond His reach.",
+      "icon": "🔍",
+      "jesus": false,
+      "title": "What Most People Miss",
+      "preview": "The chapter is not anti-tradition. It is anti-loophole."
+    },
+    {
+      "id": "jesus",
+      "body": "Jesus does not merely join the purity debate. He tells the truth about what makes us unclean: the trouble is not only out there; it lives in the human heart. That is a claim no ordinary teacher can carry lightly.\n\nAnd yet His holiness is not fragile. He enters Gentile territory, receives a desperate mother, and takes a deaf man away from the crowd before healing him. Jesus exposes what is wrong without treating hurting people like examples in a lecture. He comes close.\n\nThat is the gospel shape of the chapter. The One who names our uncleanness will carry our sin to the cross. He tells the truth because He came to save, not to score points. The heart He exposes is the heart He is willing to remake.",
+      "icon": "✝",
+      "jesus": true,
+      "title": "Jesus at the Center",
+      "preview": "Jesus is holy enough to expose uncleanness and merciful enough to heal it."
+    },
+    {
+      "id": "theology",
+      "body": "The Bible’s word here is defilement—being unclean before God. Israel’s purity laws taught that God is holy and life with Him matters. Jesus does not toss holiness aside. He takes the question deeper.\n\nFood passes through the body. Greed, deceit, cruelty, pride, and the rest come from within. We humans would prefer a problem we could fix with better habits and a respectable schedule. Jesus refuses to flatter us: the heart needs more than polish.\n\nThat is why grace is good news. Jesus does not only tell us to try harder. He forgives, cleanses, teaches, and remakes. We can stop decorating the hiding place and bring the real heart into His light.",
+      "icon": "🛡",
+      "jesus": false,
+      "title": "Theology Principle",
+      "preview": "Defilement is deeper than contact with the wrong thing. It is a heart problem only grace can heal."
+    },
+    {
+      "id": "application",
+      "body": "Before Mark 7 challenges you, notice where it ends: Jesus answering a desperate mother and treating a deaf man with quiet dignity. The One who exposes the heart is not looking for a reason to crush you. He is making room for honesty and healing.\n\nNow ask the uncomfortable question: Where am I using a good habit, tradition, or boundary to avoid plain obedience? Does it help me love God and people, or mostly help me look right?\n\nRead Jesus’ list of heart-sins slowly. Pause where one stings. Do not negotiate with it. Do not spiral either. Name it honestly, bring it to Jesus, and take the next faithful step. His truth is not a trap. The heart He exposes is the heart He came to save.",
+      "icon": "🌱",
+      "jesus": false,
+      "title": "Live It",
+      "preview": "Let Jesus challenge both the obvious mess and the respectable disguise."
+    },
+    {
+      "id": "prayer",
+      "body": "Lord Jesus, I do not want to hide behind clean-looking habits while my heart drifts from You. Show me where I protect my image more than I obey Your word. Expose the loopholes I have made peace with, especially the ones that sound spiritual.\n\nCleanse what comes from within me. Teach me to love what You command, not merely what makes me look faithful. Give me humility like the mother who came to You with empty hands and bold trust.\n\nOpen what is closed in me. Open my ears to Your voice. Open my mouth for truthful, gracious speech. Open my life to Your mercy so that obedience becomes more than appearance. Amen.",
+      "icon": "🙏",
+      "jesus": false,
+      "title": "Prayer",
+      "preview": "A prayer for an honest heart and opened life."
+    },
+    {
+      "id": "original-language",
+      "body": "Mark explains Corban for his readers as something given or dedicated to God. In the dispute, the word matters because a holy-sounding dedication could be used to block ordinary family care. Jesus is not against offerings. He is against using offerings as camouflage for disobedience.\n\nMark also preserves the Aramaic word Ephphatha in the healing of the deaf man, then explains its meaning. Aramaic was commonly spoken in Jesus' world. Keeping the word gives the scene a vivid closeness: Jesus does not heal from a distance with a vague spiritual wave. He speaks directly, personally, and the man is opened.",
+      "icon": "🔤",
+      "jesus": false,
+      "title": "Original Language",
+      "preview": "Two words help: Corban shows religious dedication, and Ephphatha preserves Jesus' healing command."
+    },
+    {
+      "id": "map-notes",
+      "body": "Tyre and Sidon sit north of Galilee along the Mediterranean coast, in territory strongly associated with Gentile life. The Decapolis was a group of Greco-Roman cities mostly to the east and southeast of the Sea of Galilee. Mark places Jesus in and around these regions right after a teaching about purity, which gives the travel theological weight.\n\nVerse 31 is famously unusual because it describes Jesus moving from Tyre through Sidon toward the Sea of Galilee and into the Decapolis. That is not the simplest route if plotted like a modern navigation app. Interpreters differ on exactly what Mark intends geographically. A faithful map should show the broad movement through northern Gentile-associated regions back toward the lake, not pretend we know every road and turn.",
+      "icon": "🗺",
+      "jesus": false,
+      "title": "Map Notes",
+      "preview": "The geography is broad and boundary-crossing, but the exact route should not be overdrawn."
+    }
+  ],
+  "keyItems": [
+    {
+      "name": "Ritual washing vessels",
+      "type": "object",
+      "blurb": "Containers used in purity practices; the issue is ceremonial tradition, not ordinary cleanliness."
+    },
+    {
+      "name": "Corban vow",
+      "type": "object",
+      "blurb": "A dedication of resources to God that, in this dispute, could be misused to avoid caring for parents."
+    },
+    {
+      "name": "Table image",
+      "type": "object",
+      "blurb": "Jesus and the Syrophoenician woman use a household meal picture to speak about Israel's priority and Gentile mercy."
+    },
+    {
+      "name": "House in Gentile territory",
+      "type": "object",
+      "blurb": "Jesus seeks privacy near Tyre, but His presence cannot stay hidden."
+    },
+    {
+      "name": "The deaf man's ears and tongue",
+      "type": "object",
+      "blurb": "Jesus heals with personal, physical actions and a spoken Aramaic command."
+    }
+  ],
+  "navCards": [
+    {
+      "id": "key-object",
+      "label": "Key Object",
+      "thumb": "/img/placeholder/detail.svg",
+      "support": "Ritual washing vessels"
+    },
+    {
+      "id": "key-person",
+      "label": "Key Person",
+      "thumb": "/img/placeholder/person.svg",
+      "support": "Jesus"
+    },
+    {
+      "id": "jesus",
+      "jesus": true,
+      "label": "Jesus",
+      "thumb": "/img/placeholder/jesus.svg",
+      "support": "Jesus makes the unclean whole"
+    }
+  ],
+  "subtitle": "Clean Hands, Restored Hearts, Opened Ears",
+  "timeline": [
+    {
+      "label": "Ministry around Galilee",
+      "detail": "Jesus teaches, heals, and draws both crowds and opposition.",
+      "current": false
+    },
+    {
+      "label": "Mark 7: Purity, Heart, and Gentile Mercy",
+      "detail": "Jesus confronts misplaced tradition, teaches about the heart, and heals beyond expected borders.",
+      "current": true
+    },
+    {
+      "label": "Toward Peter's Confession",
+      "detail": "Mark continues toward the question of Jesus' identity and the way of the cross.",
+      "current": false
+    }
+  ],
+  "versions": [
+    "ESV"
+  ],
+  "metaChips": [
+    {
+      "icon": "📅",
+      "text": "c. AD 29–30"
+    },
+    {
+      "icon": "📍",
+      "text": "Galilee, the region of Tyre and Sidon, and the Decapolis"
+    },
+    {
+      "icon": "✦",
+      "text": "Jesus exposes the heart and opens mercy beyond expected borders"
+    },
+    {
+      "icon": "✝",
+      "text": "Jesus: Jesus makes the unclean whole",
+      "jesus": true
+    }
+  ],
+  "modernMap": {
+    "alt": "Shows northern Israel around the Sea of Galilee, the Lebanese coastal area near Tyre and Sidon, and the broader Decapolis region east and southeast of the lake.",
+    "src": "/img/placeholder/map.svg",
+    "note": "Mark 7:31 describes an unusual route from Tyre through Sidon toward the Sea of Galilee and the Decapolis. The exact path is not known; display a broad regional corridor, not a precise road.",
+    "title": "Modern Map",
+    "caption": "Shows northern Israel around the Sea of Galilee, the Lebanese coastal area near Tyre and Sidon, and the broader Decapolis region east and southeast of the lake.",
+    "uncertaintyNote": "Mark 7:31 describes an unusual route from Tyre through Sidon toward the Sea of Galilee and the Decapolis. The exact path is not known; display a broad regional corridor, not a precise road."
+  },
+  "reference": "Mark 7",
+  "characters": [
+    {
+      "name": "Jesus",
+      "role": "Teacher, healer, and Son of God",
+      "description": "He exposes false purity, honors God's command, and brings mercy across boundaries."
+    },
+    {
+      "name": "Pharisees",
+      "role": "Jewish lay movement devoted to Torah faithfulness",
+      "description": "Some challenge Jesus over the disciples' failure to follow inherited purity customs."
+    },
+    {
+      "name": "Scribes from Jerusalem",
+      "role": "Experts in Scripture and law",
+      "description": "Their presence signals serious scrutiny from the religious center."
+    },
+    {
+      "name": "Syrophoenician woman",
+      "role": "Gentile mother seeking deliverance for her daughter",
+      "description": "She answers Jesus with humble, bold trust and receives mercy for her child."
+    },
+    {
+      "name": "The deaf man",
+      "role": "Man brought to Jesus for healing",
+      "description": "Jesus treats him personally and privately, restoring his hearing and speech."
+    },
+    {
+      "name": "The disciples",
+      "role": "Jesus' followers and learners",
+      "description": "They need Jesus to explain what true defilement means after the public teaching."
+    }
+  ],
+  "application": "Mark 7 invites honest prayer: Where am I using respectable habits to avoid simple obedience? Where do I care more about looking faithful than becoming whole before God? Jesus is not impressed by religious loopholes, but He is wonderfully attentive to desperate faith. Come to Him without pretending. Ask Him to search the heart, reorder love, open what is closed, and make obedience real.",
+  "historicMap": {
+    "alt": "Shows first-century Galilee under Herod Antipas, Phoenician coastal territory around Tyre and Sidon, and the largely Gentile Decapolis cities within the Roman eastern world.",
+    "src": "/img/placeholder/map.svg",
+    "note": "Ancient regional boundaries and city influence zones were not modern borders. Some place identifications are secure, but the travel sequence should remain approximate.",
+    "title": "Historic Map",
+    "caption": "Shows first-century Galilee under Herod Antipas, Phoenician coastal territory around Tyre and Sidon, and the largely Gentile Decapolis cities within the Roman eastern world.",
+    "uncertaintyNote": "Ancient regional boundaries and city influence zones were not modern borders. Some place identifications are secure, but the travel sequence should remain approximate."
+  },
+  "sceneChecks": [
+    {
+      "body": "The opening scene is easy to picture like someone got caught skipping hand sanitizer. That is not the dispute. The leaders are asking about ritual washing tied to purity tradition. Think vessels, custom, and religious boundary markers, not a modern kitchen sink with a passive-aggressive sign.",
+      "label": "Scene Check",
+      "title": "Not a sink, not a hygiene lecture",
+      "relatedVerses": [
+        "7:1-5"
+      ],
+      "visualAccuracyNotes": [
+        "Show clay or stone vessels for ritual washing, not modern basins, faucets, soap, or towels.",
+        "Depict a simple first-century meal setting with low table or shared eating space, not a modern dining room.",
+        "Avoid portraying Pharisees and scribes as sinister caricatures; show serious Jewish teachers in ordinary first-century clothing."
+      ]
+    },
+    {
+      "body": "Mark says Jesus entered a house and the mother came to Him. The daughter is not described as being present in the room. A dramatic exorcism tableau here would be visually loud and textually wrong. The power of the scene is the mother's plea and Jesus' word from a distance.",
+      "label": "Scene Check",
+      "title": "The Tyre scene is indoors and the daughter stays offstage",
+      "relatedVerses": [
+        "7:24-30"
+      ],
+      "visualAccuracyNotes": [
+        "Set the scene inside or at the threshold of a modest first-century house near Tyre.",
+        "Do not include the daughter in the room unless clearly treated as an artistic uncertainty; the text places her at home when the mother returns.",
+        "Do not visualize demonic presence with monsters, smoke, glowing eyes, or horror imagery."
+      ]
+    },
+    {
+      "body": "Jesus takes the deaf man away from the crowd before healing him. That detail matters. This is not a miracle performance with a cheering semicircle and perfect sightlines. It is personal, embodied mercy with the crowd held back.",
+      "label": "Scene Check",
+      "title": "The healing is private, not a stage show",
+      "relatedVerses": [
+        "7:32-36"
+      ],
+      "visualAccuracyNotes": [
+        "Place Jesus and the man apart from the crowd, with others at a distance or out of focus.",
+        "Treat the deaf man with dignity; avoid exaggerated disability stereotypes or comic facial expressions.",
+        "No halos, glowing hands, or theatrical miracle beams; the text describes touch, a heavenward look, a sigh, and a spoken command."
+      ]
+    }
+  ],
+  "whatHappens": "Religious leaders question why some disciples eat without following the traditional washing practice. Jesus answers by exposing how tradition can become a way of avoiding God's command, especially in the Corban example, where religious dedication could be used to neglect parents. He then teaches the crowd and disciples that defilement comes from within the human heart. After that, a Gentile mother asks Jesus to free her daughter from an unclean spirit, and Jesus grants her request after a difficult exchange. Finally, in the Decapolis, Jesus privately heals a deaf man with a speech difficulty, and the crowds cannot stop talking about what He has done.",
+  "deeperGroups": [
+    {
+      "rows": [
+        {
+          "desc": "Learn how washing customs functioned as signs of holiness and communal identity in Second Temple Judaism.",
+          "title": "Ritual purity in daily life"
+        },
+        {
+          "desc": "Explore why Jesus uses care for parents as His test case for tradition gone wrong.",
+          "title": "Corban and family responsibility"
+        }
+      ],
+      "label": "Learn More"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Trace how Mark 7 connects with Acts 10, Galatians 2, and early Christian questions about Jews and Gentiles at one table.",
+          "title": "Mark's food note"
+        },
+        {
+          "desc": "Study the geography of Jesus' movement into Gentile-associated regions and why Mark places these stories here.",
+          "title": "Tyre, Sidon, and the Decapolis"
+        }
+      ],
+      "label": "Dive Deeper"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Use Jesus' list of inner sins as a mirror, not a weapon. Ask Him to cleanse what you would rather manage.",
+          "title": "Pray the heart list slowly"
+        },
+        {
+          "desc": "Choose one clear command of God you have been explaining away, and take one humble step toward obedience today.",
+          "title": "Practice unhidden obedience"
+        }
+      ],
+      "label": "Grow Closer"
+    }
+  ],
+  "quickSummary": "Mark 7 starts with clean hands and goes straight for the human heart. Jesus exposes religious loopholes without crushing honest people, then moves toward a desperate mother and a deaf man. Clean hands are easy. Clean hearts take a miracle—and mercy has already crossed the room.",
+  "timelineMini": {
+    "labels": [
+      "Ministry around Galilee",
+      "Mark 7: Purity, Heart, and Gentile Mercy",
+      "Toward Peter's Confession"
+    ],
+    "activeIndex": 1
+  },
+  "verseByVerse": [
+    {
+      "title": "A dispute over washing",
+      "endVerse": 5,
+      "rangeLabel": "1–5",
+      "startVerse": 1,
+      "explanation": "Pharisees and scribes from Jerusalem notice that some disciples eat without following the inherited ritual washing practice. Mark explains the custom for readers outside that world. The issue is not hygiene; it is whether the disciples are honoring the tradition of the elders."
+    },
+    {
+      "title": "Tradition against God's command",
+      "endVerse": 13,
+      "rangeLabel": "6–13",
+      "startVerse": 6,
+      "explanation": "Jesus answers with Isaiah and then gives a concrete example: Corban. A religious dedication could be used as a loophole to avoid caring for parents. Jesus is not condemning every vow or tradition; He is exposing any religious system that makes disobedience sound holy."
+    },
+    {
+      "title": "The heart is the source",
+      "endVerse": 23,
+      "rangeLabel": "14–23",
+      "startVerse": 14,
+      "explanation": "Jesus calls the crowd and teaches that defilement is not caused by food entering the body but by evil that arises from within. Later, He explains this privately to the disciples. Mark adds that Jesus' teaching has major implications for food laws, a truth the early church would continue to work out."
+    },
+    {
+      "title": "Mercy for a Gentile mother",
+      "endVerse": 30,
+      "rangeLabel": "24–30",
+      "startVerse": 24,
+      "explanation": "Jesus enters the region of Tyre and Sidon, seeking privacy, but a Gentile mother finds Him and pleads for her daughter. The exchange is difficult and should not be softened into something bland. Yet her humble, bold reply receives Jesus' affirmation, and her daughter is freed."
+    },
+    {
+      "title": "The deaf man is opened",
+      "endVerse": 37,
+      "rangeLabel": "31–37",
+      "startVerse": 31,
+      "explanation": "Jesus travels through a debated route toward the Decapolis, where people bring Him a deaf man with a speech difficulty. Jesus takes him aside, uses personal physical signs, speaks an Aramaic command, and restores his hearing and speech. Though Jesus tells them not to spread the news, the people are overwhelmed."
+    }
+  ],
+  "estimatedDate": "c. AD 29–30",
+  "timelineLabel": "Jesus' Ministry in Galilee and Beyond",
+  "whatPeopleAsk": [
+    {
+      "answer": "No. The issue is ritual washing as a boundary marker of purity, not ordinary cleanliness. Washing hands before eating is wise. Jesus is confronting the way a human tradition can be treated as if it carries the same authority as God's command, especially when it becomes a way to judge others or avoid obedience.",
+      "question": "Is Jesus saying handwashing is bad?"
+    },
+    {
+      "answer": "Mark does not ask us to caricature them. Many Pharisees were deeply serious about faithfulness to God. In this scene, Jesus names a real danger: religious seriousness can go crooked when tradition becomes more protected than God's own word. That warning is not only for them; it is painfully portable.",
+      "question": "Were the Pharisees just hypocrites pretending to care about God?"
+    },
+    {
+      "answer": "Corban referred to something dedicated to God as an offering. Jesus points to a misuse where someone could declare resources dedicated and then refuse to help father or mother. The problem is not dedicated giving. The problem is using religious language to escape the plain command to honor parents.",
+      "question": "What was Corban?"
+    },
+    {
+      "answer": "Mark includes an inspired narrator's comment that Jesus' teaching declares foods clean. The full implications unfold over time in the early church, especially in Acts 10 and later Christian reflection. In Mark 7, the main point is clear: food is not the deepest source of impurity. The human heart is.",
+      "question": "Does Mark 7 mean all Old Testament food laws are canceled immediately?"
+    },
+    {
+      "answer": "The exchange is hard, and we should not pretend it is not. Jesus' words use a household image about children being fed first, which reflects Israel's priority in God's saving plan. Her answer accepts that order while asking for mercy even in the overflow. Mark does not tell us everything about Jesus' tone or full intent, but the outcome shows He is not cruel: He honors her response and delivers her daughter.",
+      "question": "Was Jesus being harsh to the Syrophoenician woman?"
+    },
+    {
+      "answer": "No. This story specifically describes an unclean spirit, but the Bible does not treat every illness, disability, mental-health struggle, or suffering as demonic. We should not use this passage to label people or avoid medical, pastoral, and practical care. The point here is Jesus' authority and compassion in this particular case.",
+      "question": "Does the daughter's unclean spirit mean sickness or disability is demonic?"
+    },
+    {
+      "answer": "Mark does not explain every reason. But the actions are personal and embodied, and Jesus takes the man away from the crowd first. That matters. Jesus does not treat him as a public object lesson. He communicates mercy in a way the man can experience, then speaks the command that opens him.",
+      "question": "Why did Jesus heal the deaf man in such a physical way?"
+    },
+    {
+      "answer": "In Mark, Jesus often restrains publicity because crowds can misunderstand His mission as only miracle-working power. He is not hiding because He lacks compassion. He is moving toward the cross, and people need more than amazement; they need to understand who He is and what kind of kingdom He brings.",
+      "question": "Why does Jesus tell people not to tell anyone if the miracle is good news?"
+    }
+  ],
+  "defaultVersion": "ESV",
+  "jesusConnection": "Mark 7 shows Jesus as the Holy One who is not contaminated by human need, Gentile territory, bodily weakness, or demonic oppression. He exposes the true source of defilement, not to shame people into despair, but to bring the diagnosis deep enough for grace to reach it. He honors God's command over human loopholes, receives a Gentile woman's faith-filled appeal, and opens the ears and tongue of a man who had been cut off from ordinary communication. The chapter points toward the gospel: Jesus does not merely adjust external behavior; He comes to cleanse hearts, gather outsiders, and restore creation from the inside out.",
+  "behindTheChapter": [
+    {
+      "body": "The Gospel is traditionally linked to John Mark, known from the early church as connected with Peter's testimony. Some details of authorship remain debated, but Markan authorship has strong early external support.",
+      "title": "Mark, a close associate of apostolic witness",
+      "category": "Author"
+    },
+    {
+      "body": "Mark explains Jewish washing customs and Aramaic terms, which suggests he expects at least some readers who need help understanding Palestinian Jewish life.",
+      "title": "Early Christians, likely including many Gentile readers",
+      "category": "First Audience"
+    },
+    {
+      "body": "Jesus' world was shaped by Torah, synagogue life, purity concerns, Roman power, local rulers, and sharp questions about Jewish identity among surrounding Gentile cultures.",
+      "title": "A holy people under empire",
+      "category": "Historical World"
+    },
+    {
+      "body": "Mark is preserved in major Greek manuscripts such as Codex Sinaiticus and Codex Vaticanus. Places named here, including Tyre, Sidon, the Sea of Galilee, and Decapolis cities such as Gerasa and Scythopolis, are well grounded in ancient sources and archaeology, though Mark's exact route in 7:31 is not certain.",
+      "title": "Manuscripts and the land of the story",
+      "category": "Evidence & Artifacts"
+    }
+  ],
+  "biblicalTimeline": {
+    "era": "Life of Jesus",
+    "dateRange": {
+      "endYear": 30,
+      "startYear": 29
+    },
+    "confidence": "medium",
+    "estimatedYear": 30,
+    "chronologyBasis": "traditional/event date",
+    "placementReason": "The chapter occurs during Jesus' public ministry, after widespread Galilean healings and before the movement toward Caesarea Philippi and explicit teaching about His death.",
+    "uncertaintyNote": "The public ministry of Jesus is commonly dated around AD 27–30 or AD 28–33 depending on how one reconstructs the chronology of the Gospels and external historical markers. Mark 7 belongs within the Galilean ministry period before Peter's confession and the passion predictions.",
+    "estimatedYearLabel": "Around AD 30, in Galilee and nearby Gentile regions"
+  },
+  "estimatedLocation": "Galilee, the region of Tyre and Sidon, and the Decapolis",
+  "modernReadersMiss": "The chapter is not saying, 'Rules are bad,' or 'religion is fake,' or 'the body is dirty.' It is sharper than that. Jesus says a person can look careful on the outside while using spiritual language to dodge love, repentance, and obedience. Clean hands are good. A heart that hides from God behind clean hands is the problem.",
+  "primaryCharacters": [
+    "Jesus",
+    "Pharisees",
+    "scribes from Jerusalem",
+    "the disciples",
+    "the Syrophoenician woman",
+    "the woman's daughter",
+    "the deaf man"
+  ],
+  "modernLocationNote": "These scenes move through areas in modern Israel, Lebanon, and possibly Jordan/Syria. The exact route in Mark 7:31 is debated, so maps should show a broad regional movement rather than a precise travel line.",
+  "jesusConnectionShort": "Jesus makes the unclean whole",
+  "chapterSpecificTopics": [
+    {
+      "title": "Tradition versus God's command",
+      "reason": "The chapter begins with inherited purity practices and Jesus' warning that tradition can displace Scripture.",
+      "priority": 1
+    },
+    {
+      "title": "Corban and religious loopholes",
+      "reason": "Jesus gives a specific example of spiritual language being used to avoid family responsibility.",
+      "priority": 2
+    },
+    {
+      "title": "The heart as the source of defilement",
+      "reason": "Jesus relocates the deepest problem from external contact to inward corruption.",
+      "priority": 3
+    },
+    {
+      "title": "Food and cleanness",
+      "reason": "Mark's narrator comment carries major implications for the later church's understanding of food laws and Gentile inclusion.",
+      "priority": 4
+    },
+    {
+      "title": "Gentile mercy",
+      "reason": "The Syrophoenician mother receives Jesus' help in a scene that presses beyond expected covenant boundaries.",
+      "priority": 5
+    },
+    {
+      "title": "Private embodied healing",
+      "reason": "Jesus restores the deaf man with dignity, away from the crowd, using touch and speech.",
+      "priority": 6
+    },
+    {
+      "title": "A difficult saying of Jesus",
+      "reason": "The exchange with the Syrophoenician woman requires careful reading without sanding down the tension or accusing Jesus falsely.",
+      "priority": 7
+    }
+  ],
+  "generationManifestDigest": "d4866b51705f2f51f9a845ee4a8577eed85a81ec74491fd452f1cda7bf651c61"
+}
