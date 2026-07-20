@@ -40,10 +40,12 @@ temporary integrity gate. Merging this PR changes **nothing** a production reade
 
 ## Approval + apply path
 
-1. **Codex** reviews the artifact at the exact head (diff.md + integrity gate + preview).
-2. **Jason** approves the copy (or edits — every field is plain text in the fixture).
-3. **Apply is out of scope here** and stays owner-gated: `mark-6` is protected, so the
-   live replacement needs either Jason running a snapshot-first SQL update himself, or
-   a future guarded text-apply lane (the image-redo lane is the pattern: digest-bound,
-   rollback-safe). Decide on the board after copy approval — nothing in this PR
-   pre-commits either route.
+1. **Codex** editorial-approved the artifact at `1e7fcb5` (2026-07-20).
+2. **Jason** approved the copy at the same head (board #29, 2026-07-20).
+3. **Apply = owner-run, snapshot-first SQL** (`apply-mark-6-revision.sql` in this
+   directory; rollback in `rollback-mark-6-revision.sql`). One transaction: archive
+   the live row into `chapter_workup_versions`, then update exactly the 10 approved
+   text paths — every path guarded against drift; any mismatch aborts everything.
+   Serving is unaffected structurally: `mark-6` has no sprint receipt gate, and
+   `workup_json` serves as-is. Jason executes in the Supabase SQL editor (neither AI
+   holds credentials); Claude verifies live read-only afterward.
