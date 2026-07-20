@@ -466,3 +466,23 @@ entries:
       saying why"
     status: queued
     completion_pr: null
+
+  - id: IQ-023
+    area: images
+    improvement: >-
+      Image identity disparity: storage/kind slugs (purity-dispute-table)
+      diverge from owner-facing display titles ("The Question at the
+      Meal"), which caused a real mid-session mismatch when staging photo
+      redos. Fix for future generations: derive the image kind/file slug
+      FROM the display title at generation time (one slugify rule), and
+      every owner-facing surface (Studio cards, redo screens, audit rows)
+      shows the display title with the slug only as small print. Published
+      chapters keep their existing slugs (never rename stored URLs -
+      IQ-010 append-only rule).
+    evidence: >-
+      Owner, in-session 2026-07-20, staging the Mark 7 redos: "can we fix
+      this disparity for future?"
+    priority_trigger: next generation-pipeline pass; Codex folds the
+      slugify rule into the image-stage spec
+    status: queued
+    completion_pr: null
