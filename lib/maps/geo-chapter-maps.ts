@@ -306,6 +306,57 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     caption:
       "Mark 10 turns south: Judea and beyond the Jordan, then the climb from Jericho toward Jerusalem. The two cities carry pins; the region's boundary is approximate; the road appears only as a broad sweep because the exact route is unrecorded.",
   },
+
+  // Psalm 23 (owner modernization, IQ-025): the first POETRY map. The psalm
+  // names NO places, so every overlay is CONTEXT — the world its imagery
+  // comes from, never an event site. Curated entries below; the caption and
+  // every tour stop say so plainly.
+  "psalm-23": {
+    views: {
+      local: { center: [35.21, 31.7], zoom: 10.3 },
+      big: { center: [35.25, 31.62], zoom: 8.4 },
+    },
+    pins: [
+      { lng: 35.2354, lat: 31.7784, label: "Jerusalem", locationName: "Jerusalem", labelSide: "left" },
+    ],
+    areas: [
+      {
+        locationName: "Bethlehem hill country",
+        label: "Bethlehem hill country · approx.",
+        polygon: circlePolygon(35.2, 31.705, 4),
+        labelAt: [35.14, 31.68],
+      },
+      {
+        locationName: "Judean wilderness",
+        label: "Judean wilderness · approx.",
+        polygon: [
+          [35.28, 31.85], [35.42, 31.78], [35.45, 31.55],
+          [35.35, 31.42], [35.24, 31.55], [35.25, 31.72],
+        ],
+        labelAt: [35.42, 31.64],
+      },
+    ],
+    corridors: [],
+    tour: [
+      {
+        center: [35.2, 31.705], zoom: 11.5, pitch: 45,
+        title: "Shepherd country",
+        caption: "The psalm names no places — but this is the world its imagery comes from: the hill country around Bethlehem where David kept his father's flock (1 Samuel 16–17). Green pasture here is seasonal and scarce; a shepherd who finds it is a provider.",
+      },
+      {
+        center: [35.38, 31.66], zoom: 10.5, pitch: 55, bearing: -30,
+        title: "The dark valley",
+        caption: "East of the hills the land tears into deep desert ravines where the sun never fully reaches the floor. Ravines like these are the texture behind 'the valley of the shadow of death' — deep darkness — though the psalm points to no single canyon.",
+      },
+      {
+        center: [35.2354, 31.7784], zoom: 12, pitch: 50,
+        title: "The house of the LORD",
+        caption: "The psalm's last line turns homeward. In David's day the sanctuary was a tent he pitched for the ark in Jerusalem (2 Samuel 6) — the temple came later. The city is pinned as the world of that line, not as a scene from the psalm.",
+      },
+    ],
+    caption:
+      "Psalm 23 is poetry and names no places. This map shows the world its imagery grew from — David's Bethlehem hills, the wilderness ravines east of them, and the sanctuary city of its closing line. Everything here is context; nothing is an event site.",
+  },
   // Mark 11 (launched 2026-07-20): renders the DIGEST-BOUND packet entries
   // that landed with #75 — Jerusalem known point · Mount of Olives known
   // region · Bethany and Bethphage probable region · Road into Jerusalem
@@ -480,6 +531,31 @@ export const GEO_CURATED_LOCATIONS: Record<
     display: string;
   }[]
 > = {
+  // Psalm 23 (IQ-025): poetry names no places — every entry is CONTEXT,
+  // the world the imagery comes from.
+  "psalm-23": [
+    {
+      name: "Jerusalem",
+      featureKind: "point",
+      certainty: "known",
+      role: "context",
+      display: "The sanctuary city of the closing line — in David's day a tent, not yet the temple (2 Samuel 6)",
+    },
+    {
+      name: "Bethlehem hill country",
+      featureKind: "region",
+      certainty: "known",
+      role: "context",
+      display: "David's shepherding world (1 Samuel 16-17) — the psalm's pastures and waters are this land's, though the psalm names no place",
+    },
+    {
+      name: "Judean wilderness",
+      featureKind: "region",
+      certainty: "known",
+      role: "context",
+      display: "The deep desert ravines east of the hills — the texture behind the valley of deep darkness; no single canyon is meant",
+    },
+  ],
   "mark-6": [
     {
       name: "Nazareth",
