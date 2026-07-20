@@ -1,7 +1,12 @@
 // SERVER-ONLY. The Approved-Examples LIBRARY (owner gap report, 2026-07-19:
-// "how do we only have 2 approved examples???") — curated exemplars harvested
-// VERBATIM from chapters the owner already approved and published (live rows
-// read the same day) plus repo fixtures. Examples teach REGISTER, not content.
+// "how do we only have 2 approved examples???"). TWO LANES, two sources
+// (Codex source audit + owner acceptance, board #29, 2026-07-20):
+//   VOICE packs — verbatim owner-approved lines from the Daily Rundown /
+//   Daily Workup / Selah Style chats and the board acceptance records; they
+//   teach REGISTER. Published chapter prose is NEVER a voice source.
+//   FORM examples — verbatim lines from reviewed chapters/specs/fixtures;
+//   they teach SHAPE only (structure, scene checks, image direction) and
+//   their wording is never imitated.
 //
 // Governance mirrors the Brain rules library: the library is version-controlled
 // and digest-bound; Codex reviews the exact texts in the PR; seeding into the
@@ -38,17 +43,18 @@ export const EXAMPLE_LIBRARY: readonly LibraryExample[] = [
   {
     title: "Selah Global Voice Pack",
     source_title:
-      "Owner-approved lines from the Daily Rundown / Daily Workup / Selah Style chats — Codex source audit + owner voice acceptance, board #29 (2026-07-20). Verbatim; register only.",
+      "Owner-approved voice lines — the Mark 6 voice workshop/acceptance record (board #29, 2026-07-20) and the Exodus 34 Daily Rundown (Codex source audit). Verbatim as approved; register only.",
     genre: "global",
     example_type: "voice",
     content:
-      "Central register (owner-approved, Mark 6 rundown lane):\n" +
+      "Central register (owner-approved Mark 6 voice acceptance record, board #29, 2026-07-20):\n" +
       "“Mark 6 keeps putting people close to Jesus—and showing how easy it is to miss Him.”\n" +
       "“You can grow up around Jesus, listen to truth about Jesus, work for Jesus and receive from Jesus—and still miss who He is.”\n" +
       "“Here is the good news. Jesus sees the disciples straining before they understand Him. He comes toward them in the dark—not after they pass a theology exam. Their faith is unfinished. Their Shepherd is not.”\n" +
       "From the Exodus 34 rundown (owner-approved):\n" +
       "“Success without God’s presence is just a prettier wilderness.”\n" +
       "“God is not jealous because He is lacking attention. He is jealous because idols are stealing His children.”\n" +
+      "“…our golden calf polished up as ‘just how I cope.’”\n" +
       "Gentle self-aware app personality (occasional, never about suffering):\n" +
       "“The disciples are holding leftovers and still missing the point. You humans, you’re remarkably consistent.”",
   },

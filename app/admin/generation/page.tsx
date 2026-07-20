@@ -2535,10 +2535,10 @@ export default function SelahStudioPage() {
             <details className="border-t pt-3">
               <summary className="cursor-pointer text-[13px] font-medium text-primary">Approved examples</summary>
               <div className="mt-1.5 space-y-1.5">
-                {/* Owner gap report 2026-07-19: seed the curated library —
-                    verbatim texts from already-approved chapters; additive
-                    only, existing rows never touched. */}
-                <div className="flex items-center gap-2">
+                {/* Codex #73 re-review: the old "Seed from published chapters"
+                    label carried exactly the false implication the owner asked
+                    us to remove — voice never comes from published prose. */}
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={async () => {
@@ -2552,10 +2552,13 @@ export default function SelahStudioPage() {
                     }}
                     className="rounded-full border px-2.5 py-1 text-[11px] text-primary hover:border-accent/40"
                   >
-                    Seed from published chapters
+                    Add approved Selah examples
                   </button>
                   {exampleSeedMsg && <span className="text-[11px] text-secondary">{exampleSeedMsg}</span>}
                 </div>
+                <p className="text-[11px] text-secondary">
+                  Voice comes from Jason&rsquo;s Daily Rundown/Workup chats; form examples come from reviewed chapters.
+                </p>
                 {examples === null ? (
                   <p className="text-[12px] text-secondary">Loading…</p>
                 ) : examples.length === 0 ? (
