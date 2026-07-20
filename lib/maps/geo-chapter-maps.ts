@@ -341,21 +341,21 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
       {
         center: [35.2, 31.705], zoom: 11.5, pitch: 45,
         title: "Shepherd country",
-        caption: "The psalm names no places — but this is the world its imagery comes from: the hill country around Bethlehem where David kept his father's flock (1 Samuel 16–17). Green pasture here is seasonal and scarce; a shepherd who finds it is a provider.",
+        caption: "We know David kept his father's flock in the hills around Bethlehem (1 Samuel 16–17). Green pasture here is seasonal and scarce — a shepherd who finds it is a provider. The psalm never says where it was written; this is simply the countryside David knew.",
       },
       {
         center: [35.38, 31.66], zoom: 10.5, pitch: 55, bearing: -30,
         title: "The dark valley",
-        caption: "East of the hills the land tears into deep desert ravines where the sun never fully reaches the floor. Ravines like these are the texture behind 'the valley of the shadow of death' — deep darkness — though the psalm points to no single canyon.",
+        caption: "We know ravines like these cut the desert east of the hills — deep, shadowed, and dangerous for sheep. Our smart guess: dark valleys like this are what the psalm's 'valley of deep darkness' would bring to mind. We don't know any single canyon the psalm means — it names none.",
       },
       {
         center: [35.2354, 31.7784], zoom: 12, pitch: 50,
         title: "The house of the LORD",
-        caption: "The psalm's last line turns homeward. In David's day the sanctuary was a tent he pitched for the ark in Jerusalem (2 Samuel 6) — the temple came later. The city is pinned as the world of that line, not as a scene from the psalm.",
+        caption: "The psalm's last line turns homeward: 'I shall dwell in the house of the LORD forever.' We know that in David's day the sanctuary was a tent he pitched for the ark in Jerusalem (2 Samuel 6) — the temple came later. Jerusalem is marked as the city connected with his worship, not as a scene from the psalm.",
       },
     ],
     caption:
-      "Psalm 23 is poetry and names no places. This map shows the world its imagery grew from — David's Bethlehem hills, the wilderness ravines east of them, and the sanctuary city of its closing line. Everything here is context; nothing is an event site.",
+      "Psalm 23 never names a place. These locations help us picture David's world: shepherd hills near Bethlehem, dry ravines east of them, and Jerusalem, the city connected with his worship. This is helpful background — not the psalm's exact setting.",
   },
   // Mark 11 (launched 2026-07-20): renders the DIGEST-BOUND packet entries
   // that landed with #75 — Jerusalem known point · Mount of Olives known
@@ -539,21 +539,21 @@ export const GEO_CURATED_LOCATIONS: Record<
       featureKind: "point",
       certainty: "known",
       role: "context",
-      display: "The sanctuary city of the closing line — in David's day a tent, not yet the temple (2 Samuel 6)",
+      display: "The city connected with David's worship — in his day the sanctuary was a tent, not yet the temple (2 Samuel 6)",
     },
     {
       name: "Bethlehem hill country",
       featureKind: "region",
       certainty: "known",
       role: "context",
-      display: "David's shepherding world (1 Samuel 16-17) — the psalm's pastures and waters are this land's, though the psalm names no place",
+      display: "We know David shepherded these hills (1 Samuel 16-17). The psalm never names a place — this is the countryside he knew",
     },
     {
       name: "Judean wilderness",
       featureKind: "region",
       certainty: "known",
       role: "context",
-      display: "The deep desert ravines east of the hills — the texture behind the valley of deep darkness; no single canyon is meant",
+      display: "Dark desert ravines east of the hills — the kind of valley the psalm's deep-darkness line brings to mind; no single canyon is meant",
     },
   ],
   "mark-6": [
