@@ -494,3 +494,22 @@ entries:
       slugify rule into the image-stage spec
     status: queued
     completion_pr: null
+
+  - id: IQ-024
+    area: content
+    improvement: >-
+      Exodus 27 still serves its storage-era pilot content: placeholder
+      images, placeholder maps, pre-voice text ("it is only showing
+      placeholders" - owner, 2026-07-20). Do not patch it piecemeal:
+      RELAUNCH it through the self-serve Prepare lane as the second
+      chapter-agnostic proof (after Mark 12) - fresh generation with voice
+      packs, landscape images, honest map treatment. Doubles as the first
+      non-Mark, non-narrative-genre live test (tabernacle/priesthood).
+      The local Exodus 27 fixture stays untouched as the offline fallback.
+    evidence: >-
+      Owner, in-session 2026-07-20: "it is only showing placeholders and
+      may have basic text placeholders. what should we do with it?"
+    priority_trigger: after the Mark 12 self-serve proof; owner-gated
+      spends as always
+    status: queued
+    completion_pr: null
