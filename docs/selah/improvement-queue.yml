@@ -592,6 +592,10 @@ entries:
       should see at a glance where every chapter stands without asking.
       Same truth the AIs track (Mega earned only after rundown
       comparison; photo/map/FAQ state), rendered as simple green checks.
+      Related cosmetic bug spotted same day: the Launch screen shows
+      "Last launch: Not published yet" for pre-launch-era chapters that
+      are visibly live (mark-6) - launch history should fall back to the
+      row's reviewed_at instead of claiming never-published.
     evidence: >-
       Owner, in-session 2026-07-20: "'chapter checkup' is the graph you
       created earlier. something similar should be available for the
