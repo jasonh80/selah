@@ -8,7 +8,10 @@ export const MARK_8_STUDIO_SLUG = "mark-8" as const;
 // approves the on-screen packet.
 // Mark 10 is connected the same way (board #29 Codex handoff, 2026-07-18):
 // its receipt only exists after the owner approves the on-screen packet.
-export const CONNECTED_STUDIO_SLUGS = ["mark-8", "mark-7", "mark-9", "mark-10"] as const;
+// Mark 11 joins identically (owner request, 2026-07-19 evening: "build Mark
+// 11 tomorrow") — nothing is pre-approved; the owner's digest-bound packet
+// approval is still the only key.
+export const CONNECTED_STUDIO_SLUGS = ["mark-8", "mark-7", "mark-9", "mark-10", "mark-11"] as const;
 export type ConnectedStudioSlug = (typeof CONNECTED_STUDIO_SLUGS)[number];
 export function isConnectedStudioSlug(value: string): value is ConnectedStudioSlug {
   return (CONNECTED_STUDIO_SLUGS as readonly string[]).includes(value);
@@ -19,6 +22,7 @@ const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
   "mark-7": 7,
   "mark-9": 9,
   "mark-10": 10,
+  "mark-11": 11,
 };
 
 // Verse-instance totals for each chapter's protected ESV window (the chapter
@@ -35,11 +39,15 @@ const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
 // Mark 10's window (Mark 9–11) the same way: Mark 9 = 48 (omits 9:44, 9:46),
 // Mark 10 = 52, Mark 11 = 32 (omits the disputed 11:26) → 132. Equally
 // UNVERIFIED offline; the live preflight validates before any spend.
+// Mark 11's window (Mark 10–12) the same way: Mark 10 = 52, Mark 11 = 32
+// (omits 11:26), Mark 12 = 44 → 128. Equally UNVERIFIED offline; the live
+// preflight validates before any spend.
 const WINDOW_VERSE_INSTANCES: Record<ConnectedStudioSlug, number> = {
   "mark-8": 125,
   "mark-7": 130,
   "mark-9": 138,
   "mark-10": 132,
+  "mark-11": 128,
 };
 
 export function connectedChapterLabel(slug: ConnectedStudioSlug): string {
