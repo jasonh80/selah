@@ -403,3 +403,20 @@ entries:
       Mark 6-10 polish batch
     status: queued
     completion_pr: null
+
+  - id: IQ-021
+    area: studio-ux
+    improvement: >-
+      Studio generation screens make it hard to tell which buttons are
+      currently available vs. unavailable ("it is difficult to tell which
+      buttons are available and which buttons are unavailable in studio
+      when generating a page"). Give disabled/waiting controls an
+      unmistakable state (dimmed + not-allowed cursor + reason tooltip or
+      inline label like "waiting for draft"), and the active next step a
+      single clear emphasis.
+    evidence: >-
+      Owner observation, in-session 2026-07-20, mid Mark 11 launch.
+    priority_trigger: next Studio UX pass (free); pairs with the self-serve
+      launch flow polish
+    status: queued
+    completion_pr: null
