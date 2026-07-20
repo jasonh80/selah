@@ -1,5 +1,6 @@
 import type { ChapterWorkup } from "@/lib/types";
 import mark7Revision from "@/lib/ai/fixtures/mark-7-mega-revision.json";
+import mark8Revision from "@/lib/ai/fixtures/mark-8-mega-revision.json";
 
 /**
  * Mega revision previews (the generalized #77 pattern — the Mark 6 lane
@@ -11,7 +12,7 @@ import mark7Revision from "@/lib/ai/fixtures/mark-7-mega-revision.json";
  * for the published chapter. Registration is FAIL-CLOSED to non-production
  * contexts; applying to the live row stays a separate owner-approved step.
  */
-const REVISIONS: { fixture: unknown }[] = [{ fixture: mark7Revision }];
+const REVISIONS: { fixture: unknown }[] = [{ fixture: mark7Revision }, { fixture: mark8Revision }];
 
 export function revisionPreviewWorkups(): ChapterWorkup[] {
   return REVISIONS.map(({ fixture }) => {
