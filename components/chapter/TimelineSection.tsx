@@ -71,13 +71,26 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
       <h2 className="text-section text-primary">Where It Fits</h2>
 
       {/* Owner decision A3 (2026-07-16): no horizontal swipe anywhere — the
-          rail fits the container on every phone width. */}
+          rail fits the container on every phone width. Owner direction
+          2026-07-19 ("combo of A & B" after the ideas review): the rail FILLS
+          with accent up to the chapter's place in the story — the canonical
+          progress-line pattern for readable timelines — and the current
+          marker is strongly lit while everything else stays quiet. */}
       <div className="mt-3">
         <div className="relative h-[78px]">
-          <div className="absolute inset-x-0 top-[40px] h-0.5 bg-line" />
+          <div className="absolute top-[40px] h-[3px] rounded-full bg-line" style={{ left: "4%", right: "4%" }} />
+          {(badgePos ?? null) != null && (
+            <div
+              className="absolute top-[40px] h-[3px] rounded-full bg-accent-strong"
+              style={{ left: "4%", width: `${Math.max(0, (badgePos as number) - 4)}%` }}
+            />
+          )}
 
           {MARKERS.map((m, i) => {
             const active = i === activeMarkerIndex;
+            // Markers the story has already passed sit on the filled rail and
+            // pick up a quiet accent border; future markers stay muted.
+            const passed = badgePos != null && posForIndex(i) < badgePos && !active;
             return (
               <div
                 key={m.key}
@@ -85,13 +98,18 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
                 style={{ left: `${posForIndex(i)}%` }}
               >
                 {m.cross ? (
-                  <span className={`leading-none text-jesus-red ${active ? "text-[16px]" : "text-[13px]"}`}>✝</span>
+                  <span className={`leading-none text-jesus-red ${active ? "text-[17px]" : "text-[13px]"}`}>✝</span>
                 ) : (
                   <span
                     className={
                       active
-                        ? "h-2.5 w-2.5 rounded-full border-2 border-accent-strong bg-accent-strong"
-                        : "h-2.5 w-2.5 rounded-full border-2 border-line bg-card"
+                        ? "h-3 w-3 rounded-full border-2 border-accent-strong bg-accent-strong"
+                        : "h-2.5 w-2.5 rounded-full border-2 bg-card"
+                    }
+                    style={
+                      active
+                        ? { boxShadow: "0 0 0 4px color-mix(in srgb, var(--accent-strong) 22%, transparent)" }
+                        : { borderColor: passed ? "var(--accent-strong)" : "var(--line)" }
                     }
                   />
                 )}
