@@ -580,3 +580,42 @@ entries:
       components as the owner defines them
     status: queued
     completion_pr: null
+
+  - id: IQ-028
+    area: studio
+    improvement: >-
+      Guarded TEXT-APPLY lane in Studio (the last SQL-paste killer): Mega
+      text revisions apply via one owner tap, exactly the published
+      image-redo pattern - immutable digest-bound candidate, exact
+      field-by-field preview, atomic conditional apply guarded on the
+      live revision, automatic snapshot first, one-tap rollback, full
+      revalidation, protected slugs included by explicit owner
+      authorization per chapter. Kills the owner-run SQL step from the
+      Mega lane; the weekly batched apply becomes one Studio tap.
+    evidence: >-
+      Owner daily-rhythm direction 2026-07-20 ("how do we automate /
+      simplify... while keeping the highest standards"); the Mark 6 apply
+      proved the snapshot-first semantics, by hand.
+    priority_trigger: Codex conditions/spec first (same rigor as the
+      image-redo lane approval); build after the Mark 7-10 Mega batch
+      (that batch still applies via the proven SQL script)
+    status: queued
+    completion_pr: null
+
+  - id: IQ-029
+    area: studio
+    improvement: >-
+      One-flow launch: chain Prepare proposal -> text generation -> image
+      generation as a single Studio flow with ONE up-front launch
+      approval; each paid step still shows its exact price and stops for
+      the owner's confirm, and publish keeps its digest-bound approval.
+      Cuts a launch from ~5 separate owner interactions to launch-confirm
+      + spend confirms + publish. No new spend authority for AIs.
+    evidence: >-
+      Owner daily-rhythm direction 2026-07-20: launch a chapter, read the
+      Bible, do the workup, have the comparison happen with minimal
+      owner mechanics.
+    priority_trigger: next Studio feature pass, after IQ-028's spec;
+      pairs with IQ-021's button-state affordance work
+    status: queued
+    completion_pr: null
