@@ -597,6 +597,13 @@ entries:
       created earlier. something similar should be available for the
       Studio - easily visible check marks when complete." Explicitly
       DO NOT START YET - saved for later on owner instruction.
+      ADDITIONS (owner, same day): (a) a per-chapter GRADE "may be
+      interesting"; (b) user data on the same screen - clicks, time on
+      chapter, photo downloads. NOTE for the spec: no analytics
+      collection exists in the app today, so (b) is a new system with
+      privacy + tooling decisions the owner makes at spec time; "photo
+      downloads" also implies a download affordance the lightbox does
+      not yet have.
     priority_trigger: owner says go; pairs with IQ-021 (Studio button
       states) and the IQ-028/029 Studio pass
     status: queued
