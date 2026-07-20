@@ -306,8 +306,162 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     caption:
       "Mark 10 turns south: Judea and beyond the Jordan, then the climb from Jericho toward Jerusalem. The two cities carry pins; the region's boundary is approximate; the road appears only as a broad sweep because the exact route is unrecorded.",
   },
+  // Mark 6 (owner request 2026-07-20: bring the pre-sprint benchmark chapter
+  // onto the real-map engine). Locations are the CURATED entries below
+  // (GEO_CURATED_LOCATIONS) — same two-axis honesty model, enforced by
+  // verify:maps-honesty exactly like the digest-bound sprint chapters.
+  "mark-6": {
+    views: {
+      local: { center: [35.56, 32.83], zoom: 10.2 },
+      big: { center: [35.48, 32.25], zoom: 7.2 },
+    },
+    pins: [
+      { lng: 35.3027, lat: 32.7019, label: "Nazareth", locationName: "Nazareth", labelSide: "left" },
+    ],
+    areas: [
+      {
+        locationName: "Feeding of the five thousand",
+        label: "Feeding of the 5,000 · site debated",
+        polygon: circlePolygon(35.585, 32.885, 4),
+        labelAt: [35.585, 32.905],
+      },
+      {
+        locationName: "Bethsaida",
+        label: "Bethsaida · site debated",
+        polygon: circlePolygon(35.626, 32.899, 2),
+        labelAt: [35.655, 32.899],
+      },
+      {
+        locationName: "Gennesaret",
+        label: "Gennesaret plain · approx.",
+        polygon: circlePolygon(35.535, 32.855, 3),
+        labelAt: [35.5, 32.838],
+      },
+      {
+        locationName: "Machaerus",
+        label: "Machaerus · per Josephus, debated",
+        polygon: circlePolygon(35.6244, 31.5672, 2.5),
+        labelAt: [35.66, 31.567],
+      },
+    ],
+    corridors: [
+      {
+        locationName: "Night crossing",
+        label: "Approx. night crossing",
+        waypoints: [
+          [35.6, 32.88], [35.575, 32.868], [35.548, 32.858],
+        ],
+        labelAt: [35.578, 32.845],
+      },
+    ],
+    tour: [
+      {
+        center: [35.3027, 32.7019], zoom: 12, pitch: 50,
+        title: "Nazareth",
+        caption: "Jesus teaches in His hometown synagogue and is dismissed by the people who know His family best (6:1–6). The village site is certain.",
+      },
+      {
+        center: [35.45, 32.8], zoom: 9, pitch: 30,
+        title: "The village circuit",
+        caption: "The Twelve go out two by two through the Galilean villages, preaching and healing (6:7–13). No itinerary is recorded, so no route is drawn.",
+      },
+      {
+        center: [35.6244, 31.5672], zoom: 10.5, pitch: 45,
+        title: "Machaerus — far from Galilee",
+        caption: "While the Twelve preach, Mark tells John's death (6:14–29). Mark names no place; Josephus places John's imprisonment and execution at Machaerus, east of the Dead Sea — the banquet's setting is debated, so the fortress shows as a soft area.",
+      },
+      {
+        center: [35.585, 32.885], zoom: 11.5, pitch: 45,
+        title: "A desolate place",
+        caption: "The feeding of the five thousand happens in a remote spot by the lake (6:31–44). Tradition points to Tabgha or the northeast shore; the exact place is debated.",
+      },
+      {
+        center: [35.575, 32.865], zoom: 11, pitch: 55, bearing: -20,
+        title: "The night crossing",
+        caption: "The disciples strain at the oars against the wind while Jesus comes to them on the water (6:45–52). The crossing toward Bethsaida is text-given; the drawn band is approximate.",
+      },
+      {
+        center: [35.535, 32.855], zoom: 12, pitch: 50,
+        title: "Gennesaret",
+        caption: "The boat lands at Gennesaret and the whole region carries its sick to Jesus — even the fringe of His garment heals (6:53–56). The fertile plain is a known region with an approximate boundary.",
+      },
+    ],
+    caption:
+      "Mark 6 moves from Nazareth's rejection through the village circuit (no route recorded), to a debated feeding site by the lake, a night crossing shown only as a broad band, and the Gennesaret plain — with John's death far south at Machaerus, per Josephus. Only Nazareth is certain enough for a pin.",
+  },
 };
 
 export function getGeoChapterMap(slug: string): GeoChapterMap | null {
   return GEO_CHAPTER_MAPS[slug] ?? null;
 }
+
+/**
+ * Curated two-axis location entries for geo chapters that PREDATE the Prepare
+ * packet lane (no digest-bound entries in mark-sprint-acceptance.v1.json).
+ * Same honesty model, same shapes, reviewed as data in the PR;
+ * verify:maps-honesty enforces every overlay against these exactly as it
+ * does against the digest-bound sprint entries.
+ */
+export const GEO_CURATED_LOCATIONS: Record<
+  string,
+  {
+    name: string;
+    featureKind: "point" | "region" | "route" | "text-only";
+    certainty: "known" | "probable" | "debated" | "unknown";
+    role: "event" | "context";
+    display: string;
+  }[]
+> = {
+  "mark-6": [
+    {
+      name: "Nazareth",
+      featureKind: "point",
+      certainty: "known",
+      role: "event",
+      display: "Jesus is dismissed in His hometown (6:1–6)",
+    },
+    {
+      name: "Galilean village circuit",
+      featureKind: "route",
+      certainty: "unknown",
+      role: "event",
+      display: "The Twelve go out two by two among the villages (6:7–13) — no itinerary recorded",
+    },
+    {
+      name: "Machaerus",
+      featureKind: "region",
+      certainty: "debated",
+      role: "event",
+      display:
+        "John's imprisonment and death — Josephus names Machaerus; Mark names no place, and the banquet's setting is debated (6:14–29)",
+    },
+    {
+      name: "Feeding of the five thousand",
+      featureKind: "region",
+      certainty: "debated",
+      role: "event",
+      display: "A desolate place by the lake (6:31–44) — traditional sites include Tabgha and the NE shore; the exact spot is debated",
+    },
+    {
+      name: "Bethsaida",
+      featureKind: "region",
+      certainty: "debated",
+      role: "event",
+      display: "The crossing's stated destination (6:45) — the town's own site is debated (et-Tell vs. el-Araj)",
+    },
+    {
+      name: "Night crossing",
+      featureKind: "route",
+      certainty: "probable",
+      role: "event",
+      display: "The boat fights the wind toward Bethsaida and lands at Gennesaret (6:45–53)",
+    },
+    {
+      name: "Gennesaret",
+      featureKind: "region",
+      certainty: "known",
+      role: "event",
+      display: "The fertile plain where the sick are carried to Jesus (6:53–56)",
+    },
+  ],
+};
