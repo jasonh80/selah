@@ -148,12 +148,25 @@ MACHINE-CHECKED COMPLETENESS (the draft is REJECTED automatically if any line fa
           .map((n) => `- ${n}`)
           .join("\n")}`
       : "";
-  const examplesBlock =
-    examples && examples.length
-      ? `\n\nAPPROVED VOICE EXAMPLE — THE GOLD STANDARD FOR HOW THIS SHOULD SOUND\nMatch the warmth, rhythm, directness, short punchy interpretive lines, restrained wit, wise-friend tone, and practical Jesus-centered clarity of the example(s) below. Write Selah's structured fields in THIS register — not generic, academic, or "Bible-app" phrasing. Capture the voice and the kind of insight; do not copy the wording verbatim.\n${examples
+  // Codex #73 P1-1: ONLY voice-type examples may enter the voice-mimic lane.
+  // Other text examples (structure, scene_check, application) demonstrate
+  // FORM — their wording/register must never be imitated, or a non-voice
+  // exemplar would quietly retrain the voice the owner rejected.
+  const voiceExamples = (examples ?? []).filter((e) => e.exampleType === "voice");
+  const formExamples = (examples ?? []).filter((e) => e.exampleType !== "voice");
+  const voiceBlock =
+    voiceExamples.length > 0
+      ? `\n\nAPPROVED VOICE EXAMPLE — THE GOLD STANDARD FOR HOW THIS SHOULD SOUND\nMatch the warmth, rhythm, directness, short punchy interpretive lines, restrained wit, wise-friend tone, and practical Jesus-centered clarity of the example(s) below. Write Selah's structured fields in THIS register — not generic, academic, or "Bible-app" phrasing. Capture the voice and the kind of insight; do not copy the wording verbatim.\n${voiceExamples
           .map((e) => `--- EXAMPLE: ${e.title} (${e.exampleType}) ---\n${e.content}\n--- END EXAMPLE ---`)
           .join("\n\n")}`
       : "";
+  const formBlock =
+    formExamples.length > 0
+      ? `\n\nAPPROVED FORM EXAMPLES — SHAPE ONLY, NOT VOICE\nThe example(s) below show the expected SHAPE of a field (how a structure is laid out, what a scene check corrects, how an application lands). Imitate their form, scope, and honesty — do NOT imitate their wording, rhythm, or register, and never copy phrases from them.\n${formExamples
+          .map((e) => `--- FORM EXAMPLE: ${e.title} (${e.exampleType}) ---\n${e.content}\n--- END FORM EXAMPLE ---`)
+          .join("\n\n")}`
+      : "";
+  const examplesBlock = `${voiceBlock}${formBlock}`;
   const generationSourceBlock = generationSource
     ? `\n\nSERVER-SUPPLIED GENERATION SOURCE (${generationSource.label.trim()})
 Use PRIMARY CHAPTER for this workup. CONTEXT BEFORE and CONTEXT AFTER may only

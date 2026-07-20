@@ -1033,11 +1033,24 @@ export async function POST(req: Request) {
   // rows are never touched). Owner gap report 2026-07-19: only 2 examples
   // existed; the library carries verbatim texts from owner-approved chapters.
   if (action === "examples_seed") {
-    const result = await seedExamplesFromLibrary();
+    // FAIL CLOSED (Codex #73 P1-2): a storage read error aborts with zero
+    // inserts — it must never read as "empty table, seed everything".
+    let result: Awaited<ReturnType<typeof seedExamplesFromLibrary>>;
+    try {
+      result = await seedExamplesFromLibrary();
+    } catch (error) {
+      const msg = String((error as Error).message).slice(0, 200);
+      await logGenerationAudit({
+        action: "examples_seed",
+        status: "failed",
+        message: `seed aborted before any insert: ${msg}`,
+      });
+      return NextResponse.json({ ok: false, error: `Seeding stopped safely — ${msg}` }, { status: 503 });
+    }
     await logGenerationAudit({
       action: "examples_seed",
       status: result.failed > 0 ? "failed" : "succeeded",
-      message: `library ${EXAMPLE_LIBRARY_VERSION} digest ${result.digest.slice(0, 12)}…: ${result.inserted} inserted, ${result.skippedExisting} already present, ${result.failed} failed`,
+      message: `library ${EXAMPLE_LIBRARY_VERSION} digest ${result.digest.slice(0, 12)}…: ${result.inserted} inserted, ${result.skippedExisting} already present, ${result.duplicatesHealed} duplicate(s) healed, ${result.failed} failed`,
     });
     return NextResponse.json({ ok: result.failed === 0, ...result });
   }

@@ -9,6 +9,7 @@ import {
 } from "../lib/server/selah-example-library";
 import { genreForSlug } from "../lib/server/selah-brain";
 import { TEXT_EXAMPLE_TYPES } from "../lib/server/selah-examples";
+import { buildChapterWorkupPrompt } from "../lib/ai/prompts/chapter-workup-prompt";
 
 let checks = 0;
 function ok(cond: boolean, label: string): void {
@@ -61,15 +62,113 @@ ok(
 const d1 = exampleLibraryDigest();
 ok(/^[a-f0-9]{64}$/.test(d1) && d1 === exampleLibraryDigest(), "digest is a stable sha256 of the content");
 
-// 5. Seed semantics without a database: fails soft (0 inserted, all counted as
-//    failed-or-skipped, never throws) — Supabase is not configured here.
+// 5. Seed semantics against the REAL seed logic via the injectable port
+//    (Codex #73 P1-2): strict reads fail closed, repeat/concurrent seeds
+//    cannot duplicate, and the owner's hand-added rows are never touched.
 const main = async () => {
-  const result = await seedExamplesFromLibrary();
-  ok(result.total === EXAMPLE_LIBRARY.length, "seed reports the full library size");
-  ok(result.inserted === 0, "no database → nothing inserted (fail soft, never throws)");
-  ok(result.digest === d1, "seed result carries the library digest for the audit line");
+  type Row = { id: string; title: string; created_at: string };
+  const makeFakePort = () => {
+    const rows: Row[] = [
+      { id: "owner-1", title: "Mark 6 Daily Rundown Voice Example", created_at: "2026-07-01T00:00:00Z" },
+    ];
+    let clock = 0;
+    return {
+      rows,
+      port: {
+        async listStrict() {
+          return [...rows];
+        },
+        async add(entry: (typeof EXAMPLE_LIBRARY)[number]) {
+          rows.push({ id: `r${++clock}`, title: entry.title, created_at: `2026-07-19T00:00:0${clock}Z` });
+          return true;
+        },
+        async remove(id: string) {
+          const i = rows.findIndex((r) => r.id === id);
+          if (i === -1) return false;
+          rows.splice(i, 1);
+          return true;
+        },
+      },
+    };
+  };
 
-  console.log(`verify:example-library ✓ ${checks} checks passed (curated library shape, reachable genres, coverage, additive seed)`);
+  // 5a. Fresh seed inserts everything once; re-seed inserts nothing.
+  const fresh = makeFakePort();
+  const first = await seedExamplesFromLibrary(fresh.port);
+  ok(first.inserted === EXAMPLE_LIBRARY.length && first.failed === 0, "fresh seed inserts the whole library");
+  const second = await seedExamplesFromLibrary(fresh.port);
+  ok(second.inserted === 0 && second.skippedExisting === EXAMPLE_LIBRARY.length, "re-seed inserts nothing (idempotent)");
+  ok(first.digest === d1 && second.digest === d1, "seed results carry the library digest");
+
+  // 5b. CONCURRENT double-tap, worst case: seed B's initial read is STALE
+  //     (taken before seed A inserted anything), so B re-inserts the whole
+  //     library — the duplicates a plain read-then-insert would leave behind.
+  //     B's self-heal pass (which re-reads fresh) must converge every library
+  //     title back to exactly one row, keeping the oldest, and never touch
+  //     the owner's hand-added row.
+  const race = makeFakePort();
+  await seedExamplesFromLibrary(race.port); // seed A completes normally
+  const staleSnapshot = [{ id: "owner-1", title: "Mark 6 Daily Rundown Voice Example", created_at: "2026-07-01T00:00:00Z" }];
+  let bReads = 0;
+  const b = await seedExamplesFromLibrary({
+    ...race.port,
+    // First read (insert planning) is stale; the heal pass re-reads fresh.
+    listStrict: async () => (++bReads === 1 ? staleSnapshot : [...race.rows]),
+  });
+  ok(b.inserted === EXAMPLE_LIBRARY.length, "stale read makes seed B re-insert everything (the hazard is real)");
+  ok(b.duplicatesHealed === EXAMPLE_LIBRARY.length, "seed B's self-heal removes every duplicate it created");
+  const counts = new Map<string, number>();
+  for (const r of race.rows) counts.set(r.title, (counts.get(r.title) ?? 0) + 1);
+  ok([...counts.values()].every((n) => n === 1), "after overlapping seeds every title exists exactly once");
+  ok(race.rows.some((r) => r.id === "owner-1"), "the owner's hand-added row is untouched by seeding and healing");
+
+  // 5c. A storage read error fails CLOSED: throws, zero inserts.
+  let inserts = 0;
+  let threw = false;
+  try {
+    await seedExamplesFromLibrary({
+      async listStrict() {
+        throw new Error("simulated read outage");
+      },
+      async add() {
+        inserts++;
+        return true;
+      },
+      async remove() {
+        return true;
+      },
+    });
+  } catch {
+    threw = true;
+  }
+  ok(threw && inserts === 0, "read outage throws before ANY insert (never 'empty table, seed everything')");
+
+  // 6. Prompt-lane separation (Codex #73 P1-1): non-voice examples must NEVER
+  //    appear under the voice gold-standard framing.
+  const prompt = buildChapterWorkupPrompt({
+    book: "Mark",
+    chapter: 99,
+    examples: [
+      { title: "V", exampleType: "voice", content: "VOICE-SAMPLE-CONTENT" },
+      { title: "S", exampleType: "structure", content: "STRUCTURE-SAMPLE-CONTENT" },
+    ],
+  } as never);
+  const voiceAt = prompt.indexOf("APPROVED VOICE EXAMPLE");
+  const formAt = prompt.indexOf("APPROVED FORM EXAMPLES");
+  ok(voiceAt !== -1 && formAt !== -1 && voiceAt < formAt, "prompt renders separate voice and form blocks");
+  const voiceSection = prompt.slice(voiceAt, formAt);
+  ok(voiceSection.includes("VOICE-SAMPLE-CONTENT"), "voice example sits in the voice-mimic lane");
+  ok(!voiceSection.includes("STRUCTURE-SAMPLE-CONTENT"), "structure example is NOT in the voice-mimic lane");
+  const formSection = prompt.slice(formAt);
+  ok(formSection.includes("STRUCTURE-SAMPLE-CONTENT") && formSection.includes("do NOT imitate"), "structure example sits under shape-only framing");
+  const formOnly = buildChapterWorkupPrompt({
+    book: "Mark",
+    chapter: 99,
+    examples: [{ title: "S", exampleType: "structure", content: "STRUCTURE-SAMPLE-CONTENT" }],
+  } as never);
+  ok(!formOnly.includes("APPROVED VOICE EXAMPLE"), "with no voice example there is NO voice-mimic block at all");
+
+  console.log(`verify:example-library ✓ ${checks} checks passed (curated library shape, reachable genres, coverage, fail-closed idempotent seed, voice-lane separation)`);
 };
 
 main().catch((error) => {

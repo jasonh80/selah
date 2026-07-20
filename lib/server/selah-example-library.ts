@@ -11,7 +11,8 @@
 // overwritten, deactivated, or deleted — the owner's two hand-added Mark 6
 // examples stay exactly as they are.
 import { createHash } from "node:crypto";
-import { addExample, listExamples, type ExampleType } from "./selah-examples";
+import { getSupabaseAdmin } from "./supabase";
+import { addExample, deleteExample, type ExampleType } from "./selah-examples";
 
 export const EXAMPLE_LIBRARY_VERSION = "example-library.v1";
 
@@ -34,11 +35,14 @@ export const EXAMPLE_LIBRARY: readonly LibraryExample[] = [
   // ---- gospel narrative -----------------------------------------------------
   {
     title: "Mark 7 Movement Structure Example",
-    source_title: "Mark 7 preload contract (owner-approved, board #29)",
+    // Codex #73 P1-3: content is now VERBATIM — two exact lines from the
+    // owner-approved Mark 7 preload spec (board #29, approved 2026-07-15),
+    // nothing synthesized.
+    source_title: "Mark 7 preload spec, board #29 (owner-approved 2026-07-15) — verbatim lines",
     genre: "gospel narrative",
     example_type: "structure",
     content:
-      "Five contiguous movements covering every verse, each named for what happens rather than a theology label: vv.1–5 the purity dispute begins · vv.6–13 tradition against God's command · vv.14–23 defilement comes from the heart · vv.24–30 the Syrophoenician mother · vv.31–37 the deaf man restored. Boundaries follow the text's own scene changes; no verse is skipped and none is counted twice.",
+      "Required movements: 1–5 · 6–13 · 14–23 · 24–30 · 31–37. Preserve all five movements: disputed purity → the heart → two boundary-crossing encounters.",
   },
   {
     title: "Mark 9 Restored Dignity Scene Check Example",
@@ -88,15 +92,69 @@ export interface ExampleSeedResult {
   inserted: number;
   skippedExisting: number;
   failed: number;
+  /** Library-title duplicates removed by the post-insert self-heal. */
+  duplicatesHealed: number;
   total: number;
   digest: string;
 }
 
-/** Idempotent, ADDITIVE seed: inserts library entries whose title is not
- * already present; never updates, deactivates, or deletes anything. */
-export async function seedExamplesFromLibrary(): Promise<ExampleSeedResult> {
-  const existing = await listExamples();
-  const existingTitles = new Set(existing.map((e) => e.title));
+/** IO port so the offline gate can prove the concurrency/failure semantics
+ * against the REAL seed logic (Codex #73 P1-2). The production port reads the
+ * table TRI-STATE — a read error THROWS instead of collapsing to "no rows". */
+export interface ExampleSeedPort {
+  /** All rows' (id, title, created_at), oldest first. THROWS on any storage
+   * error — a failed read must never look like an empty table. */
+  listStrict(): Promise<{ id: string; title: string; created_at: string }[]>;
+  add(entry: LibraryExample): Promise<boolean>;
+  remove(id: string): Promise<boolean>;
+}
+
+export class ExampleSeedError extends Error {}
+
+function productionPort(): ExampleSeedPort {
+  return {
+    async listStrict() {
+      const db = getSupabaseAdmin();
+      if (!db) throw new ExampleSeedError("example storage is not configured");
+      const { data, error } = await db
+        .from("selah_approved_examples")
+        .select("id,title,created_at")
+        .order("created_at", { ascending: true });
+      if (error) throw new ExampleSeedError(`example read failed: ${error.message}`);
+      return (data ?? []) as { id: string; title: string; created_at: string }[];
+    },
+    async add(entry) {
+      return addExample({
+        title: entry.title,
+        genre: entry.genre,
+        example_type: entry.example_type,
+        content: entry.content,
+        source_title: entry.source_title,
+      });
+    },
+    async remove(id) {
+      return deleteExample(id);
+    },
+  };
+}
+
+/**
+ * Idempotent, ADDITIVE seed. The table has no unique-title constraint (a
+ * schema change is an owner decision — deliberately not taken here), so
+ * read-then-insert alone could duplicate under a double tap or concurrent
+ * request. Discipline instead (Codex #73 P1-2):
+ *   1. STRICT read — a storage read error throws (zero inserts), never
+ *      collapses to "empty table, insert everything".
+ *   2. Insert only titles not present.
+ *   3. SELF-HEAL — re-read and delete newer duplicates of any LIBRARY title
+ *      (keep the oldest row). Concurrent seeds converge: whichever finishes
+ *      last removes the extras. Only library-titled rows are ever touched;
+ *      the owner's hand-added examples are never read, changed, or deleted.
+ */
+export async function seedExamplesFromLibrary(
+  port: ExampleSeedPort = productionPort(),
+): Promise<ExampleSeedResult> {
+  const existingTitles = new Set((await port.listStrict()).map((e) => e.title));
   let inserted = 0;
   let skippedExisting = 0;
   let failed = 0;
@@ -105,20 +163,27 @@ export async function seedExamplesFromLibrary(): Promise<ExampleSeedResult> {
       skippedExisting++;
       continue;
     }
-    const ok = await addExample({
-      title: entry.title,
-      genre: entry.genre,
-      example_type: entry.example_type,
-      content: entry.content,
-      source_title: entry.source_title,
-    });
-    if (ok) inserted++;
+    if (await port.add(entry)) inserted++;
     else failed++;
+  }
+  // Self-heal pass: converge duplicates of LIBRARY titles to the oldest row.
+  let duplicatesHealed = 0;
+  const libraryTitles = new Set(EXAMPLE_LIBRARY.map((e) => e.title));
+  const after = await port.listStrict();
+  const seen = new Set<string>();
+  for (const row of after) {
+    if (!libraryTitles.has(row.title)) continue;
+    if (seen.has(row.title)) {
+      if (await port.remove(row.id)) duplicatesHealed++;
+    } else {
+      seen.add(row.title);
+    }
   }
   return {
     inserted,
     skippedExisting,
     failed,
+    duplicatesHealed,
     total: EXAMPLE_LIBRARY.length,
     digest: exampleLibraryDigest(),
   };
