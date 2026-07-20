@@ -582,3 +582,22 @@ entries:
       components as the owner defines them
     status: queued
     completion_pr: null
+
+  - id: IQ-030
+    area: studio
+    improvement: >-
+      "Chapter Checkup" board inside Studio: the per-chapter status table
+      (text/Mega, photos, map, FAQs, next step) as an easily visible
+      Studio screen with clear checkmarks when complete - the owner
+      should see at a glance where every chapter stands without asking.
+      Same truth the AIs track (Mega earned only after rundown
+      comparison; photo/map/FAQ state), rendered as simple green checks.
+    evidence: >-
+      Owner, in-session 2026-07-20: "'chapter checkup' is the graph you
+      created earlier. something similar should be available for the
+      Studio - easily visible check marks when complete." Explicitly
+      DO NOT START YET - saved for later on owner instruction.
+    priority_trigger: owner says go; pairs with IQ-021 (Studio button
+      states) and the IQ-028/029 Studio pass
+    status: queued
+    completion_pr: null
