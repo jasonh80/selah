@@ -1,6 +1,6 @@
-# The Selah Look — visual style guide v1
+# The Selah Eye — visual style guide v1
 
-Owner direction (2026-07-20, verbatim spine): *"A distinct Selah look: cinematic,
+Named by the owner: **the Selah Eye**. Owner direction (2026-07-20, verbatim spine): *"A distinct Selah look: cinematic,
 earthy, natural, historical-documentary realism. Not lacking color, realistic, but
 not muted. Shallow depth of field for intimate moments. Variety of images for each
 chapter if possible / makes sense. Close ups. Wide, medium, something creative and
@@ -16,7 +16,7 @@ enters generation (image-stage prompt block and/or Selah Brain visuals rules).
 Every existing honesty guardrail (no halos-as-shorthand, no modern objects, no
 lettering, period accuracy, visualAccuracyNotes) stays senior to style.
 
-## The look, in one line
+## The Selah Eye, in one line
 
 **A documentary photographer embedded in the first century** — not a painting,
 not a pageant, not a movie poster.
