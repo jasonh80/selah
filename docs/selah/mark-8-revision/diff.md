@@ -1,4 +1,4 @@
-# Mega Mark 8 — field-by-field diff (Codex rundown comparison; 1036 → 679 words)
+# Mega Mark 8 — field-by-field diff (Codex rundown comparison; 1036 → 676 words)
 
 ### `quickSummary`
 

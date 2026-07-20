@@ -10,12 +10,12 @@ Same lane as Mark 7 (`revision-previews.ts` + `verify:mega-revisions`).
 | Preview | `/chapter/mark-8-revision-preview` — dev + Netlify previews ONLY (fail-closed) |
 | Gate | `verify:mega-revisions` (prebuild) |
 
-## State: Codex rundown comparison APPLIED (five fields, 1036 → 679 words)
+## State: Codex rundown comparison APPLIED (five fields, 1036 → 676 words)
 
 Codex compared Jason's Mark 8 Daily Workup chat against the live chapter
 (board #29, 2026-07-20) and rewrote exactly five fields: `quickSummary` and
 the `chapter-flow`, `jesus`, `theology`, and `application` insight bodies —
-a tightening pass, −357 words. Everything else byte-identical (gate-proven).
+a tightening pass, −360 words. Everything else byte-identical (gate-proven).
 Codex's exact-head editorial recheck is the copy gate; apply rides the
 batched snapshot-first script with the 7→10 queue.
 
