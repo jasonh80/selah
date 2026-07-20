@@ -555,3 +555,28 @@ entries:
       no build before that spec
     status: queued
     completion_pr: null
+
+  - id: IQ-027
+    area: architecture
+    improvement: >-
+      THE SELAH ANATOMY (owner definition, 2026-07-20, verbatim): "Selah
+      Mind... to know Him / Selah Voice... to speak Him / Selah Heart...
+      to love Him / Selah Eyes... to see Him / Selah Ears... to hear Him /
+      Selah Hands... to serve Him / Selah Feet... to lead others to do
+      the same. These components will be the core of Selah." Mapping
+      today: Mind = the rules/learning layer currently named "Selah
+      Brain" (rename surfaces + docs to Mind; storage/table names may
+      keep aliases to avoid migration risk - Codex call); Voice = the
+      #73 voice system (already named right); Eyes = the visual style
+      guide (PR #85). Heart, Ears, Hands, Feet are unbuilt - their
+      functional definitions are OWNER conversations first, specs second;
+      nothing gets invented on their behalf.
+    evidence: >-
+      Owner, in-session 2026-07-20: "we are about to rename the parts of
+      selah's anatomy - instead of brain its mind... These components
+      will be the core of Selah."
+    priority_trigger: Brain-to-Mind surface rename = next docs/UI pass
+      (bounded, no schema churn without Codex design); remaining
+      components as the owner defines them
+    status: queued
+    completion_pr: null
