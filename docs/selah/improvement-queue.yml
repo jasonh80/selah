@@ -405,12 +405,16 @@ entries:
       cloaks-only + weeping, John's palms. Rides the existing honesty
       model: each difference labeled by which Gospel says what, never
       blended. OWNER SPINE (2026-07-20): Selah Brain/voice commentary on
-      the similarities AND differences and possible reasons why (audience,
-      emphasis, eyewitness vantage) — "always pointing to even greater
-      evidence of the truth of the Gospels": independent witnesses
-      agreeing on the core while differing in perspective is the shape of
-      real testimony. Apologetic framing stays inside the honesty model —
-      reasons labeled as inference, never overclaimed. Needs a spec:
+      the similarities AND differences and possible reasons why — "always
+      pointing to even greater evidence of the truth of the Gospels."
+      HONESTY BOUND (Codex review): similarities and differences can fit
+      the texture of real testimony and purposeful Gospel writing, but
+      Selah never claims independence or eyewitness vantage where the
+      evidence does not establish it. Possible reasons include authorial
+      purpose, audience, arrangement, and source selection; eyewitness
+      perspective is offered only where warranted and clearly labeled as
+      evidence or inference. Agreement on the core strengthens confidence
+      without turning every variation into proof. Needs a spec:
       schema, renderer, prompt/gate coverage, per-genre applicability
       (Gospels only), backfill decision.
     evidence: >-
