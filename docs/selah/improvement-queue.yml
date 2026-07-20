@@ -533,3 +533,25 @@ entries:
       Mark 7-10 Megas; status migration on the publisher lane
     status: queued
     completion_pr: null
+
+  - id: IQ-026
+    area: images
+    improvement: >-
+      Visual cohesion + a house look, timed with the characters work:
+      when the Kelly-characters lane lands, image generation should also
+      develop a consistent Selah visual identity across chapters (light,
+      palette, lens feel, recurring faces once characters exist) instead
+      of per-image one-offs. Owner named the current Mark 10
+      jesus-walking-ahead road shot as the register he likes (golden
+      hour, believable, cinematic-but-honest) - a STYLE reference only;
+      that image itself is direction-flawed for its verse and gets redone.
+    evidence: >-
+      Owner, in-session 2026-07-20 (also told Codex directly): "when we
+      start to implement characters i want to start having more cohesion
+      in our images generated. and to develop our own look... i really
+      like this shot. make sure we address this at the right time."
+    priority_trigger: rides the Kelly-characters spec (Codex) - the spec
+      must cover visual continuity/style, not only character identity;
+      no build before that spec
+    status: queued
+    completion_pr: null
