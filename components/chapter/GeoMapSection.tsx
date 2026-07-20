@@ -300,8 +300,11 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
 
   if (!cfg) return null;
 
+  // 13px chips (owner direction 2026-07-20: the 12px row read too small), and
+  // "3-D" instead of "3-D terrain" — the owner's own trim so Reset view keeps
+  // its spot on one row on phones.
   const chip = (on: boolean) =>
-    `inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-[12px] font-medium ${on ? "text-primary" : "text-secondary"}`;
+    `inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-[13px] font-medium ${on ? "text-primary" : "text-secondary"}`;
   const activeTour = tourIdx !== null ? cfg.tour[tourIdx] : null;
   const resetView = () => {
     setTourIdx(null);
@@ -324,8 +327,8 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
             />
             Borders &amp; cities
           </label>
-          <button className={chip(threeD)} aria-pressed={threeD} onClick={() => setThreeD((t) => !t)}>
-            3-D terrain
+          <button className={chip(threeD)} aria-pressed={threeD} aria-label="3-D terrain" onClick={() => setThreeD((t) => !t)}>
+            3-D
           </button>
           <button
             className={chip(tourIdx !== null)}

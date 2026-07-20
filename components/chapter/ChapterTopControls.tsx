@@ -6,14 +6,17 @@ import { useVersion } from "@/components/VersionProvider";
 import { useEsvText } from "@/components/chapter/useEsvText";
 import { ScriptureReader } from "@/components/chapter/ScriptureReader";
 import { TitleNav } from "@/components/chapter/TitleNav";
+import { ReadingModeToggle } from "@/components/chapter/ReadingModeToggle";
 
 // The chapter header (layout spec §2/§3; owner decision A2, 2026-07-16):
-// title left with the control row — [ Read Mark 6 ] (Quick/Deep Dive is
-// retired, owner decision 2026-07-19: one scrollable page, cards expanded). Below that, a collapsed Scripture preview (first words of the
-// selected translation). "Read Mark 6" expands the FULL chapter inline right
-// here — content pushes down, no jump to a lower section. Expanded, the
-// control reads "Hide Mark 6". Selah Focus lives in the app header beside
-// the version/theme controls.
+// title left with the control row — [ Read Mark 6 ] [ Quick Study | Deep
+// Study ] (the mode toggle returned 2026-07-20, owner direction: Quick
+// compacts cards/captions to their authored short lines, Deep is the
+// zero-click full scroll). Below that, a collapsed Scripture preview (first
+// words of the selected translation). "Read Mark 6" expands the FULL chapter
+// inline right here — content pushes down, no jump to a lower section.
+// Expanded, the control reads "Hide Mark 6". Selah Focus lives in the app
+// header beside the version/theme controls.
 export function ChapterTopControls({
   data,
   publishedSlugs,
@@ -50,10 +53,10 @@ export function ChapterTopControls({
           ) : (
             <h1 className="text-title text-primary lg:text-[48px]">{data.title}</h1>
           )}
-          {/* flex-wrap (IQ-003): at a true 320px content viewport the three
-              pills measure ~330.6px, so Deep Dive must be allowed to wrap to
-              a second line instead of overflowing an 11px sliver. Wrapping
-              only engages below ~332px; typography and pill sizes unchanged. */}
+          {/* flex-wrap (IQ-003): with the mode toggle back, the control row
+              can exceed a true 320px content viewport again — it MUST keep
+              wrapping to a second line instead of overflowing. Typography and
+              pill sizes unchanged. */}
           <div className="flex flex-wrap items-center gap-s2">
             <button
               onClick={() => setScriptureOpen((open) => !open)}
@@ -65,6 +68,7 @@ export function ChapterTopControls({
                 ⌄
               </span>
             </button>
+            <ReadingModeToggle />
           </div>
         </div>
         <p className="text-subtitle mt-2.5 text-primary">{data.subtitle}</p>

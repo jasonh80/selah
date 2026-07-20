@@ -1,6 +1,11 @@
 import type { ChapterWorkup, ChapterImage } from "@/lib/types";
-import { getHeroKindOverride } from "@/lib/content/chapter-content";
-import { ExpandableImage } from "@/components/chapter/ExpandableImage";
+import {
+  getHeroKindOverride,
+  getSceneChecks,
+  assignSceneChecks,
+  type SceneCheck,
+} from "@/lib/content/chapter-content";
+import { CaptionedImage } from "@/components/chapter/CaptionedImage";
 
 // New generated chapters explicitly choose their most meaningful scene. Older
 // chapters keep the established establishing → first fallback unchanged.
@@ -20,16 +25,33 @@ export function supportingImagesFor(data: ChapterWorkup): ChapterImage[] {
   return hero ? data.images.filter((image) => image.kind !== hero.kind) : [];
 }
 
+/** Scene checks NOT bound to a Visual Chapter Path scene — the hero's check
+ * plus any unmatched extras. Computed over the SAME scene set the path
+ * renders so nothing is ever dropped or shown twice. */
+export function standaloneChecksFor(data: ChapterWorkup): SceneCheck[] {
+  const allChecks: SceneCheck[] =
+    data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
+  const { standalone } = assignSceneChecks(
+    data.slug,
+    allChecks,
+    supportingImagesFor(data).map((image) => image.kind),
+  );
+  return standalone;
+}
+
 export function HeroImage({ data }: { data: ChapterWorkup }) {
   const hero = heroImageFor(data);
   if (!hero) return null;
+  // Owner decision A1 (2026-07-16): every chapter image is uniform 3:2, full
+  // column width — the hero included. Owner direction 2026-07-20: the hero's
+  // scene check(s) attach BELOW the photo inside the same frame, Instagram
+  // caption style, with Quick Summary following as its own card.
   return (
-    <section className="overflow-hidden rounded-lg border shadow-soft">
-      {/* Owner decision A1 (2026-07-16): every chapter image is uniform 3:2,
-          full column width — the hero included. */}
-      <div className="aspect-[3/2] w-full bg-card-soft">
-        <ExpandableImage src={hero.src} alt={hero.alt} className="h-full w-full object-cover" />
-      </div>
-    </section>
+    <CaptionedImage
+      src={hero.src}
+      alt={hero.alt}
+      checks={standaloneChecksFor(data)}
+      frameClassName="overflow-hidden rounded-lg border shadow-soft"
+    />
   );
 }
