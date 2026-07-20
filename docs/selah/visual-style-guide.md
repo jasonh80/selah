@@ -12,7 +12,7 @@ geography is direction-flawed for its verse and is being redone.)
 
 This guide turns that direction into promptable, reviewable language. It changes
 NO pipeline behavior by itself — the Kelly-characters spec (IQ-026) decides how it
-enters generation (image-stage prompt block and/or Selah Brain visuals rules).
+enters generation (image-stage prompt block and/or Selah Mind visuals rules).
 Every existing honesty guardrail (no halos-as-shorthand, no modern objects, no
 lettering, period accuracy, visualAccuracyNotes) stays senior to style.
 
@@ -58,8 +58,10 @@ rules unchanged — an empty basket is fine; a glowing dove is not).
 
 ## Cohesion (what makes it OURS)
 
-- One chapter = one time of day arc where plausible (scenes feel like the same
-  day's shoot, not stock from five sources).
+- One chapter feels like one embedded shoot — consistent grade and lens
+  character — while every REAL change the text gives (day, time, place,
+  weather) is preserved: a night crossing stays night, a next-morning fig
+  tree stays morning. Cohesion never flattens the chapter's actual movement.
 - Recurring faces once the character library (Kelly lane) lands — the same
   Jesus, the same Twelve, aging and weathering consistently across chapters.
 - Consistent wardrobe/material logic (wool, linen, leather; regional dyes) and
@@ -78,6 +80,6 @@ sepia "old times" wash · modern objects, lettering, or landmarks.
 1. Codex reviews this guide (docs-only PR).
 2. The Kelly-characters spec (IQ-026) folds it in: character identity +
    THIS style contract, and decides the injection point (image-stage prompt
-   block and/or seeded Brain visuals rules — owner-gated as always).
+   block and/or seeded Selah Mind visuals rules — owner-gated as always).
 3. Until then, redo notes and new-chapter image prompts may quote this guide
    directly — it is owner-approved direction, not generated style.
