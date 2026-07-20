@@ -42,6 +42,22 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
   const range = bt?.dateRange;
   const year = chapterYear(data);
   const pinPos = year != null ? pinPosForYear(year) : null;
+  // Owner look fix (2026-07-19 phone screenshot): when the pin lands on a
+  // marker — EVERY Mark chapter sits exactly on the Jesus ✝ — the old pin dot
+  // covered the marker under a heavy halo (the /20 ring alpha silently fails
+  // on this theme's plain-var colors, rendering a solid blob). Now the badge
+  // points at the marker itself and the marker lights up instead.
+  const activeMarkerIndex =
+    pinPos == null
+      ? null
+      : (() => {
+          let best = 0;
+          for (let i = 1; i < MARKERS.length; i++) {
+            if (Math.abs(posForIndex(i) - pinPos) < Math.abs(posForIndex(best) - pinPos)) best = i;
+          }
+          return Math.abs(posForIndex(best) - pinPos) < 2.5 ? best : null;
+        })();
+  const badgePos = activeMarkerIndex != null ? posForIndex(activeMarkerIndex) : pinPos;
   const rangeText = range
     ? `${fmtYear(range.startYear)} – ${fmtYear(range.endYear)}`
     : data.estimatedDate ?? bt?.estimatedYearLabel ?? "";
@@ -60,42 +76,61 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
         <div className="relative h-[78px]">
           <div className="absolute inset-x-0 top-[40px] h-0.5 bg-line" />
 
-          {MARKERS.map((m, i) => (
-            <div
-              key={m.key}
-              className="absolute top-[34px] flex -translate-x-1/2 flex-col items-center"
-              style={{ left: `${posForIndex(i)}%` }}
-            >
-              {m.cross ? (
-                <span className="text-[13px] leading-none text-jesus-red">✝</span>
-              ) : (
-                <span className="h-2.5 w-2.5 rounded-full border-2 border-line bg-card" />
-              )}
-              <span className="mt-1.5 max-w-[60px] whitespace-normal text-center text-[9px] font-medium leading-tight text-secondary">
-                {m.label}
-              </span>
-            </div>
-          ))}
+          {MARKERS.map((m, i) => {
+            const active = i === activeMarkerIndex;
+            return (
+              <div
+                key={m.key}
+                className="absolute top-[34px] flex -translate-x-1/2 flex-col items-center"
+                style={{ left: `${posForIndex(i)}%` }}
+              >
+                {m.cross ? (
+                  <span className={`leading-none text-jesus-red ${active ? "text-[16px]" : "text-[13px]"}`}>✝</span>
+                ) : (
+                  <span
+                    className={
+                      active
+                        ? "h-2.5 w-2.5 rounded-full border-2 border-accent-strong bg-accent-strong"
+                        : "h-2.5 w-2.5 rounded-full border-2 border-line bg-card"
+                    }
+                  />
+                )}
+                <span
+                  className={`mt-1.5 max-w-[64px] whitespace-normal text-center text-[9px] font-medium leading-tight ${
+                    active ? "text-primary" : "text-secondary"
+                  }`}
+                >
+                  {m.label}
+                </span>
+              </div>
+            );
+          })}
 
-          {pinPos != null && (
+          {badgePos != null && (
             <div
-              className="absolute top-[2px] flex -translate-x-1/2 flex-col items-center"
-              style={{ left: `${pinPos}%` }}
+              className="absolute top-[4px] flex -translate-x-1/2 flex-col items-center"
+              style={{ left: `${badgePos}%` }}
             >
               <span className="whitespace-nowrap rounded-full bg-accent-strong px-2 py-0.5 text-[9px] font-semibold text-white shadow-hair">
                 {data.reference}
               </span>
-              <span className="h-[14px] w-px bg-accent-strong" />
-              <span className="-mt-px h-2.5 w-2.5 rounded-full bg-accent-strong ring-4 ring-accent/20" />
+              {/* Thin stem pointing at the rail; the dot exists ONLY when the
+                  pin sits between markers — on a marker, the marker itself is
+                  the anchor and nothing covers it. */}
+              <span className={`w-px bg-accent-strong ${activeMarkerIndex != null ? "h-[10px]" : "h-[14px]"}`} />
+              {activeMarkerIndex == null && (
+                <span
+                  className="-mt-px h-2 w-2 rounded-full bg-accent-strong"
+                  style={{ boxShadow: "0 0 0 4px color-mix(in srgb, var(--accent-strong) 22%, transparent)" }}
+                />
+              )}
             </div>
           )}
         </div>
       </div>
 
       {headline && (
-        <div className="mt-1.5">
-          <span className="text-[12px] font-semibold text-primary">{headline}</span>
-        </div>
+        <p className="mt-2 text-center text-[12px] font-medium text-secondary">{headline}</p>
       )}
     </section>
   );
