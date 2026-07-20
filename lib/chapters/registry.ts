@@ -1,5 +1,10 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { exodus27Workup, LOCAL_SOURCE, type ChapterSource } from "@/lib/chapters/source";
+import {
+  MARK_6_REVISION_PREVIEW_SLUG,
+  mark6RevisionPreviewEnabled,
+  mark6RevisionPreviewWorkup,
+} from "@/lib/chapters/mark-6-revision-preview";
 import { isSupabaseConfigured } from "@/lib/server/supabase";
 import {
   getChapterWorkupBySlug,
@@ -25,6 +30,14 @@ const FALLBACK_SLUG = "exodus-27";
 // Known local chapters (seed for fallback + chapter listing).
 const seed = exodus27Workup();
 const LOCAL = new Map<string, ChapterWorkup>([[seed.slug, seed]]);
+
+// Mega Mark 6 review candidate (board #29, 2026-07-20): a REVIEW-ONLY text
+// revision served under its own preview slug, dev + Netlify previews only —
+// fail-closed, so production can never register it. Protects Jason: the live
+// mark-6 row stays untouched while he and Codex review the proposed copy.
+if (mark6RevisionPreviewEnabled()) {
+  LOCAL.set(MARK_6_REVISION_PREVIEW_SLUG, mark6RevisionPreviewWorkup());
+}
 
 export function localChapterBySlug(slug: string): ChapterWorkup | null {
   return LOCAL.get(slug) ?? null;

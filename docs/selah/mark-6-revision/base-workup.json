@@ -1,0 +1,408 @@
+{
+  "book": "Mark",
+  "slug": "mark-6",
+  "theme": "Jesus reveals the true kingdom: rejected, compassionate, and Lord over all",
+  "title": "Mark 6",
+  "images": [
+    {
+      "alt": "Jesus teaching in a modest stone synagogue in Nazareth while familiar townspeople react with skepticism and offense.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-6/nazareth.png",
+      "kind": "nazareth",
+      "index": 1,
+      "label": "Nazareth: Familiar Faces, Closed Hearts",
+      "prompt": "Photorealistic historical scene inside a modest first-century village synagogue in Nazareth, around AD 29. Jesus, an ordinary Galilean Jewish man in simple worn wool, stands teaching before a room of townspeople who have known Him since childhood. Their faces show skepticism, discomfort, and quiet offense — crossed arms, sideways glances, murmuring neighbors. Small stone room, plastered walls, simple benches, oil-lamp and window light, dust in the air. True photorealism, documentary realism, natural light, believable Middle Eastern faces, worn fabrics. No halos, no glow, no text or lettering, no modern objects, no stained glass, no pews, no church architecture, no theatrical posing.",
+      "status": "complete",
+      "caption": "Nazareth: Familiar Faces, Closed Hearts"
+    },
+    {
+      "alt": "Two disciples with staffs and sandals on a dusty Galilean road, dressed simply, setting out with serious faces.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-6/sending.png",
+      "kind": "sending",
+      "index": 2,
+      "label": "Sent Out Two by Two",
+      "prompt": "Photorealistic historical scene of two first-century Jewish disciples being sent out on mission in Galilee, around AD 29: standing on a dusty village road with simple wooden staffs, leather sandals, single travel-worn tunics and cloaks, no bags, no provisions. Serious, resolved faces — ordinary working men, not heroes. Behind them, other pairs set out toward different villages, and Jesus sees them off at a distance. Dry hills and village houses beyond. True photorealism, documentary realism, natural morning light, dusty feet, worn textures. No halos, no glow, no text, no modern objects, no staged posing.",
+      "status": "complete",
+      "caption": "Sent Out Two by Two"
+    },
+    {
+      "alt": "Herod's tense banquet hall — wealthy guests reclining at a lavish table, opulence with unease beneath it.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-6/herods-feast.png",
+      "kind": "herods-feast",
+      "index": 3,
+      "label": "Herod's Feast: Power Without Courage",
+      "prompt": "Photorealistic historical scene of Herod Antipas's birthday banquet in a first-century Galilean palace hall: nobles, military commanders, and leading men reclining at low tables heavy with food and wine, oil lamps and torchlight, rich fabrics, gold vessels. The atmosphere is tense and morally uneasy rather than festive — Herod on his couch looks troubled and cornered, guests watch him, whispers at the edges. Serious and unsettling, not sensational; no gore, no severed head shown, nothing lurid. True photorealism, documentary realism, warm low torchlight and deep shadows, believable Middle Eastern and Roman-era faces. No halos, no text, no modern objects, no cartoon villainy, no theatrical posing.",
+      "status": "complete",
+      "caption": "Herod's Feast: Power Without Courage"
+    },
+    {
+      "alt": "Jesus and the disciples among a vast crowd of men, women, and children seated on green spring grass by the Sea of Galilee as baskets move through the crowd.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-6/feeding.png",
+      "kind": "feeding",
+      "index": 4,
+      "label": "The Feeding of the 5,000",
+      "prompt": "Photorealistic historical scene from Mark 6, the feeding of the 5,000, on a remote hillside of GREEN SPRING GRASS above the Sea of Galilee, around AD 29 near Passover season. A massive crowd of ordinary first-century Jewish villagers — 5,000 men counted, with women and children clearly present — seated and reclining in loose, uneven family groups on the green grass. Jesus, an ordinary Galilean Jewish man in worn earth-toned clothing, not glowing, not idealized, naturally placed among the people, breaks rough barley flatbreads; disciples move through the crowd with simple woven baskets of small barley loaves and small dried fish. Woven wool and linen garments, leather sandals, dusty feet, sun-worn faces, wind, cloaks spread on the grass, the lake visible beyond. True photorealism, anamorphic 35mm film still, late-afternoon directional light, warm rim light. No halos, no text, no modern objects, no Europeanized faces, no oversized bakery bread, no movie-poster posing.",
+      "status": "complete",
+      "caption": "The Feeding of the 5,000"
+    },
+    {
+      "alt": "Disciples strain at the oars of a low wooden boat in wind and waves at night as Jesus approaches across the dark water.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-6/walking-water.png",
+      "kind": "walking-water",
+      "index": 5,
+      "label": "Walking on the Water: Do Not Miss Who He Is",
+      "prompt": "Photorealistic historical night scene on the Sea of Galilee, fourth watch of the night: a low first-century wooden fishing boat with exhausted disciples straining at the oars against wind and rough waves, cloaks soaked, faces fearful. Approaching across the dark water is Jesus, an ordinary Galilean Jewish man in worn robes, walking on the sea — mysterious and quietly powerful, seen through wind and spray, NOT glowing, no halo, no supernatural light effects; the awe comes from the impossibility itself. Moonlit clouds, deep blues and shadows, realistic water, wind-blown fabric. Fearful, mysterious, revealing — not fantasy. True photorealism, documentary realism. No halos, no glow, no lightning, no text, no modern objects, no fantasy effects, no theatrical posing.",
+      "status": "complete",
+      "caption": "Walking on the Water: Do Not Miss Who He Is"
+    }
+  ],
+  "prayer": "Lord Jesus, open my eyes to see You clearly. Keep me from treating You as familiar and small. Give me courage where I fear people, dependence where I want control, and faith when I am straining in the dark. Teach me to receive Your gifts without missing You, the Giver. Amen.",
+  "status": "draft",
+  "verses": [],
+  "chapter": 6,
+  "context": "Galilee in Jesus’ day was under Roman imperial power, locally ruled by Herod Antipas, son of Herod the Great. Villages were small, honor and shame mattered deeply, teachers were judged by their family background, and a prophet who confronted sexual and political sin could be in real danger. Banquets displayed status, while ordinary people often lived close to hunger. Against that world, Jesus’ compassion for shepherdless crowds and His sending of the Twelve is not soft religious sentiment; it is the arrival of a different kingdom.",
+  "summary": "The chapter moves across Galilee with quick, vivid scenes: a synagogue in Nazareth, dusty village roads, a royal banquet hall, a lonely wilderness meal, a stormy lake at night, and crowded marketplaces filled with the sick. Mark is not simply collecting miracles. He is showing what kind of King Jesus is.",
+  "tagline": "Pause. Reflect. Elevate.",
+  "version": "1",
+  "insights": [
+    {
+      "id": "big-idea",
+      "body": "Mark 6 is built on contrast. One kingdom is Herod’s: polished, powerful, image-obsessed, and deadly. The other is Jesus’ kingdom: humble, rejected, dependent, compassionate, and overflowing with life.\n\nThe chapter begins with people in Jesus’ hometown refusing Him because He seems too familiar. It moves to the Twelve being sent with little in their hands, then to John the Baptist losing his life because a ruler cared more about saving face than obeying truth. Then Mark shows Jesus feeding a crowd in the wilderness and walking to His disciples over the sea.\n\nThat movement matters. Herod’s feast ends with death. Jesus’ feast ends with leftovers. Herod hears truth and silences it. Jesus sees need and shepherds it. The disciples receive bread but still do not grasp who stands before them.\n\nThe line to carry is simple: do not receive the bread and miss who gave it.",
+      "icon": "💡",
+      "jesus": false,
+      "title": "Big Idea",
+      "preview": "Mark 6 puts two kingdoms on the page: Herod’s kingdom of fear and Jesus’ kingdom of compassion. The question is not whether Jesus is useful, but whether we see who He is."
+    },
+    {
+      "id": "chapter-flow",
+      "body": "In verses 1-6, Jesus returns to Nazareth. The synagogue crowd is astonished, but their amazement curdles into offense. They know His family and trade, so they assume they know His limits. Familiarity pretending to be discernment.\n\nIn verses 7-13, Jesus sends the Twelve out in pairs. They carry His authority, but not much else. No image management campaign, no pile of supplies, no illusion of self-sufficiency. They preach repentance, confront evil, and heal the sick.\n\nIn verses 14-29, Mark interrupts the mission report with Herod’s memory of John. It is not random. John’s death shows what happens when truth confronts a ruler who is fascinated but unrepentant. Herodias wants revenge, Herod makes a reckless oath, and a prophet dies because a weak man will not look weak in front of guests.\n\nIn verses 30-44, the apostles return, and Jesus tries to take them away for rest. The crowds follow. Jesus does not treat them as an inconvenience. He sees shepherdless people. He teaches them and then feeds them with a small amount of food multiplied in His hands.\n\nIn verses 45-52, the disciples are on the lake at night, straining against the wind. Jesus sees them, comes to them walking on the sea, and speaks courage into their terror. Mark then gives the sting: they had not understood the meaning of the loaves. They saw power, but they had not yet understood His identity.\n\nIn verses 53-56, Gennesaret becomes a landscape of desperate faith. People carry the sick to Jesus and beg for even the slightest contact. The chapter that began with hometown rejection ends with needy strangers reaching for mercy.",
+      "icon": "🧭",
+      "jesus": false,
+      "title": "Chapter Flow",
+      "preview": "The chapter moves from rejection to mission, from a corrupt banquet to a wilderness meal, then from fear on the water to healing on the shore."
+    },
+    {
+      "id": "historical-world",
+      "body": "Nazareth was a small Galilean village, not a spiritual celebrity center. When Jesus returns there, the people do not evaluate Him in a neutral classroom. They evaluate Him through family memory, village status, and social expectation. Calling Him by His mother may simply identify Him locally, but in that culture it may also carry a dismissive edge.\n\nHerod Antipas ruled Galilee and Perea under Roman authority. He had power, but not the secure power of a true king. That helps explain the insecurity in the banquet scene. Public honor mattered. Oaths made before important guests created pressure. Herod’s tragedy is not that he lacked information; he lacked courage.\n\nThe feeding scene belongs to a world where many ordinary people lived close to scarcity. Bread was basic food, fish was common around the lake, and remote places did not have convenient markets waiting nearby. Jesus’ command to feed the crowd presses the disciples into the impossible so they can learn who He is.\n\nThe Sea of Galilee is not an ocean, but it is not a pond either. Sudden winds can make the lake dangerous, especially for exhausted rowers at night. When Mark says Jesus sees them struggling, that detail matters. The Shepherd is not absent from the storm.",
+      "icon": "🏛",
+      "jesus": false,
+      "title": "The World Behind It",
+      "preview": "This is Galilee under Rome: village honor, fragile rulers, hungry crowds, and dangerous truth-telling."
+    },
+    {
+      "id": "what-most-miss",
+      "body": "Modern readers often treat the feeding and the walking on water as two separate miracle stories. Mark connects them. After Jesus comes to the disciples on the sea, Mark says their amazement is tied to their failure to understand the loaves.\n\nThat means the feeding was not only about hungry people getting food, though it was truly that. It was a sign revealing Jesus’ identity. In the wilderness, with shepherdless people, Jesus provides bread in abundance. This echoes Israel’s story and the hope that God Himself would shepherd His people.\n\nThe disciples do not need more data. They have seen demons yield, sickness healed, bread multiplied, and water under Jesus’ feet. Their issue is deeper: they benefit from Jesus’ power without fully beholding Jesus’ person.\n\nThat is still possible. You can want help from Jesus and still resist worshiping Him as Lord. You can be grateful for the bread and still miss the Shepherd.",
+      "icon": "🔍",
+      "jesus": false,
+      "title": "What Most People Miss",
+      "preview": "The disciples’ problem is not lack of evidence. They have bread in their hands and still miss the meaning."
+    },
+    {
+      "id": "jesus",
+      "body": "Mark 6 raises the question of Jesus’ identity from several angles. Nazareth sees the carpenter and refuses the Christ. Herod hears reports about Jesus and interprets Him through guilt and fear. The crowds see a healer and run toward Him. The disciples see miracles and still struggle to understand.\n\nJesus is fully human here. He is rejected by people who knew His household. He withdraws for prayer. He seeks rest for His disciples. He grieves in a world where prophets are murdered and crowds wander without shepherds.\n\nBut He also does what only God can do. He gives bread in the wilderness. He walks on the sea. He brings healing with a power that overflows into villages and marketplaces. He does not merely announce God’s kingdom from a distance; He embodies it.\n\nThe chapter presses us past admiration. Jesus is not just useful. He is Lord. Not a miracle machine. Not a village teacher who got famous. The rejected One is the Shepherd who feeds, the King who comes in the storm, and the Holy One whom desperate people are right to reach for.",
+      "icon": "✝",
+      "jesus": true,
+      "title": "Jesus at the Center",
+      "preview": "Jesus is rejected like a prophet, compassionate like the promised Shepherd, and sovereign like the Lord who rules the sea."
+    },
+    {
+      "id": "theology",
+      "body": "The theology principle is Christology. That simply means the study of who Jesus is.\n\nMark 6 shows that Jesus is truly human. He has a hometown. People know His trade and family. He experiences rejection. He prays. He cares about rest. He enters the ordinary pressure and pain of human life without pretending.\n\nAt the same time, Mark shows Jesus with divine authority. Evil spirits obey His mission. The wilderness crowd is fed by His provision. The sea does not stop Him. Sickness retreats before Him. The signs are not random fireworks; they reveal the identity of the One doing them.\n\nThis matters because Christian faith is not merely believing that Jesus can improve life. It is trusting Him as the Son of God, the true Shepherd, and the Lord who comes near. He is fully present in the dust and fully sovereign over the deep.",
+      "icon": "🛡",
+      "jesus": false,
+      "title": "Theology Principle",
+      "preview": "Christology asks who Jesus is. Mark 6 answers with dust on His feet and the sea under them."
+    },
+    {
+      "id": "application",
+      "body": "Start with Nazareth. Where has closeness to religious language made Jesus seem ordinary in the wrong way? The danger is not knowing too much about Him. The danger is thinking you know Him so well that you no longer listen.\n\nThen look at Herod. Where are you tempted to protect your image instead of obeying the truth? Herod’s collapse is painfully modern: he knows enough to be troubled, but not enough to repent. Fear wearing royal clothing is still fear.\n\nThen look at the disciples. Jesus sends them before they fully understand Him. That should comfort and humble us. You do not have to be impressive to obey the next clear thing. Dependence is not a backup plan; it is part of discipleship.\n\nFinally, look at the storm. Jesus saw them straining. He came to them before they understood. Trust Him before you can see how the whole crossing works out. The Shepherd is not only present at the miracle meal. He is Lord in the exhausting night crossing too.",
+      "icon": "🌱",
+      "jesus": false,
+      "title": "Live It",
+      "preview": "Let Mark 6 search the places where Jesus has become too familiar, where fear of people feels stronger than obedience, and where the storm feels unseen."
+    },
+    {
+      "id": "prayer",
+      "body": "Lord Jesus, help me see You as You truly are. Forgive me for the times I have treated You as familiar and small, or wanted Your gifts more than Your presence.\n\nGive me courage where I am tempted to fear people more than You. Give me honesty where I have heard truth but delayed obedience. Teach me dependence, not as weakness, but as the way of walking with You.\n\nWhen I am tired, interrupted, or straining in the dark, remind me that You see me. Help me trust You before I understand everything. Feed my faith, quiet my fear, and make my heart ready to follow You. Amen.",
+      "icon": "🙏",
+      "jesus": false,
+      "title": "Prayer",
+      "preview": "A prayer for clearer sight, deeper trust, and courage to follow Jesus without managing appearances."
+    },
+    {
+      "id": "two-banquets",
+      "body": "Mark places Herod’s banquet close to Jesus’ feeding of the five thousand for a reason. Herod gathers the powerful. Jesus gathers the needy. Herod’s table is full of performance, manipulation, and fear. Jesus’ meal begins with compassion and ends with leftovers.\n\nThe contrast is sharp: Herod’s feast produces death for a righteous man; Jesus’ feast gives life to hungry people. Herod protects his reputation. Jesus gives Himself to shepherd the crowd.\n\nThis is more than a moral lesson about bad parties and good picnics. It is a kingdom contrast. Which table looks powerful? Which table is actually life?",
+      "icon": "✦",
+      "jesus": false,
+      "title": "Two Banquets",
+      "preview": "Herod’s feast and Jesus’ feast interpret each other. One is status with death at the center; the other is compassion with abundance at the edges."
+    },
+    {
+      "id": "map-notes",
+      "body": "Nazareth sits in the hills of Galilee, away from the lake. The Twelve likely move through village networks where hospitality and rejection would both be visible and public.\n\nThe feeding takes place in a remote area near the Sea of Galilee, though the exact site is debated. The remoteness matters because the disciples cannot solve the problem with convenience. Jesus’ provision happens where normal resources are not enough.\n\nGennesaret was a fertile plain on the northwest side of the Sea of Galilee. Ending there gives the chapter a public, crowded feel: people recognize Jesus, run through the region, and turn ordinary marketplaces into places of mercy.",
+      "icon": "🗺",
+      "jesus": false,
+      "title": "Map Notes",
+      "preview": "Geography matters because Mark 6 keeps moving: hometown, villages, wilderness, water, and shore."
+    },
+    {
+      "id": "original-language",
+      "body": "When Mark says Jesus had compassion, the Greek word points to deep, gut-level mercy. This is not distant pity. Jesus is moved from within by the condition of the crowd.\n\nThe word often translated as taking offense in Nazareth carries the sense of stumbling over someone. The people do not merely disagree with Jesus; they trip over the very ordinariness of His known background.\n\nThe word used for being made well in the final healing scene can also carry the sense of being saved or delivered, depending on context. Mark is showing real physical healing, and he is also training readers to see that Jesus’ rescue reaches deeper than the body.",
+      "icon": "🔤",
+      "jesus": false,
+      "title": "Original Language",
+      "preview": "A few Greek details sharpen the chapter’s picture of compassion, offense, and healing."
+    }
+  ],
+  "keyItems": [
+    {
+      "name": "Staff and sandals",
+      "type": "object",
+      "blurb": "Simple travel gear for the Twelve, emphasizing dependence rather than self-provision."
+    },
+    {
+      "name": "Herod’s banquet table",
+      "type": "object",
+      "blurb": "A scene of status, oath-making, manipulation, and death—the dark mirror opposite of Jesus’ wilderness meal."
+    },
+    {
+      "name": "Loaves and fish",
+      "type": "object",
+      "blurb": "Ordinary food multiplied by Jesus, revealing His compassion and authority as Shepherd."
+    },
+    {
+      "name": "Fringe of the garment",
+      "type": "object",
+      "blurb": "The edge of Jesus’ clothing becomes the place where desperate people reach out in faith and find healing."
+    }
+  ],
+  "navCards": [
+    {
+      "id": "key-object",
+      "label": "Key Object",
+      "thumb": "/img/placeholder/detail.svg",
+      "support": "Staff and sandals"
+    },
+    {
+      "id": "key-person",
+      "label": "Key Person",
+      "thumb": "/img/placeholder/person.svg",
+      "support": "Jesus"
+    },
+    {
+      "id": "jesus",
+      "jesus": true,
+      "label": "Jesus",
+      "thumb": "/img/placeholder/jesus.svg",
+      "support": "The rejected Shepherd-King"
+    }
+  ],
+  "subtitle": "The Shepherd and the Storm",
+  "timeline": [
+    {
+      "label": "Jesus begins public ministry",
+      "detail": "Jesus announces the kingdom of God in Galilee and calls disciples to follow Him.",
+      "current": false
+    },
+    {
+      "label": "Mark 6: Rejection, mission, bread, and storm",
+      "detail": "Jesus is rejected at Nazareth, sends the Twelve, feeds the crowd, walks on the sea, and heals in Gennesaret.",
+      "current": true
+    },
+    {
+      "label": "Jesus continues toward the cross",
+      "detail": "The question of Jesus’ identity grows sharper as conflict and discipleship deepen.",
+      "current": false
+    }
+  ],
+  "versions": [
+    "ESV"
+  ],
+  "metaChips": [
+    {
+      "icon": "📅",
+      "text": "c. AD 30"
+    },
+    {
+      "icon": "📍",
+      "text": "Galilee: Nazareth, villages around the lake, a wilderness area near the Sea of Galilee, and Gennesaret"
+    },
+    {
+      "icon": "✦",
+      "text": "Jesus reveals the true kingdom: rejected, compassionate, and Lord over all"
+    },
+    {
+      "icon": "✝",
+      "text": "Jesus: The rejected Shepherd-King",
+      "jesus": true
+    }
+  ],
+  "modernMap": {
+    "alt": "Shows Nazareth, the Sea of Galilee, the Gennesaret plain, and the broader northern Israel region where these events took place.",
+    "src": "/img/placeholder/map.svg",
+    "note": "The exact location of the feeding of the five thousand and the precise lake crossing route are debated.",
+    "caption": "Shows Nazareth, the Sea of Galilee, the Gennesaret plain, and the broader northern Israel region where these events took place.",
+    "uncertaintyNote": "The exact location of the feeding of the five thousand and the precise lake crossing route are debated."
+  },
+  "reference": "Mark 6",
+  "characters": [
+    {
+      "name": "Jesus",
+      "role": "Teacher, healer, Shepherd-King"
+    },
+    {
+      "name": "The Twelve",
+      "role": "Jesus’ appointed messengers"
+    },
+    {
+      "name": "John the Baptist",
+      "role": "Prophet and forerunner"
+    },
+    {
+      "name": "Herod Antipas",
+      "role": "Ruler of Galilee and Perea"
+    }
+  ],
+  "application": "Mark 6 invites honest trust. Do not let familiarity with Jesus make Him seem small. Do not let fear of people turn obedience into compromise. Do not wait until you understand everything before following what He has already made clear. And when life feels like straining at the oars in the dark, remember: Jesus sees His people before they see Him. Look past the bread and behold the Shepherd.",
+  "historicMap": {
+    "alt": "Shows first-century Galilee under Herod Antipas, village networks around the lake, possible wilderness areas, and travel by boat across the Sea of Galilee.",
+    "src": "/img/placeholder/map.svg",
+    "note": "Ancient place names and modern identifications are clear in some cases, such as Nazareth and Gennesaret, but less certain for some wilderness and shoreline scenes.",
+    "caption": "Shows first-century Galilee under Herod Antipas, village networks around the lake, possible wilderness areas, and travel by boat across the Sea of Galilee.",
+    "uncertaintyNote": "Ancient place names and modern identifications are clear in some cases, such as Nazareth and Gennesaret, but less certain for some wilderness and shoreline scenes."
+  },
+  "sceneChecks": [
+    {
+      "body": "When Jesus teaches in Nazareth, do not picture stained glass, pews, and a tall steeple. Think a modest village gathering space, local faces, stone, dust, and everyone knowing everyone’s business. That makes the rejection sharper. This is not anonymous criticism from strangers; it is hometown familiarity closing its eyes.",
+      "label": "Scene Check",
+      "title": "A Village Synagogue, Not a Cathedral",
+      "relatedVerses": [
+        "6:1-6"
+      ],
+      "visualAccuracyNotes": [
+        "first-century Galilean village setting",
+        "modest synagogue or assembly space, not a medieval church",
+        "stone walls, benches or mats, oil lamps, no pews or stained glass",
+        "no crosses as architectural decoration"
+      ]
+    },
+    {
+      "body": "This is not a small family meal with awkward conversation. It is an elite political banquet where honor, alcohol, performance, and public vows create pressure. Herod is surrounded by people whose opinions he cares about too much. That is the trap: a ruler with a full room and an empty spine.",
+      "label": "Scene Check",
+      "title": "Herod’s Banquet Was Not a Cozy Dinner Party",
+      "relatedVerses": [
+        "6:21-28"
+      ],
+      "visualAccuracyNotes": [
+        "elite first-century banquet setting under Herodian influence",
+        "reclining dining posture or low tables appropriate to the period",
+        "no medieval crowns or European castle interior",
+        "no English lettering on dishes, walls, or scrolls"
+      ]
+    },
+    {
+      "body": "The Sea of Galilee is not a symbolic puddle in a calm painting. It is a sizable freshwater lake where wind can turn a night crossing into a brutal fight. Picture tired men pulling oars in darkness, not a serene postcard. The comfort is not that the storm was imaginary. The comfort is that Jesus saw them in it.",
+      "label": "Scene Check",
+      "title": "A Real Lake, Real Wind, Real Exhaustion",
+      "relatedVerses": [
+        "6:45-52"
+      ],
+      "visualAccuracyNotes": [
+        "first-century wooden fishing boat, not a modern rowboat",
+        "dark freshwater lake with wind and waves",
+        "disciples in simple wool and linen garments",
+        "no modern lanterns, life jackets, sails with printed symbols, or cinematic fantasy lighting"
+      ]
+    }
+  ],
+  "deeperGroups": [
+    {
+      "rows": [
+        {
+          "desc": "Learn how this regional ruler governed Galilee under Rome and why John’s criticism of his marriage mattered politically and morally.",
+          "title": "Herod Antipas"
+        },
+        {
+          "desc": "Trace this Old Testament image of failed leadership and see why Jesus’ compassion in the wilderness is so powerful.",
+          "title": "Sheep without a shepherd"
+        }
+      ],
+      "label": "Learn More"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Compare Herod’s banquet and Jesus’ wilderness meal. One protects status and produces death; the other welcomes need and overflows with life.",
+          "title": "Two Banquets"
+        },
+        {
+          "desc": "Explore Old Testament passages where God rules the waters and see why Mark’s description reveals more than a miracle.",
+          "title": "Walking on the Sea"
+        }
+      ],
+      "label": "Dive Deeper"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Ask where Jesus has become too familiar to amaze you, and invite Him to restore reverence without pretending.",
+          "title": "Name the Familiarity"
+        },
+        {
+          "desc": "Bring one exhausting situation to Jesus and practice trusting that He sees you before you can see the outcome.",
+          "title": "Trust in the Dark Crossing"
+        }
+      ],
+      "label": "Grow Closer"
+    }
+  ],
+  "quickSummary": "Mark 6 places two kingdoms side by side: Herod’s fearful, image-driven power and Jesus’ humble, life-giving authority. Jesus is rejected at home, sends the Twelve, feeds a wilderness crowd, walks on the sea, and heals the sick, while Herod’s banquet exposes the violence of a ruler with power but no moral spine.",
+  "timelineMini": {
+    "labels": [
+      "Jesus begins public ministry",
+      "Mark 6: Rejection, mission, bread, and storm",
+      "Jesus continues toward the cross"
+    ],
+    "activeIndex": 1
+  },
+  "estimatedDate": "c. AD 30",
+  "defaultVersion": "ESV",
+  "jesusConnection": "Mark 6 shows Jesus as the true Shepherd-King. He is rejected like the prophets, sends messengers with His authority, feeds people in the wilderness, walks over the chaotic waters, and brings healing wherever He goes. The chapter is not merely saying that Jesus can do impressive things. It is asking who He must be if He gives bread in the wilderness, sees His disciples in the storm, rules the sea, and welcomes desperate people to reach for Him. He is fully present in human weariness and grief, and fully sovereign with the authority of God.",
+  "behindTheChapter": [
+    {
+      "body": "Early Christian tradition strongly connects this Gospel with John Mark, a coworker of Peter and Paul. The Gospel itself is formally anonymous, so the traditional attribution is early and significant, while not stated inside the text.",
+      "title": "John Mark, in the circle of Peter",
+      "category": "Author"
+    },
+    {
+      "body": "Mark’s first readers were likely Greek-speaking believers, many of them Gentiles, learning to follow a crucified and risen Messiah in a world where power, suffering, and loyalty were not abstract ideas.",
+      "title": "Early Christians under pressure",
+      "category": "First Audience"
+    },
+    {
+      "body": "The world of Mark 6 includes village life, Roman imperial oversight, Herodian politics, synagogue teaching, itinerant ministry, poverty, illness, and the daily vulnerability of people who needed shepherding.",
+      "title": "Galilee under Rome",
+      "category": "Historical World"
+    },
+    {
+      "body": "Mark is preserved in important early manuscripts such as Codex Sinaiticus and Codex Vaticanus. Herod Antipas is known from sources including Josephus, and locations such as Nazareth, the Sea of Galilee, and Gennesaret are historically grounded, though some exact event sites remain uncertain.",
+      "title": "Manuscripts, places, and rulers",
+      "category": "Evidence & Artifacts"
+    }
+  ],
+  "biblicalTimeline": {
+    "era": "Life of Jesus",
+    "dateRange": {
+      "endYear": 33,
+      "startYear": 28
+    },
+    "confidence": "medium",
+    "estimatedYear": 30,
+    "chronologyBasis": "traditional/event date within Jesus’ public ministry",
+    "placementReason": "Mark 6 belongs to the Galilean phase of Jesus’ public ministry before the final journey to Jerusalem and the crucifixion.",
+    "uncertaintyNote": "The events of Jesus’ Galilean ministry are commonly placed around AD 28-33. The exact year of Mark 6 cannot be fixed from the text alone, and proposed chronologies vary depending on how the Gospel accounts are harmonized.",
+    "estimatedYearLabel": "Around AD 30, in Galilee under Herod Antipas"
+  },
+  "estimatedLocation": "Galilee: Nazareth, villages around the lake, a wilderness area near the Sea of Galilee, and Gennesaret",
+  "modernReadersMiss": "The miracles are not random displays of power. Mark wants the reader to compare Herod’s banquet with Jesus’ banquet, the disciples’ mission with John’s martyrdom, and the disciples’ amazement with their failure to understand. They receive the bread, but they miss what the bread is saying.",
+  "jesusConnectionShort": "The rejected Shepherd-King"
+}

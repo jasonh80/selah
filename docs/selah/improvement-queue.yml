@@ -364,3 +364,21 @@ entries:
       chapters exist; design rides with IQ-017's maps pass
     status: queued
     completion_pr: null
+
+  - id: IQ-019
+    area: content-schema
+    improvement: >-
+      New chapter section type(s) beyond today's schema — owner floated a
+      "discipleship" section (what following Jesus asks of the reader in
+      this chapter) as a candidate for FUTURE chapters. Needs its own spec:
+      schema addition, renderer, prompt/gate coverage, and a decision on
+      whether/when older published chapters backfill it. Explicitly NOT
+      part of the Mega Mark 6 text revision (owner deferred it there,
+      2026-07-20: "maybe that should wait").
+    evidence: >-
+      Owner suggestion, in-session 2026-07-20, during Mega Mark 6 scoping;
+      deferred by owner in the same exchange.
+    priority_trigger: owner-initiated design pass; spec (Codex) before any
+      build; no backfill of published chapters without explicit owner go
+    status: queued
+    completion_pr: null
