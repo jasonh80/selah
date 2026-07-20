@@ -609,3 +609,23 @@ entries:
       states) and the IQ-028/029 Studio pass
     status: queued
     completion_pr: null
+
+  - id: IQ-031
+    area: accessibility
+    improvement: >-
+      Text-size scaling ("do we need a way for users to change text size,
+      or do they just do that on their device?"): today the app sets
+      fixed pixel sizes (text-[13px] etc.), so browser/OS page zoom works
+      but the device's text-size preference (Dynamic Type / font-size
+      setting) largely does not. Phase 1 (foundation, no UI): move reader-
+      facing type to rem-based scaling so every device text setting just
+      works - especially for older readers. Phase 2 (only if readers ask):
+      an in-app text-size control in Settings, the pattern Bible apps
+      commonly carry.
+    evidence: >-
+      Owner question, in-session 2026-07-20. Fixed-px audit observation
+      from the same day's component work.
+    priority_trigger: phase 1 rides the next layout/typography pass
+      (bounded, visual-parity at default settings); phase 2 owner-gated
+    status: queued
+    completion_pr: null
