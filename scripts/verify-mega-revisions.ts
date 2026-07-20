@@ -34,9 +34,15 @@ const REVISIONS: RevisionSpec[] = [
     slug: "mark-7",
     basePath: "../docs/selah/mark-7-revision/base-workup.json",
     fixturePath: "../lib/ai/fixtures/mark-7-mega-revision.json",
-    // Voice-pass draft scope; Codex's rundown comparison may widen this list
-    // in review — widening REQUIRES editing this manifest, which is the point.
-    allowedChangedPaths: ["quickSummary"],
+    // Codex rundown comparison (PR #89 review, -286 words): exactly these
+    // five fields. Widening again requires editing this manifest.
+    allowedChangedPaths: [
+      "quickSummary",
+      "insights[chapter-flow].body",
+      "insights[jesus].body",
+      "insights[theology].body",
+      "insights[application].body",
+    ],
   },
 ];
 
