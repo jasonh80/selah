@@ -364,3 +364,42 @@ entries:
       chapters exist; design rides with IQ-017's maps pass
     status: queued
     completion_pr: null
+
+  - id: IQ-019
+    area: content-schema
+    improvement: >-
+      New chapter section type(s) beyond today's schema — owner floated a
+      "discipleship" section (what following Jesus asks of the reader in
+      this chapter) as a candidate for FUTURE chapters. Needs its own spec:
+      schema addition, renderer, prompt/gate coverage, and a decision on
+      whether/when older published chapters backfill it. Explicitly NOT
+      part of the Mega Mark 6 text revision (owner deferred it there,
+      2026-07-20: "maybe that should wait").
+    evidence: >-
+      Owner suggestion, in-session 2026-07-20, during Mega Mark 6 scoping;
+      deferred by owner in the same exchange. (Entry originally rode PR #77,
+      which closes unmerged - re-landed here.)
+    priority_trigger: owner-initiated design pass; spec (Codex) before any
+      build; no backfill of published chapters without explicit owner go
+    status: queued
+    completion_pr: null
+
+  - id: IQ-020
+    area: content-schema
+    improvement: >-
+      "Gospel Comparison" section: how THIS chapter's telling differs
+      across Matthew/Mark/Luke/John — e.g. Mark 11's two-day temple telling
+      and leafy branches vs. Matthew's same-day + Zechariah, Luke's
+      cloaks-only + weeping, John's palms. Rides the existing honesty
+      model: each difference labeled by which Gospel says what, never
+      blended. Needs a spec: schema, renderer, prompt/gate coverage,
+      per-genre applicability (Gospels only), backfill decision.
+    evidence: >-
+      Owner idea, in-session 2026-07-20, mid Mark 11 launch, sparked by the
+      cross-Gospel guardrail ("OOOHHHH!!!! that should be another section
+      !!!! gospel comparison").
+    priority_trigger: owner-initiated design pass; Codex spec first (pairs
+      naturally with the Kelly-characters spec session); build after the
+      Mark 6-10 polish batch
+    status: queued
+    completion_pr: null
