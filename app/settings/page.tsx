@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageBody, ComingLater } from "@/components/shell/PageBody";
-import { ThemePicker, VersionPicker, TransparencyToggle } from "@/components/settings/controls";
+import { ThemePicker, VersionPicker, TransparencyToggle, StudyModePicker } from "@/components/settings/controls";
 import { BUILD_ID } from "@/lib/build";
 import { resolveTodaysChapter } from "@/lib/chapters/registry";
 
@@ -32,6 +32,13 @@ export default async function SettingsPage() {
           <Section label="Bible version">
             <VersionPicker />
             <p className="mt-2 text-[12px] text-secondary">Used across the app. Translation text is wired up later.</p>
+          </Section>
+
+          <Section label="Study mode">
+            <StudyModePicker />
+            <p className="mt-2 text-[12px] text-secondary">
+              New readers start in Quick Study. Your choice here sticks on this device.
+            </p>
           </Section>
 
           <Section label="Sound & Stillness" badge>
