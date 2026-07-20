@@ -8,11 +8,15 @@ import { chapterYear } from "@/lib/chapter-year";
 // between. Only the pin moves per chapter.
 type Marker = { key: string; label: string; year: number; cross?: boolean };
 
+// Owner marker set (2026-07-19): Adam & Eve · Ark · 10 Commandments ·
+// David & Goliath (owner pick over 1st Temple / Promised Land — the story
+// everyone knows on sight) · Jesus · Today. Years drive only the pin
+// interpolation between neighbors; spacing stays even.
 const MARKERS: Marker[] = [
-  { key: "creation", label: "Creation", year: -4000 },
+  { key: "adam-eve", label: "Adam & Eve", year: -4000 },
   { key: "ark", label: "Ark", year: -2500 },
   { key: "commandments", label: "10 Commandments", year: -1446 },
-  { key: "temple", label: "1st Temple", year: -960 },
+  { key: "david-goliath", label: "David & Goliath", year: -1025 },
   { key: "jesus", label: "Jesus", year: 30, cross: true },
   { key: "today", label: "Today", year: 2026 },
 ];
