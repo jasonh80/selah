@@ -12,12 +12,15 @@ for Codex's rundown comparison** — the current draft is deliberately minimal.
 | Preview | `/chapter/mark-7-revision-preview` — dev + Netlify previews ONLY (fail-closed) |
 | Gate | `verify:mega-revisions` (prebuild): declared-paths-only + word-flat-or-shorter + churchy scan |
 
-## Current draft (Claude voice pass — 2 fields, −3 words)
+## Current state: Codex rundown comparison APPLIED (five fields, -286 words)
 
-Mark 7's sprint-era copy already carries real voice ("disobedience wearing a
-name tag"). This pass touches only the two teachery spots: `quickSummary`
-(zinger close: "Clean hands are easy. Clean hearts take a miracle.") and
-`summary` (narrator-about-reader phrasing removed).
+Codex compared Jason's Mark 7 Daily Workup/Rundown against the live chapter
+(PR #89 review) and rewrote exactly five fields: `quickSummary` and the
+`chapter-flow`, `jesus`, `theology`, and `application` insight bodies.
+Combined changed copy: 879 -> 593 words. `summary` is NOT changed (it renders
+nowhere in the reader UI - flagged for schema cleanup). Codex's final
+editorial approval is the copy gate (owner decision 2026-07-20); apply rides
+the batched snapshot-first script with the rest of the 7-10 queue.
 
 ## What makes it MEGA (owner definition)
 
