@@ -46,21 +46,17 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
   const range = bt?.dateRange;
   const year = chapterYear(data);
   const pinPos = year != null ? pinPosForYear(year) : null;
-  // Owner look fix (2026-07-19 phone screenshot): when the pin lands on a
-  // marker — EVERY Mark chapter sits exactly on the Jesus ✝ — the old pin dot
-  // covered the marker under a heavy halo (the /20 ring alpha silently fails
-  // on this theme's plain-var colors, rendering a solid blob). Now the badge
-  // points at the marker itself and the marker lights up instead.
-  const activeMarkerIndex =
-    pinPos == null
-      ? null
-      : (() => {
-          let best = 0;
-          for (let i = 1; i < MARKERS.length; i++) {
-            if (Math.abs(posForIndex(i) - pinPos) < Math.abs(posForIndex(best) - pinPos)) best = i;
-          }
-          return Math.abs(posForIndex(best) - pinPos) < 2.5 ? best : null;
-        })();
+  // Owner look fix (2026-07-19 phone screenshot): when the chapter's year IS
+  // a marker's year — every Mark chapter sits exactly on Jesus (AD 30) — the
+  // badge points at the marker itself and the marker lights up; nothing
+  // covers it. EXACT year match only (Codex #74 P1: a proximity snap lit a
+  // marker published Psalm 23 does not actually sit on — nearby dates keep
+  // their honest interpolated pin instead).
+  const activeMarkerIndex = (() => {
+    if (year == null) return null;
+    const i = MARKERS.findIndex((m) => m.year === year);
+    return i === -1 ? null : i;
+  })();
   const badgePos = activeMarkerIndex != null ? posForIndex(activeMarkerIndex) : pinPos;
   const rangeText = range
     ? `${fmtYear(range.startYear)} – ${fmtYear(range.endYear)}`
