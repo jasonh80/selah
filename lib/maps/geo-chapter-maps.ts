@@ -306,9 +306,11 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     caption:
       "Mark 10 turns south: Judea and beyond the Jordan, then the climb from Jericho toward Jerusalem. The two cities carry pins; the region's boundary is approximate; the road appears only as a broad sweep because the exact route is unrecorded.",
   },
-  // Mark 11 (launched 2026-07-20): its acceptance packet carries movements
-  // but no location entries, so the map uses CURATED entries
-  // (GEO_CURATED_LOCATIONS) — same two-axis honesty model, same enforcement.
+  // Mark 11 (launched 2026-07-20): renders the DIGEST-BOUND packet entries
+  // that landed with #75 — Jerusalem known point · Mount of Olives known
+  // region · Bethany and Bethphage probable region · Road into Jerusalem
+  // probable route (Codex #81 review: the packet is authoritative; the
+  // earlier curated draft is gone).
   "mark-11": {
     views: {
       local: { center: [35.2465, 31.7765], zoom: 13.2 },
@@ -316,7 +318,6 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     },
     pins: [
       { lng: 35.2354, lat: 31.7784, label: "Jerusalem", locationName: "Jerusalem", labelSide: "left" },
-      { lng: 35.261, lat: 31.7717, label: "Bethany", locationName: "Bethany" },
     ],
     areas: [
       {
@@ -326,16 +327,16 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
         labelAt: [35.245, 31.792],
       },
       {
-        locationName: "Bethphage",
-        label: "Bethphage · site debated",
-        polygon: circlePolygon(35.2469, 31.7752, 0.7),
-        labelAt: [35.263, 31.783],
+        locationName: "Bethany and Bethphage",
+        label: "Bethany & Bethphage · probable sites",
+        polygon: circlePolygon(35.254, 31.7735, 1.1),
+        labelAt: [35.27, 31.769],
       },
     ],
     corridors: [
       {
-        locationName: "Road from Bethany",
-        label: "Approx. daily road",
+        locationName: "Road into Jerusalem",
+        label: "Approx. road into the city",
         waypoints: [
           [35.261, 31.7717], [35.2469, 31.7752], [35.2361, 31.778],
         ],
@@ -370,7 +371,7 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
       },
     ],
     caption:
-      "Mark 11 lives on two miles of road: Bethany and the Mount of Olives, the ride into Jerusalem, and the temple told across two days. Jerusalem and Bethany carry pins; Bethphage is a debated site; the daily road appears only as a broad band.",
+      "Mark 11 lives on two miles of road: the villages at the ridge, the ride over the Mount of Olives, and the temple told across two days. Jerusalem is pinned; Bethany and Bethphage share an approximate area; the ridge is a known region with an approximate boundary; the road into the city appears only as a broad band.",
   },
 
   // Mark 6 (owner request 2026-07-20: bring the pre-sprint benchmark chapter
@@ -479,45 +480,6 @@ export const GEO_CURATED_LOCATIONS: Record<
     display: string;
   }[]
 > = {
-  // Mark 11's acceptance packet has movements but no location entries, so
-  // the map's entries are curated here (reviewed as data in the PR).
-  "mark-11": [
-    {
-      name: "Jerusalem",
-      featureKind: "point",
-      certainty: "known",
-      role: "event",
-      display: "The city Jesus enters riding the colt; the temple He clears (11:1–19)",
-    },
-    {
-      name: "Bethany",
-      featureKind: "point",
-      certainty: "known",
-      role: "event",
-      display: "The village where Jesus lodges each night (11:11–12); traditional site al-Eizariya",
-    },
-    {
-      name: "Bethphage",
-      featureKind: "region",
-      certainty: "debated",
-      role: "event",
-      display: "Where the colt is fetched (11:1–7) — the traditional Mount of Olives site is debated",
-    },
-    {
-      name: "Mount of Olives",
-      featureKind: "region",
-      certainty: "known",
-      role: "event",
-      display: "The ridge east of the city where the approach begins (11:1)",
-    },
-    {
-      name: "Road from Bethany",
-      featureKind: "route",
-      certainty: "probable",
-      role: "event",
-      display: "The daily walk in and out of the city — the fig tree stands somewhere along it (11:12–14, 20–21)",
-    },
-  ],
   "mark-6": [
     {
       name: "Nazareth",
