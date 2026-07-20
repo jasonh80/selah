@@ -206,7 +206,10 @@ entries:
       used or discarded." Claude verified the append-only storage claims
       against lib/server/images.ts the same day.
     priority_trigger: after the current safety work (IQ-005/IQ-006) and
-      Mark 10; pairs naturally with the People/gallery direction
+      Mark 10; pairs naturally with the People/gallery direction. Owner
+      interest re-voiced 2026-07-20 mid-launch ("it will be interesting
+      one day to look at the outtakes folder of images unused") — the day
+      produced two rejected Humble King candidates, both preserved
     status: queued
     completion_pr: null
 
