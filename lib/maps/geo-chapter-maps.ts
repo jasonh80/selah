@@ -306,8 +306,230 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
     caption:
       "Mark 10 turns south: Judea and beyond the Jordan, then the climb from Jericho toward Jerusalem. The two cities carry pins; the region's boundary is approximate; the road appears only as a broad sweep because the exact route is unrecorded.",
   },
+  // Mark 11 (launched 2026-07-20): renders the DIGEST-BOUND packet entries
+  // that landed with #75 — Jerusalem known point · Mount of Olives known
+  // region · Bethany and Bethphage probable region · Road into Jerusalem
+  // probable route (Codex #81 review: the packet is authoritative; the
+  // earlier curated draft is gone).
+  "mark-11": {
+    views: {
+      local: { center: [35.2465, 31.7765], zoom: 13.2 },
+      big: { center: [35.33, 31.8], zoom: 9.6 },
+    },
+    pins: [
+      { lng: 35.2354, lat: 31.7784, label: "Jerusalem", locationName: "Jerusalem", labelSide: "left" },
+    ],
+    areas: [
+      {
+        locationName: "Mount of Olives",
+        label: "Mount of Olives · approx.",
+        polygon: circlePolygon(35.245, 31.778, 1.2),
+        labelAt: [35.245, 31.792],
+      },
+      {
+        locationName: "Bethany and Bethphage",
+        label: "Bethany & Bethphage · probable sites",
+        polygon: circlePolygon(35.254, 31.7735, 1.1),
+        labelAt: [35.27, 31.769],
+      },
+    ],
+    corridors: [
+      {
+        locationName: "Road into Jerusalem",
+        label: "Approx. road into the city",
+        waypoints: [
+          [35.261, 31.7717], [35.2469, 31.7752], [35.2361, 31.778],
+        ],
+        labelAt: [35.256, 31.769],
+      },
+    ],
+    tour: [
+      {
+        center: [35.2469, 31.7752], zoom: 14, pitch: 50,
+        title: "Bethphage and Bethany, at the Mount of Olives",
+        caption: "The colt is fetched near Bethphage and Bethany (11:1–7) and Jesus rides toward the city over cloaks and leafy branches cut from the fields (11:8) — the palm branches people picture are John's detail, not Mark's.",
+      },
+      {
+        center: [35.2354, 31.7781], zoom: 14.5, pitch: 55, bearing: -25,
+        title: "Into the temple — and out again",
+        caption: "Jesus enters Jerusalem, goes into the temple, looks around at everything — and leaves, because it is already late (11:11). Mark tells the temple in two days, not one.",
+      },
+      {
+        center: [35.25, 31.774], zoom: 13.8, pitch: 45,
+        title: "The road and the fig tree",
+        caption: "On the next morning's walk in from Bethany, Jesus curses a fig tree in leaf without fruit (11:12–14); they pass it withered the morning after (11:20–21). The road is drawn as a broad band; the tree's spot is unrecorded.",
+      },
+      {
+        center: [35.2354, 31.7781], zoom: 14.5, pitch: 55,
+        title: "The temple courts cleared",
+        caption: "Jesus drives out the sellers and buyers and overturns the money-changers' tables — 'a house of prayer for all the nations' (11:15–17). Mark names no whip; that detail belongs to John's account.",
+      },
+      {
+        center: [35.2354, 31.7784], zoom: 14, pitch: 50, bearing: 20,
+        title: "By what authority?",
+        caption: "Walking in the temple again, the chief priests, scribes, and elders demand His credentials (11:27–33). Jesus answers their question with John's baptism — and they refuse to answer at all.",
+      },
+    ],
+    caption:
+      "Mark 11 lives on two miles of road: the villages at the ridge, the ride over the Mount of Olives, and the temple told across two days. Jerusalem is pinned; Bethany and Bethphage share an approximate area; the ridge is a known region with an approximate boundary; the road into the city appears only as a broad band.",
+  },
+
+  // Mark 6 (owner request 2026-07-20: bring the pre-sprint benchmark chapter
+  // onto the real-map engine). Locations are the CURATED entries below
+  // (GEO_CURATED_LOCATIONS) — same two-axis honesty model, enforced by
+  // verify:maps-honesty exactly like the digest-bound sprint chapters.
+  "mark-6": {
+    views: {
+      local: { center: [35.56, 32.83], zoom: 10.2 },
+      big: { center: [35.48, 32.25], zoom: 7.2 },
+    },
+    pins: [
+      { lng: 35.3027, lat: 32.7019, label: "Nazareth", locationName: "Nazareth", labelSide: "left" },
+    ],
+    areas: [
+      {
+        locationName: "Feeding of the five thousand",
+        label: "Feeding of the 5,000 · site debated",
+        polygon: circlePolygon(35.585, 32.885, 4),
+        labelAt: [35.585, 32.905],
+      },
+      {
+        locationName: "Bethsaida",
+        label: "Bethsaida · site debated",
+        polygon: circlePolygon(35.626, 32.899, 2),
+        labelAt: [35.655, 32.899],
+      },
+      {
+        locationName: "Gennesaret",
+        label: "Gennesaret plain · approx.",
+        polygon: circlePolygon(35.535, 32.855, 3),
+        labelAt: [35.5, 32.838],
+      },
+      {
+        locationName: "Machaerus",
+        label: "Machaerus · per Josephus, debated",
+        polygon: circlePolygon(35.6244, 31.5672, 2.5),
+        labelAt: [35.66, 31.567],
+      },
+    ],
+    corridors: [
+      {
+        locationName: "Night crossing",
+        label: "Approx. night crossing",
+        waypoints: [
+          [35.6, 32.88], [35.575, 32.868], [35.548, 32.858],
+        ],
+        labelAt: [35.578, 32.845],
+      },
+    ],
+    tour: [
+      {
+        center: [35.3027, 32.7019], zoom: 12, pitch: 50,
+        title: "Nazareth",
+        caption: "Jesus teaches in His hometown synagogue and is dismissed by the people who know His family best (6:1–6). The village site is certain.",
+      },
+      {
+        center: [35.45, 32.8], zoom: 9, pitch: 30,
+        title: "The village circuit",
+        caption: "The Twelve go out two by two through the Galilean villages, preaching and healing (6:7–13). No itinerary is recorded, so no route is drawn.",
+      },
+      {
+        center: [35.6244, 31.5672], zoom: 10.5, pitch: 45,
+        title: "Machaerus — far from Galilee",
+        caption: "While the Twelve preach, Mark tells John's death (6:14–29). Mark names no place; Josephus places John's imprisonment and execution at Machaerus, east of the Dead Sea — the banquet's setting is debated, so the fortress shows as a soft area.",
+      },
+      {
+        center: [35.585, 32.885], zoom: 11.5, pitch: 45,
+        title: "A desolate place",
+        caption: "The feeding of the five thousand happens in a remote spot by the lake (6:31–44). Tradition points to Tabgha or the northeast shore; the exact place is debated.",
+      },
+      {
+        center: [35.575, 32.865], zoom: 11, pitch: 55, bearing: -20,
+        title: "The night crossing",
+        caption: "The disciples strain at the oars against the wind while Jesus comes to them on the water (6:45–52). The crossing toward Bethsaida is text-given; the drawn band is approximate.",
+      },
+      {
+        center: [35.535, 32.855], zoom: 12, pitch: 50,
+        title: "Gennesaret",
+        caption: "The boat lands at Gennesaret and the whole region carries its sick to Jesus — even the fringe of His garment heals (6:53–56). The fertile plain is a known region with an approximate boundary.",
+      },
+    ],
+    caption:
+      "Mark 6 moves from Nazareth's rejection through the village circuit (no route recorded), to a debated feeding site by the lake, a night crossing shown only as a broad band, and the Gennesaret plain — with John's death far south at Machaerus, per Josephus. Only Nazareth is certain enough for a pin.",
+  },
 };
 
 export function getGeoChapterMap(slug: string): GeoChapterMap | null {
   return GEO_CHAPTER_MAPS[slug] ?? null;
 }
+
+/**
+ * Curated two-axis location entries for geo chapters that PREDATE the Prepare
+ * packet lane (no digest-bound entries in mark-sprint-acceptance.v1.json).
+ * Same honesty model, same shapes, reviewed as data in the PR;
+ * verify:maps-honesty enforces every overlay against these exactly as it
+ * does against the digest-bound sprint entries.
+ */
+export const GEO_CURATED_LOCATIONS: Record<
+  string,
+  {
+    name: string;
+    featureKind: "point" | "region" | "route" | "text-only";
+    certainty: "known" | "probable" | "debated" | "unknown";
+    role: "event" | "context";
+    display: string;
+  }[]
+> = {
+  "mark-6": [
+    {
+      name: "Nazareth",
+      featureKind: "point",
+      certainty: "known",
+      role: "event",
+      display: "Jesus is dismissed in His hometown (6:1–6)",
+    },
+    {
+      name: "Galilean village circuit",
+      featureKind: "route",
+      certainty: "unknown",
+      role: "event",
+      display: "The Twelve go out two by two among the villages (6:7–13) — no itinerary recorded",
+    },
+    {
+      name: "Machaerus",
+      featureKind: "region",
+      certainty: "debated",
+      role: "event",
+      display:
+        "John's imprisonment and death — Josephus names Machaerus; Mark names no place, and the banquet's setting is debated (6:14–29)",
+    },
+    {
+      name: "Feeding of the five thousand",
+      featureKind: "region",
+      certainty: "debated",
+      role: "event",
+      display: "A desolate place by the lake (6:31–44) — traditional sites include Tabgha and the NE shore; the exact spot is debated",
+    },
+    {
+      name: "Bethsaida",
+      featureKind: "region",
+      certainty: "debated",
+      role: "event",
+      display: "The crossing's stated destination (6:45) — the town's own site is debated (et-Tell vs. el-Araj)",
+    },
+    {
+      name: "Night crossing",
+      featureKind: "route",
+      certainty: "probable",
+      role: "event",
+      display: "The boat fights the wind toward Bethsaida and lands at Gennesaret (6:45–53)",
+    },
+    {
+      name: "Gennesaret",
+      featureKind: "region",
+      certainty: "known",
+      role: "event",
+      display: "The fertile plain where the sick are carried to Jesus (6:53–56)",
+    },
+  ],
+};

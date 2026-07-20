@@ -41,7 +41,11 @@ import {
   type MapPin,
   type MapRegion,
 } from "../lib/maps/chapter-maps";
-import { GEO_CHAPTER_MAPS, type GeoChapterMap } from "../lib/maps/geo-chapter-maps";
+import {
+  GEO_CHAPTER_MAPS,
+  GEO_CURATED_LOCATIONS,
+  type GeoChapterMap,
+} from "../lib/maps/geo-chapter-maps";
 
 let checks = 0;
 function ok(cond: boolean, label: string): void {
@@ -389,7 +393,13 @@ function checkGeoChapter(
 
 const fixtureSlugs = Object.keys(acceptance.chapters);
 for (const slug of fixtureSlugs) {
-  const raw = acceptance.chapters[slug].locations ?? [];
+  // Digest-bound packet entries first; a packet WITHOUT location entries
+  // (mark-11) falls back to the curated set so its geo config is still
+  // enforced — never checked against an empty list (which would fail every
+  // overlay) and never skipped.
+  const raw = (acceptance.chapters[slug].locations?.length
+    ? acceptance.chapters[slug].locations
+    : GEO_CURATED_LOCATIONS[slug]) ?? [];
   const locations = raw
     .map((entry) => normalizePrepareLocation(entry))
     .filter((entry): entry is PrepareLocation => entry !== null);
@@ -407,6 +417,25 @@ for (const slug of fixtureSlugs) {
   }
   if (cfg) checkChapter(slug, locations, cfg, ok);
   if (geoCfg) checkGeoChapter(slug, locations, geoCfg, ok);
+}
+
+// Geo chapters that PREDATE the Prepare packet lane (e.g. mark-6, owner
+// request 2026-07-20) carry CURATED two-axis entries reviewed as data in the
+// PR — the same model and the same enforcement as the digest-bound sprint
+// entries. A curated geo config without entries fails: no overlay may exist
+// that this gate does not check.
+for (const slug of Object.keys(GEO_CHAPTER_MAPS)) {
+  if (acceptance.chapters[slug]) continue; // digest-bound path above
+  const raw = GEO_CURATED_LOCATIONS[slug] ?? [];
+  ok(raw.length > 0, `${slug}: curated geo chapter carries location entries`);
+  const locations = raw
+    .map((entry) => normalizePrepareLocation(entry))
+    .filter((entry): entry is PrepareLocation => entry !== null);
+  ok(
+    locations.length === raw.length,
+    `${slug}: every curated location entry is valid under the two-axis model`,
+  );
+  checkGeoChapter(slug, locations, GEO_CHAPTER_MAPS[slug], ok);
 }
 
 // --- Negative controls -------------------------------------------------------
