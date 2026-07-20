@@ -94,8 +94,12 @@ function CaptionBlock({ check }: { check: SceneCheck }) {
           <circle cx="12" cy="12" r="2.5" />
         </svg>
         <span className="flex-1 text-[15px] font-semibold leading-snug text-primary">{check.title}</span>
-        <span aria-hidden className="text-secondary">
-          {open ? "⌃" : "›"}
+        {/* Owner ask (2026-07-20): make "there's a full explanation here"
+            obvious without new real estate — a labeled expand cue in the
+            accent color, same affordance language as the "Read <ref> ⌄"
+            control, instead of a navigation-reading "›". */}
+        <span aria-hidden className="shrink-0 text-[11px] font-medium text-accent-strong">
+          {open ? "Less ⌃" : "More ⌄"}
         </span>
       </button>
       {open && (
