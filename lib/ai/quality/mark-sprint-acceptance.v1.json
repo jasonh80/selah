@@ -362,27 +362,37 @@
         {
           "id": "M11-M01",
           "startVerse": 1,
-          "endVerse": 11
+          "endVerse": 11,
+          "name": "The King arrives on a colt",
+          "reason": "Jesus enters Jerusalem on a colt as crowds spread cloaks and branches and cry 'Hosanna' (11:1-11); Mark says 'colt' and sends two unnamed disciples - no names or species beyond the text."
         },
         {
           "id": "M11-M02",
           "startVerse": 12,
-          "endVerse": 14
+          "endVerse": 14,
+          "name": "A fig tree with nothing but leaves",
+          "reason": "On the road from Bethany Jesus finds leaves but no fruit and speaks against the tree (11:12-14) - Mark notes it was not the season for figs."
         },
         {
           "id": "M11-M03",
           "startVerse": 15,
-          "endVerse": 19
+          "endVerse": 19,
+          "name": "The temple stopped in its tracks",
+          "reason": "Jesus drives out sellers and buyers, overturns tables, and stops people carrying goods through the temple, quoting 'a house of prayer for all the nations' (11:15-19); vendor fraud is not proved by the text."
         },
         {
           "id": "M11-M04",
           "startVerse": 20,
-          "endVerse": 26
+          "endVerse": 26,
+          "name": "The withered tree and believing prayer",
+          "reason": "The tree is found withered; Jesus teaches faith, prayer, and forgiveness (11:20-25) - the ESV omits the disputed verse 26 inside this movement, and prayer is never a prosperity formula."
         },
         {
           "id": "M11-M05",
           "startVerse": 27,
-          "endVerse": 33
+          "endVerse": 33,
+          "name": "By what authority?",
+          "reason": "Chief priests, scribes, and elders question Jesus' authority; his counter-question about John's baptism leaves them unwilling to answer (11:27-33)."
         }
       ],
       "manual_guardrails": [
@@ -394,6 +404,36 @@
       ],
       "textual_variants": [
         "Mark 11:26: important earlier witnesses omit the added sentence found in later manuscripts."
+      ],
+      "locations": [
+        {
+          "name": "Jerusalem",
+          "featureKind": "point",
+          "certainty": "known",
+          "role": "event",
+          "display": "The chapter's events center on Jerusalem and its temple courts (11:11, 11:15-19, 11:27) - the city is a known point; no spot inside the temple courts is pinned."
+        },
+        {
+          "name": "Mount of Olives",
+          "featureKind": "region",
+          "certainty": "known",
+          "role": "context",
+          "display": "The approach runs 'to Bethphage and Bethany, at the Mount of Olives' (11:1) - the ridge east of the city is known; shown as an area, never a pin for any single scene."
+        },
+        {
+          "name": "Bethany and Bethphage",
+          "featureKind": "region",
+          "certainty": "probable",
+          "role": "context",
+          "display": "The villages where the colt is found and where Jesus lodges each evening (11:1, 11:11-12, 11:19); their traditional sites are probable, so they appear as an approximate area, not pins."
+        },
+        {
+          "name": "Road into Jerusalem",
+          "featureKind": "route",
+          "certainty": "probable",
+          "role": "event",
+          "display": "The procession moves from the villages over the ridge into the city (11:8-10); the text gives the sequence of places but not the road, so only a broad stylized corridor is shown, never a precise line."
+        }
       ]
     }
   }

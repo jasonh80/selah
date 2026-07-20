@@ -17,12 +17,28 @@ export const dynamic = "force-dynamic";
 // one shareable home).
 const SITE_URL = "https://selahlearn.netlify.app";
 
+// Cut at the last word boundary within the limit and strip trailing
+// punctuation, so previews never end mid-word or on a dangling comma.
+function truncateAtWord(text: string, max: number): string {
+  const clean = text.trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max - 1);
+  const atWord = cut.slice(0, cut.lastIndexOf(" "));
+  return `${atWord.replace(/[,;:.\s—-]+$/u, "")}…`;
+}
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const resolved = await resolveChapter(params.slug);
   if (!resolved) return {};
   const w = resolved.workup;
   const title = `${w.reference} — ${w.subtitle} · Selah`;
-  const description = (w.quickSummary || `${w.reference}, made visual, simple, and personal.`).slice(0, 300);
+  // Production-QA fix (2026-07-19): a raw 300-char slice left dangling commas
+  // and cut-off sentences in search/social previews. Truncate at a word
+  // boundary with an honest ellipsis instead.
+  const description = truncateAtWord(
+    w.quickSummary || `${w.reference}, made visual, simple, and personal.`,
+    300,
+  );
   const canonical = `${SITE_URL}/chapter/${w.slug}`;
   // The SAME hero the page renders (heroKind + overrides + fallback via
   // heroImageFor) — the social preview must never disagree with the visible

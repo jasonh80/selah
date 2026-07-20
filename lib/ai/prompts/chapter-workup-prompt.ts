@@ -148,12 +148,36 @@ MACHINE-CHECKED COMPLETENESS (the draft is REJECTED automatically if any line fa
           .map((n) => `- ${n}`)
           .join("\n")}`
       : "";
-  const examplesBlock =
-    examples && examples.length
-      ? `\n\nAPPROVED VOICE EXAMPLE — THE GOLD STANDARD FOR HOW THIS SHOULD SOUND\nMatch the warmth, rhythm, directness, short punchy interpretive lines, restrained wit, wise-friend tone, and practical Jesus-centered clarity of the example(s) below. Write Selah's structured fields in THIS register — not generic, academic, or "Bible-app" phrasing. Capture the voice and the kind of insight; do not copy the wording verbatim.\n${examples
+  // Codex #73 P1-1: ONLY voice-type examples may enter the voice-mimic lane.
+  // Other text examples (structure, scene_check, application) demonstrate
+  // FORM — their wording/register must never be imitated, or a non-voice
+  // exemplar would quietly retrain the voice the owner rejected.
+  const voiceExamples = (examples ?? []).filter((e) => e.exampleType === "voice");
+  const formExamples = (examples ?? []).filter((e) => e.exampleType !== "voice");
+  // CANONICAL VOICE BRIEF (owner acceptance criteria, board #29, 2026-07-20).
+  // Always present — the register must hold even when no voice pack retrieves.
+  const voiceBriefBlock = `\n\nSELAH VOICE — CANONICAL BRIEF (applies to every field)
+Selah is a wise, funny, thoughtful, caring friend sitting beside the reader — a buddy, never a lecturer. Scripture first; Jesus clearly seen; every section moves the reader toward Jesus, reflection, and response.
+- Deep theology in normal words. Avoid church-insider vocabulary in ordinary explanation (e.g. not "discernment" — prefer plain phrasing like "Familiarity can feel like understanding. It isn't.").
+- Warm BEFORE challenging. Earn the hard word with real care first.
+- Crafted zingers are a core strength: sharp, memorable lines that make the truth land. A zinger must arise from the passage, clarify rather than decorate, and be original — never suppress strong writing merely because it is crafted, and never make the sufferer the joke.
+- Warm and tighten the explanatory prose BETWEEN the zingers; do not flatten the zingers themselves.
+- Occasionally (at most once per chapter) a gentle, self-aware app-personality aside about ordinary human foolishness is welcome — never about suffering.
+- Restrained humor targets human foolishness, never pain.
+- Keep what the text SAYS, what is reasonable INFERENCE, and what is UNKNOWN clearly distinct.`;
+  const voiceBlock =
+    voiceExamples.length > 0
+      ? `\n\nAPPROVED VOICE EXAMPLE — THE GOLD STANDARD FOR HOW THIS SHOULD SOUND\nThese are owner-approved lines quoted verbatim from the approved-voice chats. Match their warmth, rhythm, directness, short punchy interpretive lines, restrained wit, wise-friend tone, and practical Jesus-centered clarity. Write Selah's structured fields in THIS register — not generic, academic, or "Bible-app" phrasing. Capture the voice and the kind of insight; do NOT copy or lightly rephrase the lines themselves.\n${voiceExamples
           .map((e) => `--- EXAMPLE: ${e.title} (${e.exampleType}) ---\n${e.content}\n--- END EXAMPLE ---`)
           .join("\n\n")}`
       : "";
+  const formBlock =
+    formExamples.length > 0
+      ? `\n\nAPPROVED FORM EXAMPLES — SHAPE ONLY, NOT VOICE\nThe example(s) below show the expected SHAPE of a field (how a structure is laid out, what a scene check corrects, how an application lands). Imitate their form, scope, and honesty — do NOT imitate their wording, rhythm, or register, and never copy phrases from them.\n${formExamples
+          .map((e) => `--- FORM EXAMPLE: ${e.title} (${e.exampleType}) ---\n${e.content}\n--- END FORM EXAMPLE ---`)
+          .join("\n\n")}`
+      : "";
+  const examplesBlock = `${voiceBriefBlock}${voiceBlock}${formBlock}`;
   const generationSourceBlock = generationSource
     ? `\n\nSERVER-SUPPLIED GENERATION SOURCE (${generationSource.label.trim()})
 Use PRIMARY CHAPTER for this workup. CONTEXT BEFORE and CONTEXT AFTER may only

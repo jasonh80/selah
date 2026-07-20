@@ -83,8 +83,12 @@ entries:
       #29, no secrets accessed), so Jason's authenticated Studio session is
       the executor - his staged two-tap checklist is on the board. Rollback
       stays available after any apply.
-    status: queued
-    completion_pr: null
+    status: finished
+    completion_pr: "published-redo lane (#66), owner-run Studio taps —
+      2026-07-19: mountain + hero redone and verified landscape+live
+      (~$0.51 day total incl. Mark 10's wealthy-man); child image completed
+      2026-07-20, owner confirmed Mark 9 fully imaged 3/3 (board #29 /
+      in-session). No code change; rollback remains available."
 
   - id: IQ-005
     area: workers
