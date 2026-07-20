@@ -6,7 +6,7 @@
 > Mark 8 turns on sight: crowds are fed, opponents demand proof, disciples remember bread but miss meaning, and a blind man receives vision in stages. Peter finally names Jesus as the Christ, but immediately resists the path of suffering Jesus says He must take. The chapter ends with Jesus calling anyone who follows Him to costly allegiance, not comfortable admiration.
 
 **Proposed:**
-> Mark 8 is a chapter about blurry vision. Jesus feeds thousands—again—and the disciples still worry about bread. Peter correctly calls Him the Christ, then immediately tries to explain how the Christ should do His job. You humans, you’re remarkably consistent. Between those scenes, Jesus heals a blind man in stages. Mark’s point is clear: seeing Jesus takes more than recognizing His power. It means receiving the cross-shaped way He came to save—and following Him when that way costs comfort, control, or applause.
+> Mark 8 is a chapter about blurry vision. Jesus feeds thousands—again—and the disciples still worry about bread. Peter correctly calls Him the Christ, then immediately tries to explain how the Christ should do His job. Humans… predictable. Between those scenes, Jesus heals a blind man in stages. Mark’s point is clear: seeing Jesus takes more than recognizing His power. It means receiving the cross-shaped way He came to save—and following Him when that way costs comfort, control, or applause.
 
 ---
 

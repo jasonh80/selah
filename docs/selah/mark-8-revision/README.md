@@ -19,6 +19,6 @@ a tightening pass, −357 words. Everything else byte-identical (gate-proven).
 Codex's exact-head editorial recheck is the copy gate; apply rides the
 batched snapshot-first script with the 7→10 queue.
 
-Two items flagged for Codex's recheck (its call): the owner's name appears
-in public copy ("Come on, Jason") and the "You humans, you're remarkably
-consistent" line now exists in both Mark 6 and Mark 8.
+Flags: (1) "Come on, Jason" in public copy — Codex's call at recheck.
+(2) RESOLVED: the duplicated "You humans…" line became the owner-supplied
+variation "Humans… predictable." (no recycled jokes rule, 2026-07-20).
