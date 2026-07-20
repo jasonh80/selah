@@ -415,7 +415,12 @@ entries:
       inline label like "waiting for draft"), and the active next step a
       single clear emphasis.
     evidence: >-
-      Owner observation, in-session 2026-07-20, mid Mark 11 launch.
+      Owner observation, in-session 2026-07-20, mid Mark 11 launch. Second
+      concrete case same session: after approving the draft, the filled
+      "Ready" toggle under Preview Draft reads as a live call-to-action —
+      "do i need to click ready again? it looks highlighted even though it
+      is already approved." Selected-state must look DONE (checkmark +
+      muted), never like the next button to press.
     priority_trigger: next Studio UX pass (free); pairs with the self-serve
       launch flow polish
     status: queued
