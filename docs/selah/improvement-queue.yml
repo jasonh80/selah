@@ -601,10 +601,10 @@ entries:
       interesting"; (b) user data on the same screen - clicks, time on
       chapter, photo downloads. NOTE for the spec: no analytics
       collection exists in the app today, so (b) is a new system with
-      privacy + tooling decisions the owner makes at spec time; OWNER DECISION (same day): do NOT
-      add a download button - if a downloads metric ever exists it
-      measures organic saves only (long-press etc.), never a new
-      affordance.
+      privacy + tooling decisions the owner makes at spec time; OWNER DECISION (same day, softened
+      in follow-up): no download button FOR NOW - owner may revisit; any
+      near-term downloads metric measures organic saves only (long-press
+      etc.).
     priority_trigger: owner says go; pairs with IQ-021 (Studio button
       states) and the IQ-028/029 Studio pass
     status: queued
