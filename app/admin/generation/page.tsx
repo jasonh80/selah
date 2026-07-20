@@ -253,6 +253,7 @@ export default function SelahStudioPage() {
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
   const [rules, setRules] = useState<Rule[] | null>(null);
   const [examples, setExamples] = useState<Example[] | null>(null);
+  const [exampleSeedMsg, setExampleSeedMsg] = useState("");
   // undefined = loading · null = read failed (never shown as real facts)
   const [chapterInfo, setChapterInfo] = useState<StudioChapterInfo | null | undefined>(undefined);
   // undefined = not loaded yet · null = load failed · value = loaded
@@ -2534,6 +2535,30 @@ export default function SelahStudioPage() {
             <details className="border-t pt-3">
               <summary className="cursor-pointer text-[13px] font-medium text-primary">Approved examples</summary>
               <div className="mt-1.5 space-y-1.5">
+                {/* Codex #73 re-review: the old "Seed from published chapters"
+                    label carried exactly the false implication the owner asked
+                    us to remove — voice never comes from published prose. */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const j = (await api("POST", { action: "examples_seed" })) as Record<string, unknown>;
+                      setExampleSeedMsg(
+                        j.ok
+                          ? `Seeded: ${j.inserted} added, ${j.skippedExisting} already present.`
+                          : `Seed incomplete: ${j.failed ?? "?"} failed — check Recent activity.`,
+                      );
+                      void loadExamples();
+                    }}
+                    className="rounded-full border px-2.5 py-1 text-[11px] text-primary hover:border-accent/40"
+                  >
+                    Add approved Selah examples
+                  </button>
+                  {exampleSeedMsg && <span className="text-[11px] text-secondary">{exampleSeedMsg}</span>}
+                </div>
+                <p className="text-[11px] text-secondary">
+                  Voice comes from Jason&rsquo;s Daily Rundown/Workup chats; form examples come from reviewed chapters.
+                </p>
                 {examples === null ? (
                   <p className="text-[12px] text-secondary">Loading…</p>
                 ) : examples.length === 0 ? (

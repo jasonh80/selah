@@ -143,6 +143,40 @@ export const CHAPTER_SCENE_CHECK_IMAGE_HINTS: Record<string, Record<string, stri
     storm: "walking-water",
     boat: "walking-water",
   },
+  // Published Mark 7–10 rows predate the generated imageKind binding (#64),
+  // so their stored checks bind here instead (owner direction 2026-07-19:
+  // every photo insight sits below ITS photo). Titles verified against the
+  // live rows the same day. A check that binds to the HERO stays in the
+  // standalone card under the hero — same placement, correct photo.
+  "mark-7": {
+    sink: "purity-dispute-table",
+    hygiene: "purity-dispute-table",
+    wash: "purity-dispute-table",
+    // Codex #71 review: the second stored check ("The Tyre scene is indoors
+    // and the daughter stays offstage") pairs with the mother's scene.
+    tyre: "syrophoenician-mother",
+    daughter: "syrophoenician-mother",
+  },
+  "mark-8": {
+    picnic: "seven-baskets-after-feeding",
+    basket: "seven-baskets-after-feeding",
+    feeding: "seven-baskets-after-feeding",
+    // "Bethsaida is not a magic-stage moment" → the two-stage healing scene.
+    bethsaida: "bethsaida-partial-sight",
+  },
+  "mark-9": {
+    mountain: "transfiguration-mountain",
+    boy: "restored-by-the-hand",
+    child: "child-among-disciples",
+  },
+  "mark-10": {
+    needle: "wealthy-man-grieved",
+    camel: "wealthy-man-grieved",
+    wealthy: "wealthy-man-grieved",
+    // "No throne-room brothers" (James & John's request) → the road scene.
+    "throne-room": "jesus-walking-ahead",
+    brothers: "jesus-walking-ahead",
+  },
 };
 
 export function getSceneCheckImageKind(slug: string, checkTitle: string): string | null {
@@ -357,6 +391,41 @@ export const CHAPTER_FAQ: Record<string, FaqItem[]> = {
       question: "Where is Gennesaret?",
       answer:
         "Gennesaret is a small, fertile plain on the northwest shore of the Sea of Galilee, just south of Capernaum — less a single town than a rich stretch of farmland and villages. When the boat lands there, the whole region recognizes Jesus and rushes the sick to Him. The chapter that opened with a hometown refusing Him ends with strangers desperate just to touch the edge of His cloak.",
+    },
+  ],
+  // Psalm 23 gap (owner content-queue item, 2026-07-20): the published row
+  // predates whatPeopleAsk, so the section never rendered. Static approved
+  // copy, same as the Mark 6 set — merge only after the owner approves it.
+  "psalm-23": [
+    {
+      question: "Is “the valley of the shadow of death” about dying?",
+      answer:
+        "It can include dying, but the Hebrew phrase is broader: deep darkness (many Bibles footnote it exactly that way) — the kind a sheep meets in a narrow ravine where it cannot see what is waiting. Dying may be the darkest valley, but David's words cover every stretch where the light disappears — the diagnosis, the grief, the long night. And notice what changes there: David stops talking about the shepherd and starts talking to Him. “You are with me.” The psalm never promises a valley-free life. It promises company in every valley.",
+    },
+    {
+      question: "Did David really know shepherding, or is this just a nice image?",
+      answer:
+        "The heading says “A Psalm of David,” and David kept his father's flock in the hills near Bethlehem before anyone knew his name — he told Saul he had fought off lions and bears to protect the sheep (1 Samuel 17). So “The LORD is my shepherd” is not a greeting card; it is a job description he had lived. Finding grass and water in scarce country, guiding through ravines, standing between the flock and things with teeth — David knew exactly what he was asking God to be. He wrote it from the sheep's side.",
+    },
+    {
+      question: "What are the rod and the staff for — and why would they comfort anyone?",
+      answer:
+        "Two tools, two jobs. The rod was a club — the shepherd's protection and authority against whatever threatened the sheep; the staff was the long crook for the sheep itself — guiding it, steadying it, pulling it back from an edge. So the comfort here is not softness. It is armed protection and personal attention in dangerous country. The sheep is not calm because the hills are safe. The sheep is calm because the shepherd is not unarmed.",
+    },
+    {
+      question: "Does “goodness and mercy shall follow me” promise an easy life?",
+      answer:
+        "The same short psalm holds a dark valley and a table set “in the presence of my enemies” — David is not describing ease, and he never lived it. “Follow” is also a stronger Hebrew word than it sounds: closer to pursue. The picture is God's goodness and steady love chasing David down every day of his life, valleys included. Not “nothing bad will happen,” but “nothing that happens will outrun the Shepherd.”",
+    },
+    {
+      question: "What does “I shall dwell in the house of the LORD forever” mean — heaven?",
+      answer:
+        "For David, “the house of the LORD” meant the sanctuary tent where Israel met God — the temple was not built yet — and “forever” is literally “for length of days.” So the first meaning is: I will live near God's presence all my life. But the psalm's own path — through death's shadow, to a spread table, home to the house — has always made readers hear more than one lifetime in it, and Jesus spoke of His Father's house with rooms prepared (John 14:2). What began as David's lifelong address becomes, in Christ, a permanent one.",
+    },
+    {
+      question: "Is Jesus the shepherd of Psalm 23?",
+      answer:
+        "The psalm names the LORD — Israel's God — as the shepherd. Jesus stepped into exactly that role, on purpose: “I am the good shepherd. The good shepherd lays down his life for the sheep” (John 10:11). It is one of the boldest claims He ever made — the Shepherd David sang about, standing in front of people with a face and a voice. Psalm 23 says the LORD is my shepherd. John 10 shows what it cost Him to be it.",
     },
   ],
 };
