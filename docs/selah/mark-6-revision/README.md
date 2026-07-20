@@ -11,7 +11,7 @@ exact approved lines, buddy voice. **No publish, no spend, no live-row writes.**
 | Base snapshot (live Mark 6 render model) | `docs/selah/mark-6-revision/base-workup.json` |
 | Proposed revision (10 text paths changed) | `lib/ai/fixtures/mark-6-mega-revision.json` |
 | Field-by-field diff (the review surface) | `docs/selah/mark-6-revision/diff.md` |
-| Private preview | `/chapter/mark-6-revision-preview` — dev + Netlify previews ONLY (fail-closed; see `lib/chapters/mark-6-revision-preview.ts`) |
+| Private preview | `/chapter/mark-6-revision-preview` — dev + Netlify previews ONLY (fail-closed; see `lib/chapters/mark-6-revision-preview.ts`; the deploy context is baked at build via `SELAH_DEPLOY_CONTEXT` in `next.config.mjs` because Netlify's raw `CONTEXT` is absent from the SSR runtime — Codex r2 finding) |
 | Integrity gate | `npm run verify:mark6-revision` (in prebuild; temporary — remove with this lane) |
 
 ## Base provenance

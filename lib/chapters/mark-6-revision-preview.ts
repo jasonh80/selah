@@ -31,11 +31,15 @@ export function mark6RevisionPreviewWorkup(): ChapterWorkup {
 }
 
 /** True only where the review preview may serve: local dev and Netlify
- * deploy/branch previews. Unknown contexts (including a missing CONTEXT in
- * production) stay CLOSED. */
+ * deploy/branch previews. Unknown contexts (including a missing context in
+ * production) stay CLOSED. Reads SELAH_DEPLOY_CONTEXT — Netlify's CONTEXT
+ * baked in at build time via next.config.mjs, because the raw CONTEXT var is
+ * not reliably present in the SSR runtime (Codex #77 P1: the preview 404'd
+ * on the actual deploy preview). Raw CONTEXT remains a fallback. */
 export function mark6RevisionPreviewEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   if (env.NODE_ENV === "development") return true;
-  return env.CONTEXT === "deploy-preview" || env.CONTEXT === "branch-deploy";
+  const context = env.SELAH_DEPLOY_CONTEXT || env.CONTEXT || "";
+  return context === "deploy-preview" || context === "branch-deploy";
 }
