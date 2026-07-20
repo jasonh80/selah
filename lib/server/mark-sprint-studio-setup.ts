@@ -40,6 +40,9 @@ const FACTORY_SETUPS: readonly MarkSprintFactorySetup[] = [
   { contract: MARK_7_SETUP_CONTRACT, approval: MARK_7_STUDIO_SETUP_APPROVAL },
   { contract: buildMarkSprintSetupContract("mark-9"), approval: null },
   { contract: buildMarkSprintSetupContract("mark-10"), approval: null },
+  // Mark 11 (owner request 2026-07-19): fail-closed until the owner approves
+  // its packet on the Prepare Chapter screen — exactly like Mark 9/10.
+  { contract: buildMarkSprintSetupContract("mark-11"), approval: null },
 ];
 
 export function markSprintFactorySetupFor(

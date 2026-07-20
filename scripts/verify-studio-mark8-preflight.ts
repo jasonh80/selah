@@ -559,11 +559,11 @@ async function main(): Promise<void> {
     assert.equal(unauthorized.status, 401);
     assert.equal(loaderCalls, 0);
 
-    // mark-11 is the non-connected example now that mark-10 joined the
-    // connected flow (board #29 handoff, 2026-07-18; mark-9 joined via owner
-    // decision A5).
+    // mark-12 is the non-connected example now that mark-11 joined the
+    // connected flow (owner request 2026-07-19; mark-10 via the board #29
+    // handoff, mark-9 via owner decision A5).
     const wrongSlug = await route.POST(
-      adminRequest({ action: "mark_sprint_prepare", slug: "mark-11" }),
+      adminRequest({ action: "mark_sprint_prepare", slug: "mark-12" }),
     );
     assert.equal(wrongSlug.status, 400);
     assert.equal(loaderCalls, 0);
@@ -901,7 +901,17 @@ async function verifyMark7Enablement(): Promise<void> {
       kind: "locked",
     });
 
-    for (const unknownSlug of ["mark-8", "mark-11", "exodus-27"]) {
+    // Mark 11 (owner request 2026-07-19): connected and fail-closed until the
+    // owner approves its packet — exactly like Mark 9/10.
+    const lockedMark11 = await route.POST(
+      adminRequest({ action: "mark_sprint_setup_status", slug: "mark-11" }),
+    );
+    assert.equal(lockedMark11.status, 200);
+    assert.deepEqual(decideMarkSprintStudioSetup("mark-11", await lockedMark11.json()), {
+      kind: "locked",
+    });
+
+    for (const unknownSlug of ["mark-8", "mark-12", "exodus-27"]) {
       const refusedStatus = await route.POST(
         adminRequest({ action: "mark_sprint_setup_status", slug: unknownSlug }),
       );
