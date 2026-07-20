@@ -44,6 +44,19 @@ const REVISIONS: RevisionSpec[] = [
       "insights[application].body",
     ],
   },
+  {
+    slug: "mark-8",
+    basePath: "../docs/selah/mark-8-revision/base-workup.json",
+    fixturePath: "../lib/ai/fixtures/mark-8-mega-revision.json",
+    // Codex rundown comparison (board #29, 2026-07-20): exactly these five.
+    allowedChangedPaths: [
+      "quickSummary",
+      "insights[chapter-flow].body",
+      "insights[jesus].body",
+      "insights[theology].body",
+      "insights[application].body",
+    ],
+  },
 ];
 
 const CHURCHY = /discernment/i;

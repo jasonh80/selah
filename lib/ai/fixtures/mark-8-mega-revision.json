@@ -1,0 +1,542 @@
+{
+  "book": "Mark",
+  "slug": "mark-8",
+  "theme": "Seeing Jesus clearly means following His cross-shaped way",
+  "title": "Mark 8",
+  "images": [
+    {
+      "alt": "Disciples gather leftover bread into seven woven baskets after a large crowd has eaten in a rugged outdoor setting.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-8/d2f902b0-3dd5-48fa-8979-a3e694e67daa/seven-baskets-after-feeding.png",
+      "kind": "seven-baskets-after-feeding",
+      "index": 1,
+      "label": "Seven Baskets After the Meal",
+      "prompt": "Photorealistic historical-documentary realism, natural afternoon light in a rugged first-century Galilee or eastern lakeside wilderness setting, a large tired crowd seated on uneven ground after eating, ordinary Jewish and regional first-century men, women, and children in worn linen and wool garments, disciples gathering coarse leftover bread pieces into seven large woven baskets, simple sandals, dusty ground, sparse vegetation, Sea of Galilee region terrain in the distance; focus on human scale, abundance after scarcity, and lived-in materials. No halos or glow, no pristine costumes, no theatrical posing, no modern objects, no text or lettering, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "After feeding the crowd, seven baskets remain—evidence the disciples will soon need to remember.",
+      "description": "This scene lets the feeding miracle become evidence in the reader’s memory, just as Jesus later expects the disciples to remember it."
+    },
+    {
+      "alt": "Jesus stands outside Bethsaida with a man whose sight is being restored in stages.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-8/d2f902b0-3dd5-48fa-8979-a3e694e67daa/bethsaida-partial-sight.png",
+      "kind": "bethsaida-partial-sight",
+      "index": 2,
+      "label": "Sight Coming Clear at Bethsaida",
+      "prompt": "Photorealistic historical-documentary realism, natural light just outside a first-century village near the Sea of Galilee, Jesus as a first-century Jewish teacher in simple worn robe and mantle gently standing with a blind man away from the village, the man blinking and orienting himself as his sight begins to return, a few indistinct people at a respectful distance, rough stone houses and dusty path behind them, restrained subjective visual atmosphere suggesting partial perception without surreal fantasy; historically plausible clothing, sandals, weathered skin, lived-in setting. No halos or glow, no pristine costumes, no theatrical posing, no modern objects, no text or lettering, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "At Bethsaida, Jesus opens a man’s eyes in stages, and Mark quietly prepares us to understand the disciples’ partial sight.",
+      "description": "The two-stage healing is one of Mark’s most memorable images, helping readers feel the difference between seeing something and seeing clearly."
+    },
+    {
+      "alt": "Jesus turns toward Peter on a road near Caesarea Philippi while the other disciples watch the serious rebuke.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-8/d2f902b0-3dd5-48fa-8979-a3e694e67daa/peter-rebuked-on-the-road.png",
+      "kind": "peter-rebuked-on-the-road",
+      "index": 3,
+      "label": "The Rebuke on the Road",
+      "prompt": "Photorealistic historical-documentary realism, natural daylight on a rugged road among villages near Caesarea Philippi, Jesus as a first-century Jewish teacher in simple worn robe and mantle turning toward Peter while the other disciples are visibly present behind and around them, Peter tense and chastened but not demonized, no visible Satan figure, no possession imagery, no pagan grotto or temple foreground unless distant and ambiguous, northern hill-country terrain, dusty path, ordinary first-century travel clothing and sandals, emotionally restrained but serious confrontation. No halos or glow, no pristine costumes, no theatrical posing, no modern objects, no text or lettering, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "Peter confesses the Christ, then learns that God’s Messiah will not avoid the suffering road.",
+      "description": "This is the chapter’s turning point: Peter has the right title for Jesus but resists the road Jesus must take."
+    }
+  ],
+  "prayer": "Jesus, open my eyes to see You more clearly. Help me remember Your faithfulness, receive Your correction, and follow You even when Your way confronts my fear. Teach me to trust the Christ who gives Himself for me. Amen.",
+  "status": "draft",
+  "verses": [],
+  "chapter": 8,
+  "context": "Mark writes in a world where messianic hope could easily be imagined in terms of victory, restoration, and public power. The title Christ meant God’s anointed king, but many people did not expect that king to announce rejection, death, and resurrection as His necessary path. The settings in this chapter matter: desolate terrain, boat travel on the Sea of Galilee, debated village locations, and the northern district around Caesarea Philippi all place Jesus in real landscapes where crowds could become hungry, religious leaders could challenge Him, and disciples could wrestle with what they had just seen.",
+  "summary": "Jesus has been moving through Jewish and Gentile borderlands, healing, teaching, and confronting religious traditions that can hide the heart from God. Mark now gathers those threads into a chapter where people see enough to respond, but not yet enough to understand. Bread, blindness, confession, rebuke, and a cross all become part of one urgent question: do we see who Jesus is, and will we receive Him on His own terms?",
+  "tagline": "Pause. Reflect. Elevate.",
+  "version": "1",
+  "heroKind": "peter-rebuked-on-the-road",
+  "insights": [
+    {
+      "id": "big-idea",
+      "body": "Mark 8 moves from bread to blindness to confession to cross. That is not random storytelling. Jesus feeds a crowd, confronts sign-demanding unbelief, warns His disciples about corrupting influence, heals a blind man in stages, receives Peter’s confession, and then teaches the suffering path of the Son of Man.\n\nThe chapter’s tension is painfully familiar: people can be near Jesus and still misunderstand Him. The Pharisees demand proof while ignoring the signs already happening in front of them. The disciples worry over one loaf after watching thousands eat. Peter says the right title and then tries to correct the mission.\n\nSo Mark 8 does not simply ask, “Do you believe Jesus can do miracles?” It asks, “Do you see what His works mean? And will you follow Him when His way contradicts your expectations?”\n\nThe chapter gives us one of the most honest pictures of spiritual growth in the Gospels. Sight often comes in stages. Jesus is patient with partial sight, but He does not leave it alone. He keeps opening eyes until the cross comes into view.",
+      "icon": "💡",
+      "jesus": false,
+      "title": "Big Idea",
+      "preview": "Mark 8 is about seeing Jesus clearly—and discovering that clear sight leads to a cross, not a shortcut."
+    },
+    {
+      "id": "chapter-flow",
+      "body": "Jesus starts with hungry people and compassion. Seven loaves become enough, plus leftovers. Then Pharisees demand a sign as if feeding thousands somehow did not count. Jesus refuses to perform on command. In the boat, the disciples hear a warning about spreading corruption and decide the real emergency is lunch. Jesus points them back to both feedings: their memory has the evidence; their understanding has not caught up.\n\nAt Bethsaida, a blind man first sees people as walking trees, then clearly after Jesus touches him again. Mark places that scene exactly where it belongs. Peter is about to see that Jesus is the Christ—and still see His mission only in blur. When Jesus speaks of suffering, rejection, death, and resurrection, Peter objects. He wants the crown without the cross. Honestly, same. Jesus corrects him sharply, then calls the crowd and disciples to follow. The chapter begins with people receiving bread and ends with Jesus asking who will entrust Him with their whole life.",
+      "icon": "🧭",
+      "jesus": false,
+      "title": "Chapter Flow",
+      "preview": "The chapter moves from compassionate provision to costly discipleship, with the disciples’ partial understanding exposed along the way."
+    },
+    {
+      "id": "historical-world",
+      "body": "Mark 8 takes place around Galilee and northern regions connected by boat travel, village roads, and uneven terrain. The feeding happens in a desolate place that Mark does not name. The previous chapter places Jesus in the Decapolis region, so the broader setting may still be eastern or borderland, but Mark does not specify the crowd’s ethnicity. That matters because we should not make confident claims where Mark stays quiet.\n\nDalmanutha is also uncertain. Some manuscripts have other place names, and scholars still debate the location. Bethsaida is debated too, with more than one proposed site near the northern Sea of Galilee. Caesarea Philippi, by contrast, is generally associated with the area near modern Banias, though Mark says Jesus is among the surrounding villages, not necessarily standing at a famous shrine or cliff.\n\nThe religious tension is real. Pharisees were not priests by definition; they were a Jewish renewal and interpretation movement concerned with faithfulness to the law and tradition. In this scene, some challenge Jesus by demanding a sign from heaven. Herod, likely Herod Antipas in the broader Galilean context, represents another kind of power: political calculation, fear of instability, and worldly rule.\n\nAnd then there is the cross. For modern readers, a cross can feel like jewelry, a logo, or a church symbol. In Jesus’ world, it meant shame, terror, and Roman execution. When Jesus tells people to take up a cross before His crucifixion has happened, He is not offering a gentle metaphor for daily inconvenience. He is calling for allegiance that may cost everything.",
+      "icon": "🏛",
+      "jesus": false,
+      "title": "The World Behind It",
+      "preview": "Boats, borderlands, hungry crowds, Roman crosses, and messianic hopes all shape the pressure of this chapter."
+    },
+    {
+      "id": "what-most-miss",
+      "body": "The boat scene is easy to flatten into, “Wow, the disciples are slow.” And yes, Mark lets us feel the irony. They have one loaf, but they are sitting with the One who just fed thousands. That is not their finest meeting agenda.\n\nBut Mark is doing something deeper than making the disciples look foolish. Jesus asks them to remember. He points them back to specific feedings and specific leftovers. In other words, the raw material for faith is already in their hands. Their memory is stocked; their interpretation is broken.\n\nThat is why the Bethsaida healing matters. The man first sees, but not clearly. Then Jesus touches him again, and his sight becomes clear. Mark places that scene like a living parable. Peter’s confession comes next: he sees that Jesus is the Christ. Then Peter rejects the suffering path: he does not yet see clearly what kind of Christ Jesus is.\n\nThis is one of the most mercifully honest patterns in Scripture. Jesus does not despise partial sight. But He also does not baptize it as maturity. He keeps pressing, correcting, healing, and teaching until His followers can see not only His power, but His cross.",
+      "icon": "🔍",
+      "jesus": false,
+      "title": "What Most People Miss",
+      "preview": "The disciples’ problem is not lack of evidence. It is evidence without perception."
+    },
+    {
+      "id": "jesus",
+      "body": "Peter wants a Messiah who wins without suffering. Jesus refuses the edited role. He did not come only to solve the shortage in front of us; He came to give His life and rise again. The cross is not a detour from His mission. It is how He saves.\n\nAnd here is the mercy: Jesus keeps working with people who see only partly. The disciples forget. Peter gets the title right and the path wrong. Jesus does not throw them away. He reminds, corrects, and touches blind eyes again.\n\nThat is good news for anyone whose faith is real but unfinished. Jesus is not waiting for you to pass a theology exam before He comes near. Ask Him to show you where you have made Him useful instead of Lord—and trust that the Shepherd correcting your vision is the same Savior walking toward the cross for you.",
+      "icon": "✝",
+      "jesus": true,
+      "title": "Jesus at the Center",
+      "preview": "Jesus is the Christ, but He will not let that title be separated from suffering, death, and resurrection."
+    },
+    {
+      "id": "theology",
+      "body": "Following Jesus means letting the real Jesus lead—not the version who always protects our comfort. Peter says the right answer, “the Christ,” but still tries to rewrite the job. You can know Jesus’ title and resist His path.\n\nWhen Jesus says to deny yourself and take up your cross, He is not telling you to become less human, stay in abuse, or collect suffering as proof of faith. He is telling you to surrender the false self that must control, impress, win, hide, and save itself at all costs. That life feels protective, but it slowly suffocates the soul.\n\nJesus is not erasing you. He is freeing you from the impossible job of being your own savior. His cross saves. Ours is the daily choice to belong to Him more than to comfort, reputation, or control.",
+      "icon": "🛡",
+      "jesus": false,
+      "title": "Theology Principle",
+      "preview": "Discipleship means following the real Jesus, not the edited version that protects our preferred life."
+    },
+    {
+      "id": "application",
+      "body": "Start with your memory. Name one specific place Jesus carried, corrected, forgave, or provided for you. The disciples had leftovers in the boat and still acted like Jesus had no track record. We do the same: “Lord, You got me through that impossible thing last month, but I am pretty sure this Tuesday is where You run out of options.” Come on, Peter. Come on, Jason. Come on, all of us.\n\nThen ask where your sight is still blurry. Comfort? Control? Approval? Hurry? Pray: “Jesus, touch my eyes again. Help me see You clearly—not vaguely, culturally, or only as useful.”\n\nFinally, choose one small act of trust today. Be present with your family. Tell the truth without managing the outcome. Release the resentment that feels like a shield but has become a prison. Follow Jesus in one place where fear has been making the decisions. Clearer sight should move your feet.",
+      "icon": "🌱",
+      "jesus": false,
+      "title": "Live It",
+      "preview": "Ask Jesus for clearer sight, especially where fear, comfort, or control have made His way look unreasonable."
+    },
+    {
+      "id": "prayer",
+      "body": "Jesus, I confess that I often remember my lack more quickly than Your faithfulness. I can see bread in my hands and still forget the Giver standing near me.\n\nOpen my eyes. Where I see only partially, touch me again with Your mercy and truth. Where I confess the right words but resist Your way, correct me before my fear becomes my guide.\n\nTeach me to follow You as You truly are: the compassionate Christ, the suffering Son of Man, the risen Lord, and the coming King. Give me courage to lose what cannot save me, and to hold fast to You, who alone can. Amen.",
+      "icon": "🙏",
+      "jesus": false,
+      "title": "Prayer",
+      "preview": "A prayer for memory, clear sight, and courage to follow Jesus’ way."
+    },
+    {
+      "id": "map-notes",
+      "body": "A responsible map for Mark 8 should show regions more than pretend precision. The feeding site is unnamed. The opening may continue the Decapolis-side movement from Mark 7, but Mark 8 does not say exactly where the crowd gathered.\n\nDalmanutha is one of the Gospel’s harder place names. Some manuscript traditions preserve related alternatives, and the site has not been securely identified. Bethsaida also has debated proposed locations near the northern Sea of Galilee.\n\nCaesarea Philippi is more stable as a regional anchor, generally associated with the Banias area, but Mark says Jesus was traveling among its villages. The confession should not automatically be staged at a grotto, cliff, temple, or Mount Hermon. The point is the road conversation, not a postcard backdrop.",
+      "icon": "🗺",
+      "jesus": false,
+      "title": "Map Notes",
+      "preview": "Mark 8 is geographically vivid, but several exact locations remain uncertain."
+    },
+    {
+      "id": "original-language",
+      "body": "The word translated as leaven refers to the small fermenting agent worked through dough. That background helps Jesus’ warning in the boat. He is not giving a baking lesson with bonus anxiety about snacks. He is warning that certain ways of seeing God, power, and proof can spread quietly until they shape the whole person or community.\n\nAnother important word appears in Jesus’ sayings about saving and losing life. The Greek term can refer to life or soul depending on context. In Mark 8, Jesus is speaking about the whole self before God, not merely physical survival or an invisible inner part. His question about gaining the world and forfeiting the self is meant to expose the worst trade a human being can make.\n\nBoth words press the same issue: what is shaping us, and what are we trying to save? Jesus exposes the hidden influence and then calls us to entrust our whole life to Him.",
+      "icon": "🔤",
+      "jesus": false,
+      "title": "Original Language",
+      "preview": "Two Greek ideas sharpen the chapter: leaven as spreading influence and life/soul as the self before God."
+    }
+  ],
+  "keyItems": [
+    {
+      "name": "Seven loaves",
+      "type": "object",
+      "blurb": "The small supply Jesus receives before feeding the crowd; Mark emphasizes provision without asking us to decode the number into a hidden system."
+    },
+    {
+      "name": "Seven baskets",
+      "type": "object",
+      "blurb": "The gathered leftovers after the meal, later used by Jesus as remembered evidence the disciples should understand."
+    },
+    {
+      "name": "One loaf in the boat",
+      "type": "object",
+      "blurb": "The disciples’ small remaining bread becomes the occasion for Jesus to expose their anxious misunderstanding."
+    },
+    {
+      "name": "Leaven",
+      "type": "object",
+      "blurb": "A small spreading influence used by Jesus as a warning about the corrupting outlook of the Pharisees and Herod."
+    },
+    {
+      "name": "Cross",
+      "type": "object",
+      "blurb": "A Roman instrument of execution; Jesus uses it as a shocking image for costly allegiance before His own crucifixion."
+    }
+  ],
+  "navCards": [
+    {
+      "id": "key-object",
+      "label": "Key Object",
+      "thumb": "/img/placeholder/detail.svg",
+      "support": "Seven loaves"
+    },
+    {
+      "id": "key-person",
+      "label": "Key Person",
+      "thumb": "/img/placeholder/person.svg",
+      "support": "Jesus"
+    },
+    {
+      "id": "jesus",
+      "jesus": true,
+      "label": "Jesus",
+      "thumb": "/img/placeholder/jesus.svg",
+      "support": "The Christ who feeds also goes to the cross"
+    }
+  ],
+  "subtitle": "When Eyes Begin to Open",
+  "timeline": [
+    {
+      "label": "Galilean ministry expands",
+      "detail": "Jesus teaches, heals, and draws large crowds across the Galilee region and nearby borderlands.",
+      "current": false
+    },
+    {
+      "label": "Peter confesses Jesus as the Christ",
+      "detail": "On the road near Caesarea Philippi, Jesus’ identity is confessed and His suffering path is plainly taught.",
+      "current": true
+    },
+    {
+      "label": "The journey toward the cross deepens",
+      "detail": "Jesus continues teaching His disciples that His kingdom comes through suffering, service, death, and resurrection.",
+      "current": false
+    }
+  ],
+  "versions": [
+    "ESV"
+  ],
+  "metaChips": [
+    {
+      "icon": "📅",
+      "text": "c. AD 29–30"
+    },
+    {
+      "icon": "📍",
+      "text": "Galilee and surrounding northern regions"
+    },
+    {
+      "icon": "✦",
+      "text": "Seeing Jesus clearly means following His cross-shaped way"
+    },
+    {
+      "icon": "✝",
+      "text": "Jesus: The Christ who feeds also goes to the cross",
+      "jesus": true
+    }
+  ],
+  "modernMap": {
+    "alt": "Shows the Sea of Galilee region, possible areas associated with Dalmanutha/Magdala traditions, proposed Bethsaida locations, and the area around Banias/Caesarea Philippi in modern northern Israel and the Golan-region landscape.",
+    "src": "/img/placeholder/map.svg",
+    "note": "Dalmanutha is unidentified, Bethsaida’s exact location is debated, and Mark does not give a verified travel route; map points should be shown as probable or possible areas, not precise certainties.",
+    "title": "Modern Map",
+    "caption": "Shows the Sea of Galilee region, possible areas associated with Dalmanutha/Magdala traditions, proposed Bethsaida locations, and the area around Banias/Caesarea Philippi in modern northern Israel and the Golan-region landscape.",
+    "uncertaintyNote": "Dalmanutha is unidentified, Bethsaida’s exact location is debated, and Mark does not give a verified travel route; map points should be shown as probable or possible areas, not precise certainties."
+  },
+  "reference": "Mark 8",
+  "characters": [
+    {
+      "name": "Jesus",
+      "role": "Messiah and Son of Man",
+      "description": "He feeds, refuses manipulative testing, heals blindness, teaches His coming suffering, and calls people to follow Him."
+    },
+    {
+      "name": "Peter",
+      "role": "Disciple and spokesman",
+      "description": "He confesses Jesus as the Christ, then resists Jesus’ suffering mission and is sharply corrected."
+    },
+    {
+      "name": "the disciples",
+      "role": "Followers in training",
+      "description": "They witness provision and still struggle to understand what Jesus’ works reveal about Him."
+    },
+    {
+      "name": "the Pharisees",
+      "role": "Religious interlocutors",
+      "description": "They challenge Jesus with a testing demand for a heavenly sign after many signs have already been given."
+    },
+    {
+      "name": "the blind man",
+      "role": "Man healed at Bethsaida",
+      "description": "His staged healing becomes a vivid narrative picture of partial sight moving toward clarity."
+    },
+    {
+      "name": "the crowd",
+      "role": "Hungry hearers and potential followers",
+      "description": "They receive Jesus’ compassion at the beginning and hear His call to cross-bearing at the end."
+    }
+  ],
+  "application": "Mark 8 invites a slower, braver kind of honesty. Where have we received Jesus’ care but forgotten what it reveals about Him? Where do we want a Christ who gives bread but not a Lord who contradicts our plans? Following Jesus today may look like remembering His past faithfulness, refusing cynical demands for control, confessing Him openly, and letting Him correct our definition of success. The call is not to perform heroic suffering; it is to stop negotiating with Jesus about whether His way is allowed to be Lord.",
+  "historicMap": {
+    "alt": "Shows first-century Galilee, the Decapolis-side context from the surrounding narrative, boat crossings on the Sea of Galilee, Bethsaida, and the villages around Caesarea Philippi under Roman-era regional rule.",
+    "src": "/img/placeholder/map.svg",
+    "note": "Mark names some districts but not every feeding site or route. The opening likely continues the broader Decapolis setting from Mark 7, but the exact location and crowd makeup are not stated in Mark 8.",
+    "title": "Historic Map",
+    "caption": "Shows first-century Galilee, the Decapolis-side context from the surrounding narrative, boat crossings on the Sea of Galilee, Bethsaida, and the villages around Caesarea Philippi under Roman-era regional rule.",
+    "uncertaintyNote": "Mark names some districts but not every feeding site or route. The opening likely continues the broader Decapolis setting from Mark 7, but the exact location and crowd makeup are not stated in Mark 8."
+  },
+  "sceneChecks": [
+    {
+      "body": "The feeding scene was not a tidy lawn event with matching baskets and everyone politely in rows. Picture hungry people in rugged open country, after days with Jesus, with real travel concerns. The leftovers matter, but they are not props for a clean devotional still life.",
+      "label": "Scene Check",
+      "title": "Not a church picnic with baskets",
+      "relatedVerses": [
+        "8:1-10"
+      ],
+      "visualAccuracyNotes": [
+        "rugged outdoor terrain, not green manicured lawn",
+        "large mixed crowd seated on ground, not formal rows at tables",
+        "woven baskets and coarse bread pieces, no modern picnic baskets or plates",
+        "do not imply the crowd is entirely Gentile; Mark 8 does not state that"
+      ]
+    },
+    {
+      "body": "The blind man’s healing is quiet, personal, and outside the village. Jesus is not experimenting, failing, or looking surprised. Mark gives us a staged healing, not a nervous miracle rehearsal. Let the mystery stay reverent.",
+      "label": "Scene Check",
+      "title": "Bethsaida is not a magic-stage moment",
+      "relatedVerses": [
+        "8:22-26"
+      ],
+      "visualAccuracyNotes": [
+        "place Jesus and the man outside a first-century village, not in a synagogue or temple",
+        "no glow, sparks, or magical visual effects",
+        "show partial sight subtly if needed, not psychedelic fantasy",
+        "do not portray Jesus as uncertain or the healing as a failed first attempt"
+      ]
+    },
+    {
+      "body": "Jesus’ rebuke is severe, but Mark is not staging an exorcism. Peter is a disciple being corrected, not a possessed villain with a shadow monster over his shoulder. The other disciples matter too, because Jesus turns and sees them before speaking.",
+      "label": "Scene Check",
+      "title": "No visible Satan behind Peter",
+      "relatedVerses": [
+        "8:31-33"
+      ],
+      "visualAccuracyNotes": [
+        "include other disciples present in the road scene",
+        "no visible Satan figure, demon, shadow creature, or possession cues",
+        "Peter should appear rebuked or tense, not monstrous or villain-coded",
+        "setting is among villages near Caesarea Philippi, not necessarily at the Pan grotto, a pagan temple, or Mount Hermon"
+      ]
+    }
+  ],
+  "whatHappens": "Jesus feeds about four thousand people from a small amount of bread and fish, then crosses by boat to Dalmanutha, where Pharisees demand a sign from heaven. In the boat, Jesus warns about the leaven of the Pharisees and Herod, but the disciples fixate on their lack of bread, showing they still do not understand the meaning of His provision. At Bethsaida Jesus heals a blind man in two stages, then on the road near Caesarea Philippi Peter confesses Him as the Christ; immediately Jesus teaches that the Son of Man must suffer, die, and rise, rebukes Peter’s resistance, and calls the crowd to take up the cross and follow.",
+  "deeperGroups": [
+    {
+      "rows": [
+        {
+          "desc": "Learn why Peter’s confession matters and why Jesus immediately redefines messiahship through suffering.",
+          "title": "Messiah"
+        },
+        {
+          "desc": "Explore how Jesus uses this title for authority, suffering, and future glory.",
+          "title": "Son of Man"
+        }
+      ],
+      "label": "Learn More"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Trace how blindness and perception work as a major theme in Mark 8.",
+          "title": "Two-Stage Sight"
+        },
+        {
+          "desc": "Study how a small hidden influence can shape a whole community’s response to God.",
+          "title": "Leaven as Influence"
+        }
+      ],
+      "label": "Dive Deeper"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Practice naming concrete ways Jesus has been faithful so fear does not erase memory.",
+          "title": "Remember the Baskets"
+        },
+        {
+          "desc": "Ask where you are tempted to accept Jesus’ title while resisting His way.",
+          "title": "Follow Without Editing"
+        }
+      ],
+      "label": "Grow Closer"
+    }
+  ],
+  "quickSummary": "Mark 8 is a chapter about blurry vision. Jesus feeds thousands—again—and the disciples still worry about bread. Peter correctly calls Him the Christ, then immediately tries to explain how the Christ should do His job. You humans, you’re remarkably consistent. Between those scenes, Jesus heals a blind man in stages. Mark’s point is clear: seeing Jesus takes more than recognizing His power. It means receiving the cross-shaped way He came to save—and following Him when that way costs comfort, control, or applause.",
+  "timelineMini": {
+    "labels": [
+      "Galilean ministry expands",
+      "Peter confesses Jesus as the Christ",
+      "The journey toward the cross deepens"
+    ],
+    "activeIndex": 1
+  },
+  "verseByVerse": [
+    {
+      "title": "Jesus Feeds the Four Thousand",
+      "endVerse": 10,
+      "rangeLabel": "1–10",
+      "startVerse": 1,
+      "explanation": "A hungry crowd has stayed with Jesus long enough for the situation to become dangerous. Jesus acts from compassion, receives the small supply available, gives thanks, provides through His disciples, and the people eat enough. The leftovers become important later: the disciples are not just seeing a miracle; they are being handed evidence to remember."
+    },
+    {
+      "title": "A Testing Demand for a Sign",
+      "endVerse": 13,
+      "rangeLabel": "11–13",
+      "startVerse": 11,
+      "explanation": "Some Pharisees confront Jesus and ask for a heavenly sign, not as humble seekers but as testers. Jesus’ deep grief shows the seriousness of demanding proof while refusing the signs already given. He does not perform on command, and He leaves."
+    },
+    {
+      "title": "Bread, Leaven, and Failed Memory",
+      "endVerse": 21,
+      "rangeLabel": "14–21",
+      "startVerse": 14,
+      "explanation": "In the boat, the disciples worry because they have little bread. Jesus warns them about leaven, a small influence that spreads, connected here with the Pharisees and Herod. They miss the warning because they are stuck on lunch logistics. Jesus presses them to remember both feedings, because their problem is not lack of data but lack of perception."
+    },
+    {
+      "title": "A Blind Man Sees in Stages",
+      "endVerse": 26,
+      "rangeLabel": "22–26",
+      "startVerse": 22,
+      "explanation": "At Bethsaida, people bring a blind man to Jesus. Jesus leads him outside the village and heals him in two stages: first partial sight, then clear sight. Mark does not explain the method, but its placement strongly echoes the disciples’ condition: they are beginning to see, but not yet clearly."
+    },
+    {
+      "title": "Peter Names Jesus as the Christ",
+      "endVerse": 30,
+      "rangeLabel": "27–30",
+      "startVerse": 27,
+      "explanation": "On the road near Caesarea Philippi, Jesus asks what people are saying about Him, then asks the disciples directly. Peter answers with the messianic title. It is a major moment in Mark, but Jesus commands silence because the title must be understood through the cross, not popular expectation."
+    },
+    {
+      "title": "The Christ Must Suffer",
+      "endVerse": 33,
+      "rangeLabel": "31–33",
+      "startVerse": 31,
+      "explanation": "Jesus begins teaching plainly that the Son of Man must suffer, be rejected by Israel’s leaders, be killed, and rise after three days. Peter rejects that path and tries to correct Him. Jesus’ severe rebuke does not mean Peter is possessed; it means Peter’s counsel has become adversarial to God’s saving purpose."
+    },
+    {
+      "title": "The Cross-Shaped Call",
+      "endVerse": 38,
+      "rangeLabel": "34–38",
+      "startVerse": 34,
+      "explanation": "Jesus calls both crowd and disciples to follow Him with costly allegiance. Taking up the cross was not a decorative religious phrase; it named shame, danger, and surrender under Roman power. Jesus is not blessing abuse, self-harm, or reckless suffering; He is saying that gaining everything while losing life with God is a terrible bargain."
+    }
+  ],
+  "estimatedDate": "c. AD 29–30",
+  "timelineLabel": "Mark 8 in Jesus’ Ministry",
+  "whatPeopleAsk": [
+    {
+      "answer": "Mark presents them as two distinct events. Jesus later refers to both feedings separately and mentions different leftover counts. The point is not to turn the numbers into a secret code, but to notice that the disciples have seen repeated provision and still struggle to understand who Jesus is.",
+      "question": "Is the feeding of the four thousand the same event as the feeding of the five thousand?"
+    },
+    {
+      "answer": "The broader movement from Mark 7 makes a Decapolis-side or Gentile-region setting possible, and some readers see Gentile inclusion in the background. But Mark 8 itself does not name the feeding location or say the crowd is entirely Gentile. It is safest to say Jesus’ compassion reaches a crowd in a likely borderland setting without pretending Mark gives more detail than he does.",
+      "question": "Was the crowd in Mark 8 Gentile?"
+    },
+    {
+      "answer": "Jesus is not condemning honest questions or careful evidence-seeking. The issue is testing. These opponents demand a sign from heaven after Jesus has already been teaching, healing, delivering, and feeding. A heart can ask for evidence because it wants truth, or it can demand evidence as a way to keep avoiding trust. Mark shows the second kind here.",
+      "question": "Why does Jesus refuse to give the Pharisees a sign?"
+    },
+    {
+      "answer": "Leaven is a small thing that spreads through a whole batch of dough, so Jesus is warning about a spreading influence. The exact content is debated, but in context it likely includes resistant unbelief, desire for control, and a way of seeing Jesus that refuses God’s purpose. The Pharisees and Herod are not the same group, but both represent dangerous ways of responding to Jesus.",
+      "question": "What is the leaven of the Pharisees and Herod?"
+    },
+    {
+      "answer": "Mark does not tell us why Jesus heals this way. We should not say Jesus failed, experimented, or lacked power. The strongest reading is literary: this healing sits between the disciples’ failure to perceive and Peter’s partial confession. It becomes a living picture of sight that begins truly but still needs Jesus’ further touch.",
+      "question": "Why does Jesus heal the blind man in two stages?"
+    },
+    {
+      "answer": "Jesus is not saying Peter is demon-possessed. He is identifying Peter’s rebuke as adversarial to God’s mission. Peter has just confessed the right title, but when Jesus explains suffering, rejection, death, and resurrection, Peter resists. That resistance lines up with the temptation to have glory without the cross.",
+      "question": "Why does Jesus call Peter Satan?"
+    },
+    {
+      "answer": "No. Jesus is calling for costly allegiance to Him and the gospel, not self-destruction, abuse endurance, burnout, or preventable harm. The cross in this context means following Jesus even when loyalty to Him costs reputation, comfort, status, or safety. It never gives an abuser spiritual cover, and it never replaces wise help, protection, justice, medical care, or pastoral care.",
+      "question": "Does taking up the cross mean Christians should accept abuse or seek suffering?"
+    }
+  ],
+  "defaultVersion": "ESV",
+  "jesusConnection": "Mark 8 brings Jesus’ identity into focus, but not in the way human ambition expects. He is compassionate enough to feed the hungry, authoritative enough to refuse manipulative testing, patient enough to confront slow-hearted disciples, and powerful enough to open blind eyes. Yet when Peter names Him as the Christ, Jesus immediately defines His mission through suffering, rejection, death, and resurrection. The center of the chapter is not merely that Jesus is powerful; it is that the truly powerful Christ saves by giving His life, and He invites His people to follow Him in costly trust.",
+  "behindTheChapter": [
+    {
+      "body": "The Gospel is traditionally linked to John Mark, a coworker of Peter and Paul. Many scholars see Peter’s eyewitness preaching behind Mark’s vivid style, though the Gospel itself does not name its author.",
+      "title": "Mark, close to apostolic testimony",
+      "category": "Author"
+    },
+    {
+      "body": "Mark’s first hearers were likely Greek-speaking believers, often associated with Rome or another Gentile-majority setting, learning that Jesus’ glory and the cross cannot be separated.",
+      "title": "Early Christians under pressure",
+      "category": "First Audience"
+    },
+    {
+      "body": "The chapter unfolds in a world of village roads, boat crossings, regional rulers, religious debate, imperial power, and public shame attached to crucifixion.",
+      "title": "Galilee under Rome’s shadow",
+      "category": "Historical World"
+    },
+    {
+      "body": "Mark is well attested in early manuscripts such as Codex Vaticanus and Codex Sinaiticus. Archaeology and literary sources help locate the broader world of Galilee, Caesarea Philippi/Banias, and Roman crucifixion, while Dalmanutha and Bethsaida remain debated in exact identification.",
+      "title": "Texts, places, and first-century anchors",
+      "category": "Evidence & Artifacts"
+    }
+  ],
+  "biblicalTimeline": {
+    "era": "Life of Jesus",
+    "dateRange": {
+      "endYear": 30,
+      "startYear": 29
+    },
+    "confidence": "medium",
+    "estimatedYear": 30,
+    "chronologyBasis": "traditional/event date",
+    "placementReason": "This chapter occurs during Jesus’ public ministry in and around Galilee and northern regions, after major Galilean ministry scenes and before the later passion predictions and movement toward Jerusalem.",
+    "uncertaintyNote": "The public ministry of Jesus is commonly placed around AD 27–30 or AD 28–33 depending on how one correlates Gospel chronology with external dates. Mark 8 belongs during that ministry before the final journey to Jerusalem; the exact calendar date is not known.",
+    "estimatedYearLabel": "Around AD 30, in Galilee and the northern villages"
+  },
+  "estimatedLocation": "Galilee and surrounding northern regions",
+  "modernReadersMiss": "The disciples are not simply forgetful comic relief. They are carrying evidence in their own memory and still failing to perceive what it means. Mark places the two-stage healing right before Peter’s confession because Peter can see the title clearly before he sees the mission clearly. That is a painfully honest picture of discipleship: we may confess true things about Jesus while still trying to edit His way.",
+  "primaryCharacters": [
+    "Jesus",
+    "the disciples",
+    "Peter",
+    "the Pharisees",
+    "a blind man",
+    "the crowd"
+  ],
+  "modernLocationNote": "Scenes move through the Sea of Galilee region, an unidentified Dalmanutha area, Bethsaida, and villages near Caesarea Philippi in modern northern Israel/Golan-region geography; several exact sites remain debated.",
+  "sourceOverlapReview": {
+    "version": 1,
+    "blockerCodes": [
+      "MOSAIC_10_PLUS"
+    ],
+    "findingCount": 7,
+    "reportDigest": "a201e21ee36e305e5c7edabe2858551b773ae23dfe407b215c31e8cf8bebe356",
+    "manifestDigest": "3d47651214369a32f3d96697af878d80c766ff43a0db9c5907b3d25957400671",
+    "blockFindingCount": 1,
+    "reviewFindingCount": 6,
+    "canonicalDraftDigest": "8632ca02d3f64b802ccf3a9e23f3221a4aceabc7d6ecba07be65fb83a8de3082"
+  },
+  "jesusConnectionShort": "The Christ who feeds also goes to the cross",
+  "chapterSpecificTopics": [
+    {
+      "title": "Compassionate provision",
+      "reason": "Jesus feeds a hungry crowd because He sees their physical need and cares about their journey home.",
+      "priority": 1
+    },
+    {
+      "title": "Testing versus seeking",
+      "reason": "The Pharisees’ demand for a sign shows the difference between honest inquiry and resistant testing.",
+      "priority": 2
+    },
+    {
+      "title": "Failed memory",
+      "reason": "The disciples have witnessed provision but do not yet understand what their own memories mean.",
+      "priority": 3
+    },
+    {
+      "title": "Partial sight",
+      "reason": "The staged healing at Bethsaida becomes a chapter-shaped image for seeing Jesus truly but not fully.",
+      "priority": 4
+    },
+    {
+      "title": "Messiah and suffering",
+      "reason": "Peter’s confession is true, but Jesus defines the Christ through rejection, death, and resurrection.",
+      "priority": 5
+    },
+    {
+      "title": "Cross-bearing discipleship",
+      "reason": "Jesus calls followers to costly allegiance to Him and the gospel, not comfortable admiration.",
+      "priority": 6
+    }
+  ],
+  "generationManifestDigest": "3d47651214369a32f3d96697af878d80c766ff43a0db9c5907b3d25957400671"
+}
