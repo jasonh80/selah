@@ -513,3 +513,23 @@ entries:
       spends as always
     status: queued
     completion_pr: null
+
+  - id: IQ-025
+    area: content
+    improvement: >-
+      Psalm 23 modernization ("and psalm?" - owner, 2026-07-20): (a) geo
+      map on the real engine (curated entries, Mark 6 pattern - shepherd
+      country as honest regions: Bethlehem hill country, Judean
+      wilderness; a psalm names no event sites, so no event pins); (b)
+      Mega-style text pass at the tail of the Mark 7-10 queue, applied via
+      the protected snapshot-first script (psalm-23 is hard-frozen like
+      mark-6 was); (c) the long-queued legacy "ready" status migration
+      rides whenever the validated publisher path is ready; (d) kill the
+      last placeholder ref on the page.
+    evidence: >-
+      Owner, in-session 2026-07-20. Live check same session: 3 real
+      images, FAQs live (#79), static map only, 1 placeholder ref.
+    priority_trigger: geo map now (free, Claude); text pass after the
+      Mark 7-10 Megas; status migration on the publisher lane
+    status: queued
+    completion_pr: null
