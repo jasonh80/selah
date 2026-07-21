@@ -641,7 +641,8 @@ entries:
       IQ-030's Chapter Checkup metrics panel.
     evidence: >-
       Owner, in-session 2026-07-20 night, mid Mark 6 redo ("in a future
-      update. nothing pressing").
+      update. nothing pressing"). First data point, owner-timed: one
+      gpt-image-2 redo candidate took ~2m 15s.
     priority_trigger: rides the IQ-029 Studio pass; explicitly not
       pressing per owner
     status: queued
