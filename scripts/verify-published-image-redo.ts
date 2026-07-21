@@ -8,7 +8,9 @@
 //   2. stale references refuse                  (C4, D4, E5)
 //   3. exactly one source changes on apply      (E3)
 //   4. no public 404 / invalid chapter can land (E6 — validation-refused apply)
-//   5. Psalm 23 / Mark 6 remain protected       (B3, E7)
+//   5. Psalm 23 remains protected               (B3, E7); Mark 6 is unlocked
+//      for EXACTLY this lane (owner authorization 2026-07-20, board #29) and
+//      refuses every other action — section J proves both directions
 //   6. the live chapter row is untouched until the final conditional write
 //      (D2, and every refusal path asserts byte-identical live state)
 process.env.DEV_ADMIN_TOKEN = "verify-published-redo-offline-token";
@@ -17,7 +19,12 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://offline-selah.supabase.co";
 import assert from "node:assert/strict";
 import type { JobStorePort, JobRow, JobPredicates } from "../lib/server/generation-jobs";
 import { __setJobStoreForTesting } from "../lib/server/generation-jobs";
-import { decideMutation, __setRowLookupForTesting, type RowLookup } from "../lib/server/protected-chapters";
+import {
+  decideMutation,
+  __setRowLookupForTesting,
+  type MutationAction,
+  type RowLookup,
+} from "../lib/server/protected-chapters";
 import { __setTriggerTransportForTesting } from "../lib/server/trigger-generation";
 import {
   __setGenerationTestOverrides,
@@ -28,7 +35,8 @@ import {
   type CostEventInput,
 } from "../lib/server/cost-events-repository";
 import { __setImageTestOverrides, __setImageDepsForTesting } from "../lib/server/images";
-import { MARK_8_IMAGE_MODEL } from "../lib/server/mark8-image-plan";
+import { deriveMarkSprintImagePlan, MARK_8_IMAGE_MODEL } from "../lib/server/mark8-image-plan";
+import { CHAPTER_HERO_OVERRIDES } from "../lib/content/chapter-content";
 import { __setStoredSetupApprovalStoreForTesting } from "../lib/server/chapter-setup-approvals";
 import { __setVersionSnapshotForTesting } from "../lib/server/chapter-versions-repository";
 import {
@@ -220,6 +228,36 @@ function publishedWorkup(slug = SLUG): ChapterWorkup {
   } as unknown as ChapterWorkup;
 }
 
+/** Mirrors the REAL stored Mark 6 shape: 5 complete images at the LEGACY
+ * stable paths (no job-id directory), and NO stored heroKind — its hero is
+ * the render-level override in CHAPTER_HERO_OVERRIDES. */
+function mark6PublishedWorkup(): ChapterWorkup {
+  const scenes: Array<[string, string]> = [
+    ["nazareth", "Nazareth: Familiar Faces, Closed Hearts"],
+    ["sending", "Sent Out Two by Two"],
+    ["herods-feast", "Herod's Feast: Power Without Courage"],
+    ["feeding", "The Feeding of the 5,000"],
+    ["walking-water", "Walking on the Water"],
+  ];
+  const images = scenes.map(([kind, label], position) => ({
+    kind,
+    index: position + 1,
+    label,
+    prompt: `Documentary prompt for ${label}.`,
+    caption: label,
+    alt: `${label}.`,
+    status: "complete",
+    src: `${ORIGIN}/storage/v1/object/public/chapter-images/mark-6/${kind}.png`,
+  }));
+  return {
+    slug: "mark-6",
+    title: "Mark 6",
+    book: "Mark",
+    chapter: 6,
+    images,
+  } as unknown as ChapterWorkup;
+}
+
 function adminReq(body: Record<string, unknown>, token = ADMIN): Request {
   return new Request("http://localhost/api/admin/generation", {
     method: "POST",
@@ -308,8 +346,10 @@ const main = async () => {
       ok(/^[a-f0-9]{64}$/u.test(bindingDigest), "B1 binding digest shape");
     }
     {
-      // Protected chapters refuse the whole lane, on every step.
-      for (const slug of ["psalm-23", "mark-6"]) {
+      // Psalm 23 refuses the whole lane, on every step. (Mark 6 was here too
+      // until the owner unlocked EXACTLY this lane for it — 2026-07-20,
+      // board #29; its positive and negative coverage now lives in section J.)
+      for (const slug of ["psalm-23"]) {
         store.seed(slug, "reviewed", publishedWorkup(slug) as unknown as Record<string, unknown>);
         const res = await adminPost(adminReq({ action: "published_redo_preflight", slug, kind: "ephphatha", notes: NOTES }));
         ok(res.status === 403, `B3 ${slug} preflight refused (protected)`);
@@ -677,6 +717,105 @@ const main = async () => {
       const res = await adminPost(adminReq({ action: "published_redo_reject", slug: SLUG }));
       ok(res.status === 409, "G1 blocked (unrecorded spend) stays locked — reject refuses");
       lane.rows.delete("99999999-9999-4999-8999-999999999999");
+    }
+
+    // ---------------- J. Mark 6 unlock (owner authorization 2026-07-20, board #29) ----------------
+    // The published single-image redo lane — and NOTHING else — works for
+    // mark-6. Positive: the full lane runs against its REAL stored shape
+    // (legacy stable paths, no stored heroKind). Negative: every other
+    // mutation action still refuses mark-6, and psalm-23 refuses everything.
+    {
+      const M6 = "mark-6";
+      // J0. Hero overrides are mark-6-only, so the override-aware hero
+      // resolution can never change a sprint chapter's derived plan digest.
+      ok(
+        JSON.stringify(Object.keys(CHAPTER_HERO_OVERRIDES)) === JSON.stringify([M6]),
+        "J0 CHAPTER_HERO_OVERRIDES covers exactly mark-6 (sprint plan digests cannot drift)",
+      );
+      ok(
+        deriveMarkSprintImagePlan(SLUG, publishedWorkup()).heroKind === "washing-dispute",
+        "J0 sprint chapters still derive their STORED heroKind",
+      );
+      ok(
+        deriveMarkSprintImagePlan(M6, mark6PublishedWorkup()).heroKind === "walking-water",
+        "J0 mark-6 derives its hero from the render-level override",
+      );
+
+      // J1. FREE preflight succeeds with the exact model, landscape size,
+      // and a real cost estimate — bound to the live mark-6 revision.
+      store.seed(M6, "reviewed", mark6PublishedWorkup() as unknown as Record<string, unknown>);
+      const pf = await adminPost(adminReq({ action: "published_redo_preflight", slug: M6, kind: "sending", notes: NOTES }));
+      const pfBody = await json(pf);
+      ok(pf.status === 200 && pfBody.ok === true, "J1 mark-6 preflight succeeds (the owner-authorized unlock)");
+      const redoM6 = pfBody.redo as Record<string, unknown>;
+      ok(redoM6.model === MARK_8_IMAGE_MODEL && redoM6.size === "1536x1024", "J1 exact model and landscape size");
+      ok(typeof redoM6.estimatedCostUsd === "number" && (redoM6.estimatedCostUsd as number) > 0, "J1 real cost estimate before any spend");
+      ok(String(redoM6.currentSrc).endsWith("/chapter-images/mark-6/sending.png"), "J1 the binding targets the legacy stable path");
+      const digestM6 = String(redoM6.bindingDigest);
+      ok(
+        /^[a-f0-9]{64}$/u.test(digestM6) &&
+          typeof redoM6.baseRevision === "string" &&
+          (redoM6.baseRevision as string).length > 0,
+        "J1 binding digest pinned to the live mark-6 revision",
+      );
+
+      // J2. Every OTHER mutation action still refuses mark-6 — on its live
+      // reviewed row AND on a hypothetical draft (the unlock is one action).
+      const otherActions: MutationAction[] = [
+        "createGeneratingChapterWorkup",
+        "saveReadyChapterWorkup",
+        "updateChapterWorkupJson",
+        "markChapterWorkupFailed",
+        "restoreVersion",
+        "applyMergedDraft",
+        "publishChapter",
+      ];
+      for (const status of ["reviewed", "draft"] as const) {
+        const lookup: RowLookup = { kind: "row", row: { status, updatedAt: "T1" } };
+        for (const other of otherActions) {
+          ok(!decideMutation(other, M6, lookup).allowed, `J2 mark-6 ${other} still refused on ${status}`);
+        }
+      }
+      ok(
+        !decideMutation("applyPublishedImageRedo", "psalm-23", { kind: "row", row: { status: "reviewed", updatedAt: "T1" } }).allowed,
+        "J2 psalm-23 refuses even the dedicated redo action",
+      );
+
+      // J4. The FULL lane for mark-6: claim → worker (one spend) → apply
+      // swaps exactly one src (four legacy paths + one job-dir candidate
+      // validate together) → rollback restores the exact legacy path.
+      const genBefore = generateCalls;
+      const costsBefore = costs.length;
+      const created = await json(await adminPost(adminReq({ action: "published_redo", slug: M6, kind: "sending", notes: NOTES, bindingDigest: digestM6, confirm: true })));
+      const jobM6 = String(created.jobId);
+      ok(lane.rows.get(jobM6)?.status === "queued", "J4 mark-6 claim queued");
+      const wres = await publishedRedoWorker(workerReq(lastTrigger!.body as Record<string, unknown>));
+      ok(wres.status === 200, "J4 worker generated the mark-6 candidate");
+      ok(generateCalls === genBefore + 1 && costs.length === costsBefore + 1, "J4 exactly one model request, one cost row");
+      const candM6 = String(lane.rows.get(jobM6)!.candidate_url);
+      ok(candM6.includes(`${M6}/${jobM6}/sending.png`), "J4 candidate stored in its own immutable job directory");
+      const beforeImagesM6 = JSON.parse(
+        JSON.stringify((store.rows.get(M6)!.workup_json as Record<string, unknown>).images),
+      ) as Record<string, unknown>[];
+      const appliedM6 = await adminPost(adminReq({ action: "published_redo_apply", slug: M6, jobId: jobM6, kind: "sending", candidateUrl: candM6, confirm: true }));
+      ok(appliedM6.status === 200, "J4 apply lands for mark-6 (full revalidation with the mixed legacy/job-dir set)");
+      const afterRowM6 = store.rows.get(M6)!;
+      const afterImagesM6 = (afterRowM6.workup_json as Record<string, unknown>).images as Record<string, unknown>[];
+      ok(afterRowM6.status === "reviewed", "J4 mark-6 stays published");
+      ok(afterImagesM6.find((i) => i.kind === "sending")!.src === candM6, "J4 the target src is the candidate");
+      ok(
+        JSON.stringify(afterImagesM6.filter((i) => i.kind !== "sending")) ===
+          JSON.stringify(beforeImagesM6.filter((i) => i.kind !== "sending")),
+        "J4 the four legacy images are byte-identical (exactly one source changed)",
+      );
+      const rbM6 = await adminPost(adminReq({ action: "published_redo_rollback", slug: M6, jobId: jobM6, confirm: true }));
+      ok(rbM6.status === 200, "J4 owner-confirmed rollback succeeds");
+      const restoredM6 = (store.rows.get(M6)!.workup_json as Record<string, unknown>).images as Record<string, unknown>[];
+      ok(
+        String(restoredM6.find((i) => i.kind === "sending")!.src).endsWith("/chapter-images/mark-6/sending.png"),
+        "J4 rollback restores the exact legacy stable path",
+      );
+      ok(lane.rows.get(jobM6)?.status === "rolled_back", "J4 lane row settled as rolled_back");
     }
 
     console.log(`verify:published-redo ✓ ${checks} checks passed (dedicated lane: claim/worker/apply/rollback with the live row untouched until the final conditional write)`);

@@ -6,6 +6,10 @@
 import type { ChapterImage, ChapterWorkup, ImageKind } from "../types";
 import { sha256Canonical } from "./generation-manifest";
 import { GPT_IMAGE_2_ESTIMATED_USD_EACH } from "../ai/costs";
+// Both imports are pure data/config modules (no I/O) — this file stays
+// side-effect free as documented above.
+import { getHeroKindOverride } from "../content/chapter-content";
+import { isRedoUnlockedProtectedSlug } from "../studio-mark8-preflight";
 
 export const MARK_8_IMAGE_SLUG = "mark-8";
 export const MARK_8_IMAGE_MODEL = "gpt-image-2";
@@ -82,7 +86,16 @@ export function deriveMarkSprintImagePlan(
   if (workup.images.length !== 3 && workup.images.length !== 5) {
     throw new Error(`${label} must have exactly 3 or 5 planned images`);
   }
-  const heroKind = nonEmpty(workup.heroKind, label, "heroKind") as ImageKind;
+  // Mark 6's hero is a render-level override — its stored workup predates
+  // heroKind (owner authorization 2026-07-20, board #29). Sprint workups all
+  // store heroKind and have NO override (CHAPTER_HERO_OVERRIDES is mark-6
+  // only; verify:published-redo asserts that), so this resolution order
+  // cannot change any sprint chapter's derived plan digest.
+  const heroKind = nonEmpty(
+    getHeroKindOverride(slug) ?? workup.heroKind,
+    label,
+    "heroKind",
+  ) as ImageKind;
   const seen = new Set<string>();
   const images = workup.images.map((source, position): Mark8ImagePlanItem => {
     const kind = nonEmpty(source.kind, label, `kind ${position + 1}`) as ImageKind;
@@ -255,6 +268,10 @@ export function markSprintImageRedoUnresolved(workup: ChapterWorkup): boolean {
 
 const JOB_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
+// Sentinel for a valid LEGACY stored path (no job directory). Only ever
+// compared against null — never used as a real job id.
+const LEGACY_STABLE_PATH_JOB_ID = "legacy-stable-path";
+
 function storedJobId(slug: string, image: ChapterImage): string | null {
   if (image.status !== "complete") return null;
   try {
@@ -264,6 +281,13 @@ function storedJobId(slug: string, image: ChapterImage): string | null {
     if (!url.pathname.startsWith(prefix)) return null;
     const rest = url.pathname.slice(prefix.length);
     const parts = rest.split("/");
+    // Mark 6's launch images predate job directories and live at the stable
+    // legacy path "chapter-images/mark-6/<kind>.png" (owner authorization
+    // 2026-07-20, board #29). Accept exactly that shape for the redo-unlocked
+    // slug only; every sprint chapter still requires a job-id directory.
+    if (parts.length === 1 && isRedoUnlockedProtectedSlug(slug)) {
+      return parts[0] === `${image.kind}.png` ? LEGACY_STABLE_PATH_JOB_ID : null;
+    }
     if (parts.length !== 2 || !JOB_ID.test(parts[0])) return null;
     return parts[1] === `${image.kind}.png` ? parts[0] : null;
   } catch {
