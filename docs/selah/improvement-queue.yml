@@ -633,17 +633,22 @@ entries:
   - id: IQ-032
     area: studio
     improvement: >-
-      Time every launch stage and image redo (start/end per step: text
-      draft, image run, publish, redo generate/apply) and store simple
-      durations, so Studio can show a countdown/ETA while readers wait
-      ("we could time how long it takes... make a countdown clock to
-      estimate loading time"). Feeds IQ-029's one-flow launch UI and
-      IQ-030's Chapter Checkup metrics panel.
+      Time only the long-running generation steps — text generation and
+      image generation/redo — and show a rough range once several real
+      runs exist ("usually 2-4 minutes"), never a precise countdown
+      derived from a single sample ("we could time how long it takes...
+      make a countdown clock to estimate loading time" — delivered as an
+      honest range, not a clock). Excluded on purpose: human review
+      time, publishing, and applying an approved image; those are
+      owner-paced clicks, not waits. Keep the existing "safe to leave
+      and return" message alongside the estimate. Can feed IQ-030's
+      Chapter Checkup metrics panel later.
     evidence: >-
       Owner, in-session 2026-07-20 night, mid Mark 6 redo ("in a future
       update. nothing pressing"). First data point, owner-timed: one
-      gpt-image-2 redo candidate took ~2m 15s.
-    priority_trigger: rides the IQ-029 Studio pass; explicitly not
-      pressing per owner
+      gpt-image-2 redo candidate took ~2m 15s — a single sample, which
+      is exactly why the display is a range built from several runs.
+    priority_trigger: owner says go during a future Studio
+      simplification pass; explicitly not pressing per owner
     status: queued
     completion_pr: null
