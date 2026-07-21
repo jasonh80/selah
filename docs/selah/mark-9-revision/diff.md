@@ -1,4 +1,4 @@
-# Mega Mark 9 — field-by-field diff (Codex rundown comparison; 777 → 604 words)
+# Mega Mark 9 — field-by-field diff (Codex rundown comparison + recheck correction; 777 → 608 words)
 
 ### `quickSummary`
 
@@ -76,7 +76,7 @@
 **Proposed:**
 > Bring Jesus the unedited version. The father does. His faith and doubt arrive in the same sentence, and Jesus does not send him away to clean up the wording.
 > 
-> Notice where status and ownership creep in. The disciples argue about who matters most, overlook a child, and police someone outside their circle. Different century, same human hobby. Welcome the person you would normally pass over. Celebrate faithful work you cannot control. Ask whether you care about Jesus’ truth—or about being the one who gets credit for it.
+> Notice where status and ownership creep in. The disciples argue about who matters most; Jesus places a child among them; then they police someone outside their circle. Different century, same human hobby. Welcome the person you would normally pass over. Celebrate faithful work you cannot control. Ask whether you care about Jesus’ truth—or about being the one who gets credit for it.
 > 
 > Then take Jesus’ warning about sin seriously without turning it into self-harm. Cut off access to the habit, screen, circle, or excuse that keeps training you away from Him. Not because misery earns God’s love. Because life with Jesus is worth protecting.
 

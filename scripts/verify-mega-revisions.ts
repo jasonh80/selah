@@ -74,10 +74,9 @@ const REVISIONS: RevisionSpec[] = [
     slug: "mark-10",
     basePath: "../docs/selah/mark-10-revision/base-workup.json",
     fixturePath: "../lib/ai/fixtures/mark-10-mega-revision.json",
-    // Codex rundown comparison (board #29, 2026-07-21, + wording addendum).
-    // DOCUMENTED EXCEPTION: the compile called itself "shorter overall" but
-    // measures +23 words on the exact stored fields — flagged on the PR for
-    // Codex's editorial recheck (trim or bless); ceiling pinned to actual.
+    // Codex rundown comparison (board #29, 2026-07-21) + its recheck
+    // corrections (PR #94, 2026-07-21) — the recheck trimmed the easy-to-miss
+    // opener, so the normal flat-or-shorter gate applies again.
     allowedChangedPaths: [
       "quickSummary",
       "insights[what-most-miss].body",
@@ -85,7 +84,6 @@ const REVISIONS: RevisionSpec[] = [
       "insights[theology].body",
       "insights[application].body",
     ],
-    maxWordDelta: 23,
   },
 ];
 

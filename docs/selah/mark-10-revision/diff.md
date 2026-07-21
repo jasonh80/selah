@@ -1,4 +1,4 @@
-# Mega Mark 10 — field-by-field diff (Codex rundown comparison; 525 → 548 words)
+# Mega Mark 10 — field-by-field diff (Codex rundown comparison + recheck corrections; 525 → 524 words)
 
 ### `quickSummary`
 
@@ -6,7 +6,7 @@
 > Mark 10 follows Jesus on the road toward Jerusalem as He exposes every human attempt to secure life by control, status, possessions, or rank. He welcomes children, loves a wealthy man who walks away sad, predicts His suffering, redefines greatness as service, and restores Bartimaeus, who follows Him on the way.
 
 **Proposed:**
-> Mark 10 is a road full of people trying to stay in control: religious leaders reach for loopholes, a sincere man leans on wealth, disciples chase rank, and a crowd decides whose need matters. Jesus keeps overturning the scoreboard. Children receive. Bartimaeus cries for mercy and follows. The people who look strong are exposed; the people who know they need Jesus can finally see.
+> Mark 10 is a road full of people trying to stay in control: religious leaders reach for loopholes, a wealthy man walks away grieving, disciples chase rank, and a crowd decides whose need matters. Jesus keeps overturning the scoreboard. Children receive. Bartimaeus cries for mercy and follows. The people who look strong are exposed; the people who know they need Jesus can finally see.
 
 ---
 
@@ -20,9 +20,9 @@
 > The child receives. The wealthy man cannot release. The disciples want position. Bartimaeus cries for mercy and follows. That contrast is doing real work. The kingdom is not a trophy for people who manage the optics. It is mercy for people who come to Jesus empty-handed.
 
 **Proposed:**
-> Modern readers often separate the scenes: divorce, children, rich man, passion prediction, ambition, healing. Mark ties them together by the road and by the repeated question of access to the kingdom.
+> Along the road, Mark returns to one question: who gets access to the kingdom?
 > 
-> Mark 10 is not five unrelated lessons. The same problem keeps changing clothes: control. Can I manage marriage with a loophole? Secure life with a clean résumé and enough money? Turn closeness to Jesus into rank? Decide who gets access to Him?
+> The same problem keeps changing clothes: control. Can I manage marriage with a loophole? Secure life with a clean résumé and enough money? Turn closeness to Jesus into rank? Decide who gets access to Him?
 > 
 > Jesus refuses every version. He points back to God’s purpose, welcomes children with nothing to prove, loves a wealthy man enough to name what owns him, and stops for the beggar everyone else wants quiet. The kingdom is received, not achieved. The insiders keep missing Jesus. The blind beggar gets Him right.
 
