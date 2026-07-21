@@ -629,3 +629,20 @@ entries:
       (bounded, visual-parity at default settings); phase 2 owner-gated
     status: queued
     completion_pr: null
+
+  - id: IQ-032
+    area: studio
+    improvement: >-
+      Time every launch stage and image redo (start/end per step: text
+      draft, image run, publish, redo generate/apply) and store simple
+      durations, so Studio can show a countdown/ETA while readers wait
+      ("we could time how long it takes... make a countdown clock to
+      estimate loading time"). Feeds IQ-029's one-flow launch UI and
+      IQ-030's Chapter Checkup metrics panel.
+    evidence: >-
+      Owner, in-session 2026-07-20 night, mid Mark 6 redo ("in a future
+      update. nothing pressing").
+    priority_trigger: rides the IQ-029 Studio pass; explicitly not
+      pressing per owner
+    status: queued
+    completion_pr: null
