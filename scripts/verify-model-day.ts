@@ -291,11 +291,17 @@ async function main(): Promise<void> {
   const replay = await runWorker("mark-9");
   ok(replay.status === 500 && modelCalls.length === 2 && mdCosts().length === 2, "E1 a replayed delivery dispatches nothing and spends nothing");
 
-  // F. The structural cap gate.
+  // F. The cap gates (owner choice "A": full pre-reservation + post-call-one
+  // recheck). A pathologically billed incumbent input (provider accounting
+  // exceeding the counted bound) must stop the challenger.
+  ok(
+    modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.5"]) + modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.6-sol"]) <= MODEL_DAY_TOTAL_CAP_USD,
+    "F0 both calls' full worst case fits the cap BEFORE any dispatch (structural pre-reservation)",
+  );
   modelCalls = [];
   modelBehavior = (model) =>
     model === "gpt-5.5"
-      ? { content: VALID_WORKUP, inputTokens: 20_000, outputTokens: 4_000 } // ~$0.22 actual
+      ? { content: VALID_WORKUP, inputTokens: 100_000, outputTokens: 4_000 } // pathological billed input
       : { content: VALID_WORKUP, inputTokens: 5_000, outputTokens: 1_000 };
   lastTrigger = null;
   await createRun("mark-10");

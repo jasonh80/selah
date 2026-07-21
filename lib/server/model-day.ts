@@ -53,7 +53,11 @@ const STALE_CLAIM_MS = 45 * 60 * 1000;
 // Bounded spend. The owner's Model Day budget is a TOTAL cap; both calls are
 // hard-bounded so the recorded ledger can never exceed it.
 // ---------------------------------------------------------------------------
-export const MODEL_DAY_TOTAL_CAP_USD = 0.3;
+// PRODUCTION-QUALITY Model Day (owner choice "A", 2026-07-21, per Codex's
+// correction shape): the A/B mirrors the production request budget, so the
+// worst-case ceiling is $0.90 — BOTH calls' full worst case is reserved
+// before call one ever dispatches. Expected actual stays far lower (~$0.22).
+export const MODEL_DAY_TOTAL_CAP_USD = 0.9;
 // Coarse pre-check only — the ENFORCED input bound is the exact token count
 // below (Codex #103 P1: a chars/token assumption is an estimate, not a
 // ceiling; the incumbent alone must never be able to cross the cap).
@@ -66,11 +70,11 @@ export const MODEL_DAY_MAX_INPUT_TOKENS = 12_000;
 // Small allowance for the provider's per-message/e.g. role framing overhead
 // beyond raw content tokens — counted INTO the bound, never on top of it.
 const MODEL_DAY_TOKEN_OVERHEAD = 50;
-// Launch-quality Mark text runs observe ~3k completion tokens (~$0.11 total,
-// Mark 7 cross-check in lib/ai/costs.ts); 4000 caps the worst case while
-// leaving headroom. A truncated output fails schema validation and the run
-// fails honestly — spend recorded, nothing owner-facing.
-export const MODEL_DAY_MAX_COMPLETION_TOKENS = 4_000;
+// PRODUCTION PARITY (owner choice "A"): the exact completion budget the
+// production writing request uses (generateChapterWorkup) — reasoning tokens
+// count inside this limit, so a smaller cap could truncate a model here that
+// would succeed in production and crown the wrong writer (Codex re-review).
+export const MODEL_DAY_MAX_COMPLETION_TOKENS = 12_000;
 
 // The ONLY models this lane may quote or dispatch (Codex #103 P1: "allow only
 // models with known pricing/capability"). Published USD-per-1M-token rates in
@@ -805,6 +809,17 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     );
   }
 
+  // FULL PRE-RESERVATION (owner choice "A" + Codex correction shape): BOTH
+  // calls' complete worst case must fit the cap before the FIRST dispatch —
+  // no cross-model estimates, no discovering the budget mid-run.
+  const incumbentCeilingUsd = modelDayCallCeilingUsd(ratesFor(incumbent));
+  const challengerCeilingUsd = modelDayCallCeilingUsd(ratesFor(challenger));
+  if (incumbentCeilingUsd + challengerCeilingUsd > MODEL_DAY_TOTAL_CAP_USD) {
+    return failRow(
+      `both calls' reserved worst case ($${incumbentCeilingUsd.toFixed(2)} + $${challengerCeilingUsd.toFixed(2)}) exceeds the $${MODEL_DAY_TOTAL_CAP_USD.toFixed(2)} cap — nothing was dispatched`,
+    );
+  }
+
   // ONE bounded request per model, incumbent first. Any post-dispatch failure
   // records its possible spend durably before the row fails. All costs at the
   // MODEL'S OWN priced rates (never another model's).
@@ -896,22 +911,24 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
   const first = await runOne(incumbent);
   if (!first.ok) return failRow(first.reason, first.costUsd);
 
-  // Structural total-cap gate. Both calls send the IDENTICAL prompt, so the
-  // challenger's input cost is bounded by the incumbent's MEASURED prompt
-  // tokens (+10% cross-tokenizer margin) at the CHALLENGER'S rates. The
-  // output side is provider-enforced by max_completion_tokens. If the
-  // incumbent's usage was missing or partial, the measured bound does not
-  // exist — fall back to the challenger's static ceiling, which fails closed
-  // below (ceiling + ceiling > cap).
-  const challengerCeilingUsd =
-    first.inputTokens === null
-      ? modelDayCallCeilingUsd(ratesFor(challenger))
-      : ceilCents(
-          modelDayCostUsd(ratesFor(challenger), Math.ceil(first.inputTokens * 1.1), 0, MODEL_DAY_MAX_COMPLETION_TOKENS),
-        );
+  // Missing/partial usage STOPS THE RUN (owner choice "A" shape): with no
+  // trustworthy actual, the full reserved per-call maximum is already in the
+  // ledger and nothing further may dispatch under uncertainty.
+  if (first.inputTokens === null) {
+    return failRow(
+      `the ${incumbent} response carried absent or partial usage — the run stops here with the full reserved per-call maximum recorded; challenger NOT dispatched`,
+      first.costUsd,
+    );
+  }
+
+  // Recheck before call two: call one's ACTUAL plus call two's FULL reserved
+  // worst case must still fit the cap. No cross-model estimate — the
+  // challenger's own complete ceiling is the reserve. (Protects against a
+  // billed input exceeding the counted bound, e.g. provider-side token
+  // accounting surprises.)
   if (first.costUsd + challengerCeilingUsd > MODEL_DAY_TOTAL_CAP_USD) {
     return failRow(
-      `the incumbent run cost $${first.costUsd.toFixed(4)}; adding the challenger's ceiling ($${challengerCeilingUsd.toFixed(2)}) would risk exceeding the $${MODEL_DAY_TOTAL_CAP_USD.toFixed(2)} total cap — challenger NOT dispatched`,
+      `the incumbent run cost $${first.costUsd.toFixed(4)}; adding the challenger's full reserve ($${challengerCeilingUsd.toFixed(2)}) would exceed the $${MODEL_DAY_TOTAL_CAP_USD.toFixed(2)} cap — challenger NOT dispatched`,
       first.costUsd,
     );
   }
