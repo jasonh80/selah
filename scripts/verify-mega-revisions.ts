@@ -57,6 +57,34 @@ const REVISIONS: RevisionSpec[] = [
       "insights[application].body",
     ],
   },
+  {
+    slug: "mark-9",
+    basePath: "../docs/selah/mark-9-revision/base-workup.json",
+    fixturePath: "../lib/ai/fixtures/mark-9-mega-revision.json",
+    // Codex rundown comparison (board #29, 2026-07-21, + wording addendum).
+    allowedChangedPaths: [
+      "quickSummary",
+      "insights[what-most-miss].body",
+      "insights[jesus].body",
+      "insights[theology].body",
+      "insights[application].body",
+    ],
+  },
+  {
+    slug: "mark-10",
+    basePath: "../docs/selah/mark-10-revision/base-workup.json",
+    fixturePath: "../lib/ai/fixtures/mark-10-mega-revision.json",
+    // Codex rundown comparison (board #29, 2026-07-21) + its recheck
+    // corrections (PR #94, 2026-07-21) — the recheck trimmed the easy-to-miss
+    // opener, so the normal flat-or-shorter gate applies again.
+    allowedChangedPaths: [
+      "quickSummary",
+      "insights[what-most-miss].body",
+      "insights[jesus].body",
+      "insights[theology].body",
+      "insights[application].body",
+    ],
+  },
 ];
 
 const CHURCHY = /discernment/i;

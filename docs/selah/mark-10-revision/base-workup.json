@@ -1,0 +1,532 @@
+{
+  "book": "Mark",
+  "slug": "mark-10",
+  "theme": "Receiving the kingdom by following the Servant King",
+  "title": "Mark 10",
+  "images": [
+    {
+      "alt": "Jesus looks with compassion at a grieving wealthy man on a dusty road while disciples watch nearby.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-10/aa28cfd8-d0c1-421a-bfd0-487d060f664a/wealthy-man-grieved.png",
+      "kind": "wealthy-man-grieved",
+      "index": 1,
+      "label": "Loved, Yet Unable to Let Go",
+      "prompt": "Photorealistic historical-documentary scene on a first-century Judean road, natural daylight, Jesus as a Jewish man in simple worn linen and wool garments looking steadily and compassionately at an adult wealthy man kneeling or rising with visible grief, disciples nearby in plain travel clothes, dusty ground, modest baggage animals in background but no symbols of office, no youthful coding, no guards, no signet rings, no bright royal colors. Historically grounded, lived-in materials, believable faces, no halos or glow, no pristine costumes, no theatrical posing, no modern objects, no text or lettering, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "Jesus loves the man and names the one thing holding him back.",
+      "description": "This scene helps readers feel the force of Jesus’ love and the sorrow of a man whose possessions have become a rival center."
+    },
+    {
+      "alt": "Jesus walks ahead on a dusty road while disciples follow behind with anxious faces.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-10/fc5523ec-5ecd-45d3-b69e-df1d679c838f/jesus-walking-ahead.png",
+      "kind": "jesus-walking-ahead",
+      "index": 2,
+      "label": "Jesus Ahead on the Road",
+      "prompt": "Photorealistic historical-documentary scene of a first-century road rising through the Judean landscape toward Jerusalem, Jesus walking ahead of a small group of disciples and other followers, dusty sandals, woven cloaks, dry hills and stone-lined path, late afternoon natural light, faces showing awe and fear without exaggerated acting. Jesus consistent as a Jewish man in simple worn linen and wool garments. No halos or glow, no pristine costumes, no modern objects, no text or lettering, no theatrical posing, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "Jesus leads toward Jerusalem and tells the Twelve what awaits Him there.",
+      "description": "This image captures the chapter’s turning point: Jesus knowingly leads the way toward Jerusalem while His followers react with amazement and fear."
+    },
+    {
+      "alt": "Bartimaeus rises from the roadside as the crowd opens and Jesus calls him near.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-10/fc5523ec-5ecd-45d3-b69e-df1d679c838f/bartimaeus-called.png",
+      "kind": "bartimaeus-called",
+      "index": 3,
+      "label": "Bartimaeus Called Into the Center",
+      "prompt": "Photorealistic historical-documentary scene near first-century Jericho, roadside with dust, palms and dry valley terrain, a blind beggar named Bartimaeus respectfully rising as people make space and call him toward Jesus, cloak falling aside naturally without implying it is his only possession, crowd of varied ordinary people, Jesus as a Jewish man in simple worn linen and wool garments standing still and attentive. Portray disability with dignity: no clouded white eyes, no grotesque helplessness, no exaggerated spectacle. Natural light, worn materials, no halos or glow, no pristine costumes, no modern objects, no text or lettering, no theatrical posing, no theme-park sets, no generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "The crowd tries to silence him, but Jesus stops and calls him.",
+      "description": "Bartimaeus becomes the final living picture of discipleship in the chapter: mercy received, sight restored, and a new way to follow Jesus."
+    }
+  ],
+  "prayer": "Jesus, teach me to receive Your kingdom instead of trying to control it. Loosen my grip on what keeps me from following You, and make me brave enough to walk Your road of mercy, service, and trust.",
+  "status": "draft",
+  "verses": [],
+  "chapter": 10,
+  "context": "First-century Jewish debates about divorce often centered on how to interpret Moses’s allowance for a written certificate and what grounds a man could claim. Children held low social power, wealth was often read as a sign of blessing, and honor near a ruler mattered deeply in status-conscious cultures. Jesus challenges all of it: marriage is not merely a legal exit strategy, children are not interruptions, wealth cannot purchase eternal life, and kingdom authority does not copy Gentile power games.",
+  "summary": "Jesus leaves Galilee’s familiar territory and moves south toward Judea and the Jordan region, with Jerusalem now looming over the story. Crowds gather, opponents test Him, disciples misunderstand Him, and Jesus keeps walking toward the suffering He has already begun to name.",
+  "tagline": "Pause. Reflect. Elevate.",
+  "version": "1",
+  "heroKind": "bartimaeus-called",
+  "insights": [
+    {
+      "id": "big-idea",
+      "body": "Mark 10 is road theology. Jesus is moving toward Jerusalem, and every scene along the way tests a different human instinct: manage marriage by loophole, block inconvenient children, secure eternal life by achievement, protect wealth, chase status, silence need.\n\nJesus answers each one by bringing people back to Himself. The kingdom is not controlled by legal cleverness. It is not reserved for the impressive. It cannot be bought, inherited by résumé, or negotiated through proximity to power. It is received from God through the Servant King.\n\nThe chapter’s great irony is that the people who seem to see often miss the way, while blind Bartimaeus ends up following Jesus on it. Mark is not subtle here, and honestly, we probably needed that.",
+      "icon": "💡",
+      "jesus": false,
+      "title": "Big Idea",
+      "preview": "Mark 10 shows Jesus dismantling every false way we try to secure the kingdom."
+    },
+    {
+      "id": "chapter-flow",
+      "body": "In 10:1-12, Jesus enters the Judean and Jordan-region setting and is tested about divorce. He does not deny Moses’s regulation, but He explains it through human hardness and points back to God’s joining purpose.\n\nIn 10:13-16, the disciples act like bouncers for the kingdom. Jesus is not amused. He receives children, blesses them, and makes their lowly receptiveness a picture of how anyone enters God’s reign.\n\nIn 10:17-31, a wealthy man asks about eternal life. Jesus loves him and calls him to surrender the possessions that hold him. The man leaves grieving, and Jesus teaches that wealth makes kingdom entry difficult in a way only God can overcome.\n\nIn 10:32-34, the road sharpens. Jesus walks ahead toward Jerusalem and names the rejection, abuse, death, and resurrection awaiting Him. Then, in 10:35-45, James and John ask for glory seats, and Jesus redefines greatness as service grounded in His own self-giving mission. Finally, in 10:46-52, Bartimaeus cries for mercy, is restored, and follows Jesus on the way.",
+      "icon": "🧭",
+      "jesus": false,
+      "title": "Chapter Flow",
+      "preview": "The chapter moves from public testing to private teaching, then onto the road where Jesus leads toward Jerusalem."
+    },
+    {
+      "id": "historical-world",
+      "body": "Divorce in Jesus’ setting was not only a private emotional matter; it could determine a woman’s social and economic security. The Pharisees’ question focuses on what the law permits a man to do, but Jesus refuses to let permission become the highest moral category.\n\nChildren, meanwhile, were loved in families but had little public status. Welcoming them was not a sentimental photo op. It was Jesus placing the low-status and dependent near the center.\n\nWealth carried social honor, and many assumed prosperity signaled God’s favor. That is why the disciples are shocked when Jesus warns the wealthy. And when James and John ask for honored seats, they are thinking in a world where closeness to a ruler meant rank. Jesus points them away from Roman-style domination and toward servant-shaped leadership.",
+      "icon": "🏛",
+      "jesus": false,
+      "title": "The World Behind It",
+      "preview": "Jesus’ words land in a world shaped by household vulnerability, honor culture, and Roman-style power."
+    },
+    {
+      "id": "what-most-miss",
+      "body": "Modern readers often separate the scenes: divorce, children, rich man, passion prediction, ambition, healing. Mark ties them together by the road and by the repeated question of access to the kingdom.\n\nWho gets in? The legally careful? The morally confident? The wealthy? The inner circle? The loud crowd that decides who deserves attention? Jesus keeps overturning the assumed answer.\n\nThe child receives. The wealthy man cannot release. The disciples want position. Bartimaeus cries for mercy and follows. That contrast is doing real work. The kingdom is not a trophy for people who manage the optics. It is mercy for people who come to Jesus empty-handed.",
+      "icon": "🔍",
+      "jesus": false,
+      "title": "What Most People Miss",
+      "preview": "The repeated issue is not effort versus laziness; it is control versus receiving."
+    },
+    {
+      "id": "jesus",
+      "body": "Jesus is not drifting toward Jerusalem as if events are overtaking Him. Mark shows Him walking ahead and telling the Twelve what will happen. He knows rejection, humiliation, death, and resurrection stand before Him, and He continues.\n\nThat gives weight to everything else in the chapter. His teaching on service is not a leadership slogan taped to a conference wall. It is His mission. He serves by giving His life as a ransom for many.\n\nAnd this Servant King is not too focused on His destiny to notice the lowly. He welcomes children. He loves the wealthy man even when the man walks away. He stops for Bartimaeus when others want silence. Jesus’ road to the cross is not a cold march. It is mercy moving with purpose.",
+      "icon": "✝",
+      "jesus": true,
+      "title": "Jesus at the Center",
+      "preview": "Jesus is the King who walks toward suffering and stops for mercy on the way."
+    },
+    {
+      "id": "theology",
+      "body": "The theology word here is grace. Grace is God’s generous action toward people who cannot save themselves.\n\nThe wealthy man is not told to add one more impressive achievement to his list. He is called to follow Jesus with open hands. The disciples are not told that salvation is difficult but manageable for high performers. They are told it is impossible for humans and possible with God.\n\nThat matters because we keep trying to turn discipleship into something we can control. Jesus does call us to costly obedience. But obedience is not the engine of salvation; it is the path of those being rescued by grace.",
+      "icon": "🛡",
+      "jesus": false,
+      "title": "Theology Principle",
+      "preview": "Grace means the kingdom is received from God, not achieved by human strength."
+    },
+    {
+      "id": "application",
+      "body": "Mark 10 gives several honest questions to carry. Where am I asking for permission when Jesus is calling me back to God’s purpose? Who am I treating as an interruption to important spiritual business? What possession, success, relationship, or identity would make me sad if Jesus asked me to release it?\n\nThe point is not to manufacture guilt. The point is to come close enough to Jesus to let Him tell the truth. He looks with love before He calls the wealthy man to surrender. He stops before He heals Bartimaeus. His commands are serious because His mercy is serious.\n\nToday, practice receiving. Ask for mercy without editing yourself into something impressive. Serve without needing the good seat. Follow Jesus on the road He is actually walking, not the one our egos keep helpfully redesigning.",
+      "icon": "🌱",
+      "jesus": false,
+      "title": "Live It",
+      "preview": "Come to Jesus without the usual props: control, image, possessions, rank, or respectable noise."
+    },
+    {
+      "id": "prayer",
+      "body": "Jesus, I come to You with the parts of me that still want control, credit, comfort, and a safer version of discipleship. Show me where my heart is hard, where my hands are closed, and where my ambition has dressed itself up as faithfulness.\n\nTeach me to receive Your kingdom like a child, to let go when You lovingly call me, and to serve because You first served me. Have mercy on me. Give me sight. Help me follow You on the way.",
+      "icon": "🙏",
+      "jesus": false,
+      "title": "Prayer",
+      "preview": "Ask Jesus for open hands, clear sight, and servant-shaped courage."
+    },
+    {
+      "id": "original-language",
+      "body": "In Mark 10:43-44, Jesus uses words often rendered servant and slave or bondservant. The first can describe one who serves or waits on others; the second speaks more strongly of belonging to another’s service.\n\nThe point is not that Jesus blesses abusive power structures. He is confronting the disciples’ hunger for rank by moving greatness downward. In His kingdom, authority is not a platform for self-importance. It becomes responsibility for the good of others, patterned after the Son of Man who gives Himself.",
+      "icon": "🔤",
+      "jesus": false,
+      "title": "Original Language",
+      "preview": "Two Greek service words sharpen Jesus’ definition of greatness."
+    },
+    {
+      "id": "map-notes",
+      "body": "Mark begins with Jesus in the region of Judea and beyond the Jordan, then later places the group near Jericho, the major oasis city on the approach to Jerusalem from the Jordan Valley. From Jericho, the road rises steeply toward Jerusalem.\n\nThat upward movement helps explain the phrase often used for going to Jerusalem: it is not only spiritual direction but real terrain. Mark does not map every stop, so the best historic map should show broad regions and a possible route, not pretend we know the exact roadside where every conversation happened.",
+      "icon": "🗺",
+      "jesus": false,
+      "title": "Map Notes",
+      "preview": "Geography matters because the chapter is not standing still; it is moving toward Jerusalem."
+    }
+  ],
+  "keyItems": [
+    {
+      "name": "Divorce certificate",
+      "type": "object",
+      "blurb": "A legal document connected to Deuteronomy’s allowance, raised here in a test about marriage and human hardness."
+    },
+    {
+      "name": "Needle eye",
+      "type": "object",
+      "blurb": "A tiny opening used in Jesus’ striking image about the impossibility of wealth securing entry into God’s kingdom."
+    },
+    {
+      "name": "Road to Jerusalem",
+      "type": "object",
+      "blurb": "The physical road becomes a discipleship picture as Jesus leads toward suffering and resurrection."
+    },
+    {
+      "name": "Bartimaeus’s cloak",
+      "type": "object",
+      "blurb": "A garment he throws aside when called to Jesus, though Mark does not say it was his only possession."
+    }
+  ],
+  "navCards": [
+    {
+      "id": "key-object",
+      "label": "Key Object",
+      "thumb": "/img/placeholder/detail.svg",
+      "support": "Divorce certificate"
+    },
+    {
+      "id": "key-person",
+      "label": "Key Person",
+      "thumb": "/img/placeholder/person.svg",
+      "support": "Jesus"
+    },
+    {
+      "id": "jesus",
+      "jesus": true,
+      "label": "Jesus",
+      "thumb": "/img/placeholder/jesus.svg",
+      "support": "The Servant King on the road"
+    }
+  ],
+  "subtitle": "The Road Where Greatness Gets Rewritten",
+  "timeline": [
+    {
+      "label": "Galilee Ministry",
+      "detail": "Jesus teaches, heals, and forms the Twelve.",
+      "current": false
+    },
+    {
+      "label": "Toward Jerusalem",
+      "detail": "Jesus moves south and teaches on the way.",
+      "current": true
+    },
+    {
+      "label": "Jerusalem Week",
+      "detail": "Jesus enters the city and confronts temple leadership.",
+      "current": false
+    }
+  ],
+  "versions": [
+    "ESV"
+  ],
+  "metaChips": [
+    {
+      "icon": "📅",
+      "text": "c. AD 30"
+    },
+    {
+      "icon": "📍",
+      "text": "Judea, beyond the Jordan, and the Jericho road"
+    },
+    {
+      "icon": "✦",
+      "text": "Receiving the kingdom by following the Servant King"
+    },
+    {
+      "icon": "✝",
+      "text": "Jesus: The Servant King on the road",
+      "jesus": true
+    }
+  ],
+  "modernMap": {
+    "alt": "Shows the broad modern geography of the Jordan Valley, Jericho region, Jerusalem, and areas east and west of the Jordan River where Mark 10’s movement likely belongs.",
+    "src": "/img/placeholder/map.svg",
+    "note": "Modern political borders do not match first-century regions, and Mark does not give enough detail to pinpoint the teaching locations or exact roadside healing site.",
+    "title": "Modern Map",
+    "caption": "Shows the broad modern geography of the Jordan Valley, Jericho region, Jerusalem, and areas east and west of the Jordan River where Mark 10’s movement likely belongs.",
+    "uncertaintyNote": "Modern political borders do not match first-century regions, and Mark does not give enough detail to pinpoint the teaching locations or exact roadside healing site."
+  },
+  "reference": "Mark 10",
+  "characters": [
+    {
+      "name": "Jesus",
+      "role": "Teacher and Servant King",
+      "description": "He teaches with authority, welcomes the lowly, predicts His suffering, and gives His life for many."
+    },
+    {
+      "name": "The wealthy man",
+      "role": "Questioner seeking eternal life",
+      "description": "He approaches Jesus seriously, is loved by Him, and leaves grieving because of his many possessions."
+    },
+    {
+      "name": "James and John",
+      "role": "Disciples seeking honor",
+      "description": "They ask for places of glory and receive a lesson in costly service."
+    },
+    {
+      "name": "Bartimaeus",
+      "role": "Blind beggar near Jericho",
+      "description": "He cries for mercy, is called by Jesus, receives sight, and follows Him on the way."
+    },
+    {
+      "name": "Pharisees",
+      "role": "Religious questioners testing Jesus",
+      "description": "They ask about divorce, prompting Jesus to move from legal permission to God’s creation intent."
+    }
+  ],
+  "application": "Mark 10 invites an honest look at the things we use to feel secure: being right, being respected, being in control, being successful, being near important seats. Jesus does not shame us into surrender; He calls us to Himself. Bring Him the attachment you defend, the status you crave, the question you are afraid to ask, and the need others keep trying to silence.",
+  "historicMap": {
+    "alt": "Shows Judea, the Jordan Valley, the Jericho region, and Jerusalem as the destination, with a dashed possible route rather than a fixed itinerary.",
+    "src": "/img/placeholder/map.svg",
+    "note": "The route from the Jordan region through Jericho toward Jerusalem is historically plausible, but Mark’s wording leaves the exact path and stopping points uncertain.",
+    "title": "Historic Map",
+    "caption": "Shows Judea, the Jordan Valley, the Jericho region, and Jerusalem as the destination, with a dashed possible route rather than a fixed itinerary.",
+    "uncertaintyNote": "The route from the Jordan region through Jericho toward Jerusalem is historically plausible, but Mark’s wording leaves the exact path and stopping points uncertain."
+  },
+  "sceneChecks": [
+    {
+      "body": "The camel and needle image is supposed to feel impossible. Do not picture a tiny city gate where a camel could squeeze through after a motivational seminar and some baggage management. That later idea weakens Jesus’ point: humans cannot engineer salvation.",
+      "label": "Scene Check",
+      "title": "No Needle Gate needed",
+      "relatedVerses": [
+        "10:23",
+        "10:25",
+        "10:27"
+      ],
+      "visualAccuracyNotes": [
+        "Depict an ordinary sewing needle image only if visualized, not a stone city gate",
+        "Do not include a labeled gate, English text, or medieval-looking archway",
+        "Keep the point visually impossible rather than merely difficult"
+      ]
+    },
+    {
+      "body": "Bartimaeus is blind and poor, but he is not a prop for pity. Mark does not describe clouded eyes, a medical diagnosis, or a helpless spectacle. Picture a real man with a name, a voice, and enough courage to keep calling when the crowd wants him quiet.",
+      "label": "Scene Check",
+      "title": "Bartimaeus with dignity",
+      "relatedVerses": [
+        "10:46",
+        "10:47",
+        "10:49",
+        "10:52"
+      ],
+      "visualAccuracyNotes": [
+        "No white or clouded eyes unless the text specifies that condition",
+        "Do not portray Bartimaeus as grotesque, collapsed, or dehumanized",
+        "His cloak may be present, but do not imply it was certainly his only possession"
+      ]
+    },
+    {
+      "body": "James and John are not asking this in a palace with golden chairs already polished. They are on the road after Jesus has described suffering. The awkwardness is the point: they are imagining glory while Jesus is describing a cross-shaped path.",
+      "label": "Scene Check",
+      "title": "No throne-room brothers",
+      "relatedVerses": [
+        "10:32",
+        "10:35",
+        "10:37",
+        "10:45"
+      ],
+      "visualAccuracyNotes": [
+        "Set the scene on a road or simple gathering place, not a royal court",
+        "Do not include thrones, crowns, marble halls, or imperial costumes",
+        "Use first-century travel clothing with dusty sandals and worn woven garments"
+      ]
+    }
+  ],
+  "whatHappens": "Jesus answers a divorce test by returning to God’s creation purpose and the reality of hard hearts. He receives children, confronts a wealthy man’s attachment to possessions, teaches that salvation is impossible for humans but possible with God, predicts His death and resurrection, corrects James and John’s request for glory, and heals Bartimaeus near Jericho as the blind man calls Him Son of David and follows Him.",
+  "deeperGroups": [
+    {
+      "rows": [
+        {
+          "desc": "Learn how divorce certificates, household vulnerability, and covenant language shaped the question.",
+          "title": "Marriage in Jesus’ world"
+        },
+        {
+          "desc": "Explore why Jesus’ welcome of children challenged social assumptions about importance.",
+          "title": "Children and status"
+        }
+      ],
+      "label": "Learn More"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Study why the image should be read as deliberate impossibility, not a reference to a later gate legend.",
+          "title": "The camel and the needle"
+        },
+        {
+          "desc": "Trace how Mark 10:45 connects Jesus’ service with Old Testament themes of suffering and deliverance.",
+          "title": "Ransom for many"
+        }
+      ],
+      "label": "Dive Deeper"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Prayerfully ask Jesus what attachment most competes with following Him freely.",
+          "title": "Name the one thing"
+        },
+        {
+          "desc": "Choose one concrete act of service that brings no applause and offer it to Jesus.",
+          "title": "Practice hidden service"
+        }
+      ],
+      "label": "Grow Closer"
+    }
+  ],
+  "quickSummary": "Mark 10 follows Jesus on the road toward Jerusalem as He exposes every human attempt to secure life by control, status, possessions, or rank. He welcomes children, loves a wealthy man who walks away sad, predicts His suffering, redefines greatness as service, and restores Bartimaeus, who follows Him on the way.",
+  "timelineMini": {
+    "labels": [
+      "Galilee Ministry",
+      "Toward Jerusalem",
+      "Jerusalem Week"
+    ],
+    "activeIndex": 1
+  },
+  "verseByVerse": [
+    {
+      "title": "Marriage, Moses, and hard hearts",
+      "endVerse": 12,
+      "rangeLabel": "1–12",
+      "startVerse": 1,
+      "explanation": "Jesus is tested with a divorce question, but He refuses to let the discussion stay at the level of legal loopholes. He points back to God’s purpose in creation and names human hardness as the reason divorce became regulated. This passage is serious about covenant faithfulness, but it is not a full modern pastoral policy and must never be used to trap someone in danger."
+    },
+    {
+      "title": "Children welcomed",
+      "endVerse": 16,
+      "rangeLabel": "13–16",
+      "startVerse": 13,
+      "explanation": "People bring children to Jesus, and the disciples try to manage access. Jesus is indignant and receives the children as belonging near the kingdom. The point is not that children are sinless, but that the kingdom is received with dependence, openness, and no claim to impressive status."
+    },
+    {
+      "title": "The wealthy man and the impossible door",
+      "endVerse": 31,
+      "rangeLabel": "17–31",
+      "startVerse": 17,
+      "explanation": "A man asks about eternal life, and Jesus exposes the one attachment he cannot release. Mark says Jesus loves him, which means the hard command is not cruelty. When the man leaves sorrowful, Jesus teaches that wealth can make kingdom entry terribly difficult, and that salvation is not human achievement but God’s possibility."
+    },
+    {
+      "title": "Jesus leads toward suffering",
+      "endVerse": 34,
+      "rangeLabel": "32–34",
+      "startVerse": 32,
+      "explanation": "On the road up to Jerusalem, Jesus walks ahead while others are amazed and afraid. He tells the Twelve again that rejection, humiliation, death, and resurrection await Him. Mark presents Jesus as moving willingly toward the costly mission He has not misunderstood."
+    },
+    {
+      "title": "Greatness turned upside down",
+      "endVerse": 45,
+      "rangeLabel": "35–45",
+      "startVerse": 35,
+      "explanation": "James and John ask for honor immediately after Jesus speaks of suffering. The other disciples are upset, but Mark does not say their motives are better. Jesus contrasts worldly authority with kingdom greatness: among His people, greatness takes the form of service because the Son of Man Himself gives His life for many."
+    },
+    {
+      "title": "Bartimaeus follows on the way",
+      "endVerse": 52,
+      "rangeLabel": "46–52",
+      "startVerse": 46,
+      "explanation": "Near Jericho, Bartimaeus cries out to Jesus as Son of David while the crowd tries to quiet him. Jesus stops, calls him, asks what he wants, restores his sight, and Bartimaeus follows on the road. The chapter ends with a man who knows he needs mercy doing what many sighted people struggle to do: follow Jesus."
+    }
+  ],
+  "estimatedDate": "c. AD 30",
+  "timelineLabel": "Jesus’ Road to Jerusalem",
+  "whatPeopleAsk": [
+    {
+      "answer": "Mark 10 records Jesus answering a test by moving from loopholes to God’s covenant purpose and human hardness. It is not a complete pastoral manual for every situation, and it does not explicitly address abuse. This passage must never be used to keep someone in danger or to silence the need for protection, justice, wise pastoral care, and safety.",
+      "question": "Does Mark 10 mean divorce is never allowed under any circumstance?"
+    },
+    {
+      "answer": "The Pharisees ask about permission; Jesus asks what marriage is for. By returning to creation, He shows that marriage is not merely a contract people can dissolve when inconvenient. It is a joining God designed for faithful union. The law addressed brokenness, but Jesus reveals the deeper intent.",
+      "question": "Why does Jesus bring up creation when asked about divorce law?"
+    },
+    {
+      "answer": "Mark does not say children are morally untouched or give their exact ages. The scene highlights low social rank, dependence, and receptivity. Children come with empty hands. Jesus says the kingdom is received that way, not grabbed by people trying to prove they deserve front-row seats.",
+      "question": "What does it mean to receive the kingdom like a child?"
+    },
+    {
+      "answer": "Mark tells us what we need and leaves the rest alone. The man comes, asks, hears Jesus, is loved by Jesus, becomes sorrowful, and leaves because he has many possessions. The text does not reveal his later story or inner motives in full. The warning is still sharp: wealth can hold the heart with frightening strength.",
+      "question": "Was the wealthy man sincere, greedy, or lost forever?"
+    },
+    {
+      "answer": "Jesus does not say every possession is evil, but He also does not let us tame the warning into something harmless. Wealth can create the illusion that we are secure, blessed, and in control. Jesus’ image of the camel and needle is meant to unsettle us. Salvation is not managed by money, morality, or status; it is God’s gift.",
+      "question": "Is money evil in this chapter?"
+    },
+    {
+      "answer": "A ransom language picture involves costly release. Jesus is saying His mission is not to be served like a worldly ruler but to give Himself for others. The verse is deep enough to connect with atonement, substitution, and deliverance, but Mark’s immediate point is clear: the King saves by self-giving service.",
+      "question": "What does Jesus mean by giving His life as a ransom for many?"
+    },
+    {
+      "answer": "Mark does not explain why, but the name makes him vivid and memorable. Bartimaeus cries for mercy, is called by Jesus, receives sight, and follows on the way. His named presence also gives a strong contrast to the disciples’ confusion: a blind man sees enough to call out to the Son of David.",
+      "question": "Why is Bartimaeus named when many healed people are not?"
+    }
+  ],
+  "defaultVersion": "ESV",
+  "jesusConnection": "Mark 10 centers Jesus as the King who does not grasp status but walks willingly toward rejection, death, and resurrection. He protects the vulnerable, loves the man who cannot let go, welcomes the lowly, and teaches that His own life will be given as a ransom for many. The chapter draws us close to Jesus not by making Him soft and safe, but by showing His fierce mercy: He will not bless our idols, but He will stop on the road for a crying beggar and call him near.",
+  "behindTheChapter": [
+    {
+      "body": "Early Christian tradition links this Gospel to John Mark, a coworker of Peter and Paul. The book itself is anonymous, so that tradition is strong but not the same as a signed author line.",
+      "title": "Mark, associated with Peter",
+      "category": "Author"
+    },
+    {
+      "body": "Mark likely wrote for believers needing a clear account of Jesus’ authority, suffering, and call to discipleship, possibly in a Roman setting or for Christians familiar with Roman power.",
+      "title": "Early Christians under pressure",
+      "category": "First Audience"
+    },
+    {
+      "body": "The story unfolds in a land shaped by Roman rule, Jewish hopes for God’s kingdom, temple leadership in Jerusalem, village poverty, patronage, honor culture, and dangerous roads.",
+      "title": "Judea under Rome",
+      "category": "Historical World"
+    },
+    {
+      "body": "Mark is preserved in major biblical manuscripts such as Codex Sinaiticus and Codex Vaticanus. Archaeology at Jericho, Jerusalem, and the broader Jordan Valley helps ground the geography, though it cannot identify the exact roadside healing site.",
+      "title": "Manuscripts and material setting",
+      "category": "Evidence & Artifacts"
+    }
+  ],
+  "biblicalTimeline": {
+    "era": "Life of Jesus",
+    "dateRange": {
+      "endYear": 33,
+      "startYear": 29
+    },
+    "confidence": "medium",
+    "estimatedYear": 30,
+    "chronologyBasis": "traditional/event date",
+    "placementReason": "Mark 10 narrates Jesus’ southward movement toward Jerusalem immediately before the triumphal entry in Mark 11.",
+    "uncertaintyNote": "The events belong late in Jesus’ public ministry before His final entry into Jerusalem. Exact calendar dating depends on debated reconstructions of Gospel chronology and the year of the crucifixion, commonly placed around AD 30 or AD 33.",
+    "estimatedYearLabel": "Around AD 30, on the road to Jerusalem"
+  },
+  "estimatedLocation": "Judea, beyond the Jordan, and the Jericho road",
+  "modernReadersMiss": "The chapter is not a random collection of hard teachings and tender scenes. Mark is showing the same question again and again: will we receive the kingdom on Jesus’ terms, or keep trying to manage it through loopholes, achievements, money, rank, and crowd control?",
+  "primaryCharacters": [
+    "Jesus",
+    "Pharisees",
+    "The disciples",
+    "Children and caregivers",
+    "The wealthy man",
+    "James and John",
+    "Bartimaeus"
+  ],
+  "modernLocationNote": "The chapter moves through areas associated with modern Israel, the West Bank, and Jordan; exact teaching sites and the precise roadside location near Jericho are debated.",
+  "sourceOverlapReview": {
+    "version": 1,
+    "blockerCodes": [
+      "CROSS_FIELD_8_PLUS",
+      "EXACT_8_PLUS"
+    ],
+    "findingCount": 5,
+    "reportDigest": "eafb375ab4845f9febc054bea82659c70b9cdd0fc7f5deef84c1cda7a6237437",
+    "manifestDigest": "b6376adffdf8bdc6dc487bfced50d227d394b80ccb3df6203c976a6299986229",
+    "blockFindingCount": 3,
+    "reviewFindingCount": 2,
+    "canonicalDraftDigest": "bafdc7fd9d5d2e90fd7eaa9318136572d3d7c3106cbc0cb865c5daaffa496732"
+  },
+  "jesusConnectionShort": "The Servant King on the road",
+  "chapterSpecificTopics": [
+    {
+      "title": "Hard hearts and covenant faithfulness",
+      "reason": "Jesus turns a divorce test into a deeper exposure of human hardness and God’s design for marriage.",
+      "priority": 1
+    },
+    {
+      "title": "Receiving the kingdom like children",
+      "reason": "The children scene directly challenges status, access, and self-importance.",
+      "priority": 2
+    },
+    {
+      "title": "Wealth and impossible salvation",
+      "reason": "The wealthy man’s grief and Jesus’ warning are central to the chapter’s unsettling power.",
+      "priority": 3
+    },
+    {
+      "title": "Jesus walking toward Jerusalem",
+      "reason": "The passion prediction anchors the chapter in Jesus’ willing movement toward suffering and resurrection.",
+      "priority": 4
+    },
+    {
+      "title": "Servant greatness",
+      "reason": "James and John’s request gives Jesus the occasion to define kingdom leadership through costly service.",
+      "priority": 5
+    },
+    {
+      "title": "Bartimaeus and mercy",
+      "reason": "The healing near Jericho closes the chapter with a living picture of faith, sight, and following Jesus.",
+      "priority": 6
+    }
+  ],
+  "generationManifestDigest": "b6376adffdf8bdc6dc487bfced50d227d394b80ccb3df6203c976a6299986229"
+}
