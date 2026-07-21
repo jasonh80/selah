@@ -261,7 +261,7 @@ export function PublishedRedoCard({
               setNotes(e.target.value);
               setPreflight(null);
             }}
-            maxLength={600}
+            maxLength={1200}
             rows={2}
             placeholder="What should change? (kept exact — the rest of the scene stays the same)"
             className="w-full rounded-lg border bg-card p-2 text-[13px] text-primary"
