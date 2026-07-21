@@ -27,9 +27,11 @@ import {
   packetDigestOf,
   modelDayQuoteFor,
   modelDayCallCeilingUsd,
+  modelDayCostUsd,
   modelDayInputTokenCount,
   validModelId,
   pricedModel,
+  MODEL_DAY_PRICED_MODELS,
   MODEL_DAY_TOTAL_CAP_USD,
   MODEL_DAY_MAX_INPUT_TOKENS,
   MODEL_DAY_SCHEMA_VERSION,
@@ -136,7 +138,12 @@ async function main(): Promise<void> {
   const mdCosts = () => costs.filter((c) => c.requestType === "model_day_text");
   let lastTrigger: { url: string; body: Record<string, unknown> } | null = null;
   let modelCalls: Array<{ model: string; prompt: string }> = [];
-  let modelBehavior: (model: string) => { content: string; inputTokens: number | null; outputTokens: number | null } = () => ({
+  let modelBehavior: (model: string) => {
+    content: string;
+    inputTokens: number | null;
+    cachedInputTokens?: number | null;
+    outputTokens: number | null;
+  } = () => ({
     content: VALID_WORKUP,
     inputTokens: 5_000,
     outputTokens: 1_000,
@@ -196,7 +203,13 @@ async function main(): Promise<void> {
       quote.quoteDigest === modelDayQuoteFor("mark-9", "gpt-5.5", CHALLENGER)!.quoteDigest,
     "A3 the quote is server-computed for the EXACT pair and digest-bound",
   );
-  ok(modelDayCallCeilingUsd("gpt-5.5") < MODEL_DAY_TOTAL_CAP_USD, "A4 one bounded call always fits the cap");
+  ok(modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.5"]) < MODEL_DAY_TOTAL_CAP_USD, "A4 one bounded call always fits the cap");
+  // Cache-write-aware ceilings (Codex re-review P1): 5.6 Sol's ceiling prices
+  // input at its 1.25× cache-write rate, so it exceeds 5.5's.
+  ok(
+    modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.6-sol"]) > modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.5"]),
+    "A4b the challenger ceiling prices cache-write input, not plain input",
+  );
   ok((await adminPost({ action: "model_day_status", slug: "not a slug!" })).status === 400, "A5 unparseable slug refused");
   const unpricedQuote = await statusFor("mark-9", "gpt-4o");
   ok(unpricedQuote.json.quote === null && /priced allowlist/.test(String(unpricedQuote.json.quoteError)), "A6 an unpriced model cannot be quoted");
@@ -316,7 +329,7 @@ async function main(): Promise<void> {
     );
     const recorded = mdCosts().slice(before);
     ok(
-      recorded.length === 1 && recorded[0].estimatedCostUsd === modelDayCallCeilingUsd("gpt-5.5") && (recorded[0].metadata as { billingUncertain?: boolean })?.billingUncertain === true,
+      recorded.length === 1 && recorded[0].estimatedCostUsd === modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.5"]) && (recorded[0].metadata as { billingUncertain?: boolean })?.billingUncertain === true,
       `F${4 + i}b usage ${variant.name} records the conservative ceiling, never zero`,
     );
   }
@@ -413,6 +426,51 @@ async function main(): Promise<void> {
   ok((await statusFor("mark-9")).status === 503, "M1 a storage outage never reads as 'no run'");
   ok((await adminPost({ action: "model_day_create", slug: "mark-12", challengerModel: CHALLENGER, quoteDigest: modelDayQuoteFor("mark-12", "gpt-5.5", CHALLENGER)!.quoteDigest, confirm: true })).status === 500, "M2 a storage outage refuses new claims");
   store.failReads = false;
+
+  // O. Run identity (Codex re-review P1).
+  // O1/O2 — one UNRESOLVED run per chapter: a completed run without a verdict
+  // blocks a new paid run; recording the verdict unblocks.
+  modelBehavior = () => ({ content: VALID_WORKUP, inputTokens: 5_000, cachedInputTokens: 4_000, outputTokens: 1_000 });
+  lastTrigger = null;
+  await createRun("mark-2");
+  await runWorker("mark-2");
+  const unjudged = await readLatestModelDayRun("mark-2");
+  ok(unjudged?.status === "done" && unjudged.verdict === null, "O0 a completed run starts unjudged");
+  const blocked = await createRun("mark-2");
+  ok(blocked.status === 403 && /no recorded verdict/.test(String(blocked.json.error)), "O1 a new run is refused while the latest completed run is unjudged");
+  await adminPost({ action: "model_day_verdict", slug: "mark-2", packetDigest: unjudged!.packet_digest!, verdict: "tie" });
+  const unblocked = await createRun("mark-2");
+  ok(unblocked.status === 200, "O2 recording the verdict unblocks the next run");
+  // O3 — cached input priced at the cached rate (bucket pricing): the mark-2
+  // run's incumbent cost must equal the bucket formula, well under the
+  // all-uncached price.
+  const rates55 = MODEL_DAY_PRICED_MODELS["gpt-5.5"];
+  const bucketCost = modelDayCostUsd(rates55, 5_000, 4_000, 1_000);
+  const flatCost = modelDayCostUsd(rates55, 5_000, 0, 1_000);
+  const mark2Incumbent = mdCosts().find((c) => (c.metadata as { slug?: string })?.slug === "mark-2" && c.model === "gpt-5.5");
+  ok(mark2Incumbent?.estimatedCostUsd === bucketCost && bucketCost < flatCost, "O3 cached input tokens bill at the cached rate, never the full rate");
+  ok(mark2Incumbent?.cachedInputTokens === 4_000, "O3b the cached bucket is recorded in the ledger row");
+  // O4 — pricing drift between claim and worker refuses BEFORE dispatch: the
+  // stored snapshot no longer matching the live table means the confirmed
+  // numbers are no longer true.
+  modelCalls = [];
+  lastTrigger = null;
+  await createRun("mark-3");
+  const driftRow = store.rows.find((r) => r.slug === "mark-3" && r.status === "generating")!;
+  (driftRow.pricing_json as { ratesUsdPerM: { challenger: { inputUsdPerM: number } } }).ratesUsdPerM.challenger.inputUsdPerM = 4;
+  await runWorker("mark-3");
+  const drifted = await readLatestModelDayRun("mark-3");
+  ok(
+    drifted?.status === "failed" && /snapshot does not match current pricing/.test(drifted.error ?? "") && modelCalls.length === 0,
+    "O4 a drifted pricing snapshot refuses before any dispatch",
+  );
+  // O5 — the claim persists the accepted quote digest + snapshot.
+  const mark2Row = store.rows.find((r) => r.slug === "mark-2" && r.status === "generating");
+  ok(
+    typeof mark2Row?.quote_digest === "string" && mark2Row.pricing_json !== undefined,
+    "O5 the claim row carries the accepted quote digest and pricing snapshot",
+  );
+  modelBehavior = () => ({ content: VALID_WORKUP, inputTokens: 5_000, outputTokens: 1_000 });
 
   // N. Sanity of the exported guards.
   ok(buildJudgePacket({ ...(await readLatestModelDayRun("luke-9"))! }) === null, "N1 a failed run yields no packet");

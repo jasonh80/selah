@@ -34,6 +34,11 @@ create table if not exists model_day_runs (
   candidate_b_json jsonb,
   label_map jsonb,
   packet_digest text,
+  -- Run identity (Codex #103 re-review): the accepted quote digest and the
+  -- full pricing snapshot ride the claim; the worker prices ONLY from the
+  -- snapshot and refuses pre-dispatch on any drift from the live table.
+  quote_digest text,
+  pricing_json jsonb,
   verdict text check (verdict in ('A','B','tie')),
   verdict_note text,
   verdict_recorded_at timestamptz,

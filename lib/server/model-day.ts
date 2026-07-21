@@ -73,37 +73,55 @@ const MODEL_DAY_TOKEN_OVERHEAD = 50;
 export const MODEL_DAY_MAX_COMPLETION_TOKENS = 4_000;
 
 // The ONLY models this lane may quote or dispatch (Codex #103 P1: "allow only
-// models with known pricing/capability"). Published USD-per-1M-token rates
-// (Codex pricing research: GPT-5.6 Sol bills the same token price as 5.5).
-// Adding a model here is a reviewed code change, never a free-text field.
-export const MODEL_DAY_PRICED_MODELS: Readonly<
-  Record<string, { inputUsdPerM: number; outputUsdPerM: number }>
-> = Object.freeze({
-  "gpt-5.5": { inputUsdPerM: 5, outputUsdPerM: 30 },
-  "gpt-5.6-sol": { inputUsdPerM: 5, outputUsdPerM: 30 },
+// models with known pricing/capability"). Published USD-per-1M-token rates in
+// ALL THREE input buckets (Codex re-review P1: GPT-5.6 Sol bills cache WRITES
+// at 1.25× input — a quote that prices every prompt token at the plain input
+// rate is not a ceiling). Adding a model here is a reviewed code change,
+// never a free-text field.
+export interface ModelDayRates {
+  inputUsdPerM: number;
+  cachedInputUsdPerM: number;
+  /** What a prompt token can cost when the provider writes it to the prompt
+   * cache. Ceilings and conservative actuals price uncached input HERE. */
+  cacheWriteInputUsdPerM: number;
+  outputUsdPerM: number;
+}
+export const MODEL_DAY_PRICED_MODELS: Readonly<Record<string, ModelDayRates>> = Object.freeze({
+  "gpt-5.5": { inputUsdPerM: 5, cachedInputUsdPerM: 0.5, cacheWriteInputUsdPerM: 5, outputUsdPerM: 30 },
+  "gpt-5.6-sol": { inputUsdPerM: 5, cachedInputUsdPerM: 0.5, cacheWriteInputUsdPerM: 6.25, outputUsdPerM: 30 },
 });
 
-export function pricedModel(id: unknown): { inputUsdPerM: number; outputUsdPerM: number } | null {
+export function pricedModel(id: unknown): ModelDayRates | null {
   return typeof id === "string" ? (MODEL_DAY_PRICED_MODELS[id] ?? null) : null;
 }
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000;
 const ceilCents = (n: number) => Math.ceil(n * 100) / 100;
 
-/** Exact cost at THIS model's table rates — never another model's. */
-export function modelDayCostUsd(model: string, inputTokens: number, outputTokens: number): number {
-  const rates = pricedModel(model);
-  if (!rates) throw new Error(`model ${model} has no priced rates`);
+/** Conservative ACTUAL cost from usage buckets at the given rates snapshot.
+ * The provider's usage reports cached READS but never says whether uncached
+ * tokens incurred a cache WRITE — so uncached input is priced at the cache-
+ * write rate (the only honest direction: the ledger may overstate by the
+ * write premium, never understate). */
+export function modelDayCostUsd(
+  rates: ModelDayRates,
+  inputTokens: number,
+  cachedInputTokens: number,
+  outputTokens: number,
+): number {
+  const cached = Math.min(Math.max(0, cachedInputTokens), Math.max(0, inputTokens));
+  const uncached = Math.max(0, inputTokens) - cached;
   return round4(
-    (Math.max(0, inputTokens) / 1_000_000) * rates.inputUsdPerM +
+    (uncached / 1_000_000) * rates.cacheWriteInputUsdPerM +
+      (cached / 1_000_000) * rates.cachedInputUsdPerM +
       (Math.max(0, outputTokens) / 1_000_000) * rates.outputUsdPerM,
   );
 }
 
-/** Conservative per-call ceiling for one model: the full input-token bound +
- * the full completion cap at that model's own rates. */
-export function modelDayCallCeilingUsd(model: string): number {
-  return ceilCents(modelDayCostUsd(model, MODEL_DAY_MAX_INPUT_TOKENS, MODEL_DAY_MAX_COMPLETION_TOKENS));
+/** Conservative per-call ceiling at a rates snapshot: the full input-token
+ * bound priced at the cache-write rate + the full completion cap. */
+export function modelDayCallCeilingUsd(rates: ModelDayRates): number {
+  return ceilCents(modelDayCostUsd(rates, MODEL_DAY_MAX_INPUT_TOKENS, 0, MODEL_DAY_MAX_COMPLETION_TOKENS));
 }
 
 /** Exact input-token count for the messages this lane sends (o200k — the
@@ -116,13 +134,47 @@ export function modelDayInputTokenCount(prompt: string): number {
 export interface ModelDayQuote {
   incumbentModel: string;
   challengerModel: string;
-  ratesUsdPerM: { incumbent: { inputUsdPerM: number; outputUsdPerM: number }; challenger: { inputUsdPerM: number; outputUsdPerM: number } };
+  ratesUsdPerM: { incumbent: ModelDayRates; challenger: ModelDayRates };
   expectedUsd: number;
   perCallCeilingUsd: number;
   totalCapUsd: number;
   maxInputTokens: number;
   maxCompletionTokens: number;
   quoteDigest: string;
+}
+
+/** The immutable pricing snapshot a claim persists (Codex re-review P1: run
+ * identity — the accepted quote's every price assumption rides the row into
+ * the worker, which refuses on ANY drift from the live table). */
+export type ModelDayPricingSnapshot = {
+  schemaVersion: string;
+  slug: string;
+  incumbentModel: string;
+  challengerModel: string;
+  ratesUsdPerM: { incumbent: ModelDayRates; challenger: ModelDayRates };
+  maxInputTokens: number;
+  maxCompletionTokens: number;
+  totalCapUsd: number;
+};
+
+export function quoteBodyFor(
+  slug: string,
+  incumbentModel: string,
+  challengerModel: string,
+): ModelDayPricingSnapshot | null {
+  const incumbentRates = pricedModel(incumbentModel);
+  const challengerRates = pricedModel(challengerModel);
+  if (!incumbentRates || !challengerRates) return null;
+  return {
+    schemaVersion: MODEL_DAY_SCHEMA_VERSION,
+    slug,
+    incumbentModel,
+    challengerModel,
+    ratesUsdPerM: { incumbent: incumbentRates, challenger: challengerRates },
+    maxInputTokens: MODEL_DAY_MAX_INPUT_TOKENS,
+    maxCompletionTokens: MODEL_DAY_MAX_COMPLETION_TOKENS,
+    totalCapUsd: MODEL_DAY_TOTAL_CAP_USD,
+  };
 }
 
 /** The server-side quote for ONE exact (slug, incumbent, challenger) pair.
@@ -135,23 +187,12 @@ export function modelDayQuoteFor(
   incumbentModel: string,
   challengerModel: string,
 ): ModelDayQuote | null {
-  const incumbentRates = pricedModel(incumbentModel);
-  const challengerRates = pricedModel(challengerModel);
-  if (!incumbentRates || !challengerRates) return null;
+  const body = quoteBodyFor(slug, incumbentModel, challengerModel);
+  if (!body) return null;
   const perCallCeilingUsd = Math.max(
-    modelDayCallCeilingUsd(incumbentModel),
-    modelDayCallCeilingUsd(challengerModel),
+    modelDayCallCeilingUsd(body.ratesUsdPerM.incumbent),
+    modelDayCallCeilingUsd(body.ratesUsdPerM.challenger),
   );
-  const body = {
-    schemaVersion: MODEL_DAY_SCHEMA_VERSION,
-    slug,
-    incumbentModel,
-    challengerModel,
-    ratesUsdPerM: { incumbent: incumbentRates, challenger: challengerRates },
-    maxInputTokens: MODEL_DAY_MAX_INPUT_TOKENS,
-    maxCompletionTokens: MODEL_DAY_MAX_COMPLETION_TOKENS,
-    totalCapUsd: MODEL_DAY_TOTAL_CAP_USD,
-  };
   return {
     incumbentModel,
     challengerModel,
@@ -498,6 +539,16 @@ export async function claimModelDayRun(
       throw new ModelDayClaimError("CONFLICT", "the previous Model Day run finished just now — check its result first");
     }
   }
+  // One UNRESOLVED run per chapter (Codex re-review P1, run identity): a
+  // completed run whose blind verdict is not recorded yet must stay the
+  // accountable "latest" — a new paid run may not shadow it. Record the
+  // verdict (unlocking its reveal) before spending again.
+  if (raw && rawStatusValue === "done" && (raw.verdict === undefined || raw.verdict === null)) {
+    throw new ModelDayClaimError(
+      "REFUSED",
+      "the previous completed run has no recorded verdict — record the blind ruling first; a new run may not replace an unjudged one",
+    );
+  }
   const id = crypto.randomUUID();
   const inserted = await store.insert({
     id,
@@ -506,6 +557,11 @@ export async function claimModelDayRun(
     job_id: jobId,
     incumbent_model: incumbentModel,
     challenger_model: challengerModel,
+    // Run identity (Codex re-review P1): the ACCEPTED quote — digest and full
+    // pricing snapshot — rides the row; the worker prices from THIS snapshot
+    // and refuses on any drift from the live table.
+    quote_digest: expectedQuote.quoteDigest,
+    pricing_json: quoteBodyFor(slug, incumbentModel, challengerModel),
     schema_version: MODEL_DAY_SCHEMA_VERSION,
   });
   if (inserted === "conflict") {
@@ -539,7 +595,12 @@ export async function failClaimedModelDayRun(slug: string, jobId: string, reason
 type ModelDayModelCall = (input: {
   model: string;
   prompt: string;
-}) => Promise<{ content: string; inputTokens: number | null; outputTokens: number | null }>;
+}) => Promise<{
+  content: string;
+  inputTokens: number | null;
+  cachedInputTokens?: number | null;
+  outputTokens: number | null;
+}>;
 let modelCallForTesting: ModelDayModelCall | null = null;
 export function __setModelDayModelForTesting(fn: ModelDayModelCall | null): void {
   modelCallForTesting = fn;
@@ -555,9 +616,13 @@ function usableTokenCount(value: unknown): number | null {
 async function callModel(input: { model: string; prompt: string }): Promise<{
   content: string;
   inputTokens: number | null;
+  cachedInputTokens: number | null;
   outputTokens: number | null;
 }> {
-  if (modelCallForTesting) return modelCallForTesting(input);
+  if (modelCallForTesting) {
+    const canned = await modelCallForTesting(input);
+    return { ...canned, cachedInputTokens: canned.cachedInputTokens ?? null };
+  }
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
   const isReasoningModel = /^(gpt-5|o\d)/i.test(input.model);
@@ -580,12 +645,19 @@ async function callModel(input: { model: string; prompt: string }): Promise<{
     );
     const r = resp as {
       choices: { message?: { content?: string | null } }[];
-      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+      usage?: {
+        prompt_tokens?: unknown;
+        completion_tokens?: unknown;
+        prompt_tokens_details?: { cached_tokens?: unknown };
+      };
     };
     return {
       content: r.choices[0]?.message?.content ?? "",
-      // Each field independently: absent/invalid = null, never zero.
+      // Each REQUIRED field independently: absent/invalid = null, never zero.
       inputTokens: usableTokenCount(r.usage?.prompt_tokens),
+      // Cached reads are a discount — absent reads as null and the caller
+      // treats it as 0 (never assume a discount happened).
+      cachedInputTokens: usableTokenCount(r.usage?.prompt_tokens_details?.cached_tokens),
       outputTokens: usableTokenCount(r.usage?.completion_tokens),
     };
   } finally {
@@ -655,6 +727,26 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
   const identity = parseSlug(slug);
   if (!identity) return failRow("unparseable chapter slug (nothing was spent)");
 
+  // Run identity (Codex re-review P1): the worker prices ONLY from the row's
+  // accepted snapshot, and refuses pre-dispatch when that snapshot no longer
+  // matches the live allowlist/table — a rate or bound changed between the
+  // owner's confirm and this dispatch means the confirmed numbers are no
+  // longer true, so nothing may be spent under them.
+  const expectedBody = quoteBodyFor(slug, incumbent, challenger);
+  if (!expectedBody) {
+    return failRow("a claimed model is no longer in the priced allowlist — refusing before dispatch (nothing was spent); re-quote");
+  }
+  const expectedDigest = sha256Canonical(expectedBody);
+  const storedDigest = typeof row.quote_digest === "string" ? row.quote_digest : "";
+  const storedSnapshotDigest = row.pricing_json ? sha256Canonical(row.pricing_json) : "";
+  if (storedDigest !== expectedDigest || storedSnapshotDigest !== expectedDigest) {
+    return failRow(
+      "the run's accepted pricing snapshot does not match current pricing — the confirmed numbers drifted, refusing before dispatch (nothing was spent); re-quote and confirm again",
+    );
+  }
+  const ratesFor = (model: string): ModelDayRates =>
+    model === incumbent ? expectedBody.ratesUsdPerM.incumbent : expectedBody.ratesUsdPerM.challenger;
+
   // Live kill-switch recheck immediately before any dispatch: turning Text
   // Generation OFF stops queued Model Day jobs too.
   try {
@@ -722,19 +814,30 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     | { ok: true; workup: Record<string, unknown>; costUsd: number; inputTokens: number | null }
     | { ok: false; reason: string; costUsd: number }
   > => {
+    const rates = ratesFor(model);
     let dispatched = false;
     let contentText = "";
-    let usage: { inputTokens: number | null; outputTokens: number | null } = { inputTokens: null, outputTokens: null };
+    let usage: { inputTokens: number | null; cachedInputTokens: number; outputTokens: number | null } = {
+      inputTokens: null,
+      cachedInputTokens: 0,
+      outputTokens: null,
+    };
     try {
       if (!modelCallForTesting && !getOpenAI()) throw new Error("OpenAI not configured");
       dispatched = true;
       const result = await callModel({ model, prompt });
       contentText = result.content;
-      usage = { inputTokens: usableTokenCount(result.inputTokens), outputTokens: usableTokenCount(result.outputTokens) };
+      usage = {
+        inputTokens: usableTokenCount(result.inputTokens),
+        // Cached READS are a discount, absent = 0 (that direction is the
+        // conservative one — never assume a discount happened).
+        cachedInputTokens: usableTokenCount(result.cachedInputTokens) ?? 0,
+        outputTokens: usableTokenCount(result.outputTokens),
+      };
     } catch (e) {
       const msg = String((e as Error).message).slice(0, 200);
       if (!dispatched) return { ok: false, reason: `failed before the ${model} request was dispatched (no spend): ${msg}`, costUsd: 0 };
-      const ceiling = modelDayCallCeilingUsd(model);
+      const ceiling = modelDayCallCeilingUsd(rates);
       try {
         await recordCostEventStrict({
           requestType: "model_day_text",
@@ -748,23 +851,34 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
       }
       return { ok: false, reason: `the ${model} request failed after dispatch (the one request MAY be billed; possible spend recorded): ${msg}`, costUsd: ceiling };
     }
-    // EITHER token field absent/invalid = usage missing (Codex #103 P1): the
-    // conservative ceiling is recorded and the measured gate below cannot
-    // authorize the challenger.
+    // EITHER required token field absent/invalid = usage missing (Codex #103
+    // P1): the conservative ceiling is recorded and the measured gate below
+    // cannot authorize the challenger.
     const usageMissing = usage.inputTokens === null || usage.outputTokens === null;
+    // Bucket-priced actual at the SNAPSHOT rates: uncached input at the
+    // cache-write rate (the provider never reports whether a write happened,
+    // so the ledger may overstate by the write premium, never understate).
     const cost = usageMissing
-      ? modelDayCallCeilingUsd(model)
-      : modelDayCostUsd(model, usage.inputTokens ?? 0, usage.outputTokens ?? 0);
+      ? modelDayCallCeilingUsd(rates)
+      : modelDayCostUsd(rates, usage.inputTokens ?? 0, usage.cachedInputTokens, usage.outputTokens ?? 0);
     try {
       await recordCostEventStrict({
         requestType: "model_day_text",
         provider: "openai",
         model,
-        ...(usageMissing ? {} : { inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0 }),
+        ...(usageMissing
+          ? {}
+          : {
+              inputTokens: usage.inputTokens ?? 0,
+              cachedInputTokens: usage.cachedInputTokens,
+              outputTokens: usage.outputTokens ?? 0,
+            }),
         estimatedCostUsd: cost,
         metadata: usageMissing
           ? { slug, jobId, billingUncertain: true, note: "provider usage was absent or partial; conservative per-call ceiling recorded" }
-          : { slug, jobId },
+          : rates.cacheWriteInputUsdPerM > rates.inputUsdPerM
+            ? { slug, jobId, inputPricedConservatively: true, note: "uncached input priced at the cache-write rate (provider does not report writes) — may overstate, never understates" }
+            : { slug, jobId },
       });
     } catch {
       return { ok: false, reason: `the ${model} run's cost row could not be recorded — the spend happened, so the run stops here for manual inspection`, costUsd: cost };
@@ -791,8 +905,10 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
   // below (ceiling + ceiling > cap).
   const challengerCeilingUsd =
     first.inputTokens === null
-      ? modelDayCallCeilingUsd(challenger)
-      : ceilCents(modelDayCostUsd(challenger, Math.ceil(first.inputTokens * 1.1), MODEL_DAY_MAX_COMPLETION_TOKENS));
+      ? modelDayCallCeilingUsd(ratesFor(challenger))
+      : ceilCents(
+          modelDayCostUsd(ratesFor(challenger), Math.ceil(first.inputTokens * 1.1), 0, MODEL_DAY_MAX_COMPLETION_TOKENS),
+        );
   if (first.costUsd + challengerCeilingUsd > MODEL_DAY_TOTAL_CAP_USD) {
     return failRow(
       `the incumbent run cost $${first.costUsd.toFixed(4)}; adding the challenger's ceiling ($${challengerCeilingUsd.toFixed(2)}) would risk exceeding the $${MODEL_DAY_TOTAL_CAP_USD.toFixed(2)} total cap — challenger NOT dispatched`,
