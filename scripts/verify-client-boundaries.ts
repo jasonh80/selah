@@ -12,9 +12,10 @@
  *
  * SYNTAX COVERAGE (adversarial-verify findings, 2026-07-21): static named,
  * default, mixed default+named, and `* as ns` imports; `export ... from`
- * re-exports (barrel laundering); dynamic `import("literal")`. Namespace
- * and dynamic imports of a client module are flagged OUTRIGHT — the scanner
- * cannot see which members server code will touch. KNOWN LIMITS: dynamic
+ * re-exports (barrel laundering) including bare `export *`; dynamic
+ * `import("literal")`. Namespace imports, bare star re-exports, and dynamic
+ * imports of a client module are flagged OUTRIGHT — the scanner cannot see
+ * which members server code will touch. KNOWN LIMITS: dynamic
  * imports with computed specifiers, and files outside app/, components/,
  * lib/ are not scanned.
  *
@@ -68,6 +69,9 @@ function resolveImport(fromFile: string, spec: string): string | undefined {
 const STATIC_RE =
   /(import|export)\s+(type\s+)?(?:([A-Za-z_$][\w$]*)\s*,\s*)?({[^}]*}|\*\s*as\s+[A-Za-z_$][\w$]*|[A-Za-z_$][\w$]*)\s+from\s+["']([^"']+)["']/g;
 const DYNAMIC_RE = /import\s*\(\s*["']([^"']+)["']\s*\)/g;
+// Bare star re-export (`export * from "./client"`) — launders EVERY export,
+// so it is flagged outright when the source is a client module.
+const STAR_REEXPORT_RE = /export\s+\*\s+from\s+["']([^"']+)["']/g;
 
 const failures: string[] = [];
 let checked = 0;
@@ -111,6 +115,15 @@ for (const file of files) {
         );
       }
     }
+  }
+
+  for (const match of src.matchAll(STAR_REEXPORT_RE)) {
+    const target = resolveImport(file, match[1]);
+    if (!target || !isClient.get(target)) continue;
+    checked++;
+    failures.push(
+      `${rel} star-re-exports client module ${target.slice(root.length + 1)} — this launders every export past the component-name rule; re-export the components by name instead.`,
+    );
   }
 
   for (const match of src.matchAll(DYNAMIC_RE)) {
