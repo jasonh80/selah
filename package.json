@@ -2,7 +2,7 @@
   "name": "selah",
   "version": "0.1.0",
   "private": true,
-  "description": "Selah \u2014 your daily Bible chapter, made visual, simple, and personal.",
+  "description": "Selah — your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
     "prebuild": "npm run verify:studio-safety && npm run verify:studio-preview-access && npm run verify:studio-mark8-preflight && npm run verify:studio-polish && npm run verify:esv-attribution && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark && npm run verify:diagnostics-display && npm run verify:maps-honesty && npm run verify:image-redo && npm run verify:published-redo && npm run verify:today && npm run verify:prepare-proposals && npm run verify:chapter-year && npm run verify:example-library && npm run verify:mega-revisions && npm run verify:client-boundaries && npm run verify:model-day",
@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",
+    "gpt-tokenizer": "^2.9.0",
     "maplibre-gl": "4.7.1",
     "next": "14.2.5",
     "openai": "4.67.3",

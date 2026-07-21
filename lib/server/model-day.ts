@@ -28,9 +28,9 @@
 // EXCLUDED from the judge packet. Reveal is a separate explicit action.
 import { getSupabaseAdmin } from "./supabase";
 import { getOpenAI, CHAPTER_WORKUP_TEXT_MODEL } from "./openai";
+import { countTokens } from "gpt-tokenizer/encoding/o200k_base";
 import { buildChapterWorkupPrompt } from "../ai/prompts/chapter-workup-prompt";
 import { parseChapterWorkupJson } from "../ai/schemas/chapter-workup-schema";
-import { estimateChapterWorkupCost } from "../ai/costs";
 import { sha256Canonical } from "./generation-manifest";
 import { recordCostEventStrict } from "./cost-events-repository";
 import { logGenerationAudit, getGenerationSettings } from "./generation-settings";
@@ -41,6 +41,10 @@ import { parseSlug } from "./generate-chapter-workup";
 const TABLE = "model_day_runs";
 export const MODEL_DAY_SCHEMA_VERSION = "model-day.v1";
 
+// The exact system message both calls send — part of the counted input bound.
+export const MODEL_DAY_SYSTEM_MESSAGE =
+  "You output ONLY valid JSON matching the requested schema. No markdown, no code fences, no commentary. Do not include copyrighted Bible verse text.";
+
 // Past the 20-min job-token TTL + the worker's model budget + margin: no live
 // worker can still exist for a claim this old (two sequential 8-min calls).
 const STALE_CLAIM_MS = 45 * 60 * 1000;
@@ -50,37 +54,115 @@ const STALE_CLAIM_MS = 45 * 60 * 1000;
 // hard-bounded so the recorded ledger can never exceed it.
 // ---------------------------------------------------------------------------
 export const MODEL_DAY_TOTAL_CAP_USD = 0.3;
-// The chapter-workup prompt carries no ESV text (schema + rules + examples),
-// so real prompts sit far below this; the bound exists to make the disclosed
-// per-call ceiling enforced, never assumed (same ~4 chars/token stated
-// assumption as the Prepare lane — an estimate, not a tokenizer).
-export const MODEL_DAY_PROMPT_MAX_CHARS = 40_000;
-const MODEL_DAY_INPUT_TOKEN_CEILING = Math.ceil(MODEL_DAY_PROMPT_MAX_CHARS / 4);
+// Coarse pre-check only — the ENFORCED input bound is the exact token count
+// below (Codex #103 P1: a chars/token assumption is an estimate, not a
+// ceiling; the incumbent alone must never be able to cross the cap).
+export const MODEL_DAY_PROMPT_MAX_CHARS = 60_000;
+// Exact o200k token bound on (system + user) message content, counted with
+// the same encoding family the GPT-5 series uses, BEFORE any dispatch.
+// 12k input tokens = $0.06 at the priced rates; with the provider-enforced
+// completion cap that makes one call's worst case $0.18 < the $0.30 cap.
+export const MODEL_DAY_MAX_INPUT_TOKENS = 12_000;
+// Small allowance for the provider's per-message/e.g. role framing overhead
+// beyond raw content tokens — counted INTO the bound, never on top of it.
+const MODEL_DAY_TOKEN_OVERHEAD = 50;
 // Launch-quality Mark text runs observe ~3k completion tokens (~$0.11 total,
 // Mark 7 cross-check in lib/ai/costs.ts); 4000 caps the worst case while
 // leaving headroom. A truncated output fails schema validation and the run
 // fails honestly — spend recorded, nothing owner-facing.
 export const MODEL_DAY_MAX_COMPLETION_TOKENS = 4_000;
 
-/** Conservative per-call ceiling (both models bill the same published rates —
- * challenger pricing equality is a stated premise from the pricing research,
- * estimated at the incumbent's rates like every estimate in costs.ts). */
-export function modelDayCallCeilingUsd(): number {
-  const est = estimateChapterWorkupCost({
-    inputTokens: MODEL_DAY_INPUT_TOKEN_CEILING,
-    cachedInputTokens: 0,
-    outputTokens: MODEL_DAY_MAX_COMPLETION_TOKENS,
-  });
-  return Math.ceil(est.textEstimateUsd * 100) / 100;
+// The ONLY models this lane may quote or dispatch (Codex #103 P1: "allow only
+// models with known pricing/capability"). Published USD-per-1M-token rates
+// (Codex pricing research: GPT-5.6 Sol bills the same token price as 5.5).
+// Adding a model here is a reviewed code change, never a free-text field.
+export const MODEL_DAY_PRICED_MODELS: Readonly<
+  Record<string, { inputUsdPerM: number; outputUsdPerM: number }>
+> = Object.freeze({
+  "gpt-5.5": { inputUsdPerM: 5, outputUsdPerM: 30 },
+  "gpt-5.6-sol": { inputUsdPerM: 5, outputUsdPerM: 30 },
+});
+
+export function pricedModel(id: unknown): { inputUsdPerM: number; outputUsdPerM: number } | null {
+  return typeof id === "string" ? (MODEL_DAY_PRICED_MODELS[id] ?? null) : null;
 }
 
-/** What Studio shows before the confirm: expected (two observed-typical
- * runs) and the structural total cap. */
-export function modelDayQuote(): { expectedUsd: number; perCallCeilingUsd: number; totalCapUsd: number } {
-  return {
-    expectedUsd: 0.22, // 2 × the observed ~$0.11 Mark text run (costs.ts cross-check)
-    perCallCeilingUsd: modelDayCallCeilingUsd(),
+const round4 = (n: number) => Math.round(n * 10000) / 10000;
+const ceilCents = (n: number) => Math.ceil(n * 100) / 100;
+
+/** Exact cost at THIS model's table rates — never another model's. */
+export function modelDayCostUsd(model: string, inputTokens: number, outputTokens: number): number {
+  const rates = pricedModel(model);
+  if (!rates) throw new Error(`model ${model} has no priced rates`);
+  return round4(
+    (Math.max(0, inputTokens) / 1_000_000) * rates.inputUsdPerM +
+      (Math.max(0, outputTokens) / 1_000_000) * rates.outputUsdPerM,
+  );
+}
+
+/** Conservative per-call ceiling for one model: the full input-token bound +
+ * the full completion cap at that model's own rates. */
+export function modelDayCallCeilingUsd(model: string): number {
+  return ceilCents(modelDayCostUsd(model, MODEL_DAY_MAX_INPUT_TOKENS, MODEL_DAY_MAX_COMPLETION_TOKENS));
+}
+
+/** Exact input-token count for the messages this lane sends (o200k — the
+ * GPT-5 series encoding), including the fixed system message and a small
+ * framing overhead. This is the ENFORCED pre-dispatch bound. */
+export function modelDayInputTokenCount(prompt: string): number {
+  return countTokens(MODEL_DAY_SYSTEM_MESSAGE) + countTokens(prompt) + MODEL_DAY_TOKEN_OVERHEAD;
+}
+
+export interface ModelDayQuote {
+  incumbentModel: string;
+  challengerModel: string;
+  ratesUsdPerM: { incumbent: { inputUsdPerM: number; outputUsdPerM: number }; challenger: { inputUsdPerM: number; outputUsdPerM: number } };
+  expectedUsd: number;
+  perCallCeilingUsd: number;
+  totalCapUsd: number;
+  maxInputTokens: number;
+  maxCompletionTokens: number;
+  quoteDigest: string;
+}
+
+/** The server-side quote for ONE exact (slug, incumbent, challenger) pair.
+ * Its digest binds the pair AND every price assumption; create must echo it
+ * and the claim recomputes it — a model changed after the quote was shown
+ * (either side) makes the digest stale and the create refuses (Codex #103
+ * P1). Returns null when either model is unpriced. */
+export function modelDayQuoteFor(
+  slug: string,
+  incumbentModel: string,
+  challengerModel: string,
+): ModelDayQuote | null {
+  const incumbentRates = pricedModel(incumbentModel);
+  const challengerRates = pricedModel(challengerModel);
+  if (!incumbentRates || !challengerRates) return null;
+  const perCallCeilingUsd = Math.max(
+    modelDayCallCeilingUsd(incumbentModel),
+    modelDayCallCeilingUsd(challengerModel),
+  );
+  const body = {
+    schemaVersion: MODEL_DAY_SCHEMA_VERSION,
+    slug,
+    incumbentModel,
+    challengerModel,
+    ratesUsdPerM: { incumbent: incumbentRates, challenger: challengerRates },
+    maxInputTokens: MODEL_DAY_MAX_INPUT_TOKENS,
+    maxCompletionTokens: MODEL_DAY_MAX_COMPLETION_TOKENS,
     totalCapUsd: MODEL_DAY_TOTAL_CAP_USD,
+  };
+  return {
+    incumbentModel,
+    challengerModel,
+    ratesUsdPerM: body.ratesUsdPerM,
+    // 2 × the observed ~$0.11 Mark text run (costs.ts cross-check).
+    expectedUsd: 0.22,
+    perCallCeilingUsd,
+    totalCapUsd: MODEL_DAY_TOTAL_CAP_USD,
+    maxInputTokens: MODEL_DAY_MAX_INPUT_TOKENS,
+    maxCompletionTokens: MODEL_DAY_MAX_COMPLETION_TOKENS,
+    quoteDigest: sha256Canonical(body),
   };
 }
 
@@ -103,10 +185,13 @@ export type ModelDayLatest =
 export interface ModelDayStore {
   latest(slug: string): Promise<ModelDayLatest>;
   insert(row: Record<string, unknown>): Promise<"ok" | "conflict" | { error: string }>;
+  /** Conditional write: only a row matching (id, expected status, and every
+   * extraIsNull column still null) moves. 0 = the predicate lost. */
   conditionalUpdate(
     id: string,
     expectedStatus: ModelDayStatus,
     next: Record<string, unknown>,
+    extraIsNull?: readonly string[],
   ): Promise<number | { error: string }>;
 }
 
@@ -141,13 +226,12 @@ function productionStore(): ModelDayStore | null {
       console.error(`[selah] model day insert failed (${String(row.slug)})`);
       return { error: error.message };
     },
-    async conditionalUpdate(id, expectedStatus, next) {
-      const { data, error } = await db
-        .from(TABLE)
-        .update(next)
-        .eq("id", id)
-        .eq("status", expectedStatus)
-        .select("id");
+    async conditionalUpdate(id, expectedStatus, next, extraIsNull) {
+      let query = db.from(TABLE).update(next).eq("id", id).eq("status", expectedStatus);
+      for (const column of extraIsNull ?? []) {
+        query = query.is(column, null);
+      }
+      const { data, error } = await query.select("id");
       if (error) {
         console.error(`[selah] model day update failed (${id})`);
         return { error: error.message };
@@ -165,6 +249,8 @@ function rowStatus(raw: Record<string, unknown>): ModelDayStatus | null {
   return s === "generating" || s === "running" || s === "done" || s === "failed" ? s : null;
 }
 
+export type ModelDayVerdict = "A" | "B" | "tie";
+
 export interface ModelDayRow {
   id: string;
   slug: string;
@@ -176,6 +262,9 @@ export interface ModelDayRow {
   candidate_b_json: Record<string, unknown> | null;
   label_map: Record<string, string> | null;
   packet_digest: string | null;
+  verdict: ModelDayVerdict | null;
+  verdict_note: string | null;
+  verdict_recorded_at: string | null;
   error: string | null;
   cost_usd: number | null;
   created_at: string;
@@ -234,10 +323,54 @@ export async function readLatestModelDayRun(slug: string): Promise<ModelDayRow |
     candidate_b_json: objOrNull(raw.candidate_b_json),
     label_map: labelMap,
     packet_digest: typeof raw.packet_digest === "string" ? raw.packet_digest : null,
+    verdict: raw.verdict === "A" || raw.verdict === "B" || raw.verdict === "tie" ? raw.verdict : null,
+    verdict_note: typeof raw.verdict_note === "string" ? raw.verdict_note : null,
+    verdict_recorded_at: typeof raw.verdict_recorded_at === "string" ? raw.verdict_recorded_at : null,
     error: typeof raw.error === "string" ? raw.error : null,
     cost_usd: typeof raw.cost_usd === "number" ? raw.cost_usd : null,
     created_at: typeof raw.created_at === "string" ? raw.created_at : "",
   };
+}
+
+/** Record the judge's verdict on the EXACT completed run (digest-bound),
+ * exactly once — the reveal action requires it (Codex #103 P2: blindness
+ * until verdict is enforced in storage, not by procedure). */
+export async function recordModelDayVerdict(
+  slug: string,
+  packetDigest: string,
+  verdict: ModelDayVerdict,
+  note: string,
+): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" | "CONFLICT" | "WRITE_FAILED"; reason: string }> {
+  let row: ModelDayRow | null;
+  try {
+    row = await readLatestModelDayRun(slug);
+  } catch {
+    return { ok: false, code: "WRITE_FAILED", reason: "model day storage could not be read — try again (fail-closed)" };
+  }
+  if (!row || row.status !== "done" || row.packet_digest !== packetDigest) {
+    return { ok: false, code: "NOT_FOUND", reason: "no completed run matches that packet digest" };
+  }
+  if (row.verdict !== null) {
+    return { ok: false, code: "CONFLICT", reason: `a verdict (${row.verdict}) is already recorded for this run — verdicts are immutable` };
+  }
+  const store = productionStore();
+  if (!store) return { ok: false, code: "WRITE_FAILED", reason: "model day storage unavailable" };
+  // The verdict-still-null predicate is IN the write: two racing verdicts
+  // cannot both land — the loser matches zero rows.
+  const moved = await store.conditionalUpdate(
+    row.id,
+    "done",
+    {
+      verdict,
+      verdict_note: note.slice(0, 500),
+      verdict_recorded_at: new Date().toISOString(),
+    },
+    ["verdict"],
+  );
+  if (typeof moved !== "number" || moved !== 1) {
+    return { ok: false, code: "CONFLICT", reason: "the run changed while recording the verdict — check its state" };
+  }
+  return { ok: true };
 }
 
 export function packetDigestOf(
@@ -286,13 +419,31 @@ export async function claimModelDayRun(
   jobId: string,
   incumbentModel: string,
   challengerModel: string,
+  echoedQuoteDigest: string,
 ): Promise<string> {
   if (!parseSlug(slug)) throw new ModelDayClaimError("REFUSED", "not a recognizable chapter slug");
   if (!validModelId(incumbentModel) || !validModelId(challengerModel)) {
     throw new ModelDayClaimError("REFUSED", "model ids must be plain provider identifiers");
   }
+  if (!pricedModel(incumbentModel) || !pricedModel(challengerModel)) {
+    throw new ModelDayClaimError(
+      "REFUSED",
+      "both models must be in the priced allowlist — an unpriced model cannot be quoted honestly, so it cannot run",
+    );
+  }
   if (incumbentModel === challengerModel) {
     throw new ModelDayClaimError("REFUSED", "the challenger must differ from the incumbent — an A/A run spends twice for nothing");
+  }
+  // The create action must echo the EXACT server quote for THIS pair — a
+  // challenger edited after the quote, or an incumbent that changed in
+  // settings since, makes the digest stale and the claim refuses (Codex #103
+  // P1: the shown price is bound to the run, never a stale constant).
+  const expectedQuote = modelDayQuoteFor(slug, incumbentModel, challengerModel);
+  if (!expectedQuote || echoedQuoteDigest !== expectedQuote.quoteDigest) {
+    throw new ModelDayClaimError(
+      "REFUSED",
+      "the confirmed quote does not match this exact model pair — re-quote and confirm the shown numbers again",
+    );
   }
   const store = productionStore();
   if (!store) throw new ModelDayClaimError("WRITE_FAILED", "model day storage is not available (fail-closed)");
@@ -388,15 +539,22 @@ export async function failClaimedModelDayRun(slug: string, jobId: string, reason
 type ModelDayModelCall = (input: {
   model: string;
   prompt: string;
-}) => Promise<{ content: string; inputTokens: number; outputTokens: number | null }>;
+}) => Promise<{ content: string; inputTokens: number | null; outputTokens: number | null }>;
 let modelCallForTesting: ModelDayModelCall | null = null;
 export function __setModelDayModelForTesting(fn: ModelDayModelCall | null): void {
   modelCallForTesting = fn;
 }
 
+/** A usable token count is a finite non-negative number — anything else is
+ * MISSING (Codex #103 P1: a partially missing usage object must never read
+ * as zero cost or authorize the second dispatch). */
+function usableTokenCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
 async function callModel(input: { model: string; prompt: string }): Promise<{
   content: string;
-  inputTokens: number;
+  inputTokens: number | null;
   outputTokens: number | null;
 }> {
   if (modelCallForTesting) return modelCallForTesting(input);
@@ -410,11 +568,7 @@ async function callModel(input: { model: string; prompt: string }): Promise<{
       {
         model: input.model,
         messages: [
-          {
-            role: "system",
-            content:
-              "You output ONLY valid JSON matching the requested schema. No markdown, no code fences, no commentary. Do not include copyrighted Bible verse text.",
-          },
+          { role: "system", content: MODEL_DAY_SYSTEM_MESSAGE },
           { role: "user", content: input.prompt },
         ],
         response_format: { type: "json_object" },
@@ -426,13 +580,13 @@ async function callModel(input: { model: string; prompt: string }): Promise<{
     );
     const r = resp as {
       choices: { message?: { content?: string | null } }[];
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
+      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
     };
     return {
       content: r.choices[0]?.message?.content ?? "",
-      inputTokens: r.usage?.prompt_tokens ?? 0,
-      // null usage = usage MISSING (billing uncertainty), never zero.
-      outputTokens: r.usage ? (r.usage.completion_tokens ?? 0) : null,
+      // Each field independently: absent/invalid = null, never zero.
+      inputTokens: usableTokenCount(r.usage?.prompt_tokens),
+      outputTokens: usableTokenCount(r.usage?.completion_tokens),
     };
   } finally {
     clearTimeout(timer);
@@ -543,15 +697,25 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     chapterNotes: context.chapterNotes,
     examples: context.examples,
   });
-  // Hard prompt bound BEFORE dispatch: the disclosed ceiling is enforced.
+  // Coarse char pre-check, then the ENFORCED bound: an EXACT o200k token
+  // count of exactly what will be sent (system + prompt + framing overhead),
+  // BEFORE any dispatch (Codex #103 P1: counted, not assumed — the incumbent
+  // alone can never cross the cap: 12k in + 4k out = $0.18 worst case).
   if (prompt.length > MODEL_DAY_PROMPT_MAX_CHARS) {
     return failRow(
-      `the assembled prompt (${prompt.length} chars) exceeds the bounded maximum (${MODEL_DAY_PROMPT_MAX_CHARS}) — refusing before dispatch so the shown ceiling is never exceeded`,
+      `the assembled prompt (${prompt.length} chars) exceeds the coarse maximum (${MODEL_DAY_PROMPT_MAX_CHARS}) — refusing before dispatch`,
+    );
+  }
+  const inputTokenCount = modelDayInputTokenCount(prompt);
+  if (inputTokenCount > MODEL_DAY_MAX_INPUT_TOKENS) {
+    return failRow(
+      `the assembled input counts ${inputTokenCount} o200k tokens, over the enforced ${MODEL_DAY_MAX_INPUT_TOKENS}-token bound — refusing before dispatch so the quoted ceiling is never exceeded`,
     );
   }
 
   // ONE bounded request per model, incumbent first. Any post-dispatch failure
-  // records its possible spend durably before the row fails.
+  // records its possible spend durably before the row fails. All costs at the
+  // MODEL'S OWN priced rates (never another model's).
   const runOne = async (
     model: string,
   ): Promise<
@@ -560,17 +724,17 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
   > => {
     let dispatched = false;
     let contentText = "";
-    let usage: { inputTokens: number; outputTokens: number | null } = { inputTokens: 0, outputTokens: 0 };
+    let usage: { inputTokens: number | null; outputTokens: number | null } = { inputTokens: null, outputTokens: null };
     try {
       if (!modelCallForTesting && !getOpenAI()) throw new Error("OpenAI not configured");
       dispatched = true;
       const result = await callModel({ model, prompt });
       contentText = result.content;
-      usage = { inputTokens: result.inputTokens, outputTokens: result.outputTokens };
+      usage = { inputTokens: usableTokenCount(result.inputTokens), outputTokens: usableTokenCount(result.outputTokens) };
     } catch (e) {
       const msg = String((e as Error).message).slice(0, 200);
       if (!dispatched) return { ok: false, reason: `failed before the ${model} request was dispatched (no spend): ${msg}`, costUsd: 0 };
-      const ceiling = modelDayCallCeilingUsd();
+      const ceiling = modelDayCallCeilingUsd(model);
       try {
         await recordCostEventStrict({
           requestType: "model_day_text",
@@ -584,23 +748,22 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
       }
       return { ok: false, reason: `the ${model} request failed after dispatch (the one request MAY be billed; possible spend recorded): ${msg}`, costUsd: ceiling };
     }
-    const usageMissing = usage.outputTokens === null;
+    // EITHER token field absent/invalid = usage missing (Codex #103 P1): the
+    // conservative ceiling is recorded and the measured gate below cannot
+    // authorize the challenger.
+    const usageMissing = usage.inputTokens === null || usage.outputTokens === null;
     const cost = usageMissing
-      ? modelDayCallCeilingUsd()
-      : estimateChapterWorkupCost({
-          inputTokens: usage.inputTokens,
-          cachedInputTokens: 0,
-          outputTokens: usage.outputTokens ?? 0,
-        }).textEstimateUsd;
+      ? modelDayCallCeilingUsd(model)
+      : modelDayCostUsd(model, usage.inputTokens ?? 0, usage.outputTokens ?? 0);
     try {
       await recordCostEventStrict({
         requestType: "model_day_text",
         provider: "openai",
         model,
-        ...(usageMissing ? {} : { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens ?? 0 }),
+        ...(usageMissing ? {} : { inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0 }),
         estimatedCostUsd: cost,
         metadata: usageMissing
-          ? { slug, jobId, billingUncertain: true, note: "provider returned no usage data; conservative per-call ceiling recorded" }
+          ? { slug, jobId, billingUncertain: true, note: "provider usage was absent or partial; conservative per-call ceiling recorded" }
           : { slug, jobId },
       });
     } catch {
@@ -621,22 +784,15 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
 
   // Structural total-cap gate. Both calls send the IDENTICAL prompt, so the
   // challenger's input cost is bounded by the incumbent's MEASURED prompt
-  // tokens (+10% cross-tokenizer margin) — not by the chars/token assumption
-  // (adversarial review: a denser-than-4-chars/token prompt could otherwise
-  // let the recorded total nick past the cap). The output side is provider-
-  // enforced by max_completion_tokens. If the incumbent's usage was missing,
-  // the measured bound does not exist — fall back to the static ceiling,
-  // which then fails closed below (ceiling + ceiling > cap).
+  // tokens (+10% cross-tokenizer margin) at the CHALLENGER'S rates. The
+  // output side is provider-enforced by max_completion_tokens. If the
+  // incumbent's usage was missing or partial, the measured bound does not
+  // exist — fall back to the challenger's static ceiling, which fails closed
+  // below (ceiling + ceiling > cap).
   const challengerCeilingUsd =
     first.inputTokens === null
-      ? modelDayCallCeilingUsd()
-      : Math.ceil(
-          estimateChapterWorkupCost({
-            inputTokens: Math.ceil(first.inputTokens * 1.1),
-            cachedInputTokens: 0,
-            outputTokens: MODEL_DAY_MAX_COMPLETION_TOKENS,
-          }).textEstimateUsd * 100,
-        ) / 100;
+      ? modelDayCallCeilingUsd(challenger)
+      : ceilCents(modelDayCostUsd(challenger, Math.ceil(first.inputTokens * 1.1), MODEL_DAY_MAX_COMPLETION_TOKENS));
   if (first.costUsd + challengerCeilingUsd > MODEL_DAY_TOTAL_CAP_USD) {
     return failRow(
       `the incumbent run cost $${first.costUsd.toFixed(4)}; adding the challenger's ceiling ($${challengerCeilingUsd.toFixed(2)}) would risk exceeding the $${MODEL_DAY_TOTAL_CAP_USD.toFixed(2)} total cap — challenger NOT dispatched`,

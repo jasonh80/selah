@@ -2725,14 +2725,19 @@ function ModelDayPanel({
   const [msg, setMsg] = useState("");
   const [reveal, setReveal] = useState<Record<string, unknown> | null>(null);
 
-  async function loadStatus() {
+  // The quote (and its digest) is valid for ONE exact (incumbent, challenger)
+  // pair — editing the challenger stales it, so the confirm button disarms
+  // until a fresh server quote for the edited pair is on screen.
+  async function loadStatus(forChallenger: string) {
     setMsg("");
     setReveal(null);
-    const j = await api("POST", { action: "model_day_status", slug }).catch(() => null);
+    const j = await api("POST", { action: "model_day_status", slug, challengerModel: forChallenger.trim() }).catch(() => null);
     setStatus(j && j.ok === true ? j : null);
   }
 
   async function run() {
+    const digest = quote && typeof quote.quoteDigest === "string" ? quote.quoteDigest : "";
+    if (!digest) return; // the button is disabled without a quote; belt+braces
     setBusy(true);
     setMsg("");
     try {
@@ -2740,6 +2745,7 @@ function ModelDayPanel({
         action: "model_day_create",
         slug,
         challengerModel: challenger.trim(),
+        quoteDigest: digest,
         confirm: true,
       });
       if (j.ok === true) {
@@ -2770,6 +2776,23 @@ function ModelDayPanel({
     }
   }
 
+  async function recordVerdict(verdict: "A" | "B" | "tie") {
+    setMsg("");
+    const digest = status && typeof status.packetDigest === "string" ? status.packetDigest : "";
+    if (!digest) return;
+    try {
+      const j = await api("POST", { action: "model_day_verdict", slug, packetDigest: digest, verdict });
+      if (j.ok === true) {
+        setMsg(`Verdict ${verdict} recorded — the reveal is now unlocked.`);
+        void loadStatus(challenger);
+      } else {
+        setMsg(String(j.error ?? "The verdict could not be recorded."));
+      }
+    } catch {
+      setMsg("Studio could not reach the server.");
+    }
+  }
+
   async function unseal() {
     setMsg("");
     const digest = status && typeof status.packetDigest === "string" ? status.packetDigest : "";
@@ -2786,19 +2809,20 @@ function ModelDayPanel({
     }
   }
 
-  const quote = status && typeof status.quote === "object" ? (status.quote as Record<string, unknown>) : null;
+  const quote = status && typeof status.quote === "object" && status.quote !== null ? (status.quote as Record<string, unknown>) : null;
   const runStatus = status && typeof status.status === "string" ? status.status : null;
+  const verdictRecorded = status?.verdictRecorded === true;
   return (
     <details className="border-t pt-3">
       <summary className="cursor-pointer text-[13px] font-medium text-primary">Model Day (blind A/B)</summary>
       <div className="mt-1.5 space-y-1.5">
         <p className="text-[11px] text-secondary">
           Same chapter, current model vs a challenger — private, blind, nothing saved to the chapter,
-          nothing published, no model switched. Codex judges the packet; the winner is a separate
-          deliberate selection above.
+          nothing published, no model switched. Codex judges the packet blind; the mapping stays sealed
+          until its verdict is recorded here. The winner is a separate deliberate selection above.
         </p>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => void loadStatus()} className="text-[12px] text-secondary underline">
+          <button type="button" onClick={() => void loadStatus(challenger)} className="text-[12px] text-secondary underline">
             Check status
           </button>
           {runStatus && (
@@ -2806,6 +2830,7 @@ function ModelDayPanel({
               Latest for <span className="text-primary">{slug || "—"}</span>:{" "}
               <span className="text-primary">{runStatus}</span>
               {typeof status?.costUsd === "number" ? ` · ${formatUsd(status.costUsd as number)}` : ""}
+              {runStatus === "done" ? (verdictRecorded ? " · verdict recorded" : " · awaiting verdict") : ""}
             </p>
           )}
         </div>
@@ -2815,24 +2840,31 @@ function ModelDayPanel({
         {typeof status?.error === "string" && status.error !== "" && (
           <p className="text-[12px] text-jesus-red">Last run: {String(status.error)}</p>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="text-[12px] text-secondary" htmlFor="model-day-challenger">
             Challenger
           </label>
           <input
             id="model-day-challenger"
             value={challenger}
-            onChange={(e) => setChallenger(e.target.value)}
+            onChange={(e) => {
+              setChallenger(e.target.value);
+              // Any edit stales the on-screen quote: drop it so the confirm
+              // button disarms until this exact pair is re-quoted.
+              setStatus(undefined);
+              setArming(false);
+            }}
             className="w-40 rounded-lg border bg-card px-2 py-1 text-[12px] text-primary"
           />
           {!arming ? (
             <button
               type="button"
               onClick={() => {
-                // Arming ALWAYS fetches the quote first: the confirm button
-                // below never spends without the exact numbers on screen.
+                // Arming ALWAYS fetches the pair's server quote first: the
+                // confirm button never spends without the exact numbers (and
+                // their digest) on screen.
                 setArming(true);
-                void loadStatus();
+                void loadStatus(challenger);
               }}
               disabled={!slug || busy}
               className="rounded-full border px-2.5 py-1 text-[12px] text-primary disabled:opacity-50"
@@ -2847,8 +2879,10 @@ function ModelDayPanel({
               className="rounded-full border border-accent-strong bg-accent-strong/15 px-2.5 py-1 text-[12px] text-primary disabled:opacity-50"
             >
               {quote
-                ? `Confirm ~${formatUsd(Number(quote.expectedUsd ?? 0))} (hard cap ${formatUsd(Number(quote.totalCapUsd ?? 0))})`
-                : "Loading the exact quote…"}
+                ? `Confirm ${String(status?.incumbentModel ?? "?")} vs ${String(quote.challengerModel ?? "?")} — ~${formatUsd(Number(quote.expectedUsd ?? 0))} (hard cap ${formatUsd(Number(quote.totalCapUsd ?? 0))})`
+                : typeof status?.quoteError === "string" && status.quoteError !== ""
+                  ? String(status.quoteError)
+                  : "Loading the exact quote…"}
             </button>
           )}
           {arming && (
@@ -2858,19 +2892,35 @@ function ModelDayPanel({
           )}
         </div>
         {runStatus === "done" && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => void copyPacket()} className="rounded-full border px-2.5 py-1 text-[12px] text-primary">
               Copy blind judge packet
             </button>
-            <button type="button" onClick={() => void unseal()} className="text-[12px] text-secondary underline">
-              Reveal mapping (after verdict)
-            </button>
+            {!verdictRecorded ? (
+              <span className="flex items-center gap-1.5">
+                <span className="text-[11px] text-secondary">Record Codex&rsquo;s blind ruling:</span>
+                {(["A", "B", "tie"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => void recordVerdict(v)}
+                    className="rounded-full border px-2 py-0.5 text-[11px] text-primary"
+                  >
+                    {v}
+                  </button>
+                ))}
+              </span>
+            ) : (
+              <button type="button" onClick={() => void unseal()} className="text-[12px] text-secondary underline">
+                Reveal mapping
+              </button>
+            )}
           </div>
         )}
         {reveal && (
           <p className="text-[12px] text-primary">
             A = {String(reveal.labelMap ? (reveal.labelMap as Record<string, string>).A : "?")} · B ={" "}
-            {String(reveal.labelMap ? (reveal.labelMap as Record<string, string>).B : "?")}
+            {String(reveal.labelMap ? (reveal.labelMap as Record<string, string>).B : "?")} · verdict {String(reveal.verdict ?? "?")}
           </p>
         )}
         {msg && <p className="text-[12px] text-secondary">{msg}</p>}

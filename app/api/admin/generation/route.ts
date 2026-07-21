@@ -94,8 +94,11 @@ import {
   claimModelDayRun,
   failClaimedModelDayRun,
   buildJudgePacket,
-  modelDayQuote,
+  modelDayQuoteFor,
+  recordModelDayVerdict,
+  pricedModel,
   validModelId,
+  MODEL_DAY_PRICED_MODELS,
   ModelDayClaimError,
 } from "@/lib/server/model-day";
 import {
@@ -633,7 +636,10 @@ export async function POST(req: Request) {
   // separate deliberate owner action in settings.
   if (action === "model_day_status") {
     // FREE read/check: nothing is spent, nothing changes. The label map is
-    // NEVER in this response — reveal is its own explicit action.
+    // NEVER in this response — reveal is its own explicit action. The quote
+    // is computed server-side for the EXACT (current incumbent, requested
+    // challenger) pair and carries a digest the create action must echo
+    // (Codex #103 P1: the shown price is bound to the run).
     const slug = String(body.slug ?? "");
     if (!parseSlug(slug)) return NextResponse.json({ ok: false, error: "not a recognizable chapter slug" }, { status: 400 });
     let run;
@@ -645,14 +651,37 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
+    const settings = await getGenerationSettings();
+    const incumbent = settings.selected_text_model || process.env.CHAPTER_WORKUP_TEXT_MODEL || "";
+    const challenger = typeof body.challengerModel === "string" ? body.challengerModel : "";
+    const quote =
+      validModelId(incumbent) && validModelId(challenger) && incumbent !== challenger
+        ? modelDayQuoteFor(slug, incumbent, challenger)
+        : null;
     return NextResponse.json({
       ok: true,
       slug,
       status: run?.status ?? "none",
       packetDigest: run?.packet_digest ?? null,
+      verdictRecorded: run ? run.verdict !== null : false,
       costUsd: run?.cost_usd ?? null,
       error: run?.error ?? null,
-      quote: modelDayQuote(),
+      incumbentModel: validModelId(incumbent) ? incumbent : null,
+      pricedModels: Object.keys(MODEL_DAY_PRICED_MODELS),
+      // null quote = this exact pair cannot be quoted (unpriced model, same
+      // model both sides, or no challenger given) — and without a quote there
+      // is no digest, so nothing can be confirmed.
+      quote,
+      quoteError:
+        quote
+          ? null
+          : !validModelId(challenger)
+            ? "give a challenger model id to quote"
+            : !pricedModel(challenger) || !pricedModel(incumbent)
+              ? "both models must be in the priced allowlist to quote honestly"
+              : incumbent === challenger
+                ? "the challenger must differ from the incumbent"
+                : "this pair cannot be quoted",
     });
   }
   if (action === "model_day_create") {
@@ -661,6 +690,10 @@ export async function POST(req: Request) {
     const challenger = body.challengerModel;
     if (!validModelId(challenger)) {
       return refuse(slug, "model_day", "a plain challenger model id is required", 400);
+    }
+    const echoedQuoteDigest = String(body.quoteDigest ?? "");
+    if (!LOWERCASE_SHA256.test(echoedQuoteDigest)) {
+      return refuse(slug, "model_day", "the exact server quote digest is required — quote first, then confirm those numbers", 400);
     }
     if (body.confirm !== true) {
       return refuse(slug, "model_day", "confirmation required — the expected cost and enforced cap are shown first", 400);
@@ -672,25 +705,26 @@ export async function POST(req: Request) {
     }
     // The incumbent is whatever actually drives the press today (stored
     // Studio selection, falling back to the deployed env default) — read
-    // server-side so the A/B always measures the real current model.
+    // server-side AT CLAIM TIME; if it changed since the quote, the digest
+    // check inside the claim refuses.
     const incumbent = settings.selected_text_model || process.env.CHAPTER_WORKUP_TEXT_MODEL || "";
     if (!validModelId(incumbent)) {
       return refuse(slug, "model_day", "the current text model could not be determined — set it in Studio settings first", 500);
     }
     const jobId = newJobId();
     try {
-      await claimModelDayRun(slug, jobId, incumbent, String(challenger));
+      await claimModelDayRun(slug, jobId, incumbent, String(challenger), echoedQuoteDigest);
     } catch (e) {
       const err = e as ModelDayClaimError;
       const status = err.code === "CONFLICT" ? 409 : err.code === "REFUSED" ? 403 : 500;
       return refuse(slug, "model_day", err.message, status);
     }
-    const quote = modelDayQuote();
+    const quote = modelDayQuoteFor(slug, incumbent, String(challenger))!;
     await logGenerationAudit({
       action: "model_day",
       slug,
       status: "started",
-      message: `job ${jobId} blind A/B (expected ~$${quote.expectedUsd.toFixed(2)}, cap $${quote.totalCapUsd.toFixed(2)})`,
+      message: `job ${jobId} blind A/B (quote ${quote.quoteDigest.slice(0, 12)}…, expected ~$${quote.expectedUsd.toFixed(2)}, cap $${quote.totalCapUsd.toFixed(2)})`,
     });
     const triggered = await triggerBackgroundModelDay(slug, new URL(req.url).host, jobId);
     if (!triggered.ok) {
@@ -722,9 +756,38 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ ok: true, packet });
   }
+  if (action === "model_day_verdict") {
+    // Record the judge's blind verdict (A/B/tie) on the EXACT run, exactly
+    // once — this is what UNLOCKS the reveal (Codex #103 P2: blindness until
+    // verdict is enforced in storage, not by owner procedure).
+    const slug = String(body.slug ?? "");
+    const digest = String(body.packetDigest ?? "");
+    const verdict = body.verdict;
+    if (!parseSlug(slug)) return NextResponse.json({ ok: false, error: "not a recognizable chapter slug" }, { status: 400 });
+    if (!LOWERCASE_SHA256.test(digest)) {
+      return NextResponse.json({ ok: false, error: "the exact packet digest is required to record a verdict" }, { status: 400 });
+    }
+    if (verdict !== "A" && verdict !== "B" && verdict !== "tie") {
+      return NextResponse.json({ ok: false, error: "the verdict must be A, B, or tie — exactly as the blind judge ruled" }, { status: 400 });
+    }
+    const note = typeof body.note === "string" ? body.note : "";
+    const recorded = await recordModelDayVerdict(slug, digest, verdict, note);
+    if (!recorded.ok) {
+      const status = recorded.code === "NOT_FOUND" ? 404 : recorded.code === "CONFLICT" ? 409 : 503;
+      return NextResponse.json({ ok: false, error: recorded.reason }, { status });
+    }
+    await logGenerationAudit({
+      action: "model_day",
+      slug,
+      status: "succeeded",
+      message: `verdict ${verdict} recorded for ${digest.slice(0, 12)}… (mapping still sealed until reveal)`,
+    });
+    return NextResponse.json({ ok: true, slug, packetDigest: digest, verdict });
+  }
   if (action === "model_day_reveal") {
-    // FREE read of the sealed mapping. Requires the exact packet digest so a
-    // reveal always names the run it unblinds — used AFTER the verdict is in.
+    // FREE read of the sealed mapping — but ONLY after a verdict is durably
+    // recorded for this exact run. Requires the exact packet digest so a
+    // reveal always names the run it unblinds.
     const slug = String(body.slug ?? "");
     const digest = String(body.packetDigest ?? "");
     if (!parseSlug(slug)) return NextResponse.json({ ok: false, error: "not a recognizable chapter slug" }, { status: 400 });
@@ -740,6 +803,12 @@ export async function POST(req: Request) {
     if (!run || run.status !== "done" || run.packet_digest !== digest || !run.label_map) {
       return NextResponse.json({ ok: false, error: "no completed run matches that packet digest" }, { status: 404 });
     }
+    if (run.verdict === null) {
+      return NextResponse.json(
+        { ok: false, error: "the blind verdict is not recorded yet — record the judge's A/B/tie ruling first; the mapping stays sealed until then" },
+        { status: 403 },
+      );
+    }
     await logGenerationAudit({
       action: "model_day",
       slug,
@@ -751,6 +820,7 @@ export async function POST(req: Request) {
       slug,
       packetDigest: digest,
       labelMap: run.label_map,
+      verdict: run.verdict,
       incumbentModel: run.incumbent_model,
       challengerModel: run.challenger_model,
       costUsd: run.cost_usd,

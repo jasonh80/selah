@@ -11,16 +11,18 @@
 --   generating -> running (atomic worker consume, BEFORE any spend)
 --   generating -> failed  (failed trigger: worker provably never invoked)
 --   running    -> done | failed
+--   done: verdict/verdict_note/verdict_recorded_at set EXACTLY ONCE
+--         (conditional on verdict still null) — the only post-done write
 --   (a stale generating/running claim past the worker's maximum lifetime may
 --    be conditionally failed by the next create — see model-day.ts)
 -- enforced by conditional writes in lib/server/model-day.ts. The partial
 -- unique index makes the row insert itself the single-use claim: only one
 -- live Model Day run can exist per chapter at a time.
 --
--- BLIND SEAL: label_map ({"A": "<model>", "B": "<model>"}) is stored here and
--- EXCLUDED from the judge packet — the judge sees candidates A/B only. The
--- mapping is revealed in Studio only by the explicit reveal action, after the
--- verdict is in.
+-- BLIND SEAL, storage-enforced: label_map ({"A": "<model>", "B": "<model>"})
+-- is stored here and EXCLUDED from the judge packet — the judge sees
+-- candidates A/B only. The reveal action refuses until a verdict row is
+-- durably recorded for the exact packet digest (Codex #103 P2).
 create table if not exists model_day_runs (
   id uuid primary key,
   slug text not null,
@@ -32,6 +34,9 @@ create table if not exists model_day_runs (
   candidate_b_json jsonb,
   label_map jsonb,
   packet_digest text,
+  verdict text check (verdict in ('A','B','tie')),
+  verdict_note text,
+  verdict_recorded_at timestamptz,
   schema_version text,
   error text,
   cost_usd numeric,
