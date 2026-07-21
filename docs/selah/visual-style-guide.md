@@ -21,6 +21,13 @@ lettering, period accuracy, visualAccuracyNotes) stays senior to style.
 **A documentary photographer embedded in the first century** — not a painting,
 not a pageant, not a movie poster.
 
+## Whose eye this is
+
+The owner's direction is the differentiator (his words, 2026-07-20): "my
+directing. my vision. my camera eye. powered by the Holy Spirit. inspired by
+Jesus and all for the glory of the Father." The Eyes exist to carry that eye
+into every frame — the system serves the vision, never replaces it.
+
 ## Palette & light
 
 - Natural, available light: sun, sky, oil lamps, fire. Golden hour and blue hour
