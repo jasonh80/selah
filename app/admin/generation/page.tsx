@@ -2285,7 +2285,7 @@ export default function SelahStudioPage() {
                               <textarea
                                 id={`redo-notes-${image.kind}`}
                                 value={redoNotes}
-                                maxLength={1200}
+                                maxLength={2500}
                                 rows={3}
                                 onChange={(e) => {
                                   setRedoNotes(e.target.value);
@@ -2294,7 +2294,7 @@ export default function SelahStudioPage() {
                                 placeholder="Describe exactly what is not right in this image."
                                 className={field}
                               />
-                              <p className="text-[11px] text-secondary">{redoNotes.length}/1200</p>
+                              <p className="text-[11px] text-secondary">{redoNotes.length}/2500</p>
                               {!redoPreflight ? (
                                 <div className="flex flex-wrap gap-2">
                                   <button
