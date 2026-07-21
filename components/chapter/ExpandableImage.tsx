@@ -15,8 +15,7 @@ function isExpandableSrc(src: string): boolean {
 
 export interface ImageCaption {
   title: string;
-  /** Optional — an image-caption headline has no body, only scene checks do. */
-  body?: string;
+  body: string;
 }
 
 export function ExpandableImage({
@@ -250,11 +249,9 @@ function ImageViewer({
       {caption && scale === MIN_SCALE && (
         <div className="pointer-events-none fixed inset-x-4 bottom-20 mx-auto max-w-[64ch] rounded-md bg-[rgba(10,9,14,0.78)] px-4 py-3 backdrop-blur">
           <p className="text-[14px] font-semibold leading-snug text-white">{caption.title}</p>
-          {caption.body && (
-            <p className="mt-1 max-h-28 overflow-y-auto text-[13px] leading-relaxed text-white/80 [pointer-events:auto]">
-              {caption.body}
-            </p>
-          )}
+          <p className="mt-1 max-h-28 overflow-y-auto text-[13px] leading-relaxed text-white/80 [pointer-events:auto]">
+            {caption.body}
+          </p>
         </div>
       )}
 

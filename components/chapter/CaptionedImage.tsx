@@ -16,20 +16,10 @@ import type { SceneCheck } from "@/lib/content/chapter-content";
  * line shows, tap for the full check. Deep Study reads without clicks — the
  * caption arrives open. Users can still toggle any caption within a mode.
  */
-/** The image's caption field is a real headline only when it says something
- * the label doesn't — pre-caption chapters stored the label as the caption,
- * and those duplicates must not render as cards. */
-export function imageCaptionCard(image: { caption?: string; label?: string }): string | undefined {
-  const caption = image.caption?.trim();
-  if (!caption || caption === image.label?.trim()) return undefined;
-  return caption;
-}
-
 export function CaptionedImage({
   src,
   alt,
   overlayTitle,
-  captionCard,
   checks,
   frameClassName = "overflow-hidden rounded-md border shadow-hair",
 }: {
@@ -37,23 +27,11 @@ export function CaptionedImage({
   alt: string;
   /** Short scene title shown over the photo's lower edge (path scenes). */
   overlayTitle?: string;
-  /** One-line editorial headline for the photo (Codex render ruling,
-      board #29 2026-07-21): a dedicated caption card — NOT a scene check
-      in disguise. Always visible, no expand; scene checks keep their own
-      meaning and stack after it. */
-  captionCard?: string;
   /** Scene checks attached below the photo, in order. */
   checks: SceneCheck[];
   frameClassName?: string;
 }) {
   const primary = checks[0];
-  // Full-size viewer caption: the accuracy note wins when present; otherwise
-  // the headline repeats there for orientation (Codex ruling).
-  const viewerCaption = primary
-    ? { title: primary.title, body: primary.body }
-    : captionCard
-      ? { title: captionCard }
-      : undefined;
   return (
     <figure className={frameClassName}>
       <div className="relative">
@@ -62,14 +40,14 @@ export function CaptionedImage({
             src={src}
             alt={alt}
             className="h-full w-full object-cover"
-            caption={viewerCaption}
+            caption={primary ? { title: primary.title, body: primary.body } : undefined}
           />
         </div>
         {/* One title per photo (owner decision 2026-07-21): when a caption
             card is attached below, the card carries the words and the photo
             stays clean — the burned-in overlay renders only for card-less
             photos, where it is the image's sole title. */}
-        {overlayTitle && checks.length === 0 && !captionCard && (
+        {overlayTitle && checks.length === 0 && (
           <>
             <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(16,16,20,0.78)] via-[rgba(16,16,20,0.04)] to-transparent" />
             <figcaption className="pointer-events-none absolute inset-x-s3 bottom-s3">
@@ -80,11 +58,6 @@ export function CaptionedImage({
           </>
         )}
       </div>
-      {captionCard && (
-        <div className="border-t bg-card px-s3 py-2.5">
-          <p className="text-[15px] font-semibold leading-snug text-primary">{captionCard}</p>
-        </div>
-      )}
       {checks.map((check, i) => (
         <CaptionBlock key={i} check={check} />
       ))}
