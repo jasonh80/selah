@@ -21,6 +21,13 @@ lettering, period accuracy, visualAccuracyNotes) stays senior to style.
 **A documentary photographer embedded in the first century** — not a painting,
 not a pageant, not a movie poster.
 
+## Whose eye this is
+
+The owner's direction is the differentiator (his words, 2026-07-20): "my
+directing. my vision. my camera eye. powered by the Holy Spirit. inspired by
+Jesus and all for the glory of the Father." The Eyes exist to carry that eye
+into every frame — the system serves the vision, never replaces it.
+
 ## Palette & light
 
 - Natural, available light: sun, sky, oil lamps, fire. Golden hour and blue hour
@@ -74,6 +81,61 @@ rules unchanged — an empty basket is fine; a glowing dove is not).
 Pageant staging · identical palm-frond parades · European-fantasy Bible art ·
 halos/glow as meaning · plastic-clean costumes · day-for-night murk · muted
 sepia "old times" wash · modern objects, lettering, or landmarks.
+
+## v1.1 — owner art direction from the first live redo session (2026-07-20)
+
+Captured verbatim-in-spirit from Jason directing the Mark 6 "Sent Out Two by
+Two" redo — each is now standing direction:
+
+- **B-roll, not posed.** "Cinematic b-roll... not so on the chin." The camera
+  steals the moment; subjects don't perform it at the lens. Backs, departures,
+  long shadows, and oblique angles tell the story before faces do.
+- **Anamorphic character is welcome:** shallow focus with gentle oval bokeh,
+  subtle horizontal flare, low dramatic sun. Flare seasons the frame — never
+  becomes halo-adjacent meaning (honesty rules senior, as ever).
+- **No clone casting.** "Every character looked so similar... these dudes
+  would have very different styles and swagger." Every figure distinct: age,
+  build, hair, posture, garment wear, tool carry. Where Scripture or an
+  approved character record gives a profession, let it shape posture, wear,
+  and carried tools. Where it does not, create visual individuality without
+  inventing a biography or stereotype. Individuality is realism.
+  (Solved permanently by the character/casting lane — IQ-026.)
+- **Jesus is never an afterthought or a prop.** If He's in frame, His presence
+  is composed with intent; otherwise leave Him out of frame entirely ("looks
+  like a weird hippie uncle and an afterthought" = automatic reject).
+- **Village scale honesty:** first-century Galilean villages are SMALL and
+  LOW — one-story fieldstone/mudbrick, flat roofs, tight courtyards, a few
+  hundred people. No mini-cities on hillsides.
+- **Depth of field must mean something.** Uniform everything-in-focus reads
+  as a diorama ("depth of field is weird"); choose a subject plane.
+
+### v1.1 addendum — later rounds of the same session (reusable, not Mark 6-only)
+
+- **Don't force the whole verse into one frame.** When showing everyone
+  produces background singles, unreadable props, and generic "people
+  walking," a tighter shot tells the truth better. For a sent-out-in-pairs
+  scene: one clearly readable pair as cinematic b-roll — the caption and
+  chapter text establish that all twelve went out two by two.
+- **Scripture-specified props must be visually verifiable.** If the text
+  says staff and sandals only, the frame must prove it: one staff, sandals,
+  and no bag, satchel, strap, bread, waterskin, or pouch on anyone.
+- **The look that keeps winning:** dramatic dust-lit sunset, warm but
+  realistic color, long shadows, and a low rear three-quarter angle when
+  the scene supports it.
+- **Keep villages honestly small and frames candid** — mid-stride, unposed.
+  Both rules above broke again the moment the frame got crowded; crowding
+  is the warning sign.
+- **Lens language serves the story.** Avoid extreme shallow focus when
+  several required details must stay readable — f/1.2 intimacy and a
+  verifiable prop list can be enemies; pick the aperture the truth needs.
+- **"Creative and unexpected" includes restraint:** show the assignment
+  through one intimate human detail rather than illustrating the whole
+  verse literally.
+
+Feedback loop (standing): owner image reactions in redo notes and workup
+chats are curation evidence — each session's lessons append here as vN
+amendments, and the Kelly/casting build seeds them into Selah Mind visuals
+rules (owner-gated tap) so generation carries them automatically.
 
 ## How this ships (sequencing)
 
