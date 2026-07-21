@@ -6,6 +6,7 @@ import {
   type SceneCheck,
 } from "@/lib/content/chapter-content";
 import { CaptionedImage } from "@/components/chapter/CaptionedImage";
+import { imageCaptionCard } from "@/lib/chapters/caption-cards";
 
 // New generated chapters explicitly choose their most meaningful scene. Older
 // chapters keep the established establishing → first fallback unchanged.
@@ -50,6 +51,7 @@ export function HeroImage({ data }: { data: ChapterWorkup }) {
     <CaptionedImage
       src={hero.src}
       alt={hero.alt}
+      captionCard={imageCaptionCard(data.slug, hero)}
       checks={standaloneChecksFor(data)}
       frameClassName="overflow-hidden rounded-lg border shadow-soft"
     />
