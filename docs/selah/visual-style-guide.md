@@ -95,9 +95,10 @@ Two" redo — each is now standing direction:
   becomes halo-adjacent meaning (honesty rules senior, as ever).
 - **No clone casting.** "Every character looked so similar... these dudes
   would have very different styles and swagger." Every figure distinct: age,
-  build, hair, posture, garment wear, tool carry. These are day-1 disciples
-  from different professions — a fisherman moves like a fisherman, a tax
-  collector still carries himself like money. Individuality is realism.
+  build, hair, posture, garment wear, tool carry. Where Scripture or an
+  approved character record gives a profession, let it shape posture, wear,
+  and carried tools. Where it does not, create visual individuality without
+  inventing a biography or stereotype. Individuality is realism.
   (Solved permanently by the character/casting lane — IQ-026.)
 - **Jesus is never an afterthought or a prop.** If He's in frame, His presence
   is composed with intent; otherwise leave Him out of frame entirely ("looks
@@ -107,6 +108,29 @@ Two" redo — each is now standing direction:
   hundred people. No mini-cities on hillsides.
 - **Depth of field must mean something.** Uniform everything-in-focus reads
   as a diorama ("depth of field is weird"); choose a subject plane.
+
+### v1.1 addendum — later rounds of the same session (reusable, not Mark 6-only)
+
+- **Don't force the whole verse into one frame.** When showing everyone
+  produces background singles, unreadable props, and generic "people
+  walking," a tighter shot tells the truth better. For a sent-out-in-pairs
+  scene: one clearly readable pair as cinematic b-roll — the caption and
+  chapter text establish that all twelve went out two by two.
+- **Scripture-specified props must be visually verifiable.** If the text
+  says staff and sandals only, the frame must prove it: one staff, sandals,
+  and no bag, satchel, strap, bread, waterskin, or pouch on anyone.
+- **The look that keeps winning:** dramatic dust-lit sunset, warm but
+  realistic color, long shadows, and a low rear three-quarter angle when
+  the scene supports it.
+- **Keep villages honestly small and frames candid** — mid-stride, unposed.
+  Both rules above broke again the moment the frame got crowded; crowding
+  is the warning sign.
+- **Lens language serves the story.** Avoid extreme shallow focus when
+  several required details must stay readable — f/1.2 intimacy and a
+  verifiable prop list can be enemies; pick the aperture the truth needs.
+- **"Creative and unexpected" includes restraint:** show the assignment
+  through one intimate human detail rather than illustrating the whole
+  verse literally.
 
 Feedback loop (standing): owner image reactions in redo notes and workup
 chats are curation evidence — each session's lessons append here as vN
