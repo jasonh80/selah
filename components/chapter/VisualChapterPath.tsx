@@ -1,5 +1,6 @@
 import type { ChapterWorkup } from "@/lib/types";
-import { CaptionedImage, imageCaptionCard } from "@/components/chapter/CaptionedImage";
+import { CaptionedImage } from "@/components/chapter/CaptionedImage";
+import { imageCaptionCard } from "@/lib/chapters/caption-cards";
 import { supportingImagesFor } from "@/components/chapter/HeroImage";
 import {
   getImageTitle,
@@ -46,7 +47,7 @@ export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
               src={scene.src}
               alt={scene.alt}
               overlayTitle={getImageTitle(data.slug, scene.kind, scene.label)}
-              captionCard={imageCaptionCard(scene)}
+              captionCard={imageCaptionCard(data.slug, scene)}
               checks={check ? [check] : []}
             />
           );

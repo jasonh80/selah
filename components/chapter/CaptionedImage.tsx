@@ -16,15 +16,6 @@ import type { SceneCheck } from "@/lib/content/chapter-content";
  * line shows, tap for the full check. Deep Study reads without clicks — the
  * caption arrives open. Users can still toggle any caption within a mode.
  */
-/** The image's caption field is a real headline only when it says something
- * the label doesn't — pre-caption chapters stored the label as the caption,
- * and those duplicates must not render as cards. */
-export function imageCaptionCard(image: { caption?: string; label?: string }): string | undefined {
-  const caption = image.caption?.trim();
-  if (!caption || caption === image.label?.trim()) return undefined;
-  return caption;
-}
-
 export function CaptionedImage({
   src,
   alt,
