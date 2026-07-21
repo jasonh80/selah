@@ -75,6 +75,37 @@ Pageant staging · identical palm-frond parades · European-fantasy Bible art ·
 halos/glow as meaning · plastic-clean costumes · day-for-night murk · muted
 sepia "old times" wash · modern objects, lettering, or landmarks.
 
+## v1.1 — owner art direction from the first live redo session (2026-07-20)
+
+Captured verbatim-in-spirit from Jason directing the Mark 6 "Sent Out Two by
+Two" redo — each is now standing direction:
+
+- **B-roll, not posed.** "Cinematic b-roll... not so on the chin." The camera
+  steals the moment; subjects don't perform it at the lens. Backs, departures,
+  long shadows, and oblique angles tell the story before faces do.
+- **Anamorphic character is welcome:** shallow focus with gentle oval bokeh,
+  subtle horizontal flare, low dramatic sun. Flare seasons the frame — never
+  becomes halo-adjacent meaning (honesty rules senior, as ever).
+- **No clone casting.** "Every character looked so similar... these dudes
+  would have very different styles and swagger." Every figure distinct: age,
+  build, hair, posture, garment wear, tool carry. These are day-1 disciples
+  from different professions — a fisherman moves like a fisherman, a tax
+  collector still carries himself like money. Individuality is realism.
+  (Solved permanently by the character/casting lane — IQ-026.)
+- **Jesus is never an afterthought or a prop.** If He's in frame, His presence
+  is composed with intent; otherwise leave Him out of frame entirely ("looks
+  like a weird hippie uncle and an afterthought" = automatic reject).
+- **Village scale honesty:** first-century Galilean villages are SMALL and
+  LOW — one-story fieldstone/mudbrick, flat roofs, tight courtyards, a few
+  hundred people. No mini-cities on hillsides.
+- **Depth of field must mean something.** Uniform everything-in-focus reads
+  as a diorama ("depth of field is weird"); choose a subject plane.
+
+Feedback loop (standing): owner image reactions in redo notes and workup
+chats are curation evidence — each session's lessons append here as vN
+amendments, and the Kelly/casting build seeds them into Selah Mind visuals
+rules (owner-gated tap) so generation carries them automatically.
+
 ## How this ships (sequencing)
 
 1. Codex reviews this guide (docs-only PR).
