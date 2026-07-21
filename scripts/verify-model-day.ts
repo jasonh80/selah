@@ -226,6 +226,17 @@ async function main(): Promise<void> {
   ok(capped?.status === "failed" && /challenger NOT dispatched/.test(capped.error ?? ""), "F1 the cap gate stops the challenger when the incumbent ran hot");
   ok(modelCalls.length === 1 && modelCalls[0].model === "gpt-5.5", "F2 exactly one dispatch happened");
   ok(costs.filter((c) => c.requestType === "model_day_text").length === 3, "F3 the hot incumbent's real spend is in the ledger");
+
+  // F4. Missing incumbent usage fails the gate CLOSED: with no measured input
+  // bound, the static ceiling applies on both sides and the challenger never
+  // dispatches (ceiling + ceiling > cap).
+  modelCalls = [];
+  modelBehavior = () => ({ content: VALID_WORKUP, inputTokens: 0, outputTokens: null });
+  lastTrigger = null;
+  await adminPost({ action: "model_day_create", slug: "mark-13", challengerModel: "gpt-5.6-sol", confirm: true });
+  await modelDayWorker(workerReq({ slug: "mark-13", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
+  const usageless = await readLatestModelDayRun("mark-13");
+  ok(usageless?.status === "failed" && /challenger NOT dispatched/.test(usageless.error ?? "") && modelCalls.length === 1, "F4 usage-missing incumbent fails closed — the challenger is never dispatched on an unmeasured bound");
   modelBehavior = () => ({ content: VALID_WORKUP, inputTokens: 5_000, outputTokens: 1_000 });
 
   // G. Invalid model output: spend recorded, run failed, nothing owner-facing.
@@ -239,7 +250,7 @@ async function main(): Promise<void> {
   await modelDayWorker(workerReq({ slug: "mark-11", job: String(lastTrigger!.body.job), token: String(lastTrigger!.body.token) }));
   const invalid = await readLatestModelDayRun("mark-11");
   ok(invalid?.status === "failed" && /did not return a valid chapter workup/.test(invalid.error ?? ""), "G1 an invalid candidate fails the run honestly");
-  ok(costs.filter((c) => c.requestType === "model_day_text").length === 5, "G2 both dispatches (including the invalid one) are in the ledger");
+  ok(costs.filter((c) => c.requestType === "model_day_text").length === 6, "G2 both dispatches (including the invalid one) are in the ledger");
   ok((await adminPost({ action: "model_day_packet", slug: "mark-11" })).status === 404, "G3 a failed run serves no judge packet");
   modelBehavior = () => ({ content: VALID_WORKUP, inputTokens: 5_000, outputTokens: 1_000 });
 

@@ -2641,7 +2641,10 @@ export default function SelahStudioPage() {
               </div>
             </details>
 
-            <ModelDayPanel slug={slug} api={api} />
+            {/* key={slug}: the panel's status/reveal state belongs to ONE
+                chapter — switching chapters must never show another
+                chapter's run as this one's. */}
+            <ModelDayPanel key={slug} slug={slug} api={api} />
 
             <details className="border-t pt-3">
               <summary className="cursor-pointer text-[13px] font-medium text-primary">Recent activity</summary>
@@ -2825,7 +2828,12 @@ function ModelDayPanel({
           {!arming ? (
             <button
               type="button"
-              onClick={() => setArming(true)}
+              onClick={() => {
+                // Arming ALWAYS fetches the quote first: the confirm button
+                // below never spends without the exact numbers on screen.
+                setArming(true);
+                void loadStatus();
+              }}
               disabled={!slug || busy}
               className="rounded-full border px-2.5 py-1 text-[12px] text-primary disabled:opacity-50"
             >
@@ -2835,12 +2843,12 @@ function ModelDayPanel({
             <button
               type="button"
               onClick={() => void run()}
-              disabled={busy}
+              disabled={busy || !quote}
               className="rounded-full border border-accent-strong bg-accent-strong/15 px-2.5 py-1 text-[12px] text-primary disabled:opacity-50"
             >
               {quote
                 ? `Confirm ~${formatUsd(Number(quote.expectedUsd ?? 0))} (hard cap ${formatUsd(Number(quote.totalCapUsd ?? 0))})`
-                : "Confirm the shown estimate"}
+                : "Loading the exact quote…"}
             </button>
           )}
           {arming && (
@@ -2849,9 +2857,6 @@ function ModelDayPanel({
             </button>
           )}
         </div>
-        {arming && !quote && (
-          <p className="text-[11px] text-secondary">Tip: Check status first so the exact quote shows on the confirm button.</p>
-        )}
         {runStatus === "done" && (
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => void copyPacket()} className="rounded-full border px-2.5 py-1 text-[12px] text-primary">

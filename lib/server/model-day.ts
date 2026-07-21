@@ -555,7 +555,7 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
   const runOne = async (
     model: string,
   ): Promise<
-    | { ok: true; workup: Record<string, unknown>; costUsd: number }
+    | { ok: true; workup: Record<string, unknown>; costUsd: number; inputTokens: number | null }
     | { ok: false; reason: string; costUsd: number }
   > => {
     let dispatched = false;
@@ -613,18 +613,33 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     } catch (e) {
       return { ok: false, reason: `${model} did not return a valid chapter workup: ${String((e as Error).message).slice(0, 200)}`, costUsd: cost };
     }
-    return { ok: true, workup, costUsd: cost };
+    return { ok: true, workup, costUsd: cost, inputTokens: usageMissing ? null : usage.inputTokens };
   };
 
   const first = await runOne(incumbent);
   if (!first.ok) return failRow(first.reason, first.costUsd);
 
-  // Structural total-cap gate: the challenger dispatches ONLY if the
-  // incumbent's recorded actual cost plus the challenger's conservative
-  // ceiling still fits the owner's cap.
-  if (first.costUsd + modelDayCallCeilingUsd() > MODEL_DAY_TOTAL_CAP_USD) {
+  // Structural total-cap gate. Both calls send the IDENTICAL prompt, so the
+  // challenger's input cost is bounded by the incumbent's MEASURED prompt
+  // tokens (+10% cross-tokenizer margin) — not by the chars/token assumption
+  // (adversarial review: a denser-than-4-chars/token prompt could otherwise
+  // let the recorded total nick past the cap). The output side is provider-
+  // enforced by max_completion_tokens. If the incumbent's usage was missing,
+  // the measured bound does not exist — fall back to the static ceiling,
+  // which then fails closed below (ceiling + ceiling > cap).
+  const challengerCeilingUsd =
+    first.inputTokens === null
+      ? modelDayCallCeilingUsd()
+      : Math.ceil(
+          estimateChapterWorkupCost({
+            inputTokens: Math.ceil(first.inputTokens * 1.1),
+            cachedInputTokens: 0,
+            outputTokens: MODEL_DAY_MAX_COMPLETION_TOKENS,
+          }).textEstimateUsd * 100,
+        ) / 100;
+  if (first.costUsd + challengerCeilingUsd > MODEL_DAY_TOTAL_CAP_USD) {
     return failRow(
-      `the incumbent run cost $${first.costUsd.toFixed(4)}; adding the challenger's ceiling ($${modelDayCallCeilingUsd().toFixed(2)}) would risk exceeding the $${MODEL_DAY_TOTAL_CAP_USD.toFixed(2)} total cap — challenger NOT dispatched`,
+      `the incumbent run cost $${first.costUsd.toFixed(4)}; adding the challenger's ceiling ($${challengerCeilingUsd.toFixed(2)}) would risk exceeding the $${MODEL_DAY_TOTAL_CAP_USD.toFixed(2)} total cap — challenger NOT dispatched`,
       first.costUsd,
     );
   }
@@ -656,7 +671,10 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     slug,
     status: "succeeded",
     estimatedCost: totalCost,
-    message: `blind A/B ready ${digest.slice(0, 12)}… (total $${totalCost.toFixed(4)})`,
+    // The gate above makes an over-cap total improbable; if it ever happens
+    // anyway (cross-tokenizer surprise beyond the margin), say so loudly —
+    // the ledger stays honest either way.
+    message: `blind A/B ready ${digest.slice(0, 12)}… (total $${totalCost.toFixed(4)}${totalCost > MODEL_DAY_TOTAL_CAP_USD ? " — OVER the cap; review the margin" : ""})`,
   });
   return { ok: true, slug, status: "done", packetDigest: digest };
 }
