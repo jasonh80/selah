@@ -172,10 +172,11 @@ export const IMAGE_REDO_TRANSIENT_KEYS = [
   "imageRedoErrorCode",
 ] as const;
 
-// 1200 (owner decision 2026-07-20): his shot-list direction is the
-// differentiator — but longer isn't automatically better; past ~200 words
-// image models drop competing directives. Selection still wins.
-export const IMAGE_REDO_NOTES_MAX_CHARS = 1200;
+// 2500 (Codex recommendation, owner-relayed 2026-07-21): room for accuracy,
+// composition, and exclusions blocks without crowding — deliberately not
+// unlimited. The ceiling is not a target; past ~200 words image models drop
+// competing directives. Selection still wins.
+export const IMAGE_REDO_NOTES_MAX_CHARS = 2500;
 
 export interface MarkSprintImageRedoPlan {
   slug: string;
