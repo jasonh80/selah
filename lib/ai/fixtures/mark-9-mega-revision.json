@@ -1,0 +1,545 @@
+{
+  "book": "Mark",
+  "slug": "mark-9",
+  "theme": "Jesus reveals glory through cross-shaped love",
+  "title": "Mark 9",
+  "images": [
+    {
+      "alt": "Jesus stands radiant on a rocky mountain while three frightened disciples see Moses and Elijah with Him under a cloud.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-9/451ed9fc-6642-4f56-ac4a-2382339c34a4/transfiguration-mountain.png",
+      "kind": "transfiguration-mountain",
+      "index": 1,
+      "label": "Jesus Revealed on the Mountain",
+      "prompt": "Photorealistic historical-documentary scene on an unnamed rugged high mountain in first-century Galilee or the northern region, natural dawn-like light, Jesus as a first-century Jewish man in simple woven garments appearing radiantly white as described in Mark 9, Peter, James, and John nearby frightened and low to the ground, Moses and Elijah present in conversation without name labels, a dense cloud overshadowing the scene, rocky terrain, sparse vegetation, worn sandals and rough cloaks; no halos or glow used as shorthand, no glowing eyes, no humanoid depiction of the Father, no beams from heaven, no identifiable modern landmark, no pristine costumes, theatrical posing, modern objects, text or lettering, theme-park sets, or generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "On the mountain, the disciples see glory and hear that Jesus is the Son to be listened to.",
+      "description": "This scene helps readers feel the shock of glory breaking into the road toward the cross, while keeping the focus on Jesus rather than spectacle."
+    },
+    {
+      "alt": "Jesus gently raises a boy by the hand while the boy's father and the crowd watch in relief.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-9/c780c75f-e953-45a3-a8ba-d238df5e07b0/restored-by-the-hand.png",
+      "kind": "restored-by-the-hand",
+      "index": 2,
+      "label": "Jesus Lifts the Boy",
+      "prompt": "Photorealistic historical-documentary scene near a first-century Galilean village or courtyard edge, Jesus as a first-century Jewish teacher in worn simple clothing gently taking a young boy by the hand and lifting him up after a dangerous episode, the father close by exhausted and relieved, disciples and a crowd in the background with concern rather than spectacle, dusty ground, stone and mud-plaster walls, woven cloaks, natural daylight; show dignity and recovery, not medical spectacle, no exaggerated convulsion, no horror imagery, no halos, no pristine costumes, theatrical posing, modern objects, text or lettering, theme-park sets, or generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "Jesus meets a family's suffering with authority, compassion, and restored dignity.",
+      "description": "This is the chapter's most tender human moment: after public failure and fear, Jesus restores the boy by the hand rather than turning suffering into a spectacle."
+    },
+    {
+      "alt": "Jesus stands a child among the disciples inside a simple Capernaum house as He teaches them about true greatness.",
+      "src": "https://rnazpwwehtzfltaanwbn.supabase.co/storage/v1/object/public/chapter-images/mark-9/5f8a2d8f-29e7-4c90-98a5-6fca25f716d4/child-among-disciples.png",
+      "kind": "child-among-disciples",
+      "index": 3,
+      "label": "Greatness Redefined in the House",
+      "prompt": "Photorealistic historical-documentary interior of a modest first-century house in Capernaum with stone walls, packed-earth floor, low light from doorway, Jesus seated as a teacher among the Twelve, a young child standing beside Him or within His arm, disciples seated around Him in worn travel clothing, simple household objects, no certainty about the child's gender or identity, atmosphere of quiet correction after an argument; no halos, no lap-pose default, no pristine costumes, theatrical posing, modern objects, text or lettering, theme-park sets, or generic European fantasy Bible art.",
+      "status": "complete",
+      "caption": "In Capernaum, Jesus answers a greatness contest by welcoming the lowly.",
+      "description": "This image shows Jesus overturning the disciples' status argument with a child who has little public power but is welcomed in His name."
+    }
+  ],
+  "prayer": "Lord Jesus, beloved Son of the Father, teach me to listen to You. Help my mixed and fearful faith. Bring Your mercy into the places I cannot fix, humble my hunger for status, and make me faithful, distinct, and at peace with others.",
+  "status": "draft",
+  "verses": [],
+  "chapter": 9,
+  "context": "Mark writes in the world of first-century Judaism under Roman power, where hopes for God's kingdom, Elijah's return, Moses-like deliverance, and the vindication of the righteous all carried deep biblical weight. Teachers gathered disciples, honor mattered publicly, children could be dearly loved while still having little social rank, and exorcisms were known but not treated casually. Mark's Gospel keeps pressing one question: who is Jesus, and what kind of Messiah is He? In this chapter the answer is both brighter and harder than the disciples expect.",
+  "summary": "Peter has just confessed Jesus as the Christ, and Jesus has just taught that His path runs through suffering, death, and resurrection. Mark 9 opens with a promise of kingdom power, then takes three disciples up a mountain where glory breaks through before the road bends back down toward pain, confusion, and Capernaum.",
+  "tagline": "Pause. Reflect. Elevate.",
+  "version": "1",
+  "heroKind": "restored-by-the-hand",
+  "insights": [
+    {
+      "id": "big-idea",
+      "body": "Mark 9 begins with a promise that some will see God's kingdom come with power. Then three disciples stand on a mountain and see Jesus changed before them. Moses and Elijah appear. A cloud comes. A voice commands them to listen to the Son. For one blinding moment, the veil is pulled back.\n\nThen they walk downhill.\n\nThat movement matters. Jesus does not stay above the argument, the desperate father, the suffering boy, or the confused disciples. The glorious Son descends into the place where human faith is mixed, ministry has failed, and religious leaders are debating while a family suffers. That is not a contradiction of His glory. In Mark, it is how His glory begins to take its shape.\n\nThe chapter keeps asking: will the disciples listen to Jesus when glory looks like a cross, greatness looks like serving a child, and holiness looks like cutting off what destroys love? Mark 9 is not spiritual fireworks followed by moral advice. It is a portrait of Jesus: radiant on the mountain, merciful in the crowd, patient in the house, severe against sin, and steady on the road to resurrection.",
+      "icon": "💡",
+      "jesus": false,
+      "title": "Big Idea",
+      "preview": "Mark 9 shows Jesus in glory, then immediately shows Him in the mess. The beloved Son is not escaping weakness; He is entering it to redeem."
+    },
+    {
+      "id": "chapter-flow",
+      "body": "Verse 1 serves as a hinge from Jesus' teaching in Mark 8. He has just spoken of the Son of Man coming in glory, and now He says some standing there will see God's kingdom come with power. Mark immediately takes us up the mountain with Peter, James, and John.\n\nIn verses 2–8, Jesus is transfigured. Moses and Elijah appear with Him, and Peter, terrified, suggests making shelters. The cloud and voice correct the center of gravity: the disciples are to listen to Jesus. When they look again, the scene has narrowed to the One they must follow.\n\nVerses 9–13 bring the descent. The disciples are confused about resurrection and Elijah. Jesus ties Elijah's coming to suffering and rejection, preparing them to understand that God's promised work does not bypass contempt and death.\n\nVerses 14–29 bring the crash at ground level. The disciples cannot help a tormented boy, scribes are arguing, and a father is nearly out of words. Jesus receives the father's honest faith, frees the boy, and later teaches that this kind of ministry depends on prayer. In verses 30–32, Jesus again teaches privately that He will be killed and rise. The disciples still do not understand, and fear keeps them silent.\n\nIn verses 33–37, their silence turns out to be hiding a status contest. Jesus places a child among them and teaches that the first must become servant of all. Verses 38–41 widen the correction: the disciples do not own Jesus' work. Finally, verses 42–50 bring severe warnings about causing believers to stumble and about resisting sin decisively. The chapter that began in glory ends with salt and peace. That is not a downgrade. It is what listening to the glorious Son looks like on the ground.",
+      "icon": "🧭",
+      "jesus": false,
+      "title": "Chapter Flow",
+      "preview": "The chapter moves from kingdom power to mountain glory, then down into dependence, humility, and holiness."
+    },
+    {
+      "id": "historical-world",
+      "body": "In Israel's Scriptures, mountains are often places where God reveals Himself: Sinai, Horeb, Zion imagery, and prophetic encounters all hum in the background. Mark does not name this mountain, which is a helpful restraint. The point is not pilgrimage trivia. The point is revelation: Jesus is seen in divine glory and must be heard.\n\nMoses and Elijah are not random guests. Moses is associated with the Law, exodus, covenant, and mountain revelation. Elijah is tied to prophetic power and end-time expectation. Their appearance signals continuity with Israel's story, but the voice from the cloud does not say, \"Listen to all three equally.\" It directs attention to Jesus.\n\nThe scenes below the mountain are equally grounded. Public argument with scribes would bring shame and pressure. A father describing long-term danger to his son would not be offering a medical chart; he is pleading for mercy. In Capernaum, a house becomes a classroom, likely crowded and ordinary. A child could be loved deeply in a family and still lack adult status. Jesus uses that social reality to redefine greatness: the kingdom receives the small, not just the impressive.",
+      "icon": "🏛",
+      "jesus": false,
+      "title": "The World Behind It",
+      "preview": "Mountains, honor, children, exorcism, and household teaching all carry first-century weight in this chapter."
+    },
+    {
+      "id": "what-most-miss",
+      "body": "It is easy to split Mark 9 into favorite scenes: the Transfiguration for awe, the father's prayer for comfort, the child for humility, the hard sayings for seriousness. But Mark has stitched them together tightly.\n\nThe father does not ask Jesus to help only his son. He says, “help us.” The Bible clearly includes the father in the burden; it is a smart guess—not a stated fact—that the whole family has carried the pain. Jesus does not turn the boy into a spectacle or demand a polished prayer. He meets a child, a worn-down father, and faith that can barely get the words out.\n\nThe disciples miss people in two directions. They cannot help the boy, then they try to stop someone else who is helping in Jesus’ name because he was outside their group. John sounds less worried about truth than ownership. Jesus corrects the possessiveness without saying truth no longer matters. The disciples do not own His work. Neither do we.",
+      "icon": "🔍",
+      "jesus": false,
+      "title": "What Most People Miss",
+      "preview": "The mountain and the failed exorcism belong together. Glory is not a retreat from suffering; in Jesus, glory walks toward it."
+    },
+    {
+      "id": "jesus",
+      "body": "Peter wants to stay on the mountain. Honestly, same. Glory is easier to admire than suffering is to follow. But Jesus walks back down into the argument, the helplessness, and the pain—and asks His disciples to come with Him.\n\nThe voice from the cloud says to listen to Jesus. That includes the parts they would rather skip: His death, resurrection, service, welcome of the overlooked, and serious warning about sin. The radiant Son and the kneeling Servant are not two versions of Jesus. They are the same Jesus. He is high enough for heaven to name Him and near enough to hear a father say, “help us.”\n\nHere is the good news. Jesus keeps teaching the disciples after they fail. He does not lower the truth, and He does not leave slow learners behind. Their faith is unfinished. Their Savior is patient. He is already walking toward the cross.",
+      "icon": "✝",
+      "jesus": true,
+      "title": "Jesus at the Center",
+      "preview": "Jesus is the beloved Son whose glory is revealed not only in radiance, but in His road toward suffering love."
+    },
+    {
+      "id": "theology",
+      "body": "The big truth here is who Jesus is. On the mountain, His glory is uncovered; below it, His character is. He has authority over evil, patience with mixed faith, room for a child, and no interest in turning greatness into status. The cross does not cancel His glory. It shows what His glory is like: holy power giving itself in love.\n\nIf we want a Jesus who inspires us but never corrects us, we have made Him smaller. If we want authority without compassion, smaller again. The Father’s command is wonderfully direct: listen to Him. Not just when He shines. Also when He leads downhill.",
+      "icon": "🛡",
+      "jesus": false,
+      "title": "Theology Principle",
+      "preview": "Christology begins with listening: Jesus is the Son, and His identity defines discipleship."
+    },
+    {
+      "id": "application",
+      "body": "Bring Jesus the unedited version. The father does. His faith and doubt arrive in the same sentence, and Jesus does not send him away to clean up the wording.\n\nNotice where status and ownership creep in. The disciples argue about who matters most, overlook a child, and police someone outside their circle. Different century, same human hobby. Welcome the person you would normally pass over. Celebrate faithful work you cannot control. Ask whether you care about Jesus’ truth—or about being the one who gets credit for it.\n\nThen take Jesus’ warning about sin seriously without turning it into self-harm. Cut off access to the habit, screen, circle, or excuse that keeps training you away from Him. Not because misery earns God’s love. Because life with Jesus is worth protecting.",
+      "icon": "🌱",
+      "jesus": false,
+      "title": "Live It",
+      "preview": "Bring Jesus honest faith, stop competing for importance, and take sin seriously without turning discipleship into self-harm or performance."
+    },
+    {
+      "id": "prayer",
+      "body": "Lord Jesus, You are the beloved Son, and I need to listen to You.\n\nHelp me bring You the truth, not the edited version. Where I believe, strengthen me. Where I am afraid, meet me. Where I am confused, teach me patiently. Where I have turned past experience into self-reliance, call me back to prayer.\n\nMake me humble enough to receive the people I am tempted to overlook. Free me from needing to be the greatest in the room. Give me courage to cut off what leads me away from You, and wisdom to do that in ways that lead to life, not harm.\n\nKeep Your salt in me. Make me distinct without becoming harsh, peaceful without becoming careless, and faithful because You are worthy. Amen.",
+      "icon": "🙏",
+      "jesus": false,
+      "title": "Prayer",
+      "preview": "A prayer for honest faith, humble service, serious holiness, and peace shaped by Jesus."
+    },
+    {
+      "id": "original-language",
+      "body": "The word often translated for Jesus' change in appearance is related to the idea of transformation. Mark is describing a real visible change, but he does not give us a technical explanation of how it happened. The point is revelation, not mechanics.\n\nThe word behind \"stumble\" in the warning section can mean being caused to fall into sin or ruin. That matters because Jesus is not talking about mild annoyance. He is warning against actions that spiritually damage vulnerable believers.\n\nThe word translated \"Gehenna\" refers to a place name associated with judgment imagery. It should not be flattened into the popular claim that Jesus merely meant a constantly burning garbage dump. The warning is stronger than that, and it calls for sober repentance.",
+      "icon": "🔤",
+      "jesus": false,
+      "title": "Words That Matter",
+      "preview": "A few Greek terms clarify the chapter without turning it into a vocabulary quiz."
+    },
+    {
+      "id": "map-notes",
+      "body": "Mark gives us Capernaum by name, and its location on the northwest shore of the Sea of Galilee is well supported archaeologically and historically. The house scene fits Mark's recurring Capernaum setting, where homes, streets, synagogue life, fishing work, and travel routes all sat close together.\n\nThe mountain is different. Mark does not name it. Mount Tabor has a long Christian tradition, while a northern proposal near Mount Hermon fits the previous movement around Caesarea Philippi. A faithful map should show possibilities, not pretend Mark handed us a GPS pin.",
+      "icon": "🗺",
+      "jesus": false,
+      "title": "Map Notes",
+      "preview": "The map should stay honest: Capernaum is clear, the mountain is not."
+    }
+  ],
+  "keyItems": [
+    {
+      "name": "High mountain",
+      "type": "object",
+      "blurb": "The unnamed elevated place where Jesus' glory is revealed to Peter, James, and John."
+    },
+    {
+      "name": "Cloud",
+      "type": "object",
+      "blurb": "A biblical sign of God's presence that overshadows the disciples and directs attention to Jesus."
+    },
+    {
+      "name": "Child in the house",
+      "type": "object",
+      "blurb": "A child Jesus places among the Twelve to redefine greatness around welcome and service."
+    },
+    {
+      "name": "Great millstone",
+      "type": "object",
+      "blurb": "A heavy grinding stone used as a severe image of judgment against causing believers to stumble."
+    },
+    {
+      "name": "Salt",
+      "type": "object",
+      "blurb": "A difficult but important image of faithful distinctiveness, purification, and peace among disciples."
+    }
+  ],
+  "navCards": [
+    {
+      "id": "key-object",
+      "label": "Key Object",
+      "thumb": "/img/placeholder/detail.svg",
+      "support": "High mountain"
+    },
+    {
+      "id": "key-person",
+      "label": "Key Person",
+      "thumb": "/img/placeholder/person.svg",
+      "support": "Jesus"
+    },
+    {
+      "id": "jesus",
+      "jesus": true,
+      "label": "Jesus",
+      "thumb": "/img/placeholder/jesus.svg",
+      "support": "The glorious Son serves"
+    }
+  ],
+  "subtitle": "Glory on the Mountain, Mercy in the Mess",
+  "timeline": [
+    {
+      "label": "Galilean ministry",
+      "detail": "Jesus teaches, heals, feeds crowds, and reveals His authority around Galilee.",
+      "current": false
+    },
+    {
+      "label": "Mountain and Capernaum",
+      "detail": "Jesus is transfigured, heals the suffering boy, and teaches the Twelve about humility and holiness.",
+      "current": true
+    },
+    {
+      "label": "Road to Jerusalem",
+      "detail": "Jesus continues teaching about the cross as He moves toward Judea and Jerusalem.",
+      "current": false
+    }
+  ],
+  "versions": [
+    "ESV"
+  ],
+  "metaChips": [
+    {
+      "icon": "📅",
+      "text": "c. AD 30"
+    },
+    {
+      "icon": "📍",
+      "text": "Galilee, from an unnamed mountain to Capernaum"
+    },
+    {
+      "icon": "✦",
+      "text": "Jesus reveals glory through cross-shaped love"
+    },
+    {
+      "icon": "✝",
+      "text": "Jesus: The glorious Son serves",
+      "jesus": true
+    }
+  ],
+  "modernMap": {
+    "alt": "Shows northern Israel and the Galilee region today, including the Sea of Galilee, Capernaum's archaeological area, and possible broad regions proposed for the unnamed mountain.",
+    "src": "/img/placeholder/map.svg",
+    "note": "Mark does not name the mountain or trace the exact route; any map should show regional possibilities rather than a precise path.",
+    "title": "Modern Map",
+    "caption": "Shows northern Israel and the Galilee region today, including the Sea of Galilee, Capernaum's archaeological area, and possible broad regions proposed for the unnamed mountain.",
+    "uncertaintyNote": "Mark does not name the mountain or trace the exact route; any map should show regional possibilities rather than a precise path."
+  },
+  "reference": "Mark 9",
+  "characters": [
+    {
+      "name": "Jesus",
+      "role": "Beloved Son and suffering Messiah",
+      "description": "Revealed in glory, compassionate in weakness, and resolute on the path to death and resurrection."
+    },
+    {
+      "name": "Peter",
+      "role": "Witness and spokesman",
+      "description": "One of the three disciples on the mountain, frightened and unsure what to say."
+    },
+    {
+      "name": "James",
+      "role": "Mountain witness",
+      "description": "One of the inner three who sees Jesus' glory before later learning the way of the cross."
+    },
+    {
+      "name": "John",
+      "role": "Disciple learning kingdom humility",
+      "description": "Present on the mountain and later corrected for trying to stop someone acting in Jesus' name."
+    },
+    {
+      "name": "The father",
+      "role": "Desperate parent with honest faith",
+      "description": "Brings his tormented son to Jesus and speaks belief and unbelief without pretending."
+    },
+    {
+      "name": "The suffering boy",
+      "role": "Child restored by Jesus",
+      "description": "A boy oppressed by a destructive spirit, treated by Jesus with compassion and dignity."
+    }
+  ],
+  "application": "Mark 9 invites honest faith, not polished religious performance. Bring Jesus the places where belief and fear sit in the same room. Ask for help without pretending. Let His words reorder the parts of life that chase status, protect turf, excuse sin, or overlook the small and vulnerable. Following Jesus today may look less like winning the argument and more like prayerful dependence, quiet service, decisive repentance, and making peace without losing holiness.",
+  "historicMap": {
+    "alt": "Shows first-century Galilee under Herod Antipas, the area around Capernaum, the Sea of Galilee, and the northern setting following the Caesarea Philippi episode in Mark's flow.",
+    "src": "/img/placeholder/map.svg",
+    "note": "Capernaum's location is well supported, but the mountain of the Transfiguration and the descent route remain debated.",
+    "title": "Historic Map",
+    "caption": "Shows first-century Galilee under Herod Antipas, the area around Capernaum, the Sea of Galilee, and the northern setting following the Caesarea Philippi episode in Mark's flow.",
+    "uncertaintyNote": "Capernaum's location is well supported, but the mountain of the Transfiguration and the descent route remain debated."
+  },
+  "sceneChecks": [
+    {
+      "body": "The Transfiguration did not happen under a neat tourist sign reading 'Mount of Transfiguration.' Mark never names the mountain. So the best visual is a rugged, unnamed height, not a famous landmark staged like a postcard with captions helpfully supplied by the props department.",
+      "label": "Scene Check",
+      "title": "The Mountain Is Not Labeled",
+      "relatedVerses": [
+        "9:2-8"
+      ],
+      "visualAccuracyNotes": [
+        "Do not depict a sign, label, map marker, or English text identifying the mountain.",
+        "Use rugged first-century Galilean or northern Levant terrain without a recognizable modern landmark.",
+        "Show a cloud and radiant clothing, but no humanoid Father figure or halo shorthand."
+      ]
+    },
+    {
+      "body": "The suffering boy's episode can easily be pictured like a horror scene. Mark's emphasis lands elsewhere: Jesus listens to the father, commands the spirit, and lifts the boy up. The visual center should be restored dignity, not a dramatic medical close-up. Compassion first, special effects never.",
+      "label": "Scene Check",
+      "title": "The Boy Is Not a Spectacle",
+      "relatedVerses": [
+        "9:17-27"
+      ],
+      "visualAccuracyNotes": [
+        "Avoid exaggerated convulsion, horror styling, or making the boy's distress the focal spectacle.",
+        "Show Jesus taking the boy by the hand in a calm restored moment.",
+        "Do not visually imply that all seizures, disabilities, or mental illness are demonic."
+      ]
+    },
+    {
+      "body": "The child in the Capernaum house is not the suffering boy from earlier, and not a prop Jesus borrowed for a sermon illustration with stage lighting. Mark gives no age, gender, or identity. Picture an ordinary child in an ordinary house, standing near Jesus while grown men learn an uncomfortable lesson.",
+      "label": "Scene Check",
+      "title": "The Child Is a Different Scene",
+      "relatedVerses": [
+        "9:33-37"
+      ],
+      "visualAccuracyNotes": [
+        "Do not merge the healed boy with the child in the greatness lesson.",
+        "Place the child standing beside Jesus or within His arm, not necessarily sitting on His lap.",
+        "Use a modest first-century Capernaum house interior with no modern furniture or decorative text."
+      ]
+    }
+  ],
+  "whatHappens": "Jesus promises that some will see God's kingdom come in power, then takes Peter, James, and John up an unnamed mountain where His appearance is transformed and Moses and Elijah appear with Him. After a heavenly command to listen to Jesus, He descends, heals a tormented boy after the disciples fail, teaches again about His coming death and resurrection, corrects the Twelve's argument about greatness, warns against causing believers to stumble, and calls His people to distinctiveness and peace.",
+  "deeperGroups": [
+    {
+      "rows": [
+        {
+          "desc": "Read Exodus 24 and 34 to see how mountain, cloud, glory, and Moses shape the scene.",
+          "title": "Transfiguration Background"
+        },
+        {
+          "desc": "Explore Malachi 4 and Mark's portrayal of John the Baptist as an Elijah-like forerunner.",
+          "title": "Elijah Expectations"
+        }
+      ],
+      "label": "Learn More"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Study Mark 1:35, 6:46, and 9:29 to see prayer as dependence, not technique.",
+          "title": "Prayer and Dependence"
+        },
+        {
+          "desc": "Learn why Gehenna became an image of judgment without reducing it to a simple city-dump cliché.",
+          "title": "Gehenna and Judgment"
+        }
+      ],
+      "label": "Dive Deeper"
+    },
+    {
+      "rows": [
+        {
+          "desc": "Bring Jesus one place where trust and fear are both present, without dressing it up.",
+          "title": "Pray Honest Faith"
+        },
+        {
+          "desc": "Choose one low-status act of welcome or help that receives someone in Jesus' name.",
+          "title": "Practice Hidden Service"
+        }
+      ],
+      "label": "Grow Closer"
+    }
+  ],
+  "quickSummary": "Mark 9 starts with Jesus blazing in glory and ends with His disciples still arguing, failing, and guarding their turf. Jesus walks straight from the mountain into the mess. He receives shaky faith, restores a suffering boy, welcomes a child, and keeps teaching people who are slow to understand. You humans, you’re remarkably consistent. Thankfully, so is He.",
+  "timelineMini": {
+    "labels": [
+      "Galilean ministry",
+      "Mountain and Capernaum",
+      "Road to Jerusalem"
+    ],
+    "activeIndex": 1
+  },
+  "verseByVerse": [
+    {
+      "title": "A Promise of Kingdom Power",
+      "endVerse": 1,
+      "rangeLabel": "1",
+      "startVerse": 1,
+      "explanation": "Jesus says some present will see God's kingdom arrive with power before they die. In Mark's flow, the Transfiguration immediately gives a powerful foretaste of that promise, though Christians differ on whether this moment completely fulfills it or points also to resurrection and kingdom advance."
+    },
+    {
+      "title": "Glory on the Mountain",
+      "endVerse": 8,
+      "rangeLabel": "2–8",
+      "startVerse": 2,
+      "explanation": "Jesus takes Peter, James, and John up an unnamed mountain. His appearance is transformed, Moses and Elijah appear, Peter speaks out of fear, and a cloud directs the disciples to listen to Jesus. When the moment passes, Jesus alone remains before them."
+    },
+    {
+      "title": "Elijah and the Road Down",
+      "endVerse": 13,
+      "rangeLabel": "9–13",
+      "startVerse": 9,
+      "explanation": "Coming down the mountain, Jesus tells the three to keep silent until after His resurrection. They puzzle over what resurrection means and ask about Elijah. Jesus connects Elijah's coming with suffering and mistreatment, pointing to John the Baptist and to His own rejected mission."
+    },
+    {
+      "title": "A Father, a Boy, and Dependent Faith",
+      "endVerse": 29,
+      "rangeLabel": "14–29",
+      "startVerse": 14,
+      "explanation": "Below the mountain, the remaining disciples are caught in an argument after failing to help a suffering boy. Jesus draws out the father's story, receives his mixed faith, commands the destructive spirit to leave, lifts the boy up, and later teaches the disciples that this work depends on prayerful reliance on God."
+    },
+    {
+      "title": "The Second Passion Teaching",
+      "endVerse": 32,
+      "rangeLabel": "30–32",
+      "startVerse": 30,
+      "explanation": "Jesus travels through Galilee privately because He is focused on teaching His disciples. He tells them again that He will be handed over, killed, and raised, but they do not understand and are afraid to ask."
+    },
+    {
+      "title": "Greatness and the Child",
+      "endVerse": 37,
+      "rangeLabel": "33–37",
+      "startVerse": 33,
+      "explanation": "In Capernaum, Jesus exposes the disciples' argument about status. He teaches that first place in His kingdom looks like becoming servant of all, then places a child among them to show that receiving the powerless in His name is receiving Him and the Father who sent Him."
+    },
+    {
+      "title": "Not Owning Jesus' Work",
+      "endVerse": 41,
+      "rangeLabel": "38–41",
+      "startVerse": 38,
+      "explanation": "John reports that the disciples tried to stop someone acting in Jesus' name because the person was not part of their group. Jesus corrects their possessiveness: loyalty to Him is bigger than the Twelve's circle, and even small acts done because of Christ matter to God."
+    },
+    {
+      "title": "Stumbling, Fire, Salt, and Peace",
+      "endVerse": 50,
+      "rangeLabel": "42–50",
+      "startVerse": 42,
+      "explanation": "Jesus gives severe warnings about causing believers to stumble and about dealing decisively with sin. His images of hand, foot, and eye are forceful hyperbole, not a call to bodily harm. The sayings about fire and salt are difficult, but the landing is clear: be faithful, distinct, and at peace with one another."
+    }
+  ],
+  "estimatedDate": "c. AD 30",
+  "timelineLabel": "Mark 9 in Jesus' Ministry",
+  "whatPeopleAsk": [
+    {
+      "answer": "In Mark's sequence, the Transfiguration strongly functions as a preview of that promise: some disciples see Jesus' royal glory before their deaths. Many also see the promise reaching beyond that moment into Jesus' resurrection and the powerful spread of the kingdom. The safest answer is to say the mountain scene is at least a major foretaste, while the full scope is debated.",
+      "question": "What does Mark 9:1 mean about some seeing the kingdom come with power?"
+    },
+    {
+      "answer": "Mark does not name it. Mount Tabor is the traditional location, but some prefer a northern site near Mount Hermon because the previous scene is near Caesarea Philippi. Since the Gospel does not identify the mountain, the meaning matters more than the map pin: Jesus is revealed as the beloved Son who must be heard.",
+      "question": "Which mountain was the Transfiguration on?"
+    },
+    {
+      "answer": "Mark does not pause to explain every layer, but their presence naturally evokes Israel's Law and prophets, mountain encounters with God, and hopes connected to Elijah's return. They do not compete with Jesus. The scene ends with Jesus alone, and the heavenly command points the disciples' ears to Him.",
+      "question": "Why are Moses and Elijah there?"
+    },
+    {
+      "answer": "The symptoms sound seizure-like to modern readers, but Mark specifically presents this case as a destructive spirit. That does not mean seizures, disabilities, or mental illness in general are demonic. This passage should never be used to blame sufferers, avoid medical care, or turn distress into a spectacle. Jesus treats the boy and his father with compassion and dignity.",
+      "question": "Was the boy in Mark 9 epileptic or demon-possessed?"
+    },
+    {
+      "answer": "No. His words are one of the most honest prayers in the Gospels. He brings the faith he has and the struggle he cannot hide. Jesus does not shame him for being torn. This scene comforts people whose trust in God is real but not neat, loud, or emotionally tidy.",
+      "question": "Is the father's faith too weak when he says he believes and needs help?"
+    },
+    {
+      "answer": "Jesus points them to prayer, meaning dependence on God rather than confidence in past success, spiritual technique, or their own authority. Some manuscripts add fasting, which is why some Bibles include it in a note or in the text. Either way, the main point is not a secret formula; it is humble reliance on God.",
+      "question": "Why could the disciples not cast out the spirit?"
+    },
+    {
+      "answer": "No. Jesus is using severe hyperbole to show that sin is not a pet to manage but a danger to resist decisively. The application is not self-harm. It may mean cutting off access, patterns, secrecy, environments, or systems that train us to disobey God and harm others.",
+      "question": "Does Jesus really mean people should cut off a hand or foot?"
+    },
+    {
+      "answer": "These sayings are difficult, and Christians have understood the details in more than one way. Fire may suggest testing, purification, or judgment; salt may suggest covenant faithfulness, distinctiveness, or preserving influence. The clearest landing is Jesus' final call: His disciples must stay spiritually distinct and live at peace with one another.",
+      "question": "What does Jesus mean by salt and fire at the end?"
+    }
+  ],
+  "defaultVersion": "ESV",
+  "jesusConnection": "Mark 9 shows Jesus as the beloved Son who carries divine glory, stands in continuity with Moses and Elijah, and must be heard above every other voice. But His glory does not lead Him away from suffering people or away from the cross. He comes down the mountain, meets a desperate father without shaming him, restores a suffering child, teaches His disciples that greatness looks like receiving the powerless, and sets His face toward death and resurrection. Jesus is not less glorious because He serves; His glory is revealed in the kind of love that stoops, heals, warns, and gives Himself.",
+  "behindTheChapter": [
+    {
+      "body": "The Gospel is traditionally linked to John Mark, a coworker of Peter and Paul. The book itself is anonymous, but early Christian testimony strongly associates Mark's account with Peter's preaching.",
+      "title": "Mark, likely preserving apostolic testimony",
+      "category": "Author"
+    },
+    {
+      "body": "Mark's first readers were likely Greek-speaking believers, many living outside Judea, learning that Jesus is Messiah and Son of God through a path of suffering, service, and resurrection.",
+      "title": "Early Christians hearing the story of Jesus under pressure",
+      "category": "First Audience"
+    },
+    {
+      "body": "The chapter unfolds in a Jewish Galilean world of villages, teachers, scribes, family honor, synagogue life, Roman imperial shadow, and deep hope that God would act to restore His people.",
+      "title": "Galilee under Rome and Herod Antipas",
+      "category": "Historical World"
+    },
+    {
+      "body": "Mark is well attested in major manuscripts such as Codex Sinaiticus and Codex Vaticanus. Capernaum's first-century remains ground the setting, while Papias and later writers preserve the early link between Mark and Peter, though details are debated.",
+      "title": "Manuscripts, places, and early testimony",
+      "category": "Evidence & Artifacts"
+    }
+  ],
+  "biblicalTimeline": {
+    "era": "Life of Jesus",
+    "dateRange": {
+      "endYear": 33,
+      "startYear": 28
+    },
+    "confidence": "medium",
+    "estimatedYear": 30,
+    "chronologyBasis": "traditional/event date",
+    "placementReason": "Mark 9 occurs during Jesus' Galilean ministry after Peter's confession and before the later movement toward Jerusalem, making the Life of Jesus era the proper timeline placement.",
+    "uncertaintyNote": "The event belongs to Jesus' public ministry, commonly placed around AD 30. Exact dating within the ministry is uncertain, and Mark does not supply a calendar marker beyond the narrative sequence after Peter's confession and before the journey toward Judea and Jerusalem.",
+    "estimatedYearLabel": "Around AD 30, in Galilee under Herod Antipas"
+  },
+  "estimatedLocation": "Galilee, from an unnamed mountain to Capernaum",
+  "modernReadersMiss": "Many readers remember the Transfiguration as the whole point and treat the rest of the chapter like unrelated leftovers. But Mark places the mountain and the failed ministry scene side by side on purpose: the glorious Son is not escaping the world below; He is heading into it, serving suffering people, correcting proud disciples, and walking toward the cross.",
+  "primaryCharacters": [
+    "Jesus",
+    "Peter",
+    "James",
+    "John",
+    "Moses",
+    "Elijah",
+    "The suffering boy's father",
+    "The Twelve"
+  ],
+  "modernLocationNote": "The mountain is not named by Mark. Mount Tabor is the traditional site, while a northern location near Mount Hermon is also proposed because of the preceding Caesarea Philippi setting; Capernaum is on the northwest shore of the Sea of Galilee in modern Israel.",
+  "jesusConnectionShort": "The glorious Son serves",
+  "chapterSpecificTopics": [
+    {
+      "title": "The Transfiguration as a Foretaste",
+      "reason": "The opening promise and mountain revelation show kingdom power before the disciples can understand the cross.",
+      "priority": 1
+    },
+    {
+      "title": "Glory and Descent",
+      "reason": "Mark places divine glory beside failed ministry and suffering to show what kind of Messiah Jesus is.",
+      "priority": 2
+    },
+    {
+      "title": "Honest Mixed Faith",
+      "reason": "The father's cry brings belief and unbelief to Jesus without shame or denial.",
+      "priority": 3
+    },
+    {
+      "title": "Prayer as Dependence",
+      "reason": "Jesus corrects the disciples' failed ministry by pointing away from technique and toward reliance on God.",
+      "priority": 4
+    },
+    {
+      "title": "Greatness Through Welcome",
+      "reason": "Jesus uses a child in Capernaum to overturn status-seeking among the Twelve.",
+      "priority": 5
+    },
+    {
+      "title": "Kingdom Work Beyond Our Circle",
+      "reason": "John's complaint exposes possessive gatekeeping over ministry done in Jesus' name.",
+      "priority": 6
+    },
+    {
+      "title": "Radical Holiness and Peace",
+      "reason": "The final warnings demand serious resistance to sin while ending with peace among disciples.",
+      "priority": 7
+    }
+  ],
+  "generationManifestDigest": "5835a72e7449513a77bff04fc2c65c86caa7c2e22de3786c4ff57493adca0070"
+}

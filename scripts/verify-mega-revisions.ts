@@ -57,6 +57,36 @@ const REVISIONS: RevisionSpec[] = [
       "insights[application].body",
     ],
   },
+  {
+    slug: "mark-9",
+    basePath: "../docs/selah/mark-9-revision/base-workup.json",
+    fixturePath: "../lib/ai/fixtures/mark-9-mega-revision.json",
+    // Codex rundown comparison (board #29, 2026-07-21, + wording addendum).
+    allowedChangedPaths: [
+      "quickSummary",
+      "insights[what-most-miss].body",
+      "insights[jesus].body",
+      "insights[theology].body",
+      "insights[application].body",
+    ],
+  },
+  {
+    slug: "mark-10",
+    basePath: "../docs/selah/mark-10-revision/base-workup.json",
+    fixturePath: "../lib/ai/fixtures/mark-10-mega-revision.json",
+    // Codex rundown comparison (board #29, 2026-07-21, + wording addendum).
+    // DOCUMENTED EXCEPTION: the compile called itself "shorter overall" but
+    // measures +23 words on the exact stored fields — flagged on the PR for
+    // Codex's editorial recheck (trim or bless); ceiling pinned to actual.
+    allowedChangedPaths: [
+      "quickSummary",
+      "insights[what-most-miss].body",
+      "insights[jesus].body",
+      "insights[theology].body",
+      "insights[application].body",
+    ],
+    maxWordDelta: 23,
+  },
 ];
 
 const CHURCHY = /discernment/i;
