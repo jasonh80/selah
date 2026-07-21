@@ -128,8 +128,11 @@ Standing ritual — **Model Day, first Studio session of each month**:
 
 ## This week (P0), concretely
 
-1. Owner calls the fork (A or B above).
-2. Owner reads the two Netlify model env vars → first Model Day runs.
+1. Two-seal model approved: launch at Selah standard; add Mega after the
+   Daily Workup comparison.
+2. Verify the approved selected text and image models in Admin diagnostics;
+   inspect environment fallbacks only if settings/diagnostics are missing;
+   then run the first Model Day.
 3. Close the current batch: #94 Megas applied, Mark 6 image landed.
 4. Crossway + entity + trademark: three emails/calls, owner-initiated.
 5. Claude + Codex spec the P1 batch lane (queue, sampling QA, grader) as
