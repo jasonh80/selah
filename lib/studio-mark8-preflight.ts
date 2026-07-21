@@ -17,6 +17,20 @@ export function isConnectedStudioSlug(value: string): value is ConnectedStudioSl
   return (CONNECTED_STUDIO_SLUGS as readonly string[]).includes(value);
 }
 
+// Protected chapters unlocked for EXACTLY ONE mutation: the published
+// single-image redo lane (owner authorization 2026-07-20, board #29).
+// Mark 6 is published with launch-era images and no Studio connection; the
+// owner asked for the PR #66 redo machinery — and nothing else — to work for
+// it. Membership here changes nothing about generation, publishing, or any
+// other action: decideMutation still refuses every non-redo action for these
+// slugs, and psalm-23 (not listed) stays fully refused everywhere.
+// Defined in this client-safe module (re-exported by the server-only
+// protected-chapters.ts) so the Studio page can gate its UI on the same list.
+export const REDO_UNLOCKED_PROTECTED_SLUGS: readonly string[] = ["mark-6"];
+export function isRedoUnlockedProtectedSlug(value: string): boolean {
+  return REDO_UNLOCKED_PROTECTED_SLUGS.includes(value);
+}
+
 const CHAPTER_NUMBERS: Record<ConnectedStudioSlug, number> = {
   "mark-8": 8,
   "mark-7": 7,

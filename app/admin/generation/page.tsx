@@ -10,6 +10,7 @@ import {
   connectedChapterLabel,
   decideMark8StudioPreflight,
   isConnectedStudioSlug,
+  isRedoUnlockedProtectedSlug,
   isStudioGenerateEntryDisabled,
   MARK_8_STUDIO_SLUG,
   studioConfirmationMessage,
@@ -1932,8 +1933,11 @@ export default function SelahStudioPage() {
             </a>
             {/* Published single-image redo — the dedicated Codex-approved lane
                 (board #29 2026-07-19). Candidate work never touches the live
-                row; "Use on live chapter" is a second explicit confirmation. */}
-            {connectedSlug && (
+                row; "Use on live chapter" is a second explicit confirmation.
+                Mark 6 gets exactly this card and nothing else (owner
+                authorization 2026-07-20, board #29) — its generation, setup,
+                and publish flows stay locked as before. */}
+            {(connectedSlug || isRedoUnlockedProtectedSlug(slug)) && (
               <PublishedRedoCard
                 slug={slug}
                 chapterLabel={chapterLabel}

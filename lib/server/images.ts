@@ -39,6 +39,7 @@ import {
   CONNECTED_STUDIO_SLUGS,
   connectedChapterLabel,
   isConnectedStudioSlug,
+  isRedoUnlockedProtectedSlug,
 } from "../studio-mark8-preflight";
 import { connectedChapterReceiptAppliesIncludingStored } from "./chapter-setup-approvals";
 import { isMarkSprintSlug } from "./mark-sprint-manifest-policy";
@@ -1283,11 +1284,14 @@ async function runPublishedImageRedoJobWithinDeadline(
   // the claim terminally failed with zero credit used (a lane row never
   // strands the live chapter — nothing blocks on it but the lane itself).
   try {
-    if (!isConnectedStudioSlug(slug)) {
+    // Mark 6 is admitted to THIS worker only (owner authorization 2026-07-20,
+    // board #29) — the draft-lane redo worker above stays connected-only.
+    if (!isConnectedStudioSlug(slug) && !isRedoUnlockedProtectedSlug(slug)) {
       throw new Error("published single-image redo is available only for connected protected chapters");
     }
     if (binding.model !== MARK_8_IMAGE_MODEL) {
-      throw new Error(`${connectedChapterLabel(slug)} requires ${MARK_8_IMAGE_MODEL} exactly`);
+      const label = isConnectedStudioSlug(slug) ? connectedChapterLabel(slug) : slug;
+      throw new Error(`${label} requires ${MARK_8_IMAGE_MODEL} exactly`);
     }
     if (!(await withinImageRunDeadline(deadline, () => imageGenAllowed(slug)))) {
       throw new Error("image generation not allowed for this slug");

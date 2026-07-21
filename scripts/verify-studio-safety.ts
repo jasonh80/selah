@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   decideMutation,
   PROTECTED_SLUGS,
+  REDO_UNLOCKED_PROTECTED_SLUGS,
   type MutationAction,
   type RowLookup,
   type ChapterRowSnapshot,
@@ -120,11 +121,37 @@ for (const action of ACTIONS) {
 // refusing "reviewed" byte-for-byte unchanged (section 2 proves that).
 {
   const action: MutationAction = "applyPublishedImageRedo";
+  // The redo unlock is EXACTLY mark-6 (owner authorization 2026-07-20,
+  // board #29) — any change to the list must come back through this gate.
+  ok(
+    JSON.stringify([...REDO_UNLOCKED_PROTECTED_SLUGS]) === JSON.stringify(["mark-6"]),
+    "6b redo unlock covers exactly mark-6",
+  );
   for (const slug of PROTECTED_SLUGS) {
     for (const status of STATUSES) {
+      // FLIPPED EXPECTATION (owner authorization 2026-07-20, board #29):
+      // mark-6 may take the ONE dedicated published-redo action on its live
+      // "reviewed" row — with the same pinned revision token every connected
+      // chapter gets. Every other status still refuses for mark-6, and
+      // psalm-23 still refuses everywhere, byte-for-byte unchanged.
+      if (slug === "mark-6" && status === "reviewed") {
+        const d = decideMutation(action, slug, row(status));
+        ok(
+          d.allowed && d.expected?.status === "reviewed" && d.expected.updatedAt !== null,
+          `${slug} ${action} reviewed allowed with a pinned revision token (owner-authorized unlock)`,
+        );
+        const nullRev = decideMutation(action, slug, row(status, null));
+        ok(
+          !nullRev.allowed && /updated_at|revision/i.test(nullRev.reason),
+          `${slug} ${action} reviewed with NULL revision still refuses (fail closed)`,
+        );
+        continue;
+      }
       ok(!decideMutation(action, slug, row(status)).allowed, `${slug} ${action} ${status} refused`);
     }
     ok(!decideMutation(action, slug, { kind: "missing" }).allowed, `${slug} ${action} missing refused`);
+    ok(!decideMutation(action, slug, { kind: "error", message: "boom" }).allowed, `${slug} ${action} db error refused`);
+    ok(!decideMutation(action, slug, { kind: "unconfigured" }).allowed, `${slug} ${action} unconfigured refused`);
   }
   const allowed = decideMutation(action, "mark-9", row("reviewed"));
   ok(

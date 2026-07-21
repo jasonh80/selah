@@ -20,8 +20,10 @@
 //     (protectedChapterServeAllowed) against the EXACT next workup — the live
 //     page cannot 404 or go invalid, and it is unchanged until that write.
 //   - Stale/conflicting/protected chapters refuse: the binding digest includes
-//     the live row's revision AND the exact src being replaced; psalm-23 and
-//     mark-6 refuse inside decideMutation before anything else runs.
+//     the live row's revision AND the exact src being replaced; psalm-23
+//     refuses inside decideMutation before anything else runs. Mark 6 is
+//     unlocked for EXACTLY this lane (owner authorization 2026-07-20, board
+//     #29) — decideMutation still refuses every other action for it.
 //   - Rollback is owner-confirmed, revision-bound, and revalidated the same
 //     way, restoring the exact base_src the candidate replaced.
 import { getSupabaseAdmin } from "./supabase";
@@ -35,6 +37,7 @@ import {
   decideMutation,
   ChapterMutationError,
   isChapterMutationError,
+  isRedoUnlockedProtectedSlug,
   type MutationDecision,
 } from "./protected-chapters";
 import { requireJobStore, JOB_TOKEN_TTL_MS, newJobId, type JobStorePort } from "./generation-jobs";
@@ -295,7 +298,10 @@ export async function derivePublishedRedoBinding(
   notes: string,
   action: string,
 ): Promise<PublishedRedoBinding> {
-  if (!isConnectedStudioSlug(slug)) {
+  // Mark 6 joins the connected chapters in THIS lane only (owner
+  // authorization 2026-07-20, board #29): the published single-image redo.
+  // Every other Studio path still treats it as unconnected and protected.
+  if (!isConnectedStudioSlug(slug) && !isRedoUnlockedProtectedSlug(slug)) {
     throw new ChapterMutationError(
       "REFUSED",
       action,
@@ -570,21 +576,64 @@ async function assertNextWorkupServesClean(
   const inspection = inspectSourceOverlapReview(next as unknown as Record<string, unknown>);
   const overlapDigest = inspection.kind === "warning" ? inspection.warning.reportDigest : undefined;
   const approval = await readStoredSetupApproval(slug);
-  const validation = validateMarkSprintPublishCandidate(
-    slug,
-    next,
-    fresh,
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    overlapDigest,
-    approval,
-  );
-  if (!validation.ok) {
-    throw new ChapterMutationError(
-      "REFUSED",
-      action,
+  if (isRedoUnlockedProtectedSlug(slug) && !isConnectedStudioSlug(slug)) {
+    // Mark 6 (owner authorization 2026-07-20, board #29) predates the sprint
+    // machinery, so validateMarkSprintPublishCandidate would refuse it for
+    // requirements that cannot exist for it (Studio connection, owner setup
+    // receipt). Run the equivalent checks that DO exist for it instead:
+    // the recomputed final-review identity already passed above (which
+    // itself requires the full plan shape, complete stored images, and no
+    // unresolved redo keys), and every image must sit at the exact
+    // configured Selah storage origin — the same origin pin the sprint
+    // validation enforces. Nothing here loosens the sprint/publish gates:
+    // this branch is unreachable for connected or unlisted slugs.
+    let expectedOrigin: string;
+    try {
+      const configured = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+      if (configured.protocol !== "https:") throw new Error("unsafe protocol");
+      expectedOrigin = configured.origin;
+    } catch {
+      throw new ChapterMutationError(
+        "REFUSED",
+        action,
+        slug,
+        "Selah's chapter image storage is not safely configured — nothing was changed",
+      );
+    }
+    const exactOrigin =
+      Array.isArray(next.images) &&
+      next.images.every((image) => {
+        try {
+          return new URL(image.src).origin === expectedOrigin;
+        } catch {
+          return false;
+        }
+      });
+    if (!exactOrigin) {
+      throw new ChapterMutationError(
+        "REFUSED",
+        action,
+        slug,
+        "the resulting chapter failed full public validation — nothing was changed (one or more images are outside Selah's chapter image storage)",
+      );
+    }
+  } else {
+    const validation = validateMarkSprintPublishCandidate(
       slug,
-      `the resulting chapter failed full public validation — nothing was changed (${validation.reason})`,
+      next,
+      fresh,
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      overlapDigest,
+      approval,
     );
+    if (!validation.ok) {
+      throw new ChapterMutationError(
+        "REFUSED",
+        action,
+        slug,
+        `the resulting chapter failed full public validation — nothing was changed (${validation.reason})`,
+      );
+    }
   }
   if (!protectedChapterServeAllowed(slug, next, approval)) {
     throw new ChapterMutationError(

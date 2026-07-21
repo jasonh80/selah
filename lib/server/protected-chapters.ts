@@ -14,9 +14,18 @@
 //     swallow them nor return success-shaped responses after an unverified
 //     state, and so refusals can be durably audited at the API layer.
 import { getSupabaseAdmin } from "./supabase";
+import { isRedoUnlockedProtectedSlug } from "../studio-mark8-preflight";
 
 // Protected regardless of stored status (issue #8 recommended default).
 export const PROTECTED_SLUGS: readonly string[] = ["psalm-23", "mark-6"];
+
+// The ONE carve-out from the blanket protected refusal (owner authorization
+// 2026-07-20, board #29): Mark 6 may take applyPublishedImageRedo — and only
+// that action — which still has to pass the normal transition table below
+// ("reviewed" only, revision-pinned). The list lives in the client-safe
+// studio-mark8-preflight module; re-exported here so server code and the
+// offline gates read one source of truth.
+export { REDO_UNLOCKED_PROTECTED_SLUGS, isRedoUnlockedProtectedSlug } from "../studio-mark8-preflight";
 
 export function isProtectedSlug(slug: string): boolean {
   return PROTECTED_SLUGS.includes(slug);
@@ -80,7 +89,16 @@ export function decideMutation(action: MutationAction, slug: string, lookup: Row
     expected: null,
   });
   if (!slug || typeof slug !== "string" || !slug.trim()) return refuse("missing slug");
-  if (isProtectedSlug(slug)) return refuse(`"${slug}" is an explicitly protected chapter`);
+  // Owner authorization 2026-07-20 (board #29): the published single-image
+  // redo action — and ONLY that action — falls through to the transition
+  // table for the redo-unlocked slugs (Mark 6). It still requires a live
+  // "reviewed" row with a pinned revision there. Psalm 23 is not unlocked and
+  // keeps refusing every action here; Mark 6 keeps refusing every OTHER
+  // action here, byte-for-byte unchanged.
+  const redoUnlocked = action === "applyPublishedImageRedo" && isRedoUnlockedProtectedSlug(slug);
+  if (isProtectedSlug(slug) && !redoUnlocked) {
+    return refuse(`"${slug}" is an explicitly protected chapter`);
+  }
   if (lookup.kind === "unconfigured") return refuse(`storage is not configured, cannot verify "${slug}"`);
   if (lookup.kind === "error") return refuse(`could not verify "${slug}" (${lookup.message.slice(0, 120)})`);
 
