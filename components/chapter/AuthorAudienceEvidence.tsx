@@ -10,7 +10,15 @@ type AAECard = { category: string; title: string; body: string; media?: ContextM
 // lived in, and the manuscripts/inscriptions/landscape that ground it.
 // Single-column, full-width cards (Quick/Deep retired 2026-07-19).
 // Media renders only when a real asset exists — never an empty placeholder.
-export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
+export function AuthorAudienceEvidence({
+  data,
+  headless,
+}: {
+  data: ChapterWorkup;
+  /** Render the cards only — the Behind-the-Chapter wrapper (UI-cleanup
+   * brief) supplies its own collapsed header. */
+  headless?: boolean;
+}) {
   // Prefer generated cards; fall back to static config (e.g. Psalm 23).
   // Every DISTINCT authored layer survives in the same full-width card
   // (Codex #64 final round): the Behind-the-Chapter body stays, and the
@@ -33,14 +41,18 @@ export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
       : getChapterContext(data.slug) ?? [];
   if (cards.length === 0) return null;
 
+  const cardStack = (
+    <div className="space-y-2.5">
+      {cards.map((c, i) => (
+        <Card key={i} card={enrich(c)} />
+      ))}
+    </div>
+  );
+  if (headless) return cardStack;
   return (
     <section id="author-audience-evidence" className="scroll-mt-20">
       <SectionHead title="Behind the Chapter" />
-      <div className="space-y-2.5">
-        {cards.map((c, i) => (
-          <Card key={i} card={enrich(c)} />
-        ))}
-      </div>
+      {cardStack}
     </section>
   );
 }

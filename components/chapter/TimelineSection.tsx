@@ -1,6 +1,7 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { getTimelineNote } from "@/lib/content/chapter-content";
 import { chapterYear } from "@/lib/chapter-year";
+import { timelineContextLine } from "@/components/chapter/MetadataChips";
 
 // "Where It Fits" — the Big Story rail. Markers are evenly spaced for a clean,
 // compact, mobile-friendly rail (no huge empty gaps); the chapter PIN is placed
@@ -66,9 +67,16 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
   // lives only in the Transparency drawer.
   const headline = getTimelineNote(data.slug) ?? rangeText;
 
+  // UI-cleanup brief (board #29, 2026-07-21): the timeline owns the chapter's
+  // date/place facts — the standalone chips are gone, and this one clean line
+  // ("Around AD 30 · Galilee") carries them here.
+  const contextLine = timelineContextLine(data);
   return (
     <section id="timeline" className="scroll-mt-20 rounded-md border bg-card p-3.5 shadow-hair">
-      <h2 className="text-section text-primary">Where It Fits</h2>
+      <h2 className="text-section text-primary">Where It Fits in the Story</h2>
+      {contextLine && (
+        <p className="mt-1 text-[12px] font-medium text-secondary">{contextLine}</p>
+      )}
 
       {/* Owner decision A3 (2026-07-16): no horizontal swipe anywhere — the
           rail fits the container on every phone width. Owner direction
@@ -147,7 +155,9 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
         </div>
       </div>
 
-      {headline && (
+      {/* One entry point per fact: the curated note renders only when it says
+          something the context line above doesn't already carry. */}
+      {headline && !(contextLine && (contextLine.includes(headline) || headline.includes(contextLine))) && (
         <p className="mt-2 text-center text-[12px] font-medium text-secondary">{headline}</p>
       )}
     </section>

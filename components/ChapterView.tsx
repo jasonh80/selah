@@ -1,6 +1,6 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { HeroImage } from "@/components/chapter/HeroImage";
-import { MetadataChips } from "@/components/chapter/MetadataChips";
+import { MetadataChips, jesusChipLine } from "@/components/chapter/MetadataChips";
 import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
 import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
@@ -13,7 +13,7 @@ import { getChapterContext } from "@/lib/content/chapter-content";
 import { ChapterTopControls } from "@/components/chapter/ChapterTopControls";
 import { CompactPreviewRow } from "@/components/chapter/CompactPreviewRow";
 import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSection";
-import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
+import { BehindTheChapterSection } from "@/components/chapter/BehindTheChapterSection";
 import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection";
 import { EsvAttribution } from "@/components/chapter/EsvAttribution";
 
@@ -41,45 +41,79 @@ export function ChapterView({
   /** Published chapter slugs for title-as-navigation; omitted on draft previews. */
   publishedSlugs?: string[];
 }) {
+  // The former red Jesus/theme chip merges INTO Jesus at the Center — one
+  // entry point for the idea (UI-cleanup brief, board #29 2026-07-21).
+  const jesusLead = jesusChipLine(data);
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
       <main className="min-w-0 space-y-s6 pb-s12 pt-s2 lg:pt-s4">
-        {/* Above the fold: title + controls on one header row (owner decision
-            A2), subtitle below, inline Scripture, key image. */}
+        {/* APPROVED ORDER (Codex UI-cleanup brief + owner decisions, board
+            #29 2026-07-21; owner confirmed the same order drives Quick AND
+            Deep — only card expansion differs by mode):
+            1 header+Scripture · 2 first image bank · 3 Big Idea (open) ·
+            4 Where It Fits in the Story · 5 Quick Summary · 6 Jesus at the
+            Center (chip merged) · 7 People · 8 second image bank · 9 map
+            block · 10 What's-Easy-to-Miss · 11 third image bank · 12 Behind
+            the Chapter (collapsed) · 13 Theology · 14 Live It · 15 Prayer.
+            Shared rhythm: related items sit close (space-y-s3 groups),
+            major sections breathe at the main space-y-s6. */}
+
+        {/* 1 — Chapter header + Scripture preview */}
         <div className="space-y-s3">
           <ChapterTopControls data={data} publishedSlugs={publishedSlugs} />
-        </div>
-
-        {/* Owner layout order (2026-07-19 "mix up"): every text box full
-            width; duplicate boxes removed (WMPM card, World-Behind-It card,
-            the Deep Dive rail/header, the half-page dashboard grid). */}
-        <div className="space-y-s3">
-          {/* The hero photo carries its scene check(s) as an attached caption
-              INSIDE its frame (owner direction 2026-07-20: Instagram photo +
-              caption below, Selah style), with Quick Summary right after. */}
-          <HeroImage data={data} />
-          <QuickSummaryCard data={data} />
+          {/* Absorbed chips render nothing for typical chapters — only a chip
+              no section owns survives here, never a stranded row. */}
           <MetadataChips data={data} />
-          <CompactPreviewRow data={data} />
         </div>
 
-        {/* The visual walk: each image with ITS scene check attached */}
-        <VisualChapterPath data={data} />
+        {/* 2 — First image bank: the hero with its caption + checks */}
+        <HeroImage data={data} />
 
-        {/* Owner direction 2026-07-19: no Key Person card after the timeline. */}
+        {/* 3 — Big Idea: open, full width, no More/Less */}
+        <InsightCards data={data} types={["big_idea"]} alwaysOpen />
+
+        {/* 4 — Where It Fits in the Story: the large timeline owns the
+            date/place facts (chips absorbed into its context line) */}
         <TimelineSection data={data} />
+
+        {/* 5 — Quick Summary: what happens (Big Idea interprets; this
+            explains — two different jobs, no repetition) */}
+        <QuickSummaryCard data={data} />
+
+        {/* 6 — Jesus at the Center, with the former red chip merged in */}
+        <InsightCards data={data} types={["jesus_connection"]} alwaysOpen leadLine={jesusLead} />
+
+        {/* 7 — People (not redesigned — Kelly's character system replaces
+            this later; position preserved, shared spacing only) */}
+        <CompactPreviewRow data={data} />
+
+        {/* 8 — Second image bank */}
+        <VisualChapterPath data={data} bank="second" />
+
+        {/* 9 — Map block: map and its reader-facing notes together */}
+        <div className="space-y-s3">
+          {getGeoChapterMap(data.slug) ? <GeoMapSection data={data} /> : <MapsSection data={data} />}
+          <InsightCards data={data} types={["map_notes"]} />
+        </div>
+
+        {/* 10 — What's Easy to Miss (label itself renames in the words PR) */}
         <MostPeopleMissSection data={data} />
-        <InsightCards data={data} types={["jesus_connection"]} />
 
-        {/* Maps, with the expandable Map Notes card directly beneath */}
-        {getGeoChapterMap(data.slug) ? <GeoMapSection data={data} /> : <MapsSection data={data} />}
-        <InsightCards data={data} types={["map_notes"]} />
+        {/* 11 — Third image bank */}
+        <VisualChapterPath data={data} bank="third" />
 
-        <InsightCards data={data} types={["big_idea"]} />
-        <AuthorAudienceEvidence data={data} />
-        {/* Owner direction 2026-07-19: Chapter Flow reads best right after
-            Behind the Chapter. */}
-        <InsightCards data={data} types={["chapter_flow"]} />
+        {/* 12 — Behind the Chapter: collapsed reference material (author,
+            audience, historical world, evidence, original language, flow) */}
+        <BehindTheChapterSection data={data} />
+
+        {/* 13/14/15 — Theology Principle · Live It · Prayer: open, full
+            width. Discipleship (deferred section) keeps its slot before
+            Prayer; any unrecognized authored card still renders after these
+            rather than silently disappearing. */}
+        <InsightCards data={data} types={["theology"]} alwaysOpen />
+        <InsightCards data={data} types={["application"]} alwaysOpen />
+        <InsightCards data={data} types={["discipleship"]} />
+        <InsightCards data={data} types={["prayer"]} alwaysOpen />
         <InsightCards
           data={data}
           excludeTypes={[
@@ -87,15 +121,21 @@ export function ChapterView({
             "map_notes",
             "big_idea",
             "chapter_flow",
+            "original_language",
             "what_most_people_miss",
-            // The world/context card is excluded ONLY when Behind-the-Chapter
-            // actually renders and carries it (canonical mapping) — a legacy
-            // chapter without that section keeps its context card.
+            "theology",
+            "application",
+            "discipleship",
+            "prayer",
+            // Behind-the-Chapter carries the world/context card wherever its
+            // section renders (canonical mapping); a legacy chapter without
+            // that section keeps its context card here.
             ...((data.behindTheChapter?.length ?? 0) > 0 || getChapterContext(data.slug)
               ? ["historical_world"]
               : []),
           ]}
         />
+
         <WhatPeopleAskSection data={data} />
         <ChaptersSection data={data} />
 

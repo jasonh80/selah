@@ -1,6 +1,4 @@
 import type { ChapterWorkup } from "@/lib/types";
-import { getChapterMap } from "@/lib/maps/chapter-maps";
-import { getGeoChapterMap } from "@/lib/maps/geo-chapter-maps";
 
 // Compact top previews (layout spec §13; owner trim 2026-07-19: the
 // Where-It-Fits one-liner is gone — the large timeline below carries it):
@@ -26,18 +24,10 @@ export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
     });
   }
 
-  // The Maps preview exists ONLY when a maps section itself will render —
-  // EITHER map engine (production-QA fix: geo chapters like Mark 7–10 lost
-  // their chip because only the static config was checked) — never a dead
-  // #maps link.
-  if (getChapterMap(data.slug) || getGeoChapterMap(data.slug)) {
-    previews.push({
-      icon: "🗺",
-      label: "Maps & Places",
-      value: data.modernMap?.caption ?? "See where this chapter happens",
-      href: "#maps",
-    });
-  }
+  // UI-cleanup brief (board #29, 2026-07-21): the Maps & Places preview tile
+  // is GONE — it only ever rendered when the full map block exists further
+  // down, which made it a duplicate entry point for the same idea. The map
+  // block is the one map entry now.
 
   if (previews.length === 0) return null;
 
