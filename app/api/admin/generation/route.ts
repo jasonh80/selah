@@ -52,6 +52,7 @@ import {
 import {
   triggerBackgroundGeneration,
   triggerBackgroundPrepareProposal,
+  triggerBackgroundModelDay,
   triggerBackgroundImageGeneration,
   triggerBackgroundImageRedo,
   triggerBackgroundPublishedImageRedo,
@@ -88,6 +89,15 @@ import {
   approvedProposalApplies,
   ProposalClaimError,
 } from "@/lib/server/prepare-proposals";
+import {
+  readLatestModelDayRun,
+  claimModelDayRun,
+  failClaimedModelDayRun,
+  buildJudgePacket,
+  modelDayQuote,
+  validModelId,
+  ModelDayClaimError,
+} from "@/lib/server/model-day";
 import {
   chapterMutationDecision,
   isChapterMutationError,
@@ -614,6 +624,137 @@ export async function POST(req: Request) {
       message: `${action === "prepare_proposal_approve" ? "approved" : "rejected"} ${digest.slice(0, 12)}…`,
     });
     return NextResponse.json({ ok: true, slug });
+  }
+
+  // ---- Model Day blind A/B (printing-press plan standing ritual) ----
+  // PRIVATE by construction: this lane can read runs, claim a confirmed run,
+  // and serve the blind judge packet / sealed reveal. It can never write
+  // chapter data, publish, or change the selected models — the winner is a
+  // separate deliberate owner action in settings.
+  if (action === "model_day_status") {
+    // FREE read/check: nothing is spent, nothing changes. The label map is
+    // NEVER in this response — reveal is its own explicit action.
+    const slug = String(body.slug ?? "");
+    if (!parseSlug(slug)) return NextResponse.json({ ok: false, error: "not a recognizable chapter slug" }, { status: 400 });
+    let run;
+    try {
+      run = await readLatestModelDayRun(slug);
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "model day storage could not be read — try again (fail-closed, nothing changed)" },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      slug,
+      status: run?.status ?? "none",
+      packetDigest: run?.packet_digest ?? null,
+      costUsd: run?.cost_usd ?? null,
+      error: run?.error ?? null,
+      quote: modelDayQuote(),
+    });
+  }
+  if (action === "model_day_create") {
+    const slug = String(body.slug ?? "");
+    if (!parseSlug(slug)) return refuse(slug, "model_day", "not a recognizable chapter slug", 400);
+    const challenger = body.challengerModel;
+    if (!validModelId(challenger)) {
+      return refuse(slug, "model_day", "a plain challenger model id is required", 400);
+    }
+    if (body.confirm !== true) {
+      return refuse(slug, "model_day", "confirmation required — the expected cost and enforced cap are shown first", 400);
+    }
+    // The one text-spend kill switch covers this lane too.
+    const settings = await getGenerationSettings();
+    if (!settings.text_generation_enabled) {
+      return refuse(slug, "model_day", "Text Generation is OFF — turn it on in Advanced Settings.", 403);
+    }
+    // The incumbent is whatever actually drives the press today (stored
+    // Studio selection, falling back to the deployed env default) — read
+    // server-side so the A/B always measures the real current model.
+    const incumbent = settings.selected_text_model || process.env.CHAPTER_WORKUP_TEXT_MODEL || "";
+    if (!validModelId(incumbent)) {
+      return refuse(slug, "model_day", "the current text model could not be determined — set it in Studio settings first", 500);
+    }
+    const jobId = newJobId();
+    try {
+      await claimModelDayRun(slug, jobId, incumbent, String(challenger));
+    } catch (e) {
+      const err = e as ModelDayClaimError;
+      const status = err.code === "CONFLICT" ? 409 : err.code === "REFUSED" ? 403 : 500;
+      return refuse(slug, "model_day", err.message, status);
+    }
+    const quote = modelDayQuote();
+    await logGenerationAudit({
+      action: "model_day",
+      slug,
+      status: "started",
+      message: `job ${jobId} blind A/B (expected ~$${quote.expectedUsd.toFixed(2)}, cap $${quote.totalCapUsd.toFixed(2)})`,
+    });
+    const triggered = await triggerBackgroundModelDay(slug, new URL(req.url).host, jobId);
+    if (!triggered.ok) {
+      // The claim row must not strand as 'generating' after a failed trigger.
+      const failed = await failClaimedModelDayRun(slug, jobId, `trigger failed: ${triggered.error ?? triggered.status}`);
+      return refuse(
+        slug,
+        "model_day",
+        `background trigger failed (${triggered.error ?? `HTTP ${triggered.status}`}) — ${failed ? "the claim was marked failed (nothing spent)" : "the claim could NOT be cleared; it may still show generating"}`,
+        failed ? 502 : 500,
+      );
+    }
+    return NextResponse.json({ ok: true, triggered: true, slug, jobId, quote });
+  }
+  if (action === "model_day_packet") {
+    // FREE read: the BLIND judge packet — candidates A/B only, no model
+    // names, no label map. This is what gets handed to the judge.
+    const slug = String(body.slug ?? "");
+    if (!parseSlug(slug)) return NextResponse.json({ ok: false, error: "not a recognizable chapter slug" }, { status: 400 });
+    let run;
+    try {
+      run = await readLatestModelDayRun(slug);
+    } catch {
+      return NextResponse.json({ ok: false, error: "model day storage could not be read — try again" }, { status: 503 });
+    }
+    const packet = run ? buildJudgePacket(run) : null;
+    if (!packet) {
+      return NextResponse.json({ ok: false, error: "no completed Model Day run for this chapter" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, packet });
+  }
+  if (action === "model_day_reveal") {
+    // FREE read of the sealed mapping. Requires the exact packet digest so a
+    // reveal always names the run it unblinds — used AFTER the verdict is in.
+    const slug = String(body.slug ?? "");
+    const digest = String(body.packetDigest ?? "");
+    if (!parseSlug(slug)) return NextResponse.json({ ok: false, error: "not a recognizable chapter slug" }, { status: 400 });
+    if (!LOWERCASE_SHA256.test(digest)) {
+      return NextResponse.json({ ok: false, error: "the exact packet digest is required to unseal a run" }, { status: 400 });
+    }
+    let run;
+    try {
+      run = await readLatestModelDayRun(slug);
+    } catch {
+      return NextResponse.json({ ok: false, error: "model day storage could not be read — try again" }, { status: 503 });
+    }
+    if (!run || run.status !== "done" || run.packet_digest !== digest || !run.label_map) {
+      return NextResponse.json({ ok: false, error: "no completed run matches that packet digest" }, { status: 404 });
+    }
+    await logGenerationAudit({
+      action: "model_day",
+      slug,
+      status: "succeeded",
+      message: `revealed ${digest.slice(0, 12)}…: A=${run.label_map.A}, B=${run.label_map.B}`,
+    });
+    return NextResponse.json({
+      ok: true,
+      slug,
+      packetDigest: digest,
+      labelMap: run.label_map,
+      incumbentModel: run.incumbent_model,
+      challengerModel: run.challenger_model,
+      costUsd: run.cost_usd,
+    });
   }
 
   // ---- Prepare Chapter screen (owner decision A5, board #29, 2026-07-16) ----
