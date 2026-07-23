@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ChapterWorkup, Insight } from "@/lib/types";
-import { insightTypeOf } from "@/lib/content/chapter-content";
+import { insightTypeOf, distinctText } from "@/lib/content/chapter-content";
 import { useReadingMode } from "@/components/ReadingModeProvider";
 import { SectionCard } from "@/components/chapter/SectionCard";
 
@@ -70,6 +70,15 @@ export function InsightCards({
   );
 }
 
+/** True when `preview` carries authored words the body does not already say.
+ * Uses the project's canonical containment test, after stripping a truncation
+ * ellipsis so "first sentence…" still proves equivalence with a body that
+ * opens on that sentence. */
+function isDistinctPreview(preview: string | undefined, body: string | undefined): boolean {
+  const trimEllipsis = (t: string | undefined) => (t ?? "").replace(/(?:…|\.\.\.)\s*$/u, "").trim();
+  return distinctText(trimEllipsis(preview), body);
+}
+
 function InsightCard({
   insight,
   alwaysOpen,
@@ -87,6 +96,12 @@ function InsightCard({
     setOpen(mode === "deep");
   }, [mode]);
   const showBody = alwaysOpen || open;
+  // Authored `preview` is not always a truncation of `body` — some cards carry
+  // a distinct authored line there. Swapping preview→body on expand (or on
+  // alwaysOpen) silently dropped it (Codex #104 review, 2026-07-23). Keep BOTH
+  // whenever they differ, and dedupe only on proven equivalence: the body
+  // already contains the preview's words.
+  const keepPreview = showBody && isDistinctPreview(insight.preview, insight.body);
   const lead =
     leadLine &&
     ![insight.title, insight.subtitle ?? "", insight.body, insight.preview].some((t) =>
@@ -105,6 +120,9 @@ function InsightCard({
         <p className={`mb-1.5 text-[13px] font-medium leading-relaxed ${insight.jesus ? "text-jesus-red" : "text-primary"}`}>
           {lead}
         </p>
+      )}
+      {keepPreview && (
+        <p className="mb-1.5 text-[13px] leading-relaxed text-secondary">{insight.preview}</p>
       )}
       <p className="text-[13px] leading-relaxed text-secondary">
         {showBody ? insight.body : insight.preview}

@@ -1,6 +1,9 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { confident } from "@/lib/voice";
-import { getChipOverride } from "@/lib/content/chapter-content";
+import { getChipOverride, insightTypeOf } from "@/lib/content/chapter-content";
+import { chapterYear } from "@/lib/chapter-year";
+import { getChapterMap } from "@/lib/maps/chapter-maps";
+import { getGeoChapterMap } from "@/lib/maps/geo-chapter-maps";
 
 type ResolvedChip = { icon: string; text: string; jesus?: boolean };
 
@@ -37,15 +40,32 @@ export function timelineContextLine(data: ChapterWorkup): string | undefined {
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
+/** A chip is removed ONLY when the section that absorbs it actually renders
+ * for this chapter (Codex #104 review, 2026-07-23: filtering by icon alone
+ * silently deleted content on chapters whose destination is missing). Each
+ * predicate mirrors the destination component's own render condition:
+ *   📅 date     → The Big Story date bubble, drawn only when the chapter has a year
+ *   📍 location → the map block, drawn only when a geo/illustrated map exists
+ *   ✦ theme    → the Big Idea card
+ *   red Jesus   → Jesus at the Center (as its lead line)
+ * Anything without a live destination keeps its chip rather than vanishing. */
+function absorbed(data: ChapterWorkup, chip: ResolvedChip): boolean {
+  const types = new Set((data.insights ?? []).map((i) => insightTypeOf(i)));
+  if (chip.jesus) return types.has("jesus_connection");
+  if (chip.icon === "✦") return types.has("big_idea");
+  if (chip.icon === "📅") return chapterYear(data) != null;
+  if (chip.icon === "📍")
+    return Boolean(getGeoChapterMap(data.slug) ?? getChapterMap(data.slug));
+  return false;
+}
+
 // UI-cleanup brief (board #29, 2026-07-21): the date chip, the location chip,
-// the ✦ theme chip, and the red Jesus chip are ALL absorbed elsewhere —
-// timeline and Jesus at the Center own those ideas now. Only chips that carry
-// something no section owns still render (rare); usually this renders nothing
-// and no stranded chip row takes up space.
+// the ✦ theme chip, and the red Jesus chip are absorbed elsewhere — timeline,
+// maps, Big Idea, and Jesus at the Center own those ideas now. On a typical
+// chapter this renders nothing and no stranded chip row takes up space; on a
+// legacy or incomplete chapter the un-absorbed chip survives here.
 export function MetadataChips({ data }: { data: ChapterWorkup }) {
-  const chips = resolvedChips(data).filter(
-    (chip) => chip.icon !== "✦" && chip.icon !== "📅" && chip.icon !== "📍" && !chip.jesus,
-  );
+  const chips = resolvedChips(data).filter((chip) => !absorbed(data, chip));
   if (chips.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2">

@@ -5,12 +5,15 @@ import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
 import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
 import { InsightCards } from "@/components/chapter/InsightCardGrid";
-import { insightTypeOf } from "@/lib/content/chapter-content";
+import {
+  insightTypeOf,
+  getMapNoteOverride,
+  absorbsHistoricalWorld,
+} from "@/lib/content/chapter-content";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GeoMapSection } from "@/components/chapter/GeoMapSection";
 import { getGeoChapterMap } from "@/lib/maps/geo-chapter-maps";
-import { getChapterContext } from "@/lib/content/chapter-content";
 import { ChapterTopControls } from "@/components/chapter/ChapterTopControls";
 import { CompactPreviewRow } from "@/components/chapter/CompactPreviewRow";
 import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSection";
@@ -47,8 +50,13 @@ export function ChapterView({
   const jesusLead = jesusChipLine(data);
   // Map Notes ride INSIDE the map block; they must not also render as a card.
   const mapNotesInsight = (data.insights ?? []).find((i) => insightTypeOf(i) === "map_notes");
+  // Reader-voice rewrite where one is authored; the stored note otherwise.
   const mapNotes = mapNotesInsight
-    ? { title: mapNotesInsight.title, body: mapNotesInsight.body || mapNotesInsight.preview }
+    ? {
+        title: mapNotesInsight.title,
+        body:
+          getMapNoteOverride(data.slug) || mapNotesInsight.body || mapNotesInsight.preview,
+      }
     : undefined;
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
@@ -119,13 +127,10 @@ export function ChapterView({
         <InsightCards data={data} types={["chapter_flow"]} />
         <InsightCards data={data} types={["original_language"]} />
 
-        {/* 13/14/15 — Theology Principle · Live It · Prayer: open, full
-            width. Discipleship stays HIDDEN (owner deferral IQ-019,
-            re-confirmed on the 2026-07-23 phone pass) — its authored data
-            remains stored, nothing renders until the owner un-defers. */}
-        <InsightCards data={data} types={["theology"]} alwaysOpen />
-        <InsightCards data={data} types={["application"]} alwaysOpen />
-        <InsightCards data={data} types={["prayer"]} alwaysOpen />
+        {/* 12b — every remaining authored/custom teaching card (e.g. Mark 6's
+            Two Banquets). These sit BEFORE the closing three so nothing
+            teaching-shaped can ever appear after the prayer (Codex #104
+            review, 2026-07-23). */}
         <InsightCards
           data={data}
           excludeTypes={[
@@ -139,15 +144,24 @@ export function ChapterView({
             "application",
             "discipleship",
             "prayer",
-            // Behind-the-Chapter carries the world/context card wherever its
-            // section renders (canonical mapping); a legacy chapter without
-            // that section keeps its context card here.
-            ...((data.behindTheChapter?.length ?? 0) > 0 || getChapterContext(data.slug)
-              ? ["historical_world"]
-              : []),
+            // Behind-the-Chapter carries the world/context card only when one
+            // of its cards IS the world card; otherwise the context card
+            // keeps its place here rather than vanishing from both.
+            ...(absorbsHistoricalWorld(data) ? ["historical_world"] : []),
           ]}
         />
 
+        {/* 13/14/15 — Theology Principle · Live It · Prayer: open, full
+            width, and ALWAYS last. Prayer is the final teaching card on the
+            page. Discipleship stays HIDDEN (owner deferral IQ-019,
+            re-confirmed on the 2026-07-23 phone pass) — its authored data
+            remains stored, nothing renders until the owner un-defers; when it
+            does, it slots between Live It and Prayer. */}
+        <InsightCards data={data} types={["theology"]} alwaysOpen />
+        <InsightCards data={data} types={["application"]} alwaysOpen />
+        <InsightCards data={data} types={["prayer"]} alwaysOpen />
+
+        {/* Not teaching cards: the reader's questions and where to go next. */}
         <WhatPeopleAskSection data={data} />
         <ChaptersSection data={data} />
 

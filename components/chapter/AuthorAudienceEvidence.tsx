@@ -2,7 +2,13 @@
 
 import type { ChapterWorkup } from "@/lib/types";
 import { SectionCard } from "@/components/chapter/SectionCard";
-import { getChapterContext, insightTypeOf, distinctText, type ContextMedia } from "@/lib/content/chapter-content";
+import {
+  getChapterContext,
+  insightTypeOf,
+  distinctText,
+  isWorldCard,
+  type ContextMedia,
+} from "@/lib/content/chapter-content";
 
 type AAECard = { category: string; title: string; body: string; media?: ContextMedia };
 
@@ -26,8 +32,7 @@ export function AuthorAudienceEvidence({
   // carry material the body doesn't already contain.
   const worldInsight = data.insights?.find((i) => insightTypeOf(i) === "historical_world");
   const enrich = (card: AAECard): AAECard => {
-    const isWorld = /historical world|world behind/i.test(`${card.category} ${card.title}`);
-    if (!isWorld || !worldInsight) return card;
+    if (!isWorldCard(card) || !worldInsight) return card;
     const layers = [card.body];
     if (distinctText(worldInsight.preview, card.body)) layers.push(worldInsight.preview);
     if (distinctText(worldInsight.body, card.body) && distinctText(worldInsight.body, worldInsight.preview)) {
