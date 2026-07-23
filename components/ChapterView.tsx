@@ -15,7 +15,7 @@ import { MapsSection } from "@/components/chapter/MapsSection";
 import { GeoMapSection } from "@/components/chapter/GeoMapSection";
 import { getGeoChapterMap } from "@/lib/maps/geo-chapter-maps";
 import { ChapterTopControls } from "@/components/chapter/ChapterTopControls";
-import { CompactPreviewRow } from "@/components/chapter/CompactPreviewRow";
+import { PeopleSection } from "@/components/chapter/PeopleSection";
 import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSection";
 import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
 import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection";
@@ -97,9 +97,11 @@ export function ChapterView({
         {/* 6 — Jesus at the Center, with the former red chip merged in */}
         <InsightCards data={data} types={["jesus_connection"]} alwaysOpen leadLine={jesusLead} />
 
-        {/* 7 — People (not redesigned — Kelly's character system replaces
-            this later; position preserved, shared spacing only) */}
-        <CompactPreviewRow data={data} />
+        {/* 7 — People: the chapter's cast, in the same frame as every other
+            section. Portraits fill in from the registry as the visual cast
+            lands; an uncast person shows a labelled placeholder, never a
+            borrowed face. */}
+        <PeopleSection data={data} />
 
         {/* 8 — Second image bank */}
         <VisualChapterPath data={data} bank="second" />
