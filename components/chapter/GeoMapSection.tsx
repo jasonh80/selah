@@ -163,20 +163,29 @@ function addLabels(map: maplibregl.Map, view: MapView, markerNames: string[]): v
     source: "place-labels",
     layout: {
       "icon-image": ["get", "icon"],
+      // Labels declutter by collision, not by a paint expression: a `zoom`
+      // expression nested inside `case` is INVALID in a paint property and
+      // makes addLayer throw — which silently killed the entire label layer
+      // (no labels, and Then/Today updating a source nothing rendered). Zoom
+      // windowing is applied per-feature via setFilter in applyLabelZoom(),
+      // where the current zoom is baked in as a literal.
       "icon-allow-overlap": false,
       "icon-ignore-placement": false,
       "icon-anchor": "center",
     },
-    paint: {
-      // Fade each label in and out of its own zoom window.
-      "icon-opacity": [
-        "case",
-        ["any", ["<", ["zoom"], ["get", "minz"]], [">", ["zoom"], ["get", "maxz"]]],
-        0,
-        1,
-      ],
-    },
   });
+  applyLabelZoom(map);
+  map.on("zoom", () => applyLabelZoom(map));
+}
+
+/** Show each label only inside its own [minz, maxz] window. Recomputed on
+ * zoom with the current zoom baked in as a literal — the correct pattern,
+ * since `zoom` cannot appear inside a filter or a non-interpolate paint
+ * expression. */
+function applyLabelZoom(map: maplibregl.Map): void {
+  if (!map.getLayer("place-labels")) return;
+  const z = map.getZoom();
+  map.setFilter("place-labels", ["all", ["<=", ["get", "minz"], z], [">=", ["get", "maxz"], z]]);
 }
 
 /** The theme's colors for map overlays, read from the live CSS custom
