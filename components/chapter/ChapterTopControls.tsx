@@ -44,15 +44,17 @@ export function ChapterTopControls({
   return (
     <div id="chapter" className="scroll-mt-20 space-y-s3">
       <div className="pt-2">
-        <div className="flex flex-col gap-s3 md:flex-row md:flex-wrap md:items-center md:justify-between">
-          {/* Title-as-navigation (owner approval 2026-07-19): "Mark ⌄ 9 ⌄" —
-              the H1 is the chapter picker. Without the published list (draft
-              previews), it renders as the plain title. */}
-          {publishedSlugs && publishedSlugs.length > 0 ? (
-            <TitleNav slug={data.slug} title={data.title} publishedSlugs={publishedSlugs} />
-          ) : (
-            <h1 className="text-title text-primary lg:text-[48px]">{data.title}</h1>
-          )}
+        {/* HEADLINE FIRST (owner ruling 2026-07-23: the chapter title looked
+            "underwhelming and tucked in"). Magazine hierarchy — the reference
+            is a small locator (still the chapter picker), the chapter's own
+            title is the page's display headline, then the controls. */}
+        {publishedSlugs && publishedSlugs.length > 0 ? (
+          <TitleNav slug={data.slug} title={data.title} publishedSlugs={publishedSlugs} />
+        ) : (
+          <p className="text-[15px] font-semibold text-secondary">{data.title}</p>
+        )}
+        <h1 className="text-title mt-1 text-primary lg:text-[44px]">{data.subtitle}</h1>
+        <div className="mt-s3 flex flex-col gap-s3 md:flex-row md:flex-wrap md:items-center md:justify-between">
           {/* flex-wrap (IQ-003): with the mode toggle back, the control row
               can exceed a true 320px content viewport again — it MUST keep
               wrapping to a second line instead of overflowing. Typography and
@@ -71,7 +73,6 @@ export function ChapterTopControls({
             <ReadingModeToggle />
           </div>
         </div>
-        <p className="text-subtitle mt-2.5 text-primary">{data.subtitle}</p>
       </div>
 
       {scriptureOpen ? (

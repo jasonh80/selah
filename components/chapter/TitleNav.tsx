@@ -42,7 +42,7 @@ export function TitleNav({
 
   // Unknown slug shape (nothing to navigate from): the plain title, unchanged.
   if (!located || publishedSlugs.length === 0) {
-    return <h1 className="text-title text-primary lg:text-[48px]">{title}</h1>;
+    return <p className="text-[15px] font-semibold text-secondary">{title}</p>;
   }
   const { book, chapter } = located;
   // The page keeps its own title form for the book word ("Psalm 23", not
@@ -71,7 +71,7 @@ export function TitleNav({
 
   return (
     <div ref={rootRef} className="relative">
-      <h1 className="text-title text-primary lg:text-[48px]">
+      <p className="text-[15px] font-semibold text-secondary">
         <span className="relative inline-block">
           <button
             type="button"
@@ -159,7 +159,7 @@ export function TitleNav({
             </div>
           )}
         </span>
-      </h1>
+      </p>
     </div>
   );
 }

@@ -52,7 +52,7 @@ export function ChapterView({
     : undefined;
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
-      <main className="min-w-0 space-y-s6 pb-s12 pt-s2 lg:pt-s4">
+      <main className="min-w-0 space-y-s4 pb-s12 pt-s2 lg:pt-s4">
         {/* APPROVED ORDER (Codex UI-cleanup brief + owner decisions, board
             #29 2026-07-21; owner confirmed the same order drives Quick AND
             Deep — only card expansion differs by mode):
