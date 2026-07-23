@@ -157,3 +157,32 @@ Tyre and Sidon, both secure. Mark 7 goes there.
 
 **Next actor: Codex — verify the data and rule on the disputed sites. Jason
 approves the design.**
+
+---
+
+## 6. Future lane — every journey in one map (owner idea, 2026-07-23)
+
+*"After we make all of these maps for all the chapters of the Bible, it would
+be interesting to have an overlay that shows all of the routes taken in the
+Bible."*
+
+This is almost free **if we do not break the data shape between now and then.**
+Every chapter map already stores its route as a `corridor` — an ordered list of
+waypoints with an honesty label. The whole-Bible overlay is simply every
+corridor drawn at once, filterable by era, by person, or by book: Abraham's
+wandering, the Exodus, David's flight from Saul, the exile road, Jesus'
+ministry, Paul's voyages.
+
+**What would kill it:** routes stored inconsistently chapter to chapter — some
+as corridors, some as pins, some as prose. So this is recorded now as a
+**constraint on the data**, not a feature to build later:
+
+1. Every chapter route goes in as a `corridor` with waypoints, even when the
+   chapter map does not visually need one.
+2. Every corridor carries `who` and `era` fields from the start, so the overlay
+   can filter without a migration.
+3. The existing honesty rules travel with it — a corridor is a broad gesture,
+   never a surveyed road, and an uncertain route stays uncertain at every zoom.
+   **The combined map must not become a confident atlas by accumulation.**
+
+No build proposed now. Recorded so the option stays open at zero cost.
