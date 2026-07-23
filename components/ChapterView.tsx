@@ -111,12 +111,11 @@ export function ChapterView({
         <InsightCards data={data} types={["original_language"]} />
 
         {/* 13/14/15 — Theology Principle · Live It · Prayer: open, full
-            width. Discipleship (deferred section) keeps its slot before
-            Prayer; any unrecognized authored card still renders after these
-            rather than silently disappearing. */}
+            width. Discipleship stays HIDDEN (owner deferral IQ-019,
+            re-confirmed on the 2026-07-23 phone pass) — its authored data
+            remains stored, nothing renders until the owner un-defers. */}
         <InsightCards data={data} types={["theology"]} alwaysOpen />
         <InsightCards data={data} types={["application"]} alwaysOpen />
-        <InsightCards data={data} types={["discipleship"]} />
         <InsightCards data={data} types={["prayer"]} alwaysOpen />
         <InsightCards
           data={data}
