@@ -123,8 +123,9 @@ export function ChapterView({
             (owner ruling 2026-07-23: condensed is fine, consolidated is not).
             Chapter Flow and Original Language stand alone as normal
             collapsed-in-Quick cards. */}
+        {/* Chapter Flow now rides INSIDE Behind the Chapter (owner ruling
+            2026-07-23) — same conversation, same frame. */}
         <AuthorAudienceEvidence data={data} />
-        <InsightCards data={data} types={["chapter_flow"]} />
         <InsightCards data={data} types={["original_language"]} />
 
         {/* 12b — every remaining authored/custom teaching card (e.g. Mark 6's
@@ -159,6 +160,12 @@ export function ChapterView({
             does, it slots between Live It and Prayer. */}
         <InsightCards data={data} types={["theology"]} alwaysOpen />
         <InsightCards data={data} types={["application"]} alwaysOpen />
+        {/* Disciple It — LIVE (owner ruling 2026-07-23, deferral lifted).
+            Stacked full-width below Live It, before Prayer, in both modes.
+            Renders for any chapter that has the content; chapters generated
+            before discipleship joined the schema simply have nothing to
+            render here until their text is written. */}
+        <InsightCards data={data} types={["discipleship"]} alwaysOpen />
         <InsightCards data={data} types={["prayer"]} alwaysOpen />
 
         {/* Not teaching cards: the reader's questions and where to go next. */}

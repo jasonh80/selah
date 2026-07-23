@@ -44,11 +44,29 @@ export function AuthorAudienceEvidence({
     data.behindTheChapter && data.behindTheChapter.length > 0
       ? data.behindTheChapter
       : getChapterContext(data.slug) ?? [];
-  if (cards.length === 0) return null;
+  // Owner ruling 2026-07-23: Chapter Flow belongs INSIDE Behind the Chapter —
+  // how the chapter is built is part of the same "how did this come to us"
+  // conversation as author, audience, world, and evidence. It joins as a
+  // sibling card in the same stack rather than a separate section below.
+  const flow = data.insights?.find((i) => insightTypeOf(i) === "chapter_flow");
+  const allCards: AAECard[] = flow
+    ? [
+        ...cards,
+        {
+          category: "Chapter Flow",
+          title: flow.subtitle || flow.preview || flow.title,
+          body:
+            flow.subtitle && distinctText(flow.preview, flow.body)
+              ? [flow.preview, flow.body].join("\n\n")
+              : flow.body || flow.preview,
+        },
+      ]
+    : cards;
+  if (allCards.length === 0) return null;
 
   const cardStack = (
     <div className="space-y-2.5">
-      {cards.map((c, i) => (
+      {allCards.map((c, i) => (
         <Card key={i} card={enrich(c)} />
       ))}
     </div>

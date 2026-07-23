@@ -115,9 +115,17 @@ function InsightCard({
       title={insight.title}
       subtitle={insight.subtitle}
       tone={insight.jesus ? "jesus" : "default"}
+      // Owner ruling 2026-07-23: Jesus at the Center centers its title with
+      // its one-line lead centered underneath. Every other section keeps the
+      // left-aligned header — this is the one place the eye should settle.
+      centerHeader={insight.jesus}
     >
       {lead && (
-        <p className={`mb-1.5 text-[13px] font-medium leading-relaxed ${insight.jesus ? "text-jesus-red" : "text-primary"}`}>
+        <p
+          className={`mb-1.5 text-[13px] font-medium leading-relaxed ${
+            insight.jesus ? "text-center text-jesus-red" : "text-primary"
+          }`}
+        >
           {lead}
         </p>
       )}

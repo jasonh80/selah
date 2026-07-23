@@ -28,6 +28,7 @@ export function SectionCard({
   subtitle,
   tone = "default",
   bleed = false,
+  centerHeader = false,
   headerRight,
   children,
 }: {
@@ -39,11 +40,40 @@ export function SectionCard({
   tone?: "default" | "jesus";
   /** Content runs edge-to-edge under the header (maps, media). */
   bleed?: boolean;
+  /** Centered title + subtitle (owner ruling 2026-07-23, Jesus at the Center
+   * only — every other section keeps the left-aligned header). */
+  centerHeader?: boolean;
   /** Small controls that belong on the header row (map chips). */
   headerRight?: ReactNode;
   children: ReactNode;
 }) {
   const jesus = tone === "jesus";
+  if (centerHeader) {
+    return (
+      <section
+        id={id}
+        className={`scroll-mt-20 overflow-hidden rounded-md border bg-card shadow-hair ${
+          jesus ? "ring-1 ring-[rgba(178,58,58,0.18)]" : ""
+        }`}
+      >
+        <div className={`px-3.5 pt-3 text-center ${bleed ? "pb-2.5" : "pb-0"}`}>
+          <p className="flex items-center justify-center gap-2">
+            {jesus && (
+              <span
+                aria-hidden
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-jesus-red-soft text-sm text-jesus-red"
+              >
+                {icon}
+              </span>
+            )}
+            <span className={`text-card-title ${jesus ? "text-jesus-red" : "text-primary"}`}>{title}</span>
+          </p>
+          {subtitle && <p className="mt-0.5 text-[12.5px] leading-snug text-secondary">{subtitle}</p>}
+        </div>
+        <div className={bleed ? "" : "px-3.5 pb-3.5 pt-2"}>{children}</div>
+      </section>
+    );
+  }
   return (
     <section
       id={id}
