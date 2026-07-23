@@ -14,7 +14,7 @@ export function MostPeopleMissSection({ data }: { data: ChapterWorkup }) {
       className="scroll-mt-20 rounded-md border bg-card p-s4 shadow-hair"
       style={{ borderLeft: "3px solid var(--accent-strong)" }}
     >
-      <p className="text-eyebrow">🔍 What Most People Miss</p>
+      <p className="text-eyebrow">🔍 What's Easy to Miss</p>
       {content.intro && (
         <p className="mt-s2 text-[14px] font-medium leading-relaxed text-primary">{content.intro}</p>
       )}

@@ -511,7 +511,10 @@ export const GEO_CHAPTER_MAPS: Record<string, GeoChapterMap> = {
 };
 
 export function getGeoChapterMap(slug: string): GeoChapterMap | null {
-  return GEO_CHAPTER_MAPS[slug] ?? null;
+  // Revision previews must render faithfully: the fixture slug
+  // "<slug>-revision-preview" reads its base chapter's map (read-only lookup).
+  const base = slug.replace(/-revision-preview$/u, "");
+  return GEO_CHAPTER_MAPS[base] ?? null;
 }
 
 /**

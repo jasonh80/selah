@@ -342,5 +342,7 @@ export const CHAPTER_MAPS: Record<string, ChapterMapConfig> = {
 };
 
 export function getChapterMap(slug: string): ChapterMapConfig | null {
-  return CHAPTER_MAPS[slug] ?? null;
+  // Same faithfulness rule as getGeoChapterMap: preview slugs read their base.
+  const base = slug.replace(/-revision-preview$/u, "");
+  return CHAPTER_MAPS[base] ?? null;
 }

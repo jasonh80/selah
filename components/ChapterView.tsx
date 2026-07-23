@@ -13,7 +13,7 @@ import { getChapterContext } from "@/lib/content/chapter-content";
 import { ChapterTopControls } from "@/components/chapter/ChapterTopControls";
 import { CompactPreviewRow } from "@/components/chapter/CompactPreviewRow";
 import { MostPeopleMissSection } from "@/components/chapter/MostPeopleMissSection";
-import { BehindTheChapterSection } from "@/components/chapter/BehindTheChapterSection";
+import { AuthorAudienceEvidence } from "@/components/chapter/AuthorAudienceEvidence";
 import { WhatPeopleAskSection } from "@/components/chapter/WhatPeopleAskSection";
 import { EsvAttribution } from "@/components/chapter/EsvAttribution";
 
@@ -102,9 +102,13 @@ export function ChapterView({
         {/* 11 — Third image bank */}
         <VisualChapterPath data={data} bank="third" />
 
-        {/* 12 — Behind the Chapter: collapsed reference material (author,
-            audience, historical world, evidence, original language, flow) */}
-        <BehindTheChapterSection data={data} />
+        {/* 12 — Behind the Chapter and its companions: SEPARATE sections
+            (owner ruling 2026-07-23: condensed is fine, consolidated is not).
+            Chapter Flow and Original Language stand alone as normal
+            collapsed-in-Quick cards. */}
+        <AuthorAudienceEvidence data={data} />
+        <InsightCards data={data} types={["chapter_flow"]} />
+        <InsightCards data={data} types={["original_language"]} />
 
         {/* 13/14/15 — Theology Principle · Live It · Prayer: open, full
             width. Discipleship (deferred section) keeps its slot before
