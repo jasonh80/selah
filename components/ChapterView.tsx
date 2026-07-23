@@ -83,16 +83,16 @@ export function ChapterView({
         {/* 2 — First image bank: the hero with its caption + checks */}
         <HeroImage data={data} />
 
-        {/* 3 — Big Idea: open, full width, no More/Less */}
-        <InsightCards data={data} types={["big_idea"]} alwaysOpen />
-
-        {/* 4 — Where It Fits in the Story: the large timeline owns the
-            date/place facts (chips absorbed into its context line) */}
-        <TimelineSection data={data} />
-
-        {/* 5 — Quick Summary: what happens (Big Idea interprets; this
-            explains — two different jobs, no repetition) */}
+        {/* 3 — Quick Summary FIRST and always full size (owner ruling
+            2026-07-23): what happens comes before what it means. */}
         <QuickSummaryCard data={data} />
+
+        {/* 4 — Big Idea: the interpretation, now expandable like the rest */}
+        <InsightCards data={data} types={["big_idea"]} />
+
+        {/* 5 — The Big Story: the large timeline owns the date/place facts
+            (chips absorbed into its context line) */}
+        <TimelineSection data={data} />
 
         {/* 6 — Jesus at the Center, with the former red chip merged in */}
         <InsightCards data={data} types={["jesus_connection"]} alwaysOpen leadLine={jesusLead} />
@@ -106,7 +106,11 @@ export function ChapterView({
         {/* 8 — Second image bank */}
         <VisualChapterPath data={data} bank="second" />
 
-        {/* 9 — ONE map block: the map, its key, and its notes live in a
+        {/* 9 — What's Easy to Miss sits right after the scene it comments on
+            (owner ruling 2026-07-23: between the picture and the map). */}
+        <MostPeopleMissSection data={data} />
+
+        {/* 10 — ONE map block: the map, its key, and its notes live in a
             single frame (owner ruling 2026-07-23 — notes attach under the
             key as a Dive deeper, never a separate floating card). */}
         {getGeoChapterMap(data.slug) ? (
@@ -114,9 +118,6 @@ export function ChapterView({
         ) : (
           <MapsSection data={data} notes={mapNotes} />
         )}
-
-        {/* 10 — What's Easy to Miss (label itself renames in the words PR) */}
-        <MostPeopleMissSection data={data} />
 
         {/* 11 — Third image bank */}
         <VisualChapterPath data={data} bank="third" />
