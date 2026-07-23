@@ -82,3 +82,17 @@ docs/chatgpt-project-prompt.md). Local audition wall: /auditions in this
 repo's dev app. Automation path: near-term, Codex may batch-run prompts
 ChatGPT-side (asked on board #29); long-term, API-driven candidate
 generation lands in Studio behind the IQ-026 spec with exact prices.
+
+## Ruling: natural hair variety (owner, 2026-07-23)
+
+Ancient people had normal human variety — Scripture itself discusses bald
+and receding men (Leviticus 13:40–41). Never treat the stock "every biblical
+man has thick shoulder-length hair" image as fact.
+
+- MIND (knowledge): baldness/thinning/receding existed and is biblically
+  acknowledged; the uniform-hair convention is iconography, not history.
+- EYES (casting): cast believable variety — bald, thinning, receding, curly,
+  short, gray — across ages, builds, complexions, and grooming, while
+  maintaining each character's continuity once cast.
+- GUARDRAIL: use variety naturally, but never claim a SPECIFIC person was
+  bald (or anything else) unless Scripture or reliable evidence supports it.
