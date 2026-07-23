@@ -5,6 +5,7 @@ import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
 import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
 import { InsightCards } from "@/components/chapter/InsightCardGrid";
+import { insightTypeOf } from "@/lib/content/chapter-content";
 import { ChaptersSection } from "@/components/chapter/ChaptersSection";
 import { MapsSection } from "@/components/chapter/MapsSection";
 import { GeoMapSection } from "@/components/chapter/GeoMapSection";
@@ -44,6 +45,11 @@ export function ChapterView({
   // The former red Jesus/theme chip merges INTO Jesus at the Center — one
   // entry point for the idea (UI-cleanup brief, board #29 2026-07-21).
   const jesusLead = jesusChipLine(data);
+  // Map Notes ride INSIDE the map block; they must not also render as a card.
+  const mapNotesInsight = (data.insights ?? []).find((i) => insightTypeOf(i) === "map_notes");
+  const mapNotes = mapNotesInsight
+    ? { title: mapNotesInsight.title, body: mapNotesInsight.body || mapNotesInsight.preview }
+    : undefined;
   return (
     <div className="mx-auto w-full max-w-[480px] px-4 md:max-w-[720px] lg:px-6">
       <main className="min-w-0 space-y-s6 pb-s12 pt-s2 lg:pt-s4">
@@ -90,11 +96,14 @@ export function ChapterView({
         {/* 8 — Second image bank */}
         <VisualChapterPath data={data} bank="second" />
 
-        {/* 9 — Map block: map and its reader-facing notes together */}
-        <div className="space-y-s3">
-          {getGeoChapterMap(data.slug) ? <GeoMapSection data={data} /> : <MapsSection data={data} />}
-          <InsightCards data={data} types={["map_notes"]} />
-        </div>
+        {/* 9 — ONE map block: the map, its key, and its notes live in a
+            single frame (owner ruling 2026-07-23 — notes attach under the
+            key as a Dive deeper, never a separate floating card). */}
+        {getGeoChapterMap(data.slug) ? (
+          <GeoMapSection data={data} notes={mapNotes} />
+        ) : (
+          <MapsSection data={data} notes={mapNotes} />
+        )}
 
         {/* 10 — What's Easy to Miss (label itself renames in the words PR) */}
         <MostPeopleMissSection data={data} />

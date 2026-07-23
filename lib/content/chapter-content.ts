@@ -53,8 +53,17 @@ export const CHAPTER_CONTEXT: Record<string, ContextCard[]> = {
   ],
 };
 
+/** Revision-preview slugs ("<slug>-revision-preview") are the SAME chapter
+ * for every read-only content lookup — otherwise a preview loses its scene
+ * checks, image titles, and hero override, and every unbound check piles onto
+ * the hero (the owner's "three things about other images" bug, 2026-07-23).
+ * One helper so no future getter forgets. */
+export function contentSlug(slug: string): string {
+  return slug.replace(/-revision-preview$/u, "");
+}
+
 export function getChapterContext(slug: string): ContextCard[] | null {
-  return CHAPTER_CONTEXT[slug] ?? null;
+  return CHAPTER_CONTEXT[contentSlug(slug)] ?? null;
 }
 
 // ---- Targeted metaChip copy overrides --------------------------------------
@@ -69,7 +78,7 @@ export const CHAPTER_CHIP_OVERRIDES: Record<string, Record<number, string>> = {
 };
 
 export function getChipOverride(slug: string, index: number): string | null {
-  return CHAPTER_CHIP_OVERRIDES[slug]?.[index] ?? null;
+  return CHAPTER_CHIP_OVERRIDES[contentSlug(slug)]?.[index] ?? null;
 }
 
 // Confident main-view timeline note. Deeper authorship/manuscript nuance lives
@@ -80,7 +89,7 @@ export const CHAPTER_TIMELINE_NOTE: Record<string, string> = {
 };
 
 export function getTimelineNote(slug: string): string | null {
-  return CHAPTER_TIMELINE_NOTE[slug] ?? null;
+  return CHAPTER_TIMELINE_NOTE[contentSlug(slug)] ?? null;
 }
 
 // ---- Scene (image) titles --------------------------------------------------
@@ -104,7 +113,7 @@ export const CHAPTER_IMAGE_TITLES: Record<string, Record<string, string>> = {
 };
 
 export function getImageTitle(slug: string, kind: string, fallback: string): string {
-  return CHAPTER_IMAGE_TITLES[slug]?.[kind] ?? fallback;
+  return CHAPTER_IMAGE_TITLES[contentSlug(slug)]?.[kind] ?? fallback;
 }
 
 // ---- Hero overrides (render-level) ------------------------------------------
@@ -116,7 +125,7 @@ export const CHAPTER_HERO_OVERRIDES: Record<string, string> = {
 };
 
 export function getHeroKindOverride(slug: string): string | null {
-  return CHAPTER_HERO_OVERRIDES[slug] ?? null;
+  return CHAPTER_HERO_OVERRIDES[contentSlug(slug)] ?? null;
 }
 
 // ---- Scene Check ↔ image hints (render-level) -------------------------------
@@ -180,7 +189,7 @@ export const CHAPTER_SCENE_CHECK_IMAGE_HINTS: Record<string, Record<string, stri
 };
 
 export function getSceneCheckImageKind(slug: string, checkTitle: string): string | null {
-  const hints = CHAPTER_SCENE_CHECK_IMAGE_HINTS[slug];
+  const hints = CHAPTER_SCENE_CHECK_IMAGE_HINTS[contentSlug(slug)];
   if (!hints) return null;
   const title = checkTitle.toLowerCase();
   for (const [hint, kind] of Object.entries(hints)) {
@@ -575,5 +584,5 @@ export const CHAPTER_SCENE_CHECKS: Record<string, SceneCheck[]> = {
 };
 
 export function getSceneChecks(slug: string): SceneCheck[] | null {
-  return CHAPTER_SCENE_CHECKS[slug] ?? null;
+  return CHAPTER_SCENE_CHECKS[contentSlug(slug)] ?? null;
 }

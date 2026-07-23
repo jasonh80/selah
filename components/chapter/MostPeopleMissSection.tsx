@@ -11,8 +11,10 @@ export function MostPeopleMissSection({ data }: { data: ChapterWorkup }) {
   return (
     <section
       id="most-people-miss"
-      className="scroll-mt-20 rounded-md border bg-card p-s4 shadow-hair"
-      style={{ borderLeft: "3px solid var(--accent-strong)" }}
+      // BOX SYSTEM (owner asked for the rhyme, 2026-07-23): a plain outlined
+      // card = a teaching section; the purple left bar means "deeper layer
+      // you opened"; the red ring means Jesus. This is a section.
+      className="scroll-mt-20 rounded-md border bg-card p-3.5 shadow-hair"
     >
       <p className="text-eyebrow">🔍 What's Easy to Miss</p>
       {content.intro && (

@@ -84,9 +84,38 @@ function themeColors(): { event: string; context: string } {
   return { event: accent, context: "#8b98a7" };
 }
 
+/** Owner ruling 2026-07-23: markers must differ by SHAPE and HUE, not shade —
+ * a reader should know instantly which marker is which without decoding the
+ * legend. Where-it-happened = solid teardrop pin (accent); nearby landmark =
+ * hollow ring (slate); debated area = amber dashed; travel = purple band. */
+const AREA_FILL = "rgba(245,171,74,.18)";
+const AREA_LINE = "#f5ab4a";
+
 /** Draw one pin bitmap on a canvas in the given color (device-pixel scaled).
  * Native map images are terrain-aware through the symbol layer, unlike HTML
  * markers, so pins stay glued to their coordinates in every camera state. */
+function ringImage(color: string): { data: ImageData; pixelRatio: number } {
+  const ratio = Math.min(3, Math.ceil(window.devicePixelRatio || 1));
+  const size = 26 * ratio;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(ratio, ratio);
+  ctx.beginPath();
+  ctx.arc(13, 13, 8, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(18,20,28,.55)";
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(13, 13, 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  return { data: ctx.getImageData(0, 0, size, size), pixelRatio: ratio };
+}
+
 function pinImage(color: string): { data: ImageData; pixelRatio: number } {
   const ratio = Math.min(3, Math.ceil(window.devicePixelRatio || 1));
   const w = 30 * ratio;
@@ -120,7 +149,7 @@ function pinImage(color: string): { data: ImageData; pixelRatio: number } {
 function addOverlays(map: maplibregl.Map, cfg: GeoChapterMap): void {
   const colors = themeColors();
   const eventPin = pinImage(colors.event);
-  const contextPin = pinImage(colors.context);
+  const contextPin = ringImage("#cfd8e3");
   map.addImage("selah-pin-event", eventPin.data, { pixelRatio: eventPin.pixelRatio });
   map.addImage("selah-pin-context", contextPin.data, { pixelRatio: contextPin.pixelRatio });
 
@@ -133,8 +162,8 @@ function addOverlays(map: maplibregl.Map, cfg: GeoChapterMap): void {
     })),
   };
   map.addSource("areas", { type: "geojson", data: areas });
-  map.addLayer({ id: "areas-fill", type: "fill", source: "areas", paint: { "fill-color": "#78c8ff", "fill-opacity": 0.16 } });
-  map.addLayer({ id: "areas-line", type: "line", source: "areas", paint: { "line-color": "#b4e1ff", "line-width": 2, "line-dasharray": [2, 1.6] } });
+  map.addLayer({ id: "areas-fill", type: "fill", source: "areas", paint: { "fill-color": AREA_FILL, "fill-opacity": 1 } });
+  map.addLayer({ id: "areas-line", type: "line", source: "areas", paint: { "line-color": AREA_LINE, "line-width": 2, "line-dasharray": [2, 1.6] } });
 
   const corridors = {
     type: "FeatureCollection" as const,
@@ -167,7 +196,7 @@ function addOverlays(map: maplibregl.Map, cfg: GeoChapterMap): void {
     source: "pins",
     layout: {
       "icon-image": ["get", "icon"],
-      "icon-anchor": "bottom",
+      "icon-anchor": ["match", ["get", "icon"], "selah-pin-context", "center", "bottom"],
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
     },
@@ -184,7 +213,17 @@ function sceneBounds(cfg: GeoChapterMap): maplibregl.LngLatBounds {
   return bounds;
 }
 
-export function GeoMapSection({ data }: { data: ChapterWorkup }) {
+export function GeoMapSection({
+  data,
+  notes,
+}: {
+  data: ChapterWorkup;
+  /** The chapter's Map Notes — rendered INSIDE this block under the key as a
+   * "Dive deeper" disclosure (owner ruling 2026-07-23), never as a separate
+   * card floating below the map. */
+  notes?: { title: string; body: string };
+}) {
+  const [notesOpen, setNotesOpen] = useState(false);
   const cfg = getGeoChapterMap(data.slug);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<maplibregl.Map | null>(null);
@@ -304,7 +343,7 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
   // "3-D" instead of "3-D terrain" — the owner's own trim so Reset view keeps
   // its spot on one row on phones.
   const chip = (on: boolean) =>
-    `inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-[13px] font-medium ${on ? "text-primary" : "text-secondary"}`;
+    `inline-flex items-center gap-1 whitespace-nowrap rounded-full border bg-card px-2.5 py-1 text-[12px] font-medium ${on ? "text-primary" : "text-secondary"}`;
   const activeTour = tourIdx !== null ? cfg.tour[tourIdx] : null;
   const resetView = () => {
     setTourIdx(null);
@@ -315,9 +354,11 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
 
   return (
     <section id="maps" className="scroll-mt-20">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-section text-primary">Maps &amp; Places</h2>
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Title and every control on ONE row (owner: Reset view must not
+          orphan onto its own line) — chips shrink before they wrap. */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <h2 className="text-section mr-auto text-primary">Maps &amp; Places</h2>
+        <div className="flex items-center gap-1.5">
           <label className={`${chip(borders)} cursor-pointer select-none`}>
             <input
               type="checkbox"
@@ -325,7 +366,7 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
               onChange={(e) => setBorders(e.target.checked)}
               className="accent-[var(--accent-strong)]"
             />
-            Borders &amp; cities
+            Borders
           </label>
           <button className={chip(threeD)} aria-pressed={threeD} aria-label="3-D terrain" onClick={() => setThreeD((t) => !t)}>
             3-D
@@ -338,7 +379,7 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
             {tourIdx === null ? "▶ Journey" : "■ Stop"}
           </button>
           <button className={chip(false)} onClick={resetView}>
-            Reset view
+            Reset
           </button>
         </div>
       </div>
@@ -383,19 +424,29 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
             Every label string (including "· debated" style qualifiers) renders
             verbatim from the digest-bound config. */}
         {!failed && (cfg.pins.length > 0 || cfg.areas.length > 0 || cfg.corridors.length > 0) && (
-          <ul className="flex flex-wrap gap-x-4 gap-y-1.5 border-t px-4 py-2.5" style={{ borderColor: "var(--line)" }}>
+          <ul className="flex flex-wrap gap-x-3.5 gap-y-1 border-t px-3.5 py-2" style={{ borderColor: "var(--line)" }}>
             {cfg.pins.map((p) => (
               <li key={p.label} className="inline-flex items-center gap-1.5 text-[12px] text-secondary">
-                <svg width="11" height="15" viewBox="0 0 30 42" aria-hidden="true">
-                  <path
-                    d="M15 1 C7.3 1 1.5 7 1.5 14.4 C1.5 24 15 38 15 38 C15 38 28.5 24 28.5 14.4 C28.5 7 22.7 1 15 1 Z"
-                    fill={p.context === true ? "#8b98a7" : "var(--accent-strong)"}
-                    stroke="rgba(255,255,255,.6)"
-                    strokeWidth="2"
-                  />
-                  <circle cx="15" cy="13.6" r="5.5" fill="#fff" />
-                </svg>
-                <span className={p.context === true ? "" : "font-medium text-primary"}>{p.label}</span>
+                {p.context === true ? (
+                  <svg width="13" height="13" viewBox="0 0 26 26" aria-hidden="true">
+                    <circle cx="13" cy="13" r="8" fill="none" stroke="#cfd8e3" strokeWidth="3" />
+                    <circle cx="13" cy="13" r="2.2" fill="#cfd8e3" />
+                  </svg>
+                ) : (
+                  <svg width="11" height="15" viewBox="0 0 30 42" aria-hidden="true">
+                    <path
+                      d="M15 1 C7.3 1 1.5 7 1.5 14.4 C1.5 24 15 38 15 38 C15 38 28.5 24 28.5 14.4 C28.5 7 22.7 1 15 1 Z"
+                      fill="var(--accent-strong)"
+                      stroke="rgba(255,255,255,.6)"
+                      strokeWidth="2"
+                    />
+                    <circle cx="15" cy="13.6" r="5.5" fill="#fff" />
+                  </svg>
+                )}
+                <span className={p.context === true ? "" : "font-medium text-primary"}>
+                  {p.label}
+                  {p.context === true ? "" : " · where it happened"}
+                </span>
               </li>
             ))}
             {cfg.areas.map((a) => (
@@ -403,9 +454,9 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
                 <span
                   aria-hidden="true"
                   className="inline-block h-3 w-3 rounded-[3px]"
-                  style={{ background: "rgba(120,200,255,.16)", border: "1.5px dashed #b4e1ff" }}
+                  style={{ background: AREA_FILL, border: `1.5px dashed ${AREA_LINE}` }}
                 />
-                {a.label}
+                {a.label} · area, not a spot
               </li>
             ))}
             {cfg.corridors.map((c) => (
@@ -415,15 +466,35 @@ export function GeoMapSection({ data }: { data: ChapterWorkup }) {
                   className="inline-block h-[5px] w-4 rounded-full"
                   style={{ background: "linear-gradient(90deg, rgba(28,26,36,.55), rgba(167,139,250,.85))" }}
                 />
-                {c.label}
+                {c.label} · the way they traveled
               </li>
             ))}
           </ul>
         )}
 
-        <div className="p-4">
-          <p className="text-[12px] leading-relaxed text-secondary">{cfg.caption}</p>
+        <div className="border-t px-3.5 py-2" style={{ borderColor: "var(--line)" }}>
+          <p className="text-[12px] leading-snug text-secondary">{cfg.caption}</p>
         </div>
+        {notes && (
+          <>
+            <button
+              type="button"
+              onClick={() => setNotesOpen((v) => !v)}
+              aria-expanded={notesOpen}
+              className="flex w-full items-center border-t px-3.5 py-2 text-left text-[12px] font-medium text-accent-strong"
+              style={{ borderColor: "var(--line)" }}
+            >
+              Dive deeper
+              <span aria-hidden className="ml-auto text-[11px]">{notesOpen ? "⌃" : "⌄"}</span>
+            </button>
+            {notesOpen && (
+              <div className="border-t bg-tint px-3.5 py-2.5" style={{ borderColor: "var(--line)", borderLeft: "3px solid var(--accent-strong)" }}>
+                <p className="text-[12.5px] font-semibold leading-snug text-primary">{notes.title}</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-secondary">{notes.body}</p>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </section>
   );
