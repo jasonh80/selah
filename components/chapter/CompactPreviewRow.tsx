@@ -5,7 +5,7 @@ import type { ChapterWorkup } from "@/lib/types";
 // People · Maps & Places as one-line cards. Only previews with real content
 // render, and the People value clamps to one line.
 export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
-  const previews: { icon: string; label: string; value: string; href?: string }[] = [];
+  const previews: { label: string; value: string; href?: string }[] = [];
 
   const people = data.characters?.length
     ? data.characters
@@ -15,7 +15,6 @@ export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
     // dashboard grid / Key Person card were retired, so this is an INFO card,
     // not a link — a dead anchor scrolled nowhere on every chapter.
     previews.push({
-      icon: "👥",
       label: `People in ${data.reference}`,
       value: people
         .slice(0, 3)
@@ -43,18 +42,12 @@ export function CompactPreviewRow({ data }: { data: ChapterWorkup }) {
       {previews.map((preview) =>
         preview.href ? (
           <a key={preview.label} href={preview.href} className={`${cardClass} hover:border-accent/40`}>
-            <span className="flex items-center gap-1.5 whitespace-nowrap text-eyebrow">
-              <span aria-hidden>{preview.icon}</span>
-              {preview.label}
-            </span>
+            <span className="whitespace-nowrap text-eyebrow">{preview.label}</span>
             <span className="truncate text-[12px] leading-snug text-secondary">{preview.value}</span>
           </a>
         ) : (
           <div key={preview.label} className={cardClass}>
-            <span className="flex items-center gap-1.5 whitespace-nowrap text-eyebrow">
-              <span aria-hidden>{preview.icon}</span>
-              {preview.label}
-            </span>
+            <span className="whitespace-nowrap text-eyebrow">{preview.label}</span>
             <span className="truncate text-[12px] leading-snug text-secondary">{preview.value}</span>
           </div>
         ),

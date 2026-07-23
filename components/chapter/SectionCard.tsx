@@ -52,14 +52,18 @@ export function SectionCard({
       }`}
     >
       <div className={`flex items-start gap-2 px-3.5 pt-3 ${bleed ? "pb-2.5" : "pb-0"}`}>
-        <span
-          aria-hidden
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm ${
-            jesus ? "bg-jesus-red-soft text-jesus-red" : "bg-tint text-accent-strong"
-          }`}
-        >
-          {icon}
-        </span>
+        {/* Icons earn their place only where they carry meaning words cannot
+            (timeline anchors, map markers, and the one red cross on Jesus at
+            the Center). Section headers are typography — quiet and
+            consistent. */}
+        {jesus && (
+          <span
+            aria-hidden
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-jesus-red-soft text-sm text-jesus-red"
+          >
+            {icon}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <p className={`text-card-title pt-0.5 ${jesus ? "text-jesus-red" : "text-primary"}`}>{title}</p>
           {subtitle && <p className="mt-0.5 text-[12.5px] leading-snug text-secondary">{subtitle}</p>}

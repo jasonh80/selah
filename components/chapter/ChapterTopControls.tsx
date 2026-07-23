@@ -29,7 +29,7 @@ export function ChapterTopControls({
   const esv = useEsvText(data.reference, version === "ESV");
 
   const base =
-    "flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium transition sm:px-4";
+    "flex h-9 min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[12.5px] font-medium transition sm:px-3.5 sm:text-[13px]";
 
 
   // The preview labels ONLY what it is actually showing: real ESV words get
@@ -51,25 +51,32 @@ export function ChapterTopControls({
         {publishedSlugs && publishedSlugs.length > 0 ? (
           <TitleNav slug={data.slug} title={data.title} publishedSlugs={publishedSlugs} />
         ) : (
-          <p className="text-[15px] font-semibold text-secondary">{data.title}</p>
+          <h1 className="text-title text-primary lg:text-[48px]">{data.title}</h1>
         )}
-        <h1 className="text-title mt-1 text-primary lg:text-[44px]">{data.subtitle}</h1>
+        {/* The chapter's own title sits directly under its name and ABOVE the
+            controls — being buried beneath the buttons is what made it read
+            "tucked in". It stays clearly subordinate to the chapter name. */}
+        <p className="text-subtitle mt-1 text-primary">{data.subtitle}</p>
         <div className="mt-s3 flex flex-col gap-s3 md:flex-row md:flex-wrap md:items-center md:justify-between">
           {/* flex-wrap (IQ-003): with the mode toggle back, the control row
               can exceed a true 320px content viewport again — it MUST keep
               wrapping to a second line instead of overflowing. Typography and
               pill sizes unchanged. */}
-          <div className="flex flex-wrap items-center gap-s2">
-            <button
-              onClick={() => setScriptureOpen((open) => !open)}
-              aria-expanded={scriptureOpen}
-              className={`${base} border bg-card text-primary hover:border-accent/40`}
-            >
-              {scriptureOpen ? `Hide ${data.reference}` : `Read ${data.reference}`}
-              <span aria-hidden className={`text-secondary transition-transform ${scriptureOpen ? "rotate-180" : ""}`}>
-                ⌄
-              </span>
-            </button>
+          <div className="flex items-center justify-center gap-1.5">
+            {/* The Scripture pane below carries "Read" itself (owner ruling
+                2026-07-23 — the button and the pane were saying the same
+                thing). This control only appears when there is NO pane to
+                carry it, so the chapter text is never unreachable. */}
+            {!previewText && !scriptureOpen && (
+              <button
+                onClick={() => setScriptureOpen(true)}
+                aria-expanded={false}
+                className={`${base} border bg-card text-primary hover:border-accent/40`}
+              >
+                {`Read ${data.reference}`}
+                <span aria-hidden className="text-secondary">⌄</span>
+              </button>
+            )}
             <ReadingModeToggle />
           </div>
         </div>
@@ -77,6 +84,19 @@ export function ChapterTopControls({
 
       {scriptureOpen ? (
         <div className="rounded-lg border bg-card-soft/40 p-s3">
+          <button
+            onClick={() => setScriptureOpen(false)}
+            aria-expanded
+            className="mb-2 flex w-full items-center text-left"
+          >
+            <span className="text-eyebrow">
+              {data.reference}
+              {showingEsv ? " · ESV" : ""}
+            </span>
+            <span className="ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-accent-strong px-3 py-1 text-[12.5px] font-semibold text-white shadow-hair">
+              Hide <span aria-hidden>⌃</span>
+            </span>
+          </button>
           <ScriptureReader data={data} esv={version === "ESV" ? esv : undefined} embedded />
         </div>
       ) : (
@@ -86,9 +106,16 @@ export function ChapterTopControls({
               onClick={() => setScriptureOpen(true)}
               className="block w-full p-s3 text-left"
             >
-              <span className="text-eyebrow">
-                {data.reference}
-                {showingEsv ? " · ESV" : ""}
+              {/* The pill IS the label now (owner ruling 2026-07-23 — the
+                  reference was printed twice side by side). Only the ESV
+                  attribution stays, as Crossway's terms require it with the
+                  quotation. */}
+              <span className="flex items-center justify-center gap-2">
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-accent-strong px-3 py-1 text-[12.5px] font-semibold text-white shadow-hair">
+                  Read {data.reference}
+                  <span aria-hidden>⌄</span>
+                </span>
+                {showingEsv && <span className="text-eyebrow">ESV</span>}
               </span>
               <p className="mt-1 line-clamp-2 text-scripture text-secondary">{previewText}</p>
             </button>
