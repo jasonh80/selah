@@ -145,3 +145,78 @@ rules (owner-gated tap) so generation carries them automatically.
    block and/or seeded Selah Mind visuals rules — owner-gated as always).
 3. Until then, redo notes and new-chapter image prompts may quote this guide
    directly — it is owner-approved direction, not generated style.
+
+---
+
+## v1.2 — people & crowds (proven live 2026-07-23, owner-ruled)
+
+Everything below was tested with real generations before it was written down.
+See the Kelly repo's `docs/reference-lock-test.md` for the runs.
+
+### Reference-locking works — use it
+
+Attaching an approved portrait pins that specific individual, not just a type.
+Proven three ways: portrait → portrait (the reference carried the sun-bleached
+hair the prompt never mentioned), portrait → scene, and **two locked faces in
+one action scene with a crowd** (Jesus' striped mantle carried across too).
+Every recurring character in a scene gets their approved portrait attached.
+
+Not yet proven: intimate close-ups, where identity has drifted before. Treat
+close-ups as the one remaining risk and check them by eye.
+
+### Every scene prompt must describe its crowd
+
+Extras cannot carry reference photos. Left undescribed, the model renders **one
+man photocopied** across the whole background — verified. Crowd breadth has to
+be authored. It is prompt text and it is free.
+
+### But author it PROPORTIONALLY — not one of everything
+
+Owner ruling, 2026-07-23, after a first attempt over-corrected into what he
+called "diversity soup": *"we don't need an equal measure of everything. we
+need a proportionally accurate representation of what the population was."*
+
+A first-century Galilean crowd was demographically NARROW. Getting that wrong
+is an accuracy failure in the same way a wrong map pin is — the picture is
+making a claim about the world.
+
+- **Vary structure and age, not ethnicity.** Face shape, hairline, hair
+  texture and length, beard shape, grooming, bearing.
+- **Nearly all men bearded** — the period norm. Clean-shaven signals a Roman or
+  a Hellenized official and belongs only on one.
+- **Complexions in the natural Levantine range**, not an even spread across it.
+- **Young.** Most people did not get old. A group of eight is mostly twenties
+  and thirties with one clearly older, gray man — not one of each decade.
+- **Lean to sturdy from labor.** Real obesity was rare in a peasant population;
+  a heavyset extra is a period error, not variety.
+- **Vary the mix per scene.** The same six extras pasted into every chapter
+  just replaces one repeated man with one repeated crowd.
+
+Working paragraph (adapt per scene, do not paste verbatim everywhere):
+
+> The figures behind must read as different individuals, not variations of one
+> man — but as a believable first-century Galilean group, not an assortment.
+> Nearly all are bearded, as was the norm; complexions sit in the natural
+> Levantine range without an artificial spread. Most are in their twenties and
+> thirties, with one man clearly older and gray. Vary them by face shape,
+> hairline, hair texture and length, beard shape, and grooming rather than by
+> ethnicity. Builds are lean to sturdy from daily labor — no soft or heavy
+> bodies in a working population.
+
+### Named cast: eleven axes, no two sharing more than two
+
+The sameness in the current cast came from writing the same appearance
+sentence for five different men, not from a limit in the tool. Named characters
+get deliberate points on: hairline · hair texture · hair length · gray ·
+beard · face shape · complexion · apparent age · build and silhouette · one
+ordinary human marker · wardrobe arc. Full list and per-character assignments
+in the Kelly repo's `docs/cast-differentiators.md`.
+
+**Guardrail:** never hand the "flaw" axes only to the villains. If baldness,
+gray, and crooked noses land solely on Herod and Judas, variety has become a
+moral code.
+
+**Guardrail:** depict what a person actually did, including when it was
+indefensible — but never carry the moral verdict in the face, body, or
+complexion. Matthew collected taxes for Rome from his own people; draw the
+booth and the coin honestly, and draw the man straight.
