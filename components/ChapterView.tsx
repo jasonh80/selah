@@ -123,9 +123,13 @@ export function ChapterView({
             (owner ruling 2026-07-23: condensed is fine, consolidated is not).
             Chapter Flow and Original Language stand alone as normal
             collapsed-in-Quick cards. */}
-        {/* Chapter Flow now rides INSIDE Behind the Chapter (owner ruling
-            2026-07-23) — same conversation, same frame. */}
+        {/* Owner ruling 2026-07-23: NO wrapper section. Author, First
+            Audience, Historical World, and Evidence & Artifacts each stand as
+            their own block in the same frame as everything else — his rule is
+            that every block looks the same and only differs in whether it
+            expands. Chapter Flow and Original Language sit with them. */}
         <AuthorAudienceEvidence data={data} />
+        <InsightCards data={data} types={["chapter_flow"]} />
         <InsightCards data={data} types={["original_language"]} />
 
         {/* 12b — every remaining authored/custom teaching card (e.g. Mark 6's
