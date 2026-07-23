@@ -143,11 +143,17 @@ function addLabels(map: maplibregl.Map, view: MapView, markerNames: string[]): v
     const img = labelImage(l.name, l.kind);
     map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
   });
+  // Placement priority (symbol-sort-key: LOWER places first, so it wins the
+  // collision). Cities are what a reader looks for, so they rank above the
+  // big region names; water sits between. Without this, region labels (first
+  // in the list) claimed all the room at a zoomed-out scene view and every
+  // city was dropped.
+  const pri: Record<GeoLabelKind, number> = { city: 0, water: 1, river: 1, region: 2 };
   const data = {
     type: "FeatureCollection" as const,
     features: labels.map((l, i) => ({
       type: "Feature" as const,
-      properties: { icon: `selah-label-${i}`, minz: l.minzoom ?? 0, maxz: l.maxzoom ?? 22 },
+      properties: { icon: `selah-label-${i}`, minz: l.minzoom ?? 0, maxz: l.maxzoom ?? 22, pri: pri[l.kind] },
       geometry: { type: "Point" as const, coordinates: l.at },
     })),
   };
@@ -172,6 +178,7 @@ function addLabels(map: maplibregl.Map, view: MapView, markerNames: string[]): v
       "icon-allow-overlap": false,
       "icon-ignore-placement": false,
       "icon-anchor": "center",
+      "symbol-sort-key": ["get", "pri"],
     },
   });
   applyLabelZoom(map);

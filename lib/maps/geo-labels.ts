@@ -41,12 +41,28 @@ export const GEO_LABELS: GeoLabel[] = [
   { name: "Jordan River", at: [35.56, 32.25], kind: "river", minzoom: 7, maxzoom: 12 },
 
   // Regions — named in the Gospels, placed as names, never as territories.
-  { name: "GALILEE", at: [35.33, 32.88], kind: "region", maxzoom: 10 },
-  { name: "DECAPOLIS", at: [35.98, 32.52], kind: "region", maxzoom: 10 },
-  { name: "SAMARIA", at: [35.24, 32.24], kind: "region", maxzoom: 10 },
-  { name: "JUDEA", at: [35.08, 31.62], kind: "region", maxzoom: 10 },
-  { name: "PEREA", at: [35.72, 31.95], kind: "region", maxzoom: 10 },
-  { name: "PHOENICIA", at: [35.32, 33.3], kind: "region", maxzoom: 10 },
+  { name: "GALILEE", at: [35.33, 32.88], kind: "region", maxzoom: 9.5 },
+  { name: "DECAPOLIS", at: [35.98, 32.52], kind: "region", maxzoom: 9.5 },
+  { name: "SAMARIA", at: [35.24, 32.24], kind: "region", maxzoom: 9.5 },
+  { name: "JUDEA", at: [35.08, 31.62], kind: "region", maxzoom: 9.5 },
+  { name: "PEREA", at: [35.72, 31.95], kind: "region", maxzoom: 9.5 },
+  { name: "PHOENICIA", at: [35.32, 33.3], kind: "region", maxzoom: 9.5 },
+
+  // First-century cities — the towns of the Gospels, as context around the
+  // chapter's own numbered markers. Only securely located sites; each is a
+  // NAME AT A POINT, not a claim about extent. The label helper drops any
+  // whose name a chapter already uses as a numbered marker, so one place is
+  // never both a labelled city and a pin on the same map.
+  { name: "Nazareth", at: [35.3, 32.7], kind: "city" },
+  { name: "Capernaum", at: [35.575, 32.88], kind: "city" },
+  { name: "Tiberias", at: [35.53, 32.79], kind: "city" },
+  { name: "Sepphoris", at: [35.28, 32.75], kind: "city", minzoom: 8 },
+  { name: "Bethsaida", at: [35.63, 32.91], kind: "city" },
+  { name: "Caesarea Philippi", at: [35.69, 33.25], kind: "city" },
+  { name: "Tyre", at: [35.2, 33.27], kind: "city" },
+  { name: "Sidon", at: [35.37, 33.56], kind: "city", maxzoom: 12 },
+  { name: "Jerusalem", at: [35.23, 31.78], kind: "city" },
+  { name: "Jericho", at: [35.44, 31.87], kind: "city", minzoom: 8 },
 ];
 
 // MODERN view (owner ruling 2026-07-23: "still want to see those in there, or
