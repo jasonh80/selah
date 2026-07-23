@@ -181,6 +181,74 @@ function pinImage(color: string, num: number): { data: ImageData; pixelRatio: nu
   return { data: ctx.getImageData(0, 0, w, h), pixelRatio: ratio };
 }
 
+// ---- Legend glyphs: SVG twins of the canvas markers above ---------------
+// Owner ruling 2026-07-23: "make it the same down in the legend as it is on
+// the map." Each of these mirrors its canvas counterpart — same silhouette,
+// same colour source, same number inside — so the legend entry IS the marker
+// rather than a generic symbol with a number typed beside it.
+
+/** Twin of `pinImage` — the where-it-happened teardrop. */
+function NumberedPin({ n }: { n: number }) {
+  return (
+    <svg width="15" height="21" viewBox="0 0 30 42" aria-hidden="true" className="shrink-0">
+      <path
+        d="M15 1 C7.3 1 1.5 7 1.5 14.4 C1.5 24 15 38 15 38 C15 38 28.5 24 28.5 14.4 C28.5 7 22.7 1 15 1 Z"
+        fill="var(--accent-strong)"
+        stroke="rgba(255,255,255,.9)"
+        strokeWidth="1.4"
+      />
+      <circle cx="15" cy="13.6" r="6.4" fill="#fff" />
+      <text
+        x="15"
+        y="14"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize="11"
+        fontWeight="bold"
+        fill="var(--accent-strong)"
+      >
+        {n}
+      </text>
+    </svg>
+  );
+}
+
+/** Twin of `ringImage` — the nearby-landmark ring. */
+function NumberedRing({ n }: { n: number }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 28 28" aria-hidden="true" className="shrink-0">
+      <circle cx="14" cy="14" r="10" fill="rgba(16,18,26,.82)" stroke="#cfd8e3" strokeWidth="2.6" />
+      <text x="14" y="14.5" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#cfd8e3">
+        {n}
+      </text>
+    </svg>
+  );
+}
+
+/** Twin of `badgeImage(…, "square")` — the debated-area dashed badge. */
+function NumberedArea({ n }: { n: number }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 28 28" aria-hidden="true" className="shrink-0">
+      <rect x="3" y="6" width="22" height="16" rx="4" fill="rgba(16,18,26,.85)" stroke={AREA_LINE} strokeWidth="2.2" strokeDasharray="3 2" />
+      <text x="14" y="14.5" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill={AREA_LINE}>
+        {n}
+      </text>
+    </svg>
+  );
+}
+
+/** Twin of `badgeImage(…, "pill")` — the travel-corridor pill. */
+function NumberedCorridor({ n }: { n: number }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 28 28" aria-hidden="true" className="shrink-0">
+      <rect x="3" y="6" width="22" height="16" rx="11" fill="rgba(16,18,26,.85)" stroke="#a78bfa" strokeWidth="2.2" />
+      <text x="14" y="14.5" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#a78bfa">
+        {n}
+      </text>
+    </svg>
+  );
+}
+
 /** All overlay geometry as native layers — areas, corridors, and pins. No
  * HTML markers and no on-map text: names live in the legend below. */
 function addOverlays(map: maplibregl.Map, cfg: GeoChapterMap): void {
@@ -481,26 +549,18 @@ export function GeoMapSection({
             verbatim from the digest-bound config. */}
         {!failed && (cfg.pins.length > 0 || cfg.areas.length > 0 || cfg.corridors.length > 0) && (
           <ul className="flex flex-wrap gap-x-4 gap-y-1.5 border-t px-3.5 py-2.5" style={{ borderColor: "var(--line)" }}>
+            {/* Owner ruling 2026-07-23: the legend glyph must BE the map
+                marker — the same numbered pin, not a blank pin followed by a
+                separate "1.". One symbol, carrying its own number, in both
+                places, so the eye matches them without translating. */}
             {cfg.pins.map((p, i) => (
               <li key={p.label} className="inline-flex items-center gap-1.5 text-[13.5px] text-secondary">
                 {p.context === true ? (
-                  <svg width="13" height="13" viewBox="0 0 26 26" aria-hidden="true">
-                    <circle cx="13" cy="13" r="8" fill="none" stroke="#cfd8e3" strokeWidth="3" />
-                    <circle cx="13" cy="13" r="2.2" fill="#cfd8e3" />
-                  </svg>
+                  <NumberedRing n={i + 1} />
                 ) : (
-                  <svg width="11" height="15" viewBox="0 0 30 42" aria-hidden="true">
-                    <path
-                      d="M15 1 C7.3 1 1.5 7 1.5 14.4 C1.5 24 15 38 15 38 C15 38 28.5 24 28.5 14.4 C28.5 7 22.7 1 15 1 Z"
-                      fill="var(--accent-strong)"
-                      stroke="rgba(255,255,255,.6)"
-                      strokeWidth="2"
-                    />
-                    <circle cx="15" cy="13.6" r="5.5" fill="#fff" />
-                  </svg>
+                  <NumberedPin n={i + 1} />
                 )}
                 <span className={p.context === true ? "" : "font-medium text-primary"}>
-                  <span className="font-semibold text-primary">{i + 1}.</span>{" "}
                   {p.label}
                   {p.context === true ? " · nearby landmark" : " · where it happened"}
                 </span>
@@ -508,28 +568,14 @@ export function GeoMapSection({
             ))}
             {cfg.areas.map((a, i) => (
               <li key={a.label} className="inline-flex items-center gap-1.5 text-[13.5px] italic text-secondary">
-                <span
-                  aria-hidden="true"
-                  className="inline-block h-3 w-3 rounded-[3px]"
-                  style={{ background: AREA_FILL, border: `1.5px dashed ${AREA_LINE}` }}
-                />
-                <span>
-                  <span className="font-semibold text-primary">{cfg.pins.length + i + 1}.</span>{" "}
-                  {a.label} · area, not a spot
-                </span>
+                <NumberedArea n={cfg.pins.length + i + 1} />
+                <span>{a.label} · area, not a spot</span>
               </li>
             ))}
             {cfg.corridors.map((c, i) => (
               <li key={c.label} className="inline-flex items-center gap-1.5 text-[13.5px] italic text-secondary">
-                <span
-                  aria-hidden="true"
-                  className="inline-block h-[5px] w-4 rounded-full"
-                  style={{ background: "linear-gradient(90deg, rgba(28,26,36,.55), rgba(167,139,250,.85))" }}
-                />
-                <span>
-                  <span className="font-semibold text-primary">{cfg.pins.length + cfg.areas.length + i + 1}.</span>{" "}
-                  {c.label} · the way they traveled
-                </span>
+                <NumberedCorridor n={cfg.pins.length + cfg.areas.length + i + 1} />
+                <span>{c.label} · the way they traveled</span>
               </li>
             ))}
           </ul>
