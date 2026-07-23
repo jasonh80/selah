@@ -1,6 +1,16 @@
 # Selah Casting Board
 
-*Owner rulings (Jason + Kelly, in session, 2026-07-21).*
+*Owner rulings (Jason + Kelly, in session, 2026-07-21), corrected 2026-07-23
+per the Codex #105 honesty review.*
+
+## Provenance is mandatory
+
+Every claim in a character profile is labeled **SAYS** (Scripture states it),
+**SMART GUESS** (Selah's defensible inference — occupation, era, geography, or
+church tradition), or **UNKNOWN** (the text is silent; any depiction is
+*representative*, one plausible person and not the person). Accurate-sounding
+prose is not provenance. See `cast-profiles-digest.md` for the labels in use
+and what they retired.
 
 ## Ruling: the Twelve
 
@@ -11,20 +21,23 @@ portrait.
 
 ### Roster status
 
-| Disciple | Study profile | Notes |
-|---|---|---|
-| Peter | ✅ in library | corrected chronology 2026-07-21 |
-| John (son of Zebedee) | ✅ in library (john-apostle) | |
-| Judas Iscariot | ✅ in library | |
-| Andrew | ❌ to author | Peter's brother, fisherman |
-| James (son of Zebedee) | ❌ to author | John's brother, "sons of thunder," first martyred of the Twelve |
-| Matthew (Levi) | ❌ to author | tax collector, Capernaum |
-| Thomas | ❌ to author | |
-| Philip | ❌ to author | Bethsaida |
-| Bartholomew (Nathanael) | ❌ to author | |
-| James (son of Alphaeus) | ❌ to author | |
-| Thaddaeus (Judas son of James) | ❌ to author | |
-| Simon the Zealot | ❌ to author | |
+Status as of 2026-07-23 (corrected — the "to author" column contradicted the
+digest, which reported the 12-profile batch drafted and reviewed):
+
+| Disciple | Study profile | Portrait | Notes |
+|---|---|---|---|
+| Peter | ✅ drafted + reviewed | ✅ approved | corrected chronology 2026-07-21; NOT recast (Codex ruling 2026-07-23) |
+| John (son of Zebedee) | ✅ drafted + reviewed | ✅ approved | john-apostle |
+| Judas Iscariot | ✅ drafted + reviewed | ✅ approved | |
+| Andrew | ✅ drafted + reviewed | ✅ approved (keep face) | profile text correction owed: drop the injury/hardship bio |
+| James (son of Zebedee) | ✅ drafted + reviewed | ✅ approved | **LOCKED** (Codex cert, candidate A) |
+| Matthew (Levi) | ✅ drafted + reviewed | ✅ approved (keep face) | wardrobe simplified; Levi identification = smart guess |
+| Thomas | ✅ drafted + reviewed | ✅ approved (keep face) | occupation → UNKNOWN; fringes corrected |
+| Philip | ✅ drafted + reviewed | ✅ approved | **LOCKED** (candidate B) |
+| Bartholomew (Nathanael) | ✅ drafted + reviewed | ✅ approved | **LOCKED** (candidate C, inference transparency kept) |
+| James (son of Alphaeus) | ✅ drafted + reviewed | ✅ approved (keep face) | marked as smart guess throughout |
+| Thaddaeus (Judas son of James) | ✅ drafted + reviewed | ✅ approved (keep face) | marked as smart guess throughout |
+| Simon the Zealot | ✅ drafted + **corrected** | ⏳ re-audition staged | invented militant biography removed; neutral brief written, not yet run |
 
 (Matthias, Judas's replacement — decide later whether he joins the cast.)
 
@@ -32,23 +45,33 @@ portrait.
 
 | Figure | Status | Why Mark needs them |
 |---|---|---|
-| Herod Antipas | ❌ to author | Mark 6 (kills John the Baptist), Mark 8 ("leaven of Herod") |
-| Herodias | ❌ to author | engineer of John's death (Mark 6) |
-| Syrophoenician woman | ❌ to author | Mark 7 — anonymous; representative depiction |
+| Herod Antipas | ✅ drafted + reviewed · portrait approved | **LOCKED** (candidate B). Mark 6 (kills John the Baptist), Mark 8 ("leaven of Herod") |
+| Herodias | ✅ drafted + reviewed · portrait approved (keep face) | age corrected to ~46 for Mark 6; engineer of John's death (Mark 6) |
+| Syrophoenician woman | ✅ drafted + reviewed · portrait approved (keep face) | Mark 7 — unnamed; age is a placeholder, labeled a representative depiction |
 | Sadducees (group archetype) | ❌ to author | Mark 12 |
 | Scribes (group archetype) | partially (templeScribe exists) | throughout Mark |
 | Gentile crowds (archetype) | ❌ to author | Decapolis scenes |
 
 ## Sequence (what happens in what order)
 
-1. **Study profiles** (free, Kelly-reviewed): the 9 missing disciples + the
-   Mark gaps above. Each follows the aging rule (AGING-MODEL.md, v1.3 final)
-   and the era clock (~75).
-2. **Audition sheets** — wait for the Codex IQ-026 spec (mechanics + exact
-   price per audition). No generation happens before it.
-3. **Auditions** (paid): owner confirms each spend at its exact price;
-   owner casts from candidates.
-4. **Portraits locked** → recurring faces feed chapter images and the
+1. ✅ **Study profiles** (free, Kelly-reviewed): the 12 profiles above, each
+   following the aging rule (AGING-MODEL.md, v1.3) and the era clock (~75).
+   Drafted and reviewed in the 2026-07-21 session.
+2. ✅ **Audition wall + candidate prompts** built locally; prompts hand-run in
+   the owner's ChatGPT (ChatGPT-side path costs $0). The paid API lane still
+   waits on the Codex IQ-026 spec with exact per-audition prices.
+3. ✅ **Casting** — 12/12 cast by the owner, portraits promoted.
+4. ✅ **Mind + Eyes certification** (Codex, 2026-07-23, read-only): 4 locks,
+   7 keep-face/provisional with the profile-text corrections now applied here,
+   1 true re-audition (Simon, neutral brief). Peter preserved, not recast.
+5. ⏳ **Reference-lock test** (owner-run, gates everything visual): does
+   attaching an approved portrait actually pin that individual, or is the
+   prompt text doing the work? Protocol in the Kelly repo at
+   `docs/reference-lock-test.md`. **No scene generation at scale until it
+   passes.**
+6. ⏳ **Certified re-auditions**, one at a time on the owner's explicit go
+   (staged, deliberately not wired into the wall).
+7. **Portraits locked** → recurring faces feed chapter images and the
    People pages.
 
 Every visual follows Selah Eyes (house look) and the aging rule; no spend
@@ -56,14 +79,22 @@ without the owner's explicit priced confirmation.
 
 ## Ruling: bodies match occupations (owner, same session)
 
-A character's build must be what their WORK would have made it. Fishermen
-(Peter, Andrew, James, John) carry broad shoulders and rope-callused hands;
-a tax collector (Matthew) reads sedentary and soft next to laborers; a
-lifelong shepherd is lean and weathered; a tetrarch (Herod Antipas) wears
-banquet softness; a Zealot (Simon) is hardened and watchful. Where Scripture
-records no occupation, the build stays ordinary-working-man for the era —
-never gym-sculpted, never movie-hero (the Samson principle applies to
-everyone: extraordinary callings do not imply extraordinary physiques).
+A character's build should be what their WORK would plausibly have made it.
+Fishermen (Peter, Andrew, James, John) carry broad shoulders and rope-callused
+hands; a tax collector (Matthew) may read less weathered than the laborers
+beside him; a lifelong shepherd is lean and weathered; a tetrarch (Herod
+Antipas) may carry a sedentary court body. Where Scripture records no
+occupation, the build stays ordinary-working-man for the era — never
+gym-sculpted, never movie-hero (the Samson principle applies to everyone:
+extraordinary callings do not imply extraordinary physiques).
+
+**Honesty limit (Codex #105 review, 2026-07-23):** occupation informs a
+plausible casting choice; it never proves a physical fact. These are
+**SMART GUESS / representative depictions** and the canon must label them so.
+Specifically retired as invented detail: Matthew's pale softness and
+ink-stained hands, Herod's "compulsory" body type and never-worked hands,
+Herodias's litter-bearers, the Syrophoenician woman's water-hauling, and
+Simon's hardened-fighter frame. Never let a body type carry a moral verdict.
 
 ## Eyes v1.1 audit (2026-07-21): 12-profile batch
 
@@ -83,7 +114,10 @@ repo's dev app. Automation path: near-term, Codex may batch-run prompts
 ChatGPT-side (asked on board #29); long-term, API-driven candidate
 generation lands in Studio behind the IQ-026 spec with exact prices.
 
-## Ruling: natural hair variety (owner, 2026-07-23)
+## Ruling: natural hair variety (owner, 2026-07-22 ET / 2026-07-23 UTC)
+
+*Date verified per Codex #105: the owner exchange was the evening of July 22
+Eastern; the earlier "2026-07-23" was the UTC stamp. Both are the same moment.*
 
 Ancient people had normal human variety — Scripture itself discusses bald
 and receding men (Leviticus 13:40–41). Never treat the stock "every biblical
