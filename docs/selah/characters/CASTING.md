@@ -21,14 +21,18 @@ portrait.
 
 ### Roster status
 
-Status as of 2026-07-23 (corrected — the "to author" column contradicted the
-digest, which reported the 12-profile batch drafted and reviewed):
+Status as of 2026-07-23 (corrected twice — first because the "to author" column
+contradicted the digest, then because **"12/12 cast" was wrong**: the twelve
+counted was the new-profile batch, not the Twelve. **Ten of the Twelve have
+portraits. John son of Zebedee and Judas Iscariot have none, and Mark cannot be
+finished without them** — John is in the inner circle at the transfiguration,
+Judas carries Mark 14):
 
 | Disciple | Study profile | Portrait | Notes |
 |---|---|---|---|
 | Peter | ✅ drafted + reviewed | ✅ approved | corrected chronology 2026-07-21; NOT recast (Codex ruling 2026-07-23) |
-| John (son of Zebedee) | ✅ drafted + reviewed | ✅ approved | john-apostle |
-| Judas Iscariot | ✅ drafted + reviewed | ✅ approved | |
+| John (son of Zebedee) | ✅ drafted + reviewed | ❌ **NO PORTRAIT** | john-apostle; inner circle — Mark 5, 9, 13, 14 all need him. **Must be cast to finish Mark.** |
+| Judas Iscariot | ✅ drafted + reviewed | ❌ **NO PORTRAIT** | Mark 14 needs him. **Must be cast to finish Mark.** |
 | Andrew | ✅ drafted + reviewed | ✅ approved (keep face) | profile text correction owed: drop the injury/hardship bio |
 | James (son of Zebedee) | ✅ drafted + reviewed | ✅ approved | **LOCKED** (Codex cert, candidate A) |
 | Matthew (Levi) | ✅ drafted + reviewed | ✅ approved (keep face) | wardrobe simplified; Levi identification = smart guess |
