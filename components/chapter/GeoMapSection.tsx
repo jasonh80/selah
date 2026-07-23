@@ -28,6 +28,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { ChapterWorkup } from "@/lib/types";
 import { getGeoChapterMap, type GeoChapterMap } from "@/lib/maps/geo-chapter-maps";
+import { labelsForView, type GeoLabelKind } from "@/lib/maps/geo-labels";
 import { SectionCard } from "@/components/chapter/SectionCard";
 
 const IMAGERY_TILES =
@@ -73,9 +74,109 @@ function baseStyle(): maplibregl.StyleSpecification {
     },
     layers: [
       { id: "imagery", type: "raster", source: "imagery" },
-      { id: "reference", type: "raster", source: "reference", paint: { "raster-opacity": 0.92 } },
+      // OWNER RULING 2026-07-23: the Esri "Boundaries and Places" raster is
+      // OFF. Its words were burned into someone else's tiles — blurry at our
+      // zooms, half in Hebrew, and naming modern Israeli towns (Almagor,
+      // Ramot, Kahal) that have nothing to do with the chapter. Our own
+      // labels replace it: crisp, ours, and chosen per view.
+      // The source is left declared so the layer can be restored in one line
+      // if we ever want its road/border reference back.
     ],
   };
+}
+
+/** Draw one authored place label as a bitmap. Canvas rather than a MapLibre
+ * text layer on purpose: text layers need a glyph server (an external font
+ * dependency we do not have), while an image label needs nothing, renders
+ * crisply at device pixel ratio, and rides the same terrain-aware symbol
+ * machinery the numbered pins already use. */
+function labelImage(text: string, kind: GeoLabelKind): { data: ImageData; pixelRatio: number } {
+  const ratio = Math.min(3, Math.ceil(window.devicePixelRatio || 1));
+  const style = LABEL_STYLES[kind];
+  const pad = 6;
+  const measure = document.createElement("canvas").getContext("2d")!;
+  measure.font = style.font;
+  const w = Math.ceil(measure.measureText(text).width) + pad * 2;
+  const h = style.size + pad * 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = w * ratio;
+  canvas.height = h * ratio;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(ratio, ratio);
+  ctx.font = style.font;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  // A dark halo so the label survives both bright desert and dark water.
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = "rgba(12,14,20,.85)";
+  ctx.lineJoin = "round";
+  ctx.strokeText(text, w / 2, h / 2);
+  ctx.fillStyle = style.color;
+  ctx.fillText(text, w / 2, h / 2);
+  return { data: ctx.getImageData(0, 0, canvas.width, canvas.height), pixelRatio: ratio };
+}
+
+const LABEL_STYLES: Record<GeoLabelKind, { font: string; size: number; color: string }> = {
+  water: { font: "italic 600 13px system-ui, -apple-system, sans-serif", size: 13, color: "#bcd9ef" },
+  river: { font: "italic 500 11px system-ui, -apple-system, sans-serif", size: 11, color: "#bcd9ef" },
+  region: { font: "600 11px system-ui, -apple-system, sans-serif", size: 11, color: "#f0e6d2" },
+  city: { font: "600 12px system-ui, -apple-system, sans-serif", size: 12, color: "#ffffff" },
+};
+
+/** Every place this map already names with a numbered marker. Authored
+ * labels skip these so one place never appears twice under two treatments. */
+function markerNames(cfg: GeoChapterMap): string[] {
+  return [
+    ...cfg.pins.map((p) => p.label),
+    ...cfg.areas.map((a) => a.label),
+    ...cfg.corridors.map((c) => c.label),
+  ].map((l) => l.split("·")[0].trim());
+}
+
+/** Authored place names for the active view. Replaces the retired Esri
+ * reference raster. Rebuilt whenever the view changes. */
+function addLabels(map: maplibregl.Map, view: MapView, markerNames: string[]): void {
+  const labels = labelsForView(view, markerNames);
+  labels.forEach((l, i) => {
+    const id = `selah-label-${i}`;
+    if (map.hasImage(id)) map.removeImage(id);
+    const img = labelImage(l.name, l.kind);
+    map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+  });
+  const data = {
+    type: "FeatureCollection" as const,
+    features: labels.map((l, i) => ({
+      type: "Feature" as const,
+      properties: { icon: `selah-label-${i}`, minz: l.minzoom ?? 0, maxz: l.maxzoom ?? 22 },
+      geometry: { type: "Point" as const, coordinates: l.at },
+    })),
+  };
+  const src = map.getSource("place-labels") as maplibregl.GeoJSONSource | undefined;
+  if (src) {
+    src.setData(data);
+    return;
+  }
+  map.addSource("place-labels", { type: "geojson", data });
+  map.addLayer({
+    id: "place-labels",
+    type: "symbol",
+    source: "place-labels",
+    layout: {
+      "icon-image": ["get", "icon"],
+      "icon-allow-overlap": false,
+      "icon-ignore-placement": false,
+      "icon-anchor": "center",
+    },
+    paint: {
+      // Fade each label in and out of its own zoom window.
+      "icon-opacity": [
+        "case",
+        ["any", ["<", ["zoom"], ["get", "minz"]], [">", ["zoom"], ["get", "maxz"]]],
+        0,
+        1,
+      ],
+    },
+  });
 }
 
 /** The theme's colors for map overlays, read from the live CSS custom
@@ -90,6 +191,11 @@ function themeColors(): { event: string; context: string } {
  * a reader should know instantly which marker is which without decoding the
  * legend. Where-it-happened = solid teardrop pin (accent); nearby landmark =
  * hollow ring (slate); debated area = amber dashed; travel = purple band. */
+/** Which world the labels describe: the chapter's, or today's.
+ * Owner ruling 2026-07-23: "modern-day cities on one view and the chapter
+ * cities … in the other view". */
+export type MapView = "chapter" | "today";
+
 const AREA_FILL = "rgba(245,171,74,.18)";
 const AREA_LINE = "#f5ab4a";
 
@@ -368,6 +474,10 @@ export function GeoMapSection({
   const mapObj = useRef<maplibregl.Map | null>(null);
   const tourTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [threeD, setThreeD] = useState(false);
+  const [view, setView] = useState<MapView>("chapter");
+  // The map's load handler runs once; it reads the CURRENT view through a
+  // ref so a toggle before first paint is never lost.
+  const viewRef = useRef<MapView>("chapter");
   const [tourIdx, setTourIdx] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -400,6 +510,7 @@ export function GeoMapSection({
     map.on("error", (e) => console.warn("[selah-map] error:", e.error?.message ?? e));
     map.on("load", () => {
       addOverlays(map, cfg);
+      addLabels(map, viewRef.current, markerNames(cfg));
       map.resize();
       setReady(true);
     });
@@ -415,6 +526,15 @@ export function GeoMapSection({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.slug]);
+
+  // Then / Today: swap the authored label set in place. The map itself does
+  // not reload — only which names it carries.
+  useEffect(() => {
+    viewRef.current = view;
+    const map = mapObj.current;
+    if (!map || !ready || !cfg) return;
+    addLabels(map, view, markerNames(cfg));
+  }, [view, ready, cfg]);
 
   // Pin colors follow the ACTIVE theme: when <html data-theme> changes, the
   // pin bitmaps are rebuilt from the new --accent-strong so the map and the
@@ -495,6 +615,14 @@ export function GeoMapSection({
       bleed
       headerRight={
         <div className="flex items-center gap-1.5">
+          <button
+            className={chip(view === "today")}
+            aria-pressed={view === "today"}
+            aria-label="Show today's cities instead of the chapter's places"
+            onClick={() => setView((v) => (v === "chapter" ? "today" : "chapter"))}
+          >
+            {view === "today" ? "Today" : "Then"}
+          </button>
           <button className={chip(threeD)} aria-pressed={threeD} aria-label="3-D terrain" onClick={() => setThreeD((t) => !t)}>
             3-D
           </button>
