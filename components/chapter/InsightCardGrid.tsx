@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { ChapterWorkup, Insight } from "@/lib/types";
 import { insightTypeOf } from "@/lib/content/chapter-content";
 import { useReadingMode } from "@/components/ReadingModeProvider";
+import { SectionCard } from "@/components/chapter/SectionCard";
 
 // One "Deep Dive" system (layout spec §15): the former "Deeper Study" cards
 // and the former "Go Deeper" topic menu merged. A compact topic rail sits
@@ -78,21 +79,14 @@ function InsightCard({
   alwaysOpen?: boolean;
   leadLine?: string;
 }) {
-  // Quick/Deep Study returned (owner direction 2026-07-20): Deep Study opens
-  // every card — the zero-click scroll #64 established; Quick Study compacts
-  // each card to its authored PREVIEW line (two-copy mechanic, never CSS
-  // truncation). Switching mode resets all cards; a tap still toggles one
-  // card in place. FAQs stay collapsed either way.
+  // One section frame for every card (SectionCard), one expand affordance —
+  // the same inline "More ⌄" language the photos and the map use.
   const { mode } = useReadingMode();
   const [open, setOpen] = useState(mode === "deep");
   useEffect(() => {
     setOpen(mode === "deep");
   }, [mode]);
-  // Anchor sections (UI-cleanup brief): always open, no toggle affordance —
-  // one guided journey, not a stack of equally-tappable database cards.
   const showBody = alwaysOpen || open;
-  // The absorbed lead line renders only when it carries material the card's
-  // own text doesn't already contain (one entry point per idea, no repeats).
   const lead =
     leadLine &&
     ![insight.title, insight.subtitle ?? "", insight.body, insight.preview].some((t) =>
@@ -100,57 +94,34 @@ function InsightCard({
     )
       ? leadLine
       : undefined;
-  const inner = (
-    <>
-      <div className="flex items-start gap-2">
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm ${
-            insight.jesus ? "bg-jesus-red-soft text-jesus-red" : "bg-tint text-accent-strong"
-          }`}
-          aria-hidden
-        >
-          {insight.icon}
-        </span>
-        <p className={`text-card-title pt-0.5 ${insight.jesus ? "text-jesus-red" : "text-primary"}`}>
-          {insight.title}
-        </p>
-      </div>
-
-      {insight.subtitle && (
-        <p className="mt-2 font-display text-lg font-semibold tracking-[-0.01em] text-primary">
-          {insight.subtitle}
-        </p>
-      )}
-
+  return (
+    <SectionCard
+      icon={insight.icon}
+      title={insight.title}
+      subtitle={insight.subtitle}
+      tone={insight.jesus ? "jesus" : "default"}
+    >
       {lead && (
-        <p className={`mt-1.5 text-[13px] font-medium leading-relaxed ${insight.jesus ? "text-jesus-red" : "text-primary"}`}>
+        <p className={`mb-1.5 text-[13px] font-medium leading-relaxed ${insight.jesus ? "text-jesus-red" : "text-primary"}`}>
           {lead}
         </p>
       )}
-
-      {/* Owner ask (2026-07-20, live Mark 9 review): the lone "›" hid that a
-          full explanation exists AND cost a whole padded row. The cue now
-          flows INLINE at the end of the text — labeled, accent-colored, same
-          affordance as "Read <ref> ⌄" — and the card gets shorter. */}
-      <p className="mt-1.5 text-[13px] leading-relaxed text-secondary">
+      <p className="text-[13px] leading-relaxed text-secondary">
         {showBody ? insight.body : insight.preview}
         {!alwaysOpen && (
           <>
             {" "}
-            <span aria-hidden className="whitespace-nowrap text-[11px] font-medium text-accent-strong">
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              className="whitespace-nowrap text-[12px] font-medium text-accent-strong"
+            >
               {open ? "Less ⌃" : "More ⌄"}
-            </span>
+            </button>
           </>
         )}
       </p>
-    </>
-  );
-  const frame = `flex w-full flex-col rounded-md border bg-card p-3.5 text-left shadow-hair transition ${insight.jesus ? "ring-1 ring-[rgba(178,58,58,0.18)]" : ""}`;
-  return alwaysOpen ? (
-    <div className={frame}>{inner}</div>
-  ) : (
-    <button onClick={() => setOpen((v) => !v)} className={frame}>
-      {inner}
-    </button>
+    </SectionCard>
   );
 }

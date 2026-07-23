@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
 import { chapterYear } from "@/lib/chapter-year";
+import { SectionCard } from "@/components/chapter/SectionCard";
 
 // THE BIG STORY — the true-time rail (owner-approved design, iterated live
 // 2026-07-22/23 on the playground preview and ratified "let's put it out
@@ -121,14 +122,9 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
   const todayOpen = open === "today";
 
   return (
-    <section
-      id="timeline"
-      className="relative scroll-mt-20 rounded-md border bg-card p-3.5 shadow-hair"
-      onClick={() => setOpen(null)}
-    >
-      <h2 className="text-section text-primary">The Big Story</h2>
-
-      <div className="relative mt-9 h-[64px]">
+    <SectionCard id="timeline" icon="🕰" title="The Big Story">
+    <div className="relative" onClick={() => setOpen(null)}>
+      <div className="relative mt-7 h-[64px]">
         {/* chapter bubble — date only, riding high and clear of the cross */}
         {hasYear && chapterX != null && (
           <div className="absolute top-[-22px] flex -translate-x-1/2 flex-col items-center" style={{ left: `${chapterX}%` }}>
@@ -273,6 +269,7 @@ export function TimelineSection({ data }: { data: ChapterWorkup }) {
           </p>
         </div>
       )}
-    </section>
+    </div>
+    </SectionCard>
   );
 }

@@ -23,10 +23,12 @@
 // every label ("· debated", "unidentified", …) move verbatim into the legend.
 
 import { useEffect, useRef, useState } from "react";
+import { useReadingMode } from "@/components/ReadingModeProvider";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { ChapterWorkup } from "@/lib/types";
 import { getGeoChapterMap, type GeoChapterMap } from "@/lib/maps/geo-chapter-maps";
+import { SectionCard } from "@/components/chapter/SectionCard";
 
 const IMAGERY_TILES =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
@@ -94,29 +96,59 @@ const AREA_LINE = "#f5ab4a";
 /** Draw one pin bitmap on a canvas in the given color (device-pixel scaled).
  * Native map images are terrain-aware through the symbol layer, unlike HTML
  * markers, so pins stay glued to their coordinates in every camera state. */
-function ringImage(color: string): { data: ImageData; pixelRatio: number } {
+function ringImage(color: string, num: number): { data: ImageData; pixelRatio: number } {
   const ratio = Math.min(3, Math.ceil(window.devicePixelRatio || 1));
-  const size = 26 * ratio;
+  const size = 28 * ratio;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
   ctx.scale(ratio, ratio);
   ctx.beginPath();
-  ctx.arc(13, 13, 8, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(18,20,28,.55)";
+  ctx.arc(14, 14, 10, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(16,18,26,.82)";
   ctx.fill();
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2.6;
   ctx.strokeStyle = color;
   ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(13, 13, 2.2, 0, Math.PI * 2);
   ctx.fillStyle = color;
-  ctx.fill();
+  ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(num), 14, 14.5);
   return { data: ctx.getImageData(0, 0, size, size), pixelRatio: ratio };
 }
 
-function pinImage(color: string): { data: ImageData; pixelRatio: number } {
+/** A numbered disc for an AREA or CORRIDOR — square-ish (areas) or pill
+ * (corridors) so shape alone separates them from point markers. */
+function badgeImage(color: string, num: number, shape: "square" | "pill"): { data: ImageData; pixelRatio: number } {
+  const ratio = Math.min(3, Math.ceil(window.devicePixelRatio || 1));
+  const w = 28 * ratio;
+  const h = 28 * ratio;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(ratio, ratio);
+  const r = shape === "square" ? 4 : 11;
+  ctx.beginPath();
+  ctx.roundRect(3, 6, 22, 16, r);
+  ctx.fillStyle = "rgba(16,18,26,.85)";
+  ctx.fill();
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = color;
+  ctx.setLineDash(shape === "square" ? [3, 2] : []);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = color;
+  ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(num), 14, 14.5);
+  return { data: ctx.getImageData(0, 0, w, h), pixelRatio: ratio };
+}
+
+function pinImage(color: string, num: number): { data: ImageData; pixelRatio: number } {
   const ratio = Math.min(3, Math.ceil(window.devicePixelRatio || 1));
   const w = 30 * ratio;
   const h = 42 * ratio;
@@ -138,9 +170,14 @@ function pinImage(color: string): { data: ImageData; pixelRatio: number } {
   ctx.strokeStyle = "rgba(255,255,255,.9)";
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(15, 13.6, 4.6, 0, Math.PI * 2);
+  ctx.arc(15, 13.6, 6.4, 0, Math.PI * 2);
   ctx.fillStyle = "#fff";
   ctx.fill();
+  ctx.fillStyle = color;
+  ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(num), 15, 14);
   return { data: ctx.getImageData(0, 0, w, h), pixelRatio: ratio };
 }
 
@@ -148,10 +185,26 @@ function pinImage(color: string): { data: ImageData; pixelRatio: number } {
  * HTML markers and no on-map text: names live in the legend below. */
 function addOverlays(map: maplibregl.Map, cfg: GeoChapterMap): void {
   const colors = themeColors();
-  const eventPin = pinImage(colors.event);
-  const contextPin = ringImage("#cfd8e3");
-  map.addImage("selah-pin-event", eventPin.data, { pixelRatio: eventPin.pixelRatio });
-  map.addImage("selah-pin-context", contextPin.data, { pixelRatio: contextPin.pixelRatio });
+  // ONE numbering across pins → areas → corridors, matching the legend order
+  // below (owner ruling 2026-07-23: a reader must know instantly which marker
+  // is which). Numbers are the key; shape and hue carry the role.
+  let n = 0;
+  const pinNums = cfg.pins.map(() => ++n);
+  const areaNums = cfg.areas.map(() => ++n);
+  const corridorNums = cfg.corridors.map(() => ++n);
+
+  cfg.pins.forEach((p, i) => {
+    const img = p.context === true ? ringImage("#cfd8e3", pinNums[i]) : pinImage(colors.event, pinNums[i]);
+    map.addImage(`selah-pin-${i}`, img.data, { pixelRatio: img.pixelRatio });
+  });
+  cfg.areas.forEach((_, i) => {
+    const img = badgeImage(AREA_LINE, areaNums[i], "square");
+    map.addImage(`selah-area-${i}`, img.data, { pixelRatio: img.pixelRatio });
+  });
+  cfg.corridors.forEach((_, i) => {
+    const img = badgeImage("#c4b5fd", corridorNums[i], "pill");
+    map.addImage(`selah-corridor-${i}`, img.data, { pixelRatio: img.pixelRatio });
+  });
 
   const areas = {
     type: "FeatureCollection" as const,
@@ -174,29 +227,43 @@ function addOverlays(map: maplibregl.Map, cfg: GeoChapterMap): void {
     })),
   };
   map.addSource("corridors", { type: "geojson", data: corridors });
-  // A broad, soft, blurred band — reads as "they moved this general way",
-  // deliberately nothing like a surveyed road line. Purple core over a dark
-  // neutral halo (owner request, 2026-07-18): clearly visible on satellite
-  // greens/tans while the blur/width keep the uncertainty styling.
   map.addLayer({ id: "corridor-halo", type: "line", source: "corridors", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#1c1a24", "line-width": 30, "line-opacity": 0.38, "line-blur": 12 } });
   map.addLayer({ id: "corridor-core", type: "line", source: "corridors", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#a78bfa", "line-width": 8, "line-opacity": 0.7, "line-blur": 3 } });
 
-  const pins = {
-    type: "FeatureCollection" as const,
-    features: cfg.pins.map((p) => ({
-      type: "Feature" as const,
-      properties: { icon: p.context === true ? "selah-pin-context" : "selah-pin-event" },
-      geometry: { type: "Point" as const, coordinates: [p.lng, p.lat] },
-    })),
+  // numbered markers: pins at their point, area badges at the polygon's
+  // centroid, corridor badges at the middle waypoint.
+  const centroid = (poly: [number, number][]): [number, number] => {
+    const s = poly.reduce((acc, v) => [acc[0] + v[0], acc[1] + v[1]] as [number, number], [0, 0] as [number, number]);
+    return [s[0] / poly.length, s[1] / poly.length];
   };
-  map.addSource("pins", { type: "geojson", data: pins });
+  const markers = {
+    type: "FeatureCollection" as const,
+    features: [
+      ...cfg.pins.map((p, i) => ({
+        type: "Feature" as const,
+        properties: { icon: `selah-pin-${i}`, anchor: p.context === true ? "center" : "bottom" },
+        geometry: { type: "Point" as const, coordinates: [p.lng, p.lat] },
+      })),
+      ...cfg.areas.map((a, i) => ({
+        type: "Feature" as const,
+        properties: { icon: `selah-area-${i}`, anchor: "center" },
+        geometry: { type: "Point" as const, coordinates: centroid(a.polygon as [number, number][]) },
+      })),
+      ...cfg.corridors.map((c, i) => ({
+        type: "Feature" as const,
+        properties: { icon: `selah-corridor-${i}`, anchor: "center" },
+        geometry: { type: "Point" as const, coordinates: c.waypoints[Math.floor(c.waypoints.length / 2)] },
+      })),
+    ],
+  };
+  map.addSource("pins", { type: "geojson", data: markers });
   map.addLayer({
     id: "pins",
     type: "symbol",
     source: "pins",
     layout: {
       "icon-image": ["get", "icon"],
-      "icon-anchor": ["match", ["get", "icon"], "selah-pin-context", "center", "bottom"],
+      "icon-anchor": ["get", "anchor"],
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
     },
@@ -223,12 +290,15 @@ export function GeoMapSection({
    * card floating below the map. */
   notes?: { title: string; body: string };
 }) {
-  const [notesOpen, setNotesOpen] = useState(false);
+  const { mode } = useReadingMode();
+  const [notesOpen, setNotesOpen] = useState(mode === "deep");
+  useEffect(() => {
+    setNotesOpen(mode === "deep");
+  }, [mode]);
   const cfg = getGeoChapterMap(data.slug);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<maplibregl.Map | null>(null);
   const tourTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [borders, setBorders] = useState(true);
   const [threeD, setThreeD] = useState(false);
   const [tourIdx, setTourIdx] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
@@ -286,24 +356,21 @@ export function GeoMapSection({
     const observer = new MutationObserver(() => {
       const map = mapObj.current;
       if (!map) return;
+      // Theme change: redraw every NUMBERED marker so the map and the legend
+      // can never disagree (Codex #59 review), numbering preserved.
+      if (!cfg) return;
       const colors = themeColors();
-      const eventPin = pinImage(colors.event);
-      const contextPin = pinImage(colors.context);
-      if (map.hasImage("selah-pin-event")) map.removeImage("selah-pin-event");
-      if (map.hasImage("selah-pin-context")) map.removeImage("selah-pin-context");
-      map.addImage("selah-pin-event", eventPin.data, { pixelRatio: eventPin.pixelRatio });
-      map.addImage("selah-pin-context", contextPin.data, { pixelRatio: contextPin.pixelRatio });
+      cfg.pins.forEach((pin, i) => {
+        const id = `selah-pin-${i}`;
+        const img = pin.context === true ? ringImage("#cfd8e3", i + 1) : pinImage(colors.event, i + 1);
+        if (map.hasImage(id)) map.removeImage(id);
+        map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+      });
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     return () => observer.disconnect();
   }, [ready]);
 
-  // borders & cities (default on)
-  useEffect(() => {
-    const map = mapObj.current;
-    if (!map || !ready) return;
-    map.setLayoutProperty("reference", "visibility", borders ? "visible" : "none");
-  }, [borders, ready]);
 
   // 3-D terrain
   useEffect(() => {
@@ -353,21 +420,13 @@ export function GeoMapSection({
   };
 
   return (
-    <section id="maps" className="scroll-mt-20">
-      {/* Title and every control on ONE row (owner: Reset view must not
-          orphan onto its own line) — chips shrink before they wrap. */}
-      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <h2 className="text-section mr-auto text-primary">Maps &amp; Places</h2>
+    <SectionCard
+      id="maps"
+      icon="🗺"
+      title="Maps &amp; Places"
+      bleed
+      headerRight={
         <div className="flex items-center gap-1.5">
-          <label className={`${chip(borders)} cursor-pointer select-none`}>
-            <input
-              type="checkbox"
-              checked={borders}
-              onChange={(e) => setBorders(e.target.checked)}
-              className="accent-[var(--accent-strong)]"
-            />
-            Borders
-          </label>
           <button className={chip(threeD)} aria-pressed={threeD} aria-label="3-D terrain" onClick={() => setThreeD((t) => !t)}>
             3-D
           </button>
@@ -382,12 +441,9 @@ export function GeoMapSection({
             Reset
           </button>
         </div>
-      </div>
-
-      <div
-        className="flex flex-col overflow-hidden rounded-md border bg-card"
-        style={{ boxShadow: "0 0 0 1px var(--line), 0 14px 40px -20px var(--accent)" }}
-      >
+      }
+    >
+      <div className="flex flex-col">
         {failed && (
           <div className="flex items-center justify-center p-8 text-center" style={{ aspectRatio: "4 / 3" }}>
             <p className="max-w-[40ch] text-[13px] leading-relaxed text-secondary">
@@ -424,9 +480,9 @@ export function GeoMapSection({
             Every label string (including "· debated" style qualifiers) renders
             verbatim from the digest-bound config. */}
         {!failed && (cfg.pins.length > 0 || cfg.areas.length > 0 || cfg.corridors.length > 0) && (
-          <ul className="flex flex-wrap gap-x-3.5 gap-y-1 border-t px-3.5 py-2" style={{ borderColor: "var(--line)" }}>
-            {cfg.pins.map((p) => (
-              <li key={p.label} className="inline-flex items-center gap-1.5 text-[12px] text-secondary">
+          <ul className="flex flex-wrap gap-x-4 gap-y-1.5 border-t px-3.5 py-2.5" style={{ borderColor: "var(--line)" }}>
+            {cfg.pins.map((p, i) => (
+              <li key={p.label} className="inline-flex items-center gap-1.5 text-[13.5px] text-secondary">
                 {p.context === true ? (
                   <svg width="13" height="13" viewBox="0 0 26 26" aria-hidden="true">
                     <circle cx="13" cy="13" r="8" fill="none" stroke="#cfd8e3" strokeWidth="3" />
@@ -444,36 +500,43 @@ export function GeoMapSection({
                   </svg>
                 )}
                 <span className={p.context === true ? "" : "font-medium text-primary"}>
+                  <span className="font-semibold text-primary">{i + 1}.</span>{" "}
                   {p.label}
-                  {p.context === true ? "" : " · where it happened"}
+                  {p.context === true ? " · nearby landmark" : " · where it happened"}
                 </span>
               </li>
             ))}
-            {cfg.areas.map((a) => (
-              <li key={a.label} className="inline-flex items-center gap-1.5 text-[12px] italic text-secondary">
+            {cfg.areas.map((a, i) => (
+              <li key={a.label} className="inline-flex items-center gap-1.5 text-[13.5px] italic text-secondary">
                 <span
                   aria-hidden="true"
                   className="inline-block h-3 w-3 rounded-[3px]"
                   style={{ background: AREA_FILL, border: `1.5px dashed ${AREA_LINE}` }}
                 />
-                {a.label} · area, not a spot
+                <span>
+                  <span className="font-semibold text-primary">{cfg.pins.length + i + 1}.</span>{" "}
+                  {a.label} · area, not a spot
+                </span>
               </li>
             ))}
-            {cfg.corridors.map((c) => (
-              <li key={c.label} className="inline-flex items-center gap-1.5 text-[12px] italic text-secondary">
+            {cfg.corridors.map((c, i) => (
+              <li key={c.label} className="inline-flex items-center gap-1.5 text-[13.5px] italic text-secondary">
                 <span
                   aria-hidden="true"
                   className="inline-block h-[5px] w-4 rounded-full"
                   style={{ background: "linear-gradient(90deg, rgba(28,26,36,.55), rgba(167,139,250,.85))" }}
                 />
-                {c.label} · the way they traveled
+                <span>
+                  <span className="font-semibold text-primary">{cfg.pins.length + cfg.areas.length + i + 1}.</span>{" "}
+                  {c.label} · the way they traveled
+                </span>
               </li>
             ))}
           </ul>
         )}
 
         <div className="border-t px-3.5 py-2" style={{ borderColor: "var(--line)" }}>
-          <p className="text-[12px] leading-snug text-secondary">{cfg.caption}</p>
+          <p className="text-[13.5px] leading-snug text-secondary">{cfg.caption}</p>
         </div>
         {notes && (
           <>
@@ -481,7 +544,7 @@ export function GeoMapSection({
               type="button"
               onClick={() => setNotesOpen((v) => !v)}
               aria-expanded={notesOpen}
-              className="flex w-full items-center border-t px-3.5 py-2 text-left text-[12px] font-medium text-accent-strong"
+              className="flex w-full items-center border-t px-3.5 py-2 text-left text-[13px] font-medium text-accent-strong"
               style={{ borderColor: "var(--line)" }}
             >
               Dive deeper
@@ -489,13 +552,13 @@ export function GeoMapSection({
             </button>
             {notesOpen && (
               <div className="border-t bg-tint px-3.5 py-2.5" style={{ borderColor: "var(--line)", borderLeft: "3px solid var(--accent-strong)" }}>
-                <p className="text-[12.5px] font-semibold leading-snug text-primary">{notes.title}</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-secondary">{notes.body}</p>
+                <p className="text-[13.5px] font-semibold leading-snug text-primary">{notes.title}</p>
+                <p className="mt-1 text-[13px] leading-relaxed text-secondary">{notes.body}</p>
               </div>
             )}
           </>
         )}
       </div>
-    </section>
+    </SectionCard>
   );
 }

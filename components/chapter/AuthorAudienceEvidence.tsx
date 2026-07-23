@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChapterWorkup } from "@/lib/types";
-import { SectionHead } from "@/components/chapter/SectionHead";
+import { SectionCard } from "@/components/chapter/SectionCard";
 import { getChapterContext, insightTypeOf, distinctText, type ContextMedia } from "@/lib/content/chapter-content";
 
 type AAECard = { category: string; title: string; body: string; media?: ContextMedia };
@@ -50,16 +50,15 @@ export function AuthorAudienceEvidence({
   );
   if (headless) return cardStack;
   return (
-    <section id="author-audience-evidence" className="scroll-mt-20">
-      <SectionHead title="Behind the Chapter" />
+    <SectionCard id="author-audience-evidence" icon="🏛" title="Behind the Chapter">
       {cardStack}
-    </section>
+    </SectionCard>
   );
 }
 
 function Card({ card }: { card: AAECard }) {
   return (
-    <div className="flex flex-col rounded-md border bg-card p-3.5 shadow-hair">
+    <div className="flex flex-col border-t pt-2.5 first:border-0 first:pt-0">
       <p className="text-eyebrow">{card.category}</p>
       <p className="text-card-title mt-1 text-primary">{card.title}</p>
 

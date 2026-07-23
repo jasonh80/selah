@@ -1,5 +1,6 @@
 import type { ChapterWorkup } from "@/lib/types";
 import { mostPeopleMissContent } from "@/lib/content/chapter-content";
+import { SectionCard } from "@/components/chapter/SectionCard";
 
 // "What Most People Miss" — ONE canonical source (the two-layer insight card
 // when present; both layers render), so removing the duplicate card from the
@@ -9,21 +10,11 @@ export function MostPeopleMissSection({ data }: { data: ChapterWorkup }) {
   if (!content) return null;
 
   return (
-    <section
-      id="most-people-miss"
-      // BOX SYSTEM (owner asked for the rhyme, 2026-07-23): a plain outlined
-      // card = a teaching section; the purple left bar means "deeper layer
-      // you opened"; the red ring means Jesus. This is a section.
-      className="scroll-mt-20 rounded-md border bg-card p-3.5 shadow-hair"
-    >
-      <p className="text-eyebrow">🔍 What's Easy to Miss</p>
-      {content.intro && (
-        <p className="mt-s2 text-[14px] font-medium leading-relaxed text-primary">{content.intro}</p>
-      )}
-      <p className="mt-s2 text-[14px] leading-relaxed text-primary">{content.body}</p>
+    <SectionCard id="most-people-miss" icon="🔍" title="What's Easy to Miss" subtitle={content.intro}>
+      <p className="text-[13px] leading-relaxed text-secondary">{content.body}</p>
       {content.extra && (
-        <p className="mt-s2 border-t pt-s2 text-[14px] leading-relaxed text-primary">{content.extra}</p>
+        <p className="mt-2 border-t pt-2 text-[13px] leading-relaxed text-secondary">{content.extra}</p>
       )}
-    </section>
+    </SectionCard>
   );
 }
