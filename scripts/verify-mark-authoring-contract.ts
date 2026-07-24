@@ -252,7 +252,8 @@ export function passingDraft(slug: string): GeneratedChapterWorkup {
       // so it gets a bespoke compliant body instead of the generic prose().
       if (type === "discipleship") {
         return {
-          id: `${type}-${index + 1}`,
+          // IQ-019: the gate requires the exact core id/type "discipleship".
+          id: "discipleship",
           title: "Disciple It",
           type,
           priority: index + 1,

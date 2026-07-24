@@ -5,7 +5,7 @@
   "description": "Selah \u2014 your daily Bible chapter, made visual, simple, and personal.",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run verify:studio-safety && npm run verify:studio-preview-access && npm run verify:studio-mark8-preflight && npm run verify:studio-polish && npm run verify:esv-attribution && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark && npm run verify:diagnostics-display && npm run verify:maps-honesty && npm run verify:image-redo && npm run verify:published-redo && npm run verify:today && npm run verify:prepare-proposals && npm run verify:chapter-year && npm run verify:example-library && npm run verify:mega-revisions && npm run verify:discipleship && npm run verify:client-boundaries",
+    "prebuild": "npm run verify:studio-safety && npm run verify:studio-preview-access && npm run verify:studio-mark8-preflight && npm run verify:studio-polish && npm run verify:esv-attribution && npm run verify:brain && npm run verify:authoring && npm run verify:manifest && npm run verify:source && npm run verify:manifest-v3 && npm run verify:mark-runtime && npm run verify:mark-draft && npm run verify:mark-worker && npm run verify:benchmark && npm run verify:diagnostics-display && npm run verify:maps-honesty && npm run verify:image-redo && npm run verify:published-redo && npm run verify:today && npm run verify:prepare-proposals && npm run verify:chapter-year && npm run verify:example-library && npm run verify:mega-revisions && npm run verify:discipleship && npm run verify:discipleship-live-path && npm run verify:discipleship-render && npm run verify:client-boundaries",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -35,6 +35,8 @@
     "verify:chapter-year": "node --import tsx scripts/verify-chapter-year.ts",
     "verify:mega-revisions": "node --import tsx scripts/verify-mega-revisions.ts",
     "verify:discipleship": "node --import tsx scripts/verify-discipleship.ts",
+    "verify:discipleship-live-path": "node --import tsx scripts/verify-discipleship-live-path.ts",
+    "verify:discipleship-render": "node --import tsx scripts/verify-discipleship-render.tsx",
     "verify:example-library": "node --import tsx scripts/verify-example-library.ts",
     "verify:client-boundaries": "node --import tsx scripts/verify-client-boundaries.ts"
   },
