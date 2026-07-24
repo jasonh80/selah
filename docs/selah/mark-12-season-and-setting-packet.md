@@ -41,10 +41,12 @@ The reader copy this packet backs lives in
   independently supports a genuinely cool night. **Use a broad range; never a
   single reconstructed temperature.**
 - **Crowding: heavy — HIGH.** A pilgrim Passover swelled Jerusalem far beyond
-  its residents; the temple courts were the largest public gathering space.
-- **Sensory: dust, incense/sacrificial smoke, animals, coin-noise, roasting
-  food — MEDIUM-HIGH.** Standard, well-attested texture of a working temple at
-  festival; not chapter-specific claims, so keep them as atmosphere.
+  its residents; the temple was among the largest public gathering spaces.
+- **Sensory: dust, incense/sacrificial smoke, roasting food, the sound of coins
+  at the temple treasury (12:41) — MEDIUM-HIGH.** Standard, well-attested texture
+  of a working temple at festival; keep as atmosphere. **Note:** Mark 11 has just
+  cleared the sellers/money-changers, so do NOT stage active money-changing in
+  the Mark 12 scene — the treasury and its chests are the chapter's coin image.
 - **Light: hard sun on pale limestone — MEDIUM.** Typical of a bright Judean
   spring day; the text does not fix the hour, so keep light general.
 

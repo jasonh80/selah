@@ -16,9 +16,9 @@ import base from "@/lib/ai/fixtures/exodus-27-generated.json";
 export const MARK_12_SET_THE_SCENE = {
   kicker: "What it may have felt like",
   body: [
-    "Jerusalem is crowded and on edge. Passover is only days away, so the city has swollen with pilgrims, and the temple courts — the biggest public space most of them had ever stood in — are packed with people, traders, penned animals, and the smoke of sacrifice.",
-    "It is early spring in the Judean hills, and Jerusalem sits high, near 2,500 feet, so the days were probably mild — somewhere in the 60s — while the nights could still turn cold enough to want a fire. Hard sunlight falls on pale limestone; doves call from their cages; coins clink at the money-changers' tables; the air carries dust, incense, and roasting food.",
-    "This is not a quiet chapel. Every trap the leaders spring on Jesus here — about taxes, about resurrection, about the greatest command — is sprung out in the open, in the noise, with a watching crowd. The setting is the point: Jesus answers where everyone can hear.",
+    "Jerusalem is crowded and on edge. Passover is only days away, so at the feast the temple complex — one of Jerusalem's largest public spaces — would likely still have been thronged with pilgrims, the air heavy with the smoke of sacrifice.",
+    "It is early spring in the Judean hills, and Jerusalem sits high, near 2,500 feet, so the days were probably mild — probably in the 60s or low 70s — while the nights could still turn cold enough to want a fire. Hard sunlight falls on pale limestone; coins ring into the temple treasury chests; the air likely carried dust, incense, and roasting food.",
+    "This is not a quiet chapel. The hostile traps the leaders spring on Jesus here — about taxes, about resurrection — are sprung out in the open, in the noise, with a watching crowd; even the scribe who asks sincerely about the greatest command does so in public. The setting sharpens the moment: Jesus answers where everyone can hear.",
   ].join("\n\n"),
 };
 
@@ -32,7 +32,7 @@ export function buildSetTheScenePreview(): ChapterWorkup {
       title: "Mark 12",
       subtitle: "Traps in the Temple Courts",
       summary:
-        "In his last days of public teaching, Jesus faces a running series of challenges in the temple — the tenants, the tax coin, the resurrection, the greatest command — and closes by pointing not to the rich givers but to a poor widow and her two small coins.",
+        "In his last days of public teaching, Jesus faces a running series of challenges in the temple — the tenants, the tax coin, the resurrection — and a scribe's honest question about the greatest command, before closing by pointing not to the rich givers but to a poor widow and her two small coins.",
       setTheScene: MARK_12_SET_THE_SCENE,
     }),
   );
