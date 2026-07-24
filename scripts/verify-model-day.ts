@@ -35,11 +35,14 @@ import {
   MODEL_DAY_TOTAL_CAP_USD,
   MODEL_DAY_MAX_INPUT_TOKENS,
   MODEL_DAY_SCHEMA_VERSION,
+  modelDayRequestBody,
+  MODEL_DAY_REQUEST_EXCEPTIONS,
   ModelDayClaimError,
   type ModelDayStore,
   type ModelDayStatus,
   type ModelDayLatest,
 } from "../lib/server/model-day";
+import { buildChapterWorkupRequestBody } from "../lib/server/generate-chapter-workup";
 import { passingDraft } from "./verify-mark-authoring-contract";
 import {
   __setGenerationTestOverrides,
@@ -489,6 +492,26 @@ async function main(): Promise<void> {
   __setGenerationTestOverrides({ settings: null, captureAudit: null });
   __setCostCaptureForTesting(null);
   __setTriggerTransportForTesting(null);
+
+  // ===== Codex #103 correction 2: byte-equality regression =====
+  // Model Day's request is byte-for-byte the production chapter-writing request
+  // (same shared builder) EXCEPT the model id and the two declared spend-safety
+  // exceptions. Proven directly on the pure builders so they can never drift.
+  {
+    const prompt = "SHARED PROMPT BODY — identical inputs must yield identical requests.";
+    const prod = buildChapterWorkupRequestBody({ model: "gpt-5.5", prompt });
+    const md = modelDayRequestBody({ model: "gpt-5.5", prompt });
+    const { service_tier, prompt_cache_options, ...mdBase } = md as Record<string, unknown>;
+    ok(JSON.stringify(mdBase) === JSON.stringify(prod), "BE1 Model Day request base equals the production request byte-for-byte");
+    ok(service_tier === "default", "BE2 service_tier pinned to default");
+    ok(JSON.stringify(prompt_cache_options) === JSON.stringify({ mode: "explicit" }), "BE3 prompt_cache_options is explicit mode");
+    ok(JSON.stringify(MODEL_DAY_REQUEST_EXCEPTIONS) === JSON.stringify({ service_tier: "default", prompt_cache_options: { mode: "explicit" } }), "BE4 declared exceptions are exactly the two spend-safety fields");
+    // Two candidate models differ in NOTHING but the model id.
+    const a = modelDayRequestBody({ model: "gpt-5.5", prompt });
+    const b = modelDayRequestBody({ model: CHALLENGER, prompt });
+    ok(a.model === "gpt-5.5" && b.model === CHALLENGER, "BE5 each request carries its own model id");
+    ok(JSON.stringify({ ...a, model: "X" }) === JSON.stringify({ ...b, model: "X" }), "BE6 the two requests are byte-equal except the model id");
+  }
 
   console.log(`verify:model-day OK (${checks} checks)`);
 }

@@ -623,6 +623,27 @@ function usableTokenCount(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+// The TWO declared Model-Day-only exceptions to byte-equality with the press
+// (Codex #103 correction 2/3): `service_tier: "default"` pins the priced tier
+// (an omitted tier means "auto", which Project settings could reprice), and
+// `prompt_cache_options: { mode: "explicit" }` disables the implicit cache-write
+// breakpoint so no unbudgeted cache-write can undermine the cap.
+export const MODEL_DAY_REQUEST_EXCEPTIONS = Object.freeze({
+  service_tier: "default" as const,
+  prompt_cache_options: Object.freeze({ mode: "explicit" as const }),
+});
+
+/** The EXACT chat-completions body Model Day sends: the shared production
+ * request body (byte-equal to the press except model id) plus the two declared
+ * spend-safety exceptions. Pure — used by callModel AND by the byte-equality
+ * regression, so the two can never drift. */
+export function modelDayRequestBody(input: { model: string; prompt: string }): Record<string, unknown> {
+  return {
+    ...buildChapterWorkupRequestBody({ model: input.model, prompt: input.prompt }),
+    ...MODEL_DAY_REQUEST_EXCEPTIONS,
+  };
+}
+
 async function callModel(input: { model: string; prompt: string }): Promise<{
   content: string;
   inputTokens: number | null;
@@ -638,20 +659,8 @@ async function callModel(input: { model: string; prompt: string }): Promise<{
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8 * 60 * 1000);
   try {
-    // Byte-for-byte the production writing request (Codex #103 correction 2:
-    // ONE shared builder) plus the TWO declared Model-Day-only spend-safety
-    // exceptions: `service_tier: "default"` pins the priced tier (an omitted
-    // tier means "auto", which Project settings could reprice), and
-    // `prompt_cache_options: { mode: "explicit" }` disables the implicit
-    // cache-write breakpoint so no unbudgeted cache-write charge can undermine
-    // the cap. Everything else equals the press's request except model id.
-    const base = buildChapterWorkupRequestBody({ model: input.model, prompt: input.prompt });
     const resp = await client.chat.completions.create(
-      {
-        ...base,
-        service_tier: "default",
-        prompt_cache_options: { mode: "explicit" },
-      } as never,
+      modelDayRequestBody({ model: input.model, prompt: input.prompt }) as never,
       // maxRetries 0: "one request per model" must be literally true.
       { signal: controller.signal, maxRetries: 0 },
     );
