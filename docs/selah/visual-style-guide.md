@@ -145,3 +145,95 @@ rules (owner-gated tap) so generation carries them automatically.
    block and/or seeded Selah Mind visuals rules — owner-gated as always).
 3. Until then, redo notes and new-chapter image prompts may quote this guide
    directly — it is owner-approved direction, not generated style.
+
+---
+
+## v1.2 — people & crowds (proven live 2026-07-23, owner-ruled)
+
+Everything below was tested with real generations before it was written down.
+See the Kelly repo's `docs/reference-lock-test.md` for the runs.
+
+### Reference-locking works — use it
+
+Attaching an approved portrait pins that specific individual, not just a type.
+Proven three ways: portrait → portrait (the reference carried the sun-bleached
+hair the prompt never mentioned), portrait → scene, and **two locked faces in
+one action scene with a crowd** (Jesus' striped mantle carried across too).
+Every recurring character in a scene gets their approved portrait attached.
+
+Not yet proven: intimate close-ups, where identity has drifted before. Treat
+close-ups as the one remaining risk and check them by eye.
+
+### Every scene prompt must describe its crowd
+
+Extras cannot carry reference photos. Left undescribed, the model renders **one
+man photocopied** across the whole background — verified. Crowd breadth has to
+be authored. It is prompt text and it is free.
+
+### But author it PROPORTIONALLY — not one of everything
+
+Owner ruling, 2026-07-23, after a first attempt over-corrected into what he
+called "diversity soup": *"we don't need an equal measure of everything. we
+need a proportionally accurate representation of what the population was."*
+
+A first-century crowd was demographically NARROWER than a modern one, but the
+answer is not a fixed formula — it is **the crowd this particular scene would
+actually hold** (Codex #105: replace absolutes with proportional,
+scene-dependent smart guesses). Getting it wrong is an accuracy failure like a
+wrong map pin; getting it *rigid* is the same failure the other direction.
+
+**First ask what scene it is.** The mix follows the setting, not a template:
+- **Who would be there?** A fishing shore skews to working men; a village or a
+  market or a temple court holds **women, children, and families**; a
+  synagogue, a road, a wedding, a tax booth each draw a different crowd. Do not
+  default every crowd to adult men.
+- **Class and occupation vary within the frame** — laborers, tradespeople, a
+  scribe or an official, the poor and the better-off — shown through cloth,
+  grooming, and bearing, never through caricature.
+
+**Then apply these as tendencies, not laws:**
+- **Vary structure and age, not ethnicity.** Face shape, hairline, hair
+  texture and length, beard shape, grooming, bearing.
+- **Adult men were usually bearded** in this world, so most are — but "usually"
+  is not "all," and clean-shaven reads as a Roman or Hellenized figure.
+- **Women** wear historically plausible arranged hair and head coverings for
+  the setting; **children** are present wherever the scene would hold them.
+- **Complexions across the plausible Levantine range** for the locale — a broad
+  band, not an even rainbow and not a single tone.
+- **Age skews younger than today** (fewer people grew old), so a crowd leans
+  young with some genuinely older faces — a tendency to honor, not a quota to
+  fill.
+- **Builds are mostly lean-to-sturdy from labor**, with room for a
+  better-fed figure where class or role makes it plausible — not a blanket ban.
+- **Vary the mix per scene.** The same extras pasted into every chapter just
+  replaces one repeated man with one repeated crowd.
+
+Working paragraph (adapt to the scene; never paste verbatim):
+
+> The figures must read as different individuals and as the believable crowd
+> *this* place and moment would hold — [for the scene: e.g. working men on a
+> shore / families and women in a village or temple court]. Most adult men are
+> bearded, as was common; include women in plausible head coverings and
+> children where the setting fits. Complexions sit across the natural Levantine
+> range for the locale; ages lean younger with some older faces; builds are
+> mostly lean-to-sturdy from labor, with class shown through cloth and bearing.
+> Vary them by face shape, hairline, hair texture and length, beard shape, and
+> grooming rather than by ethnicity.
+
+### Named cast: eleven axes, no two sharing more than two
+
+The sameness in the current cast came from writing the same appearance
+sentence for five different men, not from a limit in the tool. Named characters
+get deliberate points on: hairline · hair texture · hair length · gray ·
+beard · face shape · complexion · apparent age · build and silhouette · one
+ordinary human marker · wardrobe arc. Full list and per-character assignments
+in the Kelly repo's `docs/cast-differentiators.md`.
+
+**Guardrail:** never hand the "flaw" axes only to the villains. If baldness,
+gray, and crooked noses land solely on Herod and Judas, variety has become a
+moral code.
+
+**Guardrail:** depict what a person actually did, including when it was
+indefensible — but never carry the moral verdict in the face, body, or
+complexion. Matthew collected taxes for Rome from his own people; draw the
+booth and the coin honestly, and draw the man straight.
