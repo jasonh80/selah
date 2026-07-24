@@ -48,12 +48,56 @@ create table if not exists model_day_runs (
   created_at timestamptz not null default now()
 );
 
-create unique index if not exists model_day_runs_one_live
+-- Single-use claim AND unresolved-run guard, storage-enforced (Codex #103
+-- correction 3): only ONE unresolved run per chapter may exist at a time — a
+-- live claim (generating/running) OR a completed-but-UNJUDGED run (done with no
+-- verdict). A new run's INSERT therefore cannot shadow an unjudged paid run in a
+-- delayed race; once the blind verdict is recorded the row leaves the predicate
+-- and a new run may begin. (Supersedes the old one-live index.)
+drop index if exists model_day_runs_one_live;
+create unique index if not exists model_day_runs_one_unresolved
   on model_day_runs (slug)
-  where status in ('generating','running');
+  where status in ('generating','running') or (status = 'done' and verdict is null);
 
 create index if not exists model_day_runs_slug_created
   on model_day_runs (slug, created_at desc);
+
+-- Verdict + blind-payload immutability, storage-enforced (Codex #103 correction
+-- 4): identity/pricing are fixed at insert; a recorded verdict is write-once;
+-- and the candidate A/B payload + label map are write-once (set on `done`,
+-- never changed). Status transitions and the single verdict write still pass.
+create or replace function model_day_runs_immutable() returns trigger as $$
+begin
+  if NEW.slug is distinct from OLD.slug
+     or NEW.job_id is distinct from OLD.job_id
+     or NEW.incumbent_model is distinct from OLD.incumbent_model
+     or NEW.challenger_model is distinct from OLD.challenger_model
+     or NEW.quote_digest is distinct from OLD.quote_digest
+     or NEW.pricing_json::text is distinct from OLD.pricing_json::text
+     or NEW.created_at is distinct from OLD.created_at then
+    raise exception 'model_day_runs: run identity/pricing is immutable after insert';
+  end if;
+  if OLD.verdict is not null and (
+       NEW.verdict is distinct from OLD.verdict
+    or NEW.verdict_note is distinct from OLD.verdict_note
+    or NEW.verdict_recorded_at is distinct from OLD.verdict_recorded_at) then
+    raise exception 'model_day_runs: verdict is immutable once recorded';
+  end if;
+  if OLD.candidate_a_json is not null and (
+       NEW.candidate_a_json::text is distinct from OLD.candidate_a_json::text
+    or NEW.candidate_b_json::text is distinct from OLD.candidate_b_json::text
+    or NEW.label_map::text is distinct from OLD.label_map::text
+    or NEW.packet_digest is distinct from OLD.packet_digest) then
+    raise exception 'model_day_runs: the blind A/B payload is immutable once written';
+  end if;
+  return NEW;
+end;
+$$ language plpgsql;
+
+drop trigger if exists model_day_runs_immutable_trg on model_day_runs;
+create trigger model_day_runs_immutable_trg
+  before update on model_day_runs
+  for each row execute function model_day_runs_immutable();
 
 alter table model_day_runs enable row level security;
 -- No policies on purpose: service-role access only, like the other tables.

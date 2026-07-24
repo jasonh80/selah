@@ -12,16 +12,19 @@
 // Storage is the dedicated immutable table model_day_runs (see
 // supabase/model-day-runs.sql — owner runs the DDL once; until then this
 // lane fails closed). The single-use claim IS a row insert (status
-// 'generating', one live run per slug via partial unique index), atomically
-// CONSUMED by the worker (generating→running) BEFORE any model dispatch —
-// exactly the prepare-proposals discipline.
+// 'generating'), atomically CONSUMED by the worker (generating→running) BEFORE
+// any model dispatch — exactly the prepare-proposals discipline. A partial
+// unique index makes only ONE UNRESOLVED run per slug possible — a live claim
+// OR a completed-but-unjudged run — so no new run can shadow an unjudged paid
+// one; verdict + blind-payload immutability is storage-enforced by trigger.
 //
-// SPEND DISCIPLINE (owner cap: under $0.30 total, structurally enforced):
-// each call is hard-bounded (prompt char bound pre-dispatch + completion
-// token cap), the incumbent runs FIRST, and the challenger dispatches ONLY if
-// the incumbent's recorded actual cost plus the challenger's conservative
-// ceiling still fits inside MODEL_DAY_TOTAL_CAP_USD. One request per model,
-// maxRetries 0, every outcome durably in the cost ledger (IQ-006 standard).
+// SPEND DISCIPLINE (owner choice "A": production-quality; $0.90 disclosed
+// worst-case total, structurally enforced): each call is hard-bounded (exact
+// o200k input-token count pre-dispatch + completion-token cap), and BOTH calls'
+// full worst case is RESERVED before either dispatches. The two requests then
+// run CONCURRENTLY under ONE shared deadline safely below Netlify's 15-min
+// limit; each outcome is settled durably in the cost ledger before the run
+// turns terminal. One request per model, maxRetries 0 (IQ-006 standard).
 //
 // BLIND SEAL: the two outputs are stored as candidates A/B by coin flip;
 // label_map (which letter is which model) lives only in the row and is
@@ -390,8 +393,10 @@ export async function readLatestModelDayRun(slug: string): Promise<ModelDayRow |
 }
 
 /** Record the judge's verdict on the EXACT completed run (digest-bound),
- * exactly once — the reveal action requires it (Codex #103 P2: blindness
- * until verdict is enforced in storage, not by procedure). */
+ * exactly once — the reveal action requires it (Codex #103 P2). The write-once
+ * guarantee is enforced both here (conditional write, verdict-still-null
+ * predicate) AND in storage (the model_day_runs immutability trigger), so a
+ * recorded verdict and the blind payload can never be altered. */
 export async function recordModelDayVerdict(
   slug: string,
   packetDigest: string,
