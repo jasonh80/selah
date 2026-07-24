@@ -178,11 +178,11 @@ assorted.
 
 ### `mark12-herodian` — group
 
-- **SAYS:** they exist and act with the Pharisees against Jesus (3:6, 12:13).
-  Their defining, attested trait is a **political allegiance** to the Herodian
-  house — NOT a uniform or a documented look.
-- **SMART GUESS:** likely more Hellenised/Greco-Roman in bearing than the
-  Pharisees beside them.
+- **SAYS:** Mark attests the **name** and their **joint action with the
+  Pharisees against Jesus** (3:6, 12:13) — and nothing more.
+- **SMART GUESS (leading historical inference):** a **political allegiance** to
+  the Herodian house; their exact identity remains uncertain. Likely more
+  Hellenised/Greco-Roman in bearing than the Pharisees beside them.
 - **OPEN CASTING CHOICE (not evidence):** Herodian grooming and clothing are a
   representative visual choice, not attested fact — do NOT invent a visible
   "Herodian uniform." Any dress contrast is a legible casting device, labeled as
