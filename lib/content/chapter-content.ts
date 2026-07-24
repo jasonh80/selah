@@ -53,8 +53,38 @@ export const CHAPTER_CONTEXT: Record<string, ContextCard[]> = {
   ],
 };
 
+/** Revision-preview slugs ("<slug>-revision-preview") are the SAME chapter
+ * for every read-only content lookup — otherwise a preview loses its scene
+ * checks, image titles, and hero override, and every unbound check piles onto
+ * the hero (the owner's "three things about other images" bug, 2026-07-23).
+ * One helper so no future getter forgets. */
+export function contentSlug(slug: string): string {
+  return slug.replace(/-revision-preview$/u, "");
+}
+
 export function getChapterContext(slug: string): ContextCard[] | null {
-  return CHAPTER_CONTEXT[slug] ?? null;
+  return CHAPTER_CONTEXT[contentSlug(slug)] ?? null;
+}
+
+/** The one Behind-the-Chapter card that owns the historical_world material. */
+export function isWorldCard(card: { category: string; title: string }): boolean {
+  return /historical world|world behind/i.test(`${card.category} ${card.title}`);
+}
+
+/** Behind the Chapter absorbs historical_world ONLY when one of its rendered
+ * cards IS the world card — merely HAVING behind-the-chapter data is not
+ * absorption (Codex #104 review, 2026-07-23). The chapter tail keys its
+ * historical_world exclusion on this, so that content can never be dropped
+ * from both places at once. Server-safe: the tail is rendered on the server. */
+export function absorbsHistoricalWorld(data: {
+  slug: string;
+  behindTheChapter?: { category: string; title: string; body: string }[];
+}): boolean {
+  const cards =
+    data.behindTheChapter && data.behindTheChapter.length > 0
+      ? data.behindTheChapter
+      : getChapterContext(data.slug) ?? [];
+  return cards.some((c) => isWorldCard(c));
 }
 
 // ---- Targeted metaChip copy overrides --------------------------------------
@@ -69,7 +99,29 @@ export const CHAPTER_CHIP_OVERRIDES: Record<string, Record<number, string>> = {
 };
 
 export function getChipOverride(slug: string, index: number): string | null {
-  return CHAPTER_CHIP_OVERRIDES[slug]?.[index] ?? null;
+  return CHAPTER_CHIP_OVERRIDES[contentSlug(slug)]?.[index] ?? null;
+}
+
+// ---- Reader-facing map notes -----------------------------------------------
+// The stored map_notes bodies were written as production direction — "a
+// responsible map should show…", "should not automatically be staged…". True,
+// but addressed to the mapmaker, not to the reader (Codex #104 review,
+// 2026-07-23). These rewrites keep every hedge and every uncertainty the
+// stored note carries and say it to the person reading the chapter. Authored
+// per slug — never generated, never paraphrased at render time.
+export const MAP_NOTE_OVERRIDES: Record<string, string> = {
+  "mark-7":
+    "Tyre and Sidon sit north of Galilee on the Mediterranean coast, in territory strongly associated with Gentile life. The Decapolis was a cluster of Greco-Roman cities mostly east and southeast of the Sea of Galilee. Mark puts Jesus in and around both regions right after a teaching about what makes a person clean — the travel itself carries the point.\n\nVerse 31 traces an unusual path: from Tyre, through Sidon, toward the Sea of Galilee, and into the Decapolis. Plotted like a modern route, that is the long way around, and interpreters read it differently. So this map shows the broad movement through northern Gentile-associated regions and back toward the lake, rather than a road-by-road route Mark never gives us.",
+  "mark-8":
+    "Mark 8 covers a lot of ground, but several of its places cannot be pinned down — so this map shows regions rather than pretend precision. The feeding site is never named. The chapter may still be on the Decapolis side from Mark 7, but Mark does not say where the crowd gathered.\n\nDalmanutha is one of the hardest place names in the Gospels: some manuscript traditions preserve related alternatives, and no site has been securely identified. Bethsaida has several proposed locations near the northern end of the Sea of Galilee.\n\nCaesarea Philippi is a firmer regional anchor, generally associated with the Banias area — though Mark says Jesus was traveling among its villages, not standing at a landmark. Peter's confession happened on the road, and this map leaves it there rather than staging it at a grotto, a cliff, or a mountain.",
+  "mark-9":
+    "Capernaum is solid ground. Mark names it, and its place on the northwest shore of the Sea of Galilee is well supported archaeologically and historically. The house scene fits Mark's familiar Capernaum world, where homes, streets, synagogue life, fishing work, and travel routes all sat close together.\n\nThe mountain is a different matter — Mark never names it. Mount Tabor carries a long Christian tradition; a northern site near Mount Hermon fits the movement around Caesarea Philippi just before it. So the map shows the possibilities instead of choosing for you: Mark did not hand us a pin.",
+  "mark-10":
+    "Mark opens with Jesus in Judea and beyond the Jordan, then places the group near Jericho — the great oasis city on the approach to Jerusalem from the Jordan Valley. From Jericho, the road rises steeply.\n\nThat climb is why going to Jerusalem is spoken of as going up: it is real terrain, not only spiritual direction. Mark does not record every stop along the way, so this map shows broad regions and a likely route rather than the exact roadside of each conversation.",
+};
+
+export function getMapNoteOverride(slug: string): string | null {
+  return MAP_NOTE_OVERRIDES[contentSlug(slug)] ?? null;
 }
 
 // Confident main-view timeline note. Deeper authorship/manuscript nuance lives
@@ -80,7 +132,7 @@ export const CHAPTER_TIMELINE_NOTE: Record<string, string> = {
 };
 
 export function getTimelineNote(slug: string): string | null {
-  return CHAPTER_TIMELINE_NOTE[slug] ?? null;
+  return CHAPTER_TIMELINE_NOTE[contentSlug(slug)] ?? null;
 }
 
 // ---- Scene (image) titles --------------------------------------------------
@@ -104,7 +156,7 @@ export const CHAPTER_IMAGE_TITLES: Record<string, Record<string, string>> = {
 };
 
 export function getImageTitle(slug: string, kind: string, fallback: string): string {
-  return CHAPTER_IMAGE_TITLES[slug]?.[kind] ?? fallback;
+  return CHAPTER_IMAGE_TITLES[contentSlug(slug)]?.[kind] ?? fallback;
 }
 
 // ---- Hero overrides (render-level) ------------------------------------------
@@ -116,7 +168,7 @@ export const CHAPTER_HERO_OVERRIDES: Record<string, string> = {
 };
 
 export function getHeroKindOverride(slug: string): string | null {
-  return CHAPTER_HERO_OVERRIDES[slug] ?? null;
+  return CHAPTER_HERO_OVERRIDES[contentSlug(slug)] ?? null;
 }
 
 // ---- Scene Check ↔ image hints (render-level) -------------------------------
@@ -180,7 +232,7 @@ export const CHAPTER_SCENE_CHECK_IMAGE_HINTS: Record<string, Record<string, stri
 };
 
 export function getSceneCheckImageKind(slug: string, checkTitle: string): string | null {
-  const hints = CHAPTER_SCENE_CHECK_IMAGE_HINTS[slug];
+  const hints = CHAPTER_SCENE_CHECK_IMAGE_HINTS[contentSlug(slug)];
   if (!hints) return null;
   const title = checkTitle.toLowerCase();
   for (const [hint, kind] of Object.entries(hints)) {
@@ -575,5 +627,5 @@ export const CHAPTER_SCENE_CHECKS: Record<string, SceneCheck[]> = {
 };
 
 export function getSceneChecks(slug: string): SceneCheck[] | null {
-  return CHAPTER_SCENE_CHECKS[slug] ?? null;
+  return CHAPTER_SCENE_CHECKS[contentSlug(slug)] ?? null;
 }

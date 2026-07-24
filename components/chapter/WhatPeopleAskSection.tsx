@@ -1,5 +1,5 @@
 import type { ChapterWorkup } from "@/lib/types";
-import { SectionHead } from "@/components/chapter/SectionHead";
+import { SectionCard } from "@/components/chapter/SectionCard";
 import { getChapterFaq } from "@/lib/content/chapter-content";
 
 // "What People Ask" — static, approved chapter FAQ (not a live Ask Selah tool
@@ -10,21 +10,20 @@ export function WhatPeopleAskSection({ data }: { data: ChapterWorkup }) {
   if (!items || items.length === 0) return null;
 
   return (
-    <section id="what-people-ask" className="scroll-mt-20">
-      <SectionHead title="What People Ask" />
-      <div className="space-y-2.5">
+    <SectionCard id="what-people-ask" icon="💬" title="What People Ask">
+      <div className="-mx-1">
         {items.map((it, i) => (
-          <details key={i} className="group rounded-md border bg-card shadow-hair">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-[14px] font-medium text-primary transition hover:text-accent-strong">
+          <details key={i} className="group border-t first:border-0">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-1 py-2 text-[13px] font-medium text-primary transition hover:text-accent-strong">
               <span>{it.question}</span>
-              <span aria-hidden className="shrink-0 text-lg leading-none text-secondary transition group-open:rotate-45">
+              <span aria-hidden className="shrink-0 text-[15px] leading-none text-secondary transition group-open:rotate-45">
                 +
               </span>
             </summary>
-            <p className="border-t px-4 py-3 text-[13px] leading-relaxed text-secondary">{it.answer}</p>
+            <p className="px-1 pb-2.5 text-[13px] leading-relaxed text-secondary">{it.answer}</p>
           </details>
         ))}
       </div>
-    </section>
+    </SectionCard>
   );
 }

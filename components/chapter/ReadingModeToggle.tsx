@@ -9,18 +9,20 @@ import { useReadingMode, type ReadingMode } from "@/components/ReadingModeProvid
 // Read control, or FAQs (always collapsed).
 export function ReadingModeToggle() {
   const { mode, setMode } = useReadingMode();
+  // The Read control moved onto the Scripture pane, so this toggle owns the
+  // row and keeps its full labels at every width.
   const options: { id: ReadingMode; label: string }[] = [
     { id: "quick", label: "Quick Study" },
     { id: "deep", label: "Deep Study" },
   ];
   return (
-    <div className="inline-flex gap-1 rounded-full border bg-card p-1 shadow-hair">
+    <div className="inline-flex shrink-0 gap-0.5 rounded-full border bg-card p-0.5 shadow-hair">
       {options.map((o) => (
         <button
           key={o.id}
           onClick={() => setMode(o.id)}
           aria-pressed={mode === o.id}
-          className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
+          className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-[12.5px] font-medium transition sm:px-3 sm:text-[13px] ${
             mode === o.id ? "bg-accent-strong text-white" : "text-secondary"
           }`}
         >

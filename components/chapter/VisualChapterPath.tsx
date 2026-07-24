@@ -17,19 +17,35 @@ import {
 // Scene Checks that belong to a scene render with it, photo-and-caption
 // style: always open, directly under the picture (owner direction
 // 2026-07-19) — never paragraphs over the picture itself.
-export function VisualChapterPath({ data }: { data: ChapterWorkup }) {
+export function VisualChapterPath({
+  data,
+  bank = "all",
+}: {
+  data: ChapterWorkup;
+  /** UI-cleanup brief (board #29, 2026-07-21): the approved order carries
+   * THREE image banks — the hero is bank one; the remaining scenes split in
+   * narrative order into a "second" bank (first half, after People) and a
+   * "third" bank (rest, after What's-Easy-to-Miss). "all" keeps the whole
+   * path for layouts that render it once. */
+  bank?: "all" | "second" | "third";
+}) {
   // The hero already anchors the top of the page — the path carries the
   // REMAINING scenes in narrative order, so no image ever appears twice.
-  const scenes = [...supportingImagesFor(data)].sort((a, b) => a.index - b.index);
-  if (scenes.length === 0) return null;
-
+  const allScenes = [...supportingImagesFor(data)].sort((a, b) => a.index - b.index);
+  // Check assignment ALWAYS runs over the full supporting set — the same set
+  // standaloneChecksFor(hero) complements — so splitting into banks can never
+  // drop or double-render a check.
   const checks: SceneCheck[] =
     data.sceneChecks && data.sceneChecks.length > 0 ? data.sceneChecks : getSceneChecks(data.slug) ?? [];
   const { forScene: checkByKind } = assignSceneChecks(
     data.slug,
     checks,
-    scenes.map((scene) => scene.kind),
+    allScenes.map((scene) => scene.kind),
   );
+  const splitAt = Math.ceil(allScenes.length / 2);
+  const scenes =
+    bank === "all" ? allScenes : bank === "second" ? allScenes.slice(0, splitAt) : allScenes.slice(splitAt);
+  if (scenes.length === 0) return null;
 
   // Owner decision 2026-07-19: no "Path" header and no number badges — the
   // scenes simply flow with their captions and attached checks. Owner

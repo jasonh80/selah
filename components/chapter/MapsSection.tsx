@@ -18,7 +18,14 @@ import {
 //   Standing There → a future street-level view (official API only; graceful now)
 type Step = "big" | "local" | "street";
 
-export function MapsSection({ data }: { data: ChapterWorkup }) {
+export function MapsSection({
+  data,
+  notes,
+}: {
+  data: ChapterWorkup;
+  /** Rendered inside this block (owner ruling 2026-07-23). */
+  notes?: { title: string; body: string };
+}) {
   const cfg = getChapterMap(data.slug);
   const allSteps: { id: Step; label: string; show: boolean }[] = [
     { id: "big", label: "Big Picture", show: Boolean(cfg?.bigPicture) },
@@ -58,7 +65,33 @@ export function MapsSection({ data }: { data: ChapterWorkup }) {
       {step === "big" && cfg.bigPicture && <BigPicturePanel cfg={cfg.bigPicture} reference={data.reference} />}
       {step === "local" && cfg.local && <LocalMapPanel cfg={cfg.local} reference={data.reference} />}
       {step === "street" && cfg.streetView && <StreetViewPanel cfg={cfg.streetView} />}
+
+      {/* Map Notes ride INSIDE this block (owner ruling 2026-07-23). */}
+      {notes && <MapNotesDisclosure notes={notes} />}
     </section>
+  );
+}
+
+function MapNotesDisclosure({ notes }: { notes: { title: string; body: string } }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 overflow-hidden rounded-md border bg-card shadow-hair">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center px-3.5 py-2 text-left text-[12px] font-medium text-accent-strong"
+      >
+        Dive deeper
+        <span aria-hidden className="ml-auto text-[11px]">{open ? "⌃" : "⌄"}</span>
+      </button>
+      {open && (
+        <div className="border-t bg-tint px-3.5 py-2.5" style={{ borderLeft: "3px solid var(--accent-strong)" }}>
+          <p className="text-[12.5px] font-semibold leading-snug text-primary">{notes.title}</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-secondary">{notes.body}</p>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,25 +1,38 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ChapterWorkup } from "@/lib/types";
-import { SectionHead } from "@/components/chapter/SectionHead";
-import { getChapterContext, insightTypeOf, distinctText, type ContextMedia } from "@/lib/content/chapter-content";
+import { SectionCard } from "@/components/chapter/SectionCard";
+import { useReadingMode } from "@/components/ReadingModeProvider";
+import {
+  getChapterContext,
+  insightTypeOf,
+  distinctText,
+  isWorldCard,
+  type ContextMedia,
+} from "@/lib/content/chapter-content";
 
 type AAECard = { category: string; title: string; body: string; media?: ContextMedia };
 
-// Author, Audience & Evidence — who wrote it, who first heard it, the world they
-// lived in, and the manuscripts/inscriptions/landscape that ground it.
-// Single-column, full-width cards (Quick/Deep retired 2026-07-19).
-// Media renders only when a real asset exists — never an empty placeholder.
+/**
+ * Author · First Audience · Historical World · Evidence & Artifacts.
+ *
+ * OWNER RULING 2026-07-23: these are FIVE SEPARATE SECTIONS, not one big
+ * "Behind the Chapter" box with sub-sections inside it. His rule for the whole
+ * page: every block looks the same, and the only difference between blocks is
+ * that some expand and some are fixed. A box containing four more boxes broke
+ * that, so the wrapper is gone — each part now stands in the same frame as
+ * every other section on the page and expands the same way.
+ */
 export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
   // Prefer generated cards; fall back to static config (e.g. Psalm 23).
-  // Every DISTINCT authored layer survives in the same full-width card
-  // (Codex #64 final round): the Behind-the-Chapter body stays, and the
-  // removed historical_world insight's summary/full text append when they
-  // carry material the body doesn't already contain.
+  // Every DISTINCT authored layer survives (Codex #64 final round): the
+  // Behind-the-Chapter body stays, and the removed historical_world insight's
+  // summary/full text append when they carry material the body doesn't
+  // already contain.
   const worldInsight = data.insights?.find((i) => insightTypeOf(i) === "historical_world");
   const enrich = (card: AAECard): AAECard => {
-    const isWorld = /historical world|world behind/i.test(`${card.category} ${card.title}`);
-    if (!isWorld || !worldInsight) return card;
+    if (!isWorldCard(card) || !worldInsight) return card;
     const layers = [card.body];
     if (distinctText(worldInsight.preview, card.body)) layers.push(worldInsight.preview);
     if (distinctText(worldInsight.body, card.body) && distinctText(worldInsight.body, worldInsight.preview)) {
@@ -34,25 +47,31 @@ export function AuthorAudienceEvidence({ data }: { data: ChapterWorkup }) {
   if (cards.length === 0) return null;
 
   return (
-    <section id="author-audience-evidence" className="scroll-mt-20">
-      <SectionHead title="Behind the Chapter" />
-      <div className="space-y-2.5">
-        {cards.map((c, i) => (
-          <Card key={i} card={enrich(c)} />
-        ))}
-      </div>
-    </section>
+    <>
+      {cards.map((c, i) => (
+        <ContextSection key={i} card={enrich(c)} />
+      ))}
+    </>
   );
 }
 
-function Card({ card }: { card: AAECard }) {
+/** One context section: the category IS the section title, the authored
+ * headline is its one-line subtitle, and the body expands — exactly the shape
+ * every other expanding section on the page uses. */
+function ContextSection({ card }: { card: AAECard }) {
+  const { mode } = useReadingMode();
+  const [open, setOpen] = useState(mode === "deep");
+  useEffect(() => {
+    setOpen(mode === "deep");
+  }, [mode]);
   return (
-    <div className="flex flex-col rounded-md border bg-card p-3.5 shadow-hair">
-      <p className="text-eyebrow">{card.category}</p>
-      <p className="text-card-title mt-1 text-primary">{card.title}</p>
-
+    // IDENTICAL shape to every other expanding section (owner: "I don't want
+    // the reader wondering why we treated these sections differently"):
+    // section title, one paragraph that swaps its authored headline for the
+    // full body, and the same inline More/Less at the end of that paragraph.
+    <SectionCard id={sectionId(card.category)} icon="" title={titleCase(card.category)}>
       {card.media && (
-        <figure className="mt-3 overflow-hidden rounded-sm border">
+        <figure className="mb-2 overflow-hidden rounded-sm border">
           <img src={card.media.src} alt={card.media.alt} className="h-full w-full object-cover" loading="lazy" />
           <figcaption className="bg-card-soft px-2.5 py-1.5 text-[11px] leading-snug text-secondary">
             {card.media.caption}
@@ -60,10 +79,31 @@ function Card({ card }: { card: AAECard }) {
           </figcaption>
         </figure>
       )}
-
-      <p className={"mt-2 whitespace-pre-line text-[13px] leading-relaxed text-secondary"}>
-        {card.body}
+      <p className="whitespace-pre-line text-[13px] leading-relaxed text-secondary">
+        {open ? card.body : card.title}{" "}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="whitespace-nowrap text-[12px] font-medium text-accent-strong"
+        >
+          {open ? "Less ⌃" : "More ⌄"}
+        </button>
       </p>
-    </div>
+    </SectionCard>
   );
+}
+
+/** "FIRST AUDIENCE" → "First Audience"; authored casing wins when it is
+ * already mixed. */
+function titleCase(s: string): string {
+  const t = s.trim();
+  if (t !== t.toUpperCase()) return t;
+  return t
+    .toLowerCase()
+    .replace(/(^|\s|&\s)([a-z])/g, (_, pre, ch) => `${pre}${ch.toUpperCase()}`);
+}
+
+function sectionId(category: string): string {
+  return `context-${category.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 }

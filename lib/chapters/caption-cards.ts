@@ -30,7 +30,9 @@ export function imageCaptionCard(
   slug: string,
   image: { caption?: string; label?: string },
 ): string | undefined {
-  if (!CAPTION_CARD_APPROVED_SLUGS.has(slug)) return undefined;
+  // Revision previews render their base chapter's cards (the allowlist gate
+  // still applies — only approved BASE slugs ever show cards).
+  if (!CAPTION_CARD_APPROVED_SLUGS.has(slug.replace(/-revision-preview$/u, ""))) return undefined;
   const caption = image.caption?.trim();
   if (!caption || caption === image.label?.trim()) return undefined;
   return caption;
