@@ -76,6 +76,11 @@ export interface TerritoryCity {
   contextOnly?: boolean;
   /** Disputed exact site → render as a candidate area, not a precise pin. */
   disputedSite?: boolean;
+  /** The candidate sites (e.g. et-Tell / el-Araj for Bethsaida), each named. */
+  candidates?: { name: string; at: [number, number] }[];
+  /** A geographic polygon covering the candidates — drawn as a dashed
+   * uncertainty area instead of a false-precision point (Codex #104). */
+  disputedArea?: [number, number][];
 }
 
 /** Broad region washes — soft fills over the territory a ruler is known to
@@ -161,7 +166,22 @@ export const MARK_TERRITORY: TerritoryMap = {
     { name: "Machaerus", at: [35.62, 31.57], ruler: "antipas", provenance: "direct", note: "Josephus's site for John the Baptist's imprisonment and death, in Antipas's Perea." },
     // Philip — his tetrarchy (Bethsaida site disputed → area)
     { name: "Caesarea Philippi", at: [35.69, 33.25], ruler: "philip", provenance: "direct", note: "Rebuilt by Philip; the confession country of Mark 8." },
-    { name: "Bethsaida", at: [35.63, 32.91], ruler: "philip", provenance: "direct", note: "Philip's jurisdiction is secure; the exact site is disputed (et-Tell / el-Araj), so shown as an area.", disputedSite: true },
+    {
+      name: "Bethsaida",
+      at: [35.63, 32.9],
+      ruler: "philip",
+      provenance: "direct",
+      note: "Philip's jurisdiction is secure; the exact site is disputed between two candidates (et-Tell and el-Araj), so it is drawn as an area, not a pin.",
+      disputedSite: true,
+      candidates: [
+        { name: "et-Tell", at: [35.63, 32.913] },
+        { name: "el-Araj", at: [35.63, 32.888] },
+      ],
+      // A small dashed area covering both candidate sites near the north shore.
+      disputedArea: [
+        [35.605, 32.925], [35.655, 32.925], [35.658, 32.878], [35.605, 32.878],
+      ],
+    },
     // Roman prefect — Judea/Samaria
     { name: "Jerusalem", at: [35.23, 31.78], ruler: "prefect", provenance: "regional-inference", note: "In the Roman province under the prefect; the high priest led temple authority." },
     { name: "Caesarea Maritima", at: [34.9, 32.5], ruler: "prefect", provenance: "direct", note: "The Roman prefect's actual seat (Josephus)." },

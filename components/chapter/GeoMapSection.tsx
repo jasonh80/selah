@@ -501,7 +501,7 @@ function NumberedCorridor({ n }: { n: number }) {
 // area, not a precise pin. Everything is added once (hidden) and toggled.
 // Ancient (Then) borders and modern (Today) borders are separate layer sets;
 // only one shows, and only while Borders is on.
-const ANCIENT_LAYERS = ["territory-wash", "territory-outline-casing", "territory-outline", "territory-disputed", "territory-labels"];
+const ANCIENT_LAYERS = ["territory-wash", "territory-outline-casing", "territory-outline", "territory-disputed", "territory-disputed-line", "territory-candidate-labels", "territory-labels"];
 const MODERN_LAYERS = ["modern-borders-casing", "modern-borders", "modern-labels"];
 
 function addTerritory(map: maplibregl.Map): void {
@@ -542,8 +542,10 @@ function addTerritory(map: maplibregl.Map): void {
     paint: { "line-color": ["get", "color"], "line-width": 2.4, "line-opacity": 1 },
   });
 
-  // Disputed exact site (Bethsaida) → a dashed ring: an area, not a point.
-  const disputed = territoryCities(false).filter((c) => c.disputedSite);
+  // Disputed exact site (Bethsaida) → a real geographic candidate AREA
+  // (dashed polygon over both candidate sites), never a false-precision point
+  // (Codex #104 recheck). The two candidates get small hollow markers.
+  const disputed = territoryCities(false).filter((c) => c.disputedSite && c.disputedArea);
   map.addSource("territory-disputed", {
     type: "geojson",
     data: {
@@ -551,22 +553,57 @@ function addTerritory(map: maplibregl.Map): void {
       features: disputed.map((c) => ({
         type: "Feature" as const,
         properties: { color: MARK_RULERS[c.ruler].color },
-        geometry: { type: "Point" as const, coordinates: c.at },
+        geometry: { type: "Polygon" as const, coordinates: [[...c.disputedArea!, c.disputedArea![0]]] },
       })),
     },
   });
   map.addLayer({
     id: "territory-disputed",
-    type: "circle",
+    type: "fill",
     source: "territory-disputed",
     layout: { visibility: "none" },
-    paint: {
-      "circle-radius": 12,
-      "circle-color": ["get", "color"],
-      "circle-opacity": 0.18,
-      "circle-stroke-width": 1.5,
-      "circle-stroke-color": ["get", "color"],
+    paint: { "fill-color": ["get", "color"], "fill-opacity": 0.14 },
+  });
+  map.addLayer({
+    id: "territory-disputed-line",
+    type: "line",
+    source: "territory-disputed",
+    layout: { visibility: "none" },
+    paint: { "line-color": ["get", "color"], "line-width": 1.6, "line-dasharray": [2, 1.6], "line-opacity": 0.9 },
+  });
+  // Labels: the disputed city NAME across the area (no dot), plus the two
+  // candidate site names small beneath it.
+  const cands: { name: string; at: [number, number]; color: string; big?: boolean }[] = [];
+  disputed.forEach((c) => {
+    const col = MARK_RULERS[c.ruler].color;
+    // Area name near the top of the candidate box.
+    const top = Math.max(...c.disputedArea!.map((p) => p[1]));
+    const midLon = (Math.min(...c.disputedArea!.map((p) => p[0])) + Math.max(...c.disputedArea!.map((p) => p[0]))) / 2;
+    cands.push({ name: `${c.name} ?`, at: [midLon, top + 0.012], color: col, big: true });
+    (c.candidates ?? []).forEach((k) => cands.push({ name: k.name, at: k.at, color: col }));
+  });
+  cands.forEach((k, i) => {
+    const id = `terr-cand-${i}`;
+    const img = textLabelImage(k.name, { color: k.color, size: k.big ? 12 : 10, weight: k.big ? 700 : 600 });
+    if (map.hasImage(id)) map.removeImage(id);
+    map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+  });
+  map.addSource("territory-candidates", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: cands.map((k, i) => ({
+        type: "Feature" as const,
+        properties: { icon: `terr-cand-${i}` },
+        geometry: { type: "Point" as const, coordinates: k.at },
+      })),
     },
+  });
+  map.addLayer({
+    id: "territory-candidate-labels",
+    type: "symbol",
+    source: "territory-candidates",
+    layout: { visibility: "none", "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-anchor": "center" },
   });
 
   // ---- Ancient: labels — region NAMES + city NAMES colored by ruler.
@@ -580,7 +617,9 @@ function addTerritory(map: maplibregl.Map): void {
     map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
     labelFeatures.push({ type: "Feature", properties: { icon: id, pri: 0 }, geometry: { type: "Point", coordinates: r.labelAt } });
   });
-  territoryCities(false).forEach((c, i) => {
+  // Disputed-site cities are NOT given a precise point label — their name
+  // rides the candidate area instead (Codex #104: no false-precision dot).
+  territoryCities(false).filter((c) => !c.disputedSite).forEach((c, i) => {
     const id = `terr-city-${i}`;
     const img = textLabelImage(c.name, { color: MARK_RULERS[c.ruler].color, size: 12, weight: 700, dot: MARK_RULERS[c.ruler].color });
     if (map.hasImage(id)) map.removeImage(id);
@@ -943,42 +982,43 @@ export function GeoMapSection({
       icon="🗺"
       title="Maps &amp; Places"
       bleed
-      headerRight={
-        <div className="flex items-center gap-1.5">
-          <button
-            className={chip(view === "today")}
-            aria-pressed={view === "today"}
-            aria-label="Show today's cities instead of the chapter's places"
-            onClick={() => setView((v) => (v === "chapter" ? "today" : "chapter"))}
-          >
-            {view === "today" ? "Today" : "Then"}
-          </button>
-          {hasBorders && (
-            <button
-              className={chip(borders)}
-              aria-pressed={borders}
-              aria-label="Show who ruled where, around AD 29-30"
-              onClick={() => setBorders((b) => !b)}
-            >
-              Borders
-            </button>
-          )}
-          <button className={chip(threeD)} aria-pressed={threeD} aria-label="3-D terrain" onClick={() => setThreeD((t) => !t)}>
-            3-D
-          </button>
-          <button
-            className={chip(tourIdx !== null)}
-            aria-pressed={tourIdx !== null}
-            onClick={() => setTourIdx(tourIdx === null ? 0 : null)}
-          >
-            {tourIdx === null ? "▶ Journey" : "■ Stop"}
-          </button>
-          <button className={chip(false)} onClick={resetView}>
-            Reset
-          </button>
-        </div>
-      }
     >
+      {/* Controls on their own WRAPPING row (Codex #104 recheck): five chips
+          plus the full title cannot share one line at 320-390px, so the title
+          keeps the header and the controls wrap freely below it. */}
+      <div className="flex flex-wrap gap-1.5 px-3.5 pb-2 pt-0.5">
+        <button
+          className={chip(view === "today")}
+          aria-pressed={view === "today"}
+          aria-label="Show today's cities instead of the chapter's places"
+          onClick={() => setView((v) => (v === "chapter" ? "today" : "chapter"))}
+        >
+          {view === "today" ? "Today" : "Then"}
+        </button>
+        {hasBorders && (
+          <button
+            className={chip(borders)}
+            aria-pressed={borders}
+            aria-label="Show who ruled where, around AD 29-30"
+            onClick={() => setBorders((b) => !b)}
+          >
+            Borders
+          </button>
+        )}
+        <button className={chip(threeD)} aria-pressed={threeD} aria-label="3-D terrain" onClick={() => setThreeD((t) => !t)}>
+          3-D
+        </button>
+        <button
+          className={chip(tourIdx !== null)}
+          aria-pressed={tourIdx !== null}
+          onClick={() => setTourIdx(tourIdx === null ? 0 : null)}
+        >
+          {tourIdx === null ? "▶ Journey" : "■ Stop"}
+        </button>
+        <button className={chip(false)} onClick={resetView}>
+          Reset
+        </button>
+      </div>
       <div className="flex flex-col">
         {failed && (
           <div className="flex items-center justify-center p-8 text-center" style={{ aspectRatio: "4 / 3" }}>
