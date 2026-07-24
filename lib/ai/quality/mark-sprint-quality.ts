@@ -1,5 +1,9 @@
 import type { GeneratedChapterWorkup } from "../schemas/chapter-workup-schema";
 import contractJson from "./mark-sprint-acceptance.v1.json";
+import {
+  checkDiscipleship,
+  type DiscipleshipViolation,
+} from "./discipleship-gate";
 
 type Movement = { id: string; startVerse: number; endVerse: number };
 type ChapterContract = {
@@ -62,6 +66,25 @@ export interface MarkSprintQualityReport {
     textualVariants: string[];
   };
 }
+
+/**
+ * IQ-019: map each deterministic Disciple It violation to a stable QUALITY
+ * code in the existing "PREFIX-### NAME" grammar. Only the code reaches the
+ * durable audit token (safeQualityDiagnostic strips everything else), so these
+ * carry the failure class without leaking any authored copy.
+ */
+const DISCIPLESHIP_QUALITY_CODE: Record<DiscipleshipViolation["code"], string> = {
+  MISSING: "DSC-001 DISCIPLESHIP_MISSING",
+  DUPLICATE_SECTION: "DSC-002 DISCIPLESHIP_DUPLICATE_SECTION",
+  ASSIGNMENT_LANGUAGE: "DSC-003 DISCIPLESHIP_ASSIGNMENT_LANGUAGE",
+  QUOTA_OR_DEADLINE: "DSC-004 DISCIPLESHIP_QUOTA_OR_DEADLINE",
+  GUILT_OR_SCORE: "DSC-005 DISCIPLESHIP_GUILT_OR_SCORE",
+  PERSON_AS_PROJECT: "DSC-006 DISCIPLESHIP_PERSON_AS_PROJECT",
+  NO_VERSE_REF: "DSC-007 DISCIPLESHIP_NO_VERSE_REF",
+  VERSE_REF_OFF_CHAPTER: "DSC-008 DISCIPLESHIP_VERSE_REF_OFF_CHAPTER",
+  DUPLICATES_LIVE_IT: "DSC-009 DISCIPLESHIP_DUPLICATES_LIVE_IT",
+  GENERIC_COPY: "DSC-010 DISCIPLESHIP_GENERIC_COPY",
+};
 
 function normalized(value: string): string {
   return value
@@ -887,6 +910,52 @@ export function evaluateMarkSprintDraft(
         "SAFE-004 PROMPT_RULE_ADMIN_LEAKAGE",
         "Generation provenance is server-owned and cannot be supplied in model-authored bibleText metadata.",
         ["workup:/bibleText/source", "workup:/bibleText/note"],
+      );
+    }
+  }
+
+  // IQ-019 Disciple It safety gate (Codex ruling, 2026-07-24). Runs
+  // UNCONDITIONALLY — outside the acceptance-contract branch — so it protects
+  // newly prepared chapters (Mark 12 first) that do not yet have an acceptance
+  // contract entry. The existing STR-007 check enforces exactly-one core
+  // discipleship section only where a contract exists; this layer enforces
+  // presence + invitation-not-assignment for every fresh draft.
+  {
+    const sections = workup.sections ?? [];
+    const discipleshipSections = sections.filter(
+      (section) => section.type === "discipleship",
+    );
+    const primary =
+      discipleshipSections.find((section) => section.isCore) ??
+      discipleshipSections[0] ??
+      null;
+    const primaryIndex = primary ? sections.indexOf(primary) : -1;
+    const sectionPath =
+      primaryIndex >= 0
+        ? `workup:/sections/${primaryIndex}/fullContent`
+        : "workup:/sections";
+
+    const violations = checkDiscipleship({
+      section: primary
+        ? {
+            title: primary.title,
+            cardSummary: primary.cardSummary,
+            fullContent: primary.fullContent,
+            verseRefs: primary.verseRefs,
+          }
+        : null,
+      count: discipleshipSections.length,
+      applicationText: workup.application,
+      chapterRef: `${workup.book} ${workup.chapter}`,
+    });
+
+    for (const violation of violations) {
+      add(
+        DISCIPLESHIP_QUALITY_CODE[violation.code],
+        violation.evidence
+          ? `${violation.message} (evidence: "${violation.evidence}")`
+          : violation.message,
+        [violation.code === "DUPLICATE_SECTION" ? "workup:/sections" : sectionPath],
       );
     }
   }

@@ -246,18 +246,38 @@ export function passingDraft(slug: string): GeneratedChapterWorkup {
       reason: `This topic proves ${slug} topic ${index + 1} survives the authoring adapter.`,
       priority: index + 1,
     })),
-    sections: coreTypes.map((type, index) => ({
-      id: `${type}-${index + 1}`,
-      title: `Synthetic ${type.replaceAll("_", " ")} section`,
-      type,
-      priority: index + 1,
-      isCore: true,
-      cardSummary: `A distinct chapter-specific summary for ${type} in ${slug}.`,
-      fullContent: prose(
-        `${slug} ${type} section`,
-        `This unique body tests the ${type} requirement and contains enough structured material for a meaningful owner review.`,
-      ),
-    })),
+    sections: coreTypes.map((type, index) => {
+      // IQ-019: the discipleship section must clear the Disciple It safety gate
+      // (invitation, verse-grounded, chapter-specific, distinct from Live It),
+      // so it gets a bespoke compliant body instead of the generic prose().
+      if (type === "discipleship") {
+        return {
+          id: `${type}-${index + 1}`,
+          title: "Disciple It",
+          type,
+          priority: index + 1,
+          isCore: true,
+          verseRefs: [`Mark ${chapter}:1`],
+          cardSummary: `A gentle invitation, grounded in Mark ${chapter}:1, to let the chapter's picture of following Jesus travel to one other person.`,
+          fullContent:
+            `Mark ${chapter}:1 shows following Jesus beginning with him rather than with our own striving. ` +
+            `If it would help, you might quietly invite one friend to read verse ${chapter}:1 beside you and notice what Jesus does first — ` +
+            `letting that gentle offer be the whole of it, with no pressure, no timeline, and nothing anyone owes to report back.`,
+        };
+      }
+      return {
+        id: `${type}-${index + 1}`,
+        title: `Synthetic ${type.replaceAll("_", " ")} section`,
+        type,
+        priority: index + 1,
+        isCore: true,
+        cardSummary: `A distinct chapter-specific summary for ${type} in ${slug}.`,
+        fullContent: prose(
+          `${slug} ${type} section`,
+          `This unique body tests the ${type} requirement and contains enough structured material for a meaningful owner review.`,
+        ),
+      };
+    }),
     biblicalTimeline: {
       era: "Life of Jesus",
       estimatedYear: 30,
@@ -343,6 +363,60 @@ for (const slug of ["mark-7", "mark-8", "mark-9", "mark-10", "mark-11"]) {
 }
 
 const base = passingDraft("mark-8");
+
+// IQ-019: prove the Disciple It safety gate is wired into the LIVE quality
+// path (evaluateMarkSprintDraft), not only the standalone gate/fixtures.
+// A coercive Disciple It section must block the whole draft.
+const coerciveDiscipleship = {
+  ...base,
+  sections: base.sections.map((section) =>
+    section.type === "discipleship"
+      ? {
+          ...section,
+          fullContent:
+            `Your assignment this week: ask three people to read Mark 8 alongside verse 8:1 ` +
+            `and report back to you by Sunday so you can track how many friends you have discipled.`,
+        }
+      : section,
+  ),
+};
+const coerciveReport = evaluateMarkSprintDraft(
+  parseChapterWorkupJson(JSON.stringify(coerciveDiscipleship)),
+  "mark-8",
+);
+assert.equal(
+  coerciveReport.machineVerdict,
+  "block",
+  "a coercive Disciple It section must block the draft",
+);
+assert.ok(
+  hasCode(coerciveReport, "DSC-003 DISCIPLESHIP_ASSIGNMENT_LANGUAGE"),
+  "assignment language must be caught by the live path",
+);
+assert.ok(
+  hasCode(coerciveReport, "DSC-004 DISCIPLESHIP_QUOTA_OR_DEADLINE"),
+  "quota/deadline must be caught by the live path",
+);
+
+// IQ-019: the gate runs UNCONDITIONALLY — even for a slug with no acceptance
+// contract yet (Mark 12). A fresh Mark 12 draft missing Disciple It is still
+// caught, which is exactly the launch case this wiring protects.
+const mark12NoDiscipleship = {
+  ...base,
+  book: "Mark",
+  chapter: 12,
+  slug: "mark-12",
+  title: "Mark 12",
+  sections: base.sections.filter((section) => section.type !== "discipleship"),
+};
+const mark12Report = evaluateMarkSprintDraft(
+  parseChapterWorkupJson(JSON.stringify(mark12NoDiscipleship)),
+  "mark-12",
+);
+assert.ok(
+  hasCode(mark12Report, "DSC-001 DISCIPLESHIP_MISSING"),
+  "missing Disciple It on Mark 12 must be caught even without a contract entry",
+);
 
 const wrongIdentity = { ...base, slug: "mark-9" };
 assert.ok(
