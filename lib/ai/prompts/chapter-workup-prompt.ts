@@ -248,6 +248,7 @@ optional. Fill every string with real, specific content for ${book} ${chapter}:
   "primaryCharacters": ["<name>", "<name>"],
   "summary": "<2-3 sentences>",
   "sceneSetter": "<sets the scene>",
+  "setTheScene": { "kicker": "What it may have felt like", "body": "<One short immersive paragraph (or two) that lets the reader inhabit the chapter's physical world BEFORE it is explained: where and when they are, the probable season/weather (a responsible temperature RANGE only when season+location+geography support it), terrain, vegetation and light, the sounds and smells and textures the setting likely carried, and end with one sentence linking the physical setting to what the passage is doing. Selah Voice, conversational and visual — never a forecast, dashboard, or climate footnote. Use hedged language (probably, likely, may have felt) for anything not stated in the text; never present a reconstructed temperature as Scripture fact; prefer a broad human range over false precision. Keep it short enough to read in one sitting.>" },
   "historicalContext": "<historical + cultural background>",
   "whatHappens": "<what happens in the chapter>",
   "whatPeopleMiss": "<what a modern reader misunderstands or overlooks>",
