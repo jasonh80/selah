@@ -2641,6 +2641,11 @@ export default function SelahStudioPage() {
               </div>
             </details>
 
+            {/* key={slug}: the panel's status/reveal state belongs to ONE
+                chapter — switching chapters must never show another
+                chapter's run as this one's. */}
+            <ModelDayPanel key={slug} slug={slug} api={api} />
+
             <details className="border-t pt-3">
               <summary className="cursor-pointer text-[13px] font-medium text-primary">Recent activity</summary>
               <div className="mt-1.5 space-y-1">
@@ -2698,6 +2703,229 @@ export default function SelahStudioPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------- Model Day (printing-press plan standing ritual) ----------------
+// Private blind A/B: the current chapter's workup prompt on the incumbent
+// model vs one challenger. Nothing is saved to chapter data, nothing is
+// published, no model is switched — the judge packet is blind (A/B only) and
+// the sealed mapping is revealed by an explicit tap after the verdict.
+function ModelDayPanel({
+  slug,
+  api,
+}: {
+  slug: string;
+  api: (method: "GET" | "POST", body?: unknown) => Promise<Record<string, unknown>>;
+}) {
+  const [status, setStatus] = useState<Record<string, unknown> | null | undefined>(undefined);
+  const [challenger, setChallenger] = useState("gpt-5.6-sol");
+  const [arming, setArming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [reveal, setReveal] = useState<Record<string, unknown> | null>(null);
+
+  // The quote (and its digest) is valid for ONE exact (incumbent, challenger)
+  // pair — editing the challenger stales it, so the confirm button disarms
+  // until a fresh server quote for the edited pair is on screen.
+  async function loadStatus(forChallenger: string) {
+    setMsg("");
+    setReveal(null);
+    const j = await api("POST", { action: "model_day_status", slug, challengerModel: forChallenger.trim() }).catch(() => null);
+    setStatus(j && j.ok === true ? j : null);
+  }
+
+  async function run() {
+    const digest = quote && typeof quote.quoteDigest === "string" ? quote.quoteDigest : "";
+    if (!digest) return; // the button is disabled without a quote; belt+braces
+    setBusy(true);
+    setMsg("");
+    try {
+      const j = await api("POST", {
+        action: "model_day_create",
+        slug,
+        challengerModel: challenger.trim(),
+        quoteDigest: digest,
+        confirm: true,
+      });
+      if (j.ok === true) {
+        setArming(false);
+        setMsg("Running — both candidates generate in the background. Check status in a few minutes.");
+      } else {
+        setMsg(String(j.error ?? "The run could not start."));
+      }
+    } catch {
+      setMsg("Studio could not reach the server.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyPacket() {
+    setMsg("");
+    try {
+      const j = await api("POST", { action: "model_day_packet", slug });
+      if (j.ok !== true) {
+        setMsg(String(j.error ?? "No completed run to copy."));
+        return;
+      }
+      await navigator.clipboard.writeText(JSON.stringify(j.packet, null, 2));
+      setMsg("Blind judge packet copied — paste it to Codex. It contains candidates A/B only, no model names.");
+    } catch {
+      setMsg("The packet could not be copied.");
+    }
+  }
+
+  async function recordVerdict(verdict: "A" | "B" | "tie") {
+    setMsg("");
+    const digest = status && typeof status.packetDigest === "string" ? status.packetDigest : "";
+    if (!digest) return;
+    try {
+      const j = await api("POST", { action: "model_day_verdict", slug, packetDigest: digest, verdict });
+      if (j.ok === true) {
+        setMsg(`Verdict ${verdict} recorded — the reveal is now unlocked.`);
+        void loadStatus(challenger);
+      } else {
+        setMsg(String(j.error ?? "The verdict could not be recorded."));
+      }
+    } catch {
+      setMsg("Studio could not reach the server.");
+    }
+  }
+
+  async function unseal() {
+    setMsg("");
+    const digest = status && typeof status.packetDigest === "string" ? status.packetDigest : "";
+    if (!digest) {
+      setMsg("Check status first — the reveal needs the completed run's packet digest.");
+      return;
+    }
+    try {
+      const j = await api("POST", { action: "model_day_reveal", slug, packetDigest: digest });
+      if (j.ok === true) setReveal(j);
+      else setMsg(String(j.error ?? "The mapping could not be revealed."));
+    } catch {
+      setMsg("Studio could not reach the server.");
+    }
+  }
+
+  const quote = status && typeof status.quote === "object" && status.quote !== null ? (status.quote as Record<string, unknown>) : null;
+  const runStatus = status && typeof status.status === "string" ? status.status : null;
+  const verdictRecorded = status?.verdictRecorded === true;
+  return (
+    <details className="border-t pt-3">
+      <summary className="cursor-pointer text-[13px] font-medium text-primary">Model Day (blind A/B)</summary>
+      <div className="mt-1.5 space-y-1.5">
+        <p className="text-[11px] text-secondary">
+          Same chapter, current model vs a challenger — private, blind, nothing saved to the chapter,
+          nothing published, no model switched. Codex judges the packet blind; the mapping stays sealed
+          until its verdict is recorded here. The winner is a separate deliberate selection above.
+        </p>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => void loadStatus(challenger)} className="text-[12px] text-secondary underline">
+            Check status
+          </button>
+          {runStatus && (
+            <p className="text-[12px] text-secondary">
+              Latest for <span className="text-primary">{slug || "—"}</span>:{" "}
+              <span className="text-primary">{runStatus}</span>
+              {typeof status?.costUsd === "number" ? ` · ${formatUsd(status.costUsd as number)}` : ""}
+              {runStatus === "done" ? (verdictRecorded ? " · verdict recorded" : " · awaiting verdict") : ""}
+            </p>
+          )}
+        </div>
+        {status === null && (
+          <p className="text-[12px] text-jesus-red">Model Day status could not be read — try again.</p>
+        )}
+        {typeof status?.error === "string" && status.error !== "" && (
+          <p className="text-[12px] text-jesus-red">Last run: {String(status.error)}</p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-[12px] text-secondary" htmlFor="model-day-challenger">
+            Challenger
+          </label>
+          <input
+            id="model-day-challenger"
+            value={challenger}
+            onChange={(e) => {
+              setChallenger(e.target.value);
+              // Any edit stales the on-screen quote: drop it so the confirm
+              // button disarms until this exact pair is re-quoted.
+              setStatus(undefined);
+              setArming(false);
+            }}
+            className="w-40 rounded-lg border bg-card px-2 py-1 text-[12px] text-primary"
+          />
+          {!arming ? (
+            <button
+              type="button"
+              onClick={() => {
+                // Arming ALWAYS fetches the pair's server quote first: the
+                // confirm button never spends without the exact numbers (and
+                // their digest) on screen.
+                setArming(true);
+                void loadStatus(challenger);
+              }}
+              disabled={!slug || busy}
+              className="rounded-full border px-2.5 py-1 text-[12px] text-primary disabled:opacity-50"
+            >
+              Run blind A/B…
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void run()}
+              disabled={busy || !quote}
+              className="rounded-full border border-accent-strong bg-accent-strong/15 px-2.5 py-1 text-[12px] text-primary disabled:opacity-50"
+            >
+              {quote
+                ? `Confirm ${String(status?.incumbentModel ?? "?")} vs ${String(quote.challengerModel ?? "?")} — ~${formatUsd(Number(quote.expectedUsd ?? 0))} (hard cap ${formatUsd(Number(quote.totalCapUsd ?? 0))})`
+                : typeof status?.quoteError === "string" && status.quoteError !== ""
+                  ? String(status.quoteError)
+                  : "Loading the exact quote…"}
+            </button>
+          )}
+          {arming && (
+            <button type="button" onClick={() => setArming(false)} className="text-[12px] text-secondary underline">
+              Cancel
+            </button>
+          )}
+        </div>
+        {runStatus === "done" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => void copyPacket()} className="rounded-full border px-2.5 py-1 text-[12px] text-primary">
+              Copy blind judge packet
+            </button>
+            {!verdictRecorded ? (
+              <span className="flex items-center gap-1.5">
+                <span className="text-[11px] text-secondary">Record Codex&rsquo;s blind ruling:</span>
+                {(["A", "B", "tie"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => void recordVerdict(v)}
+                    className="rounded-full border px-2 py-0.5 text-[11px] text-primary"
+                  >
+                    {v}
+                  </button>
+                ))}
+              </span>
+            ) : (
+              <button type="button" onClick={() => void unseal()} className="text-[12px] text-secondary underline">
+                Reveal mapping
+              </button>
+            )}
+          </div>
+        )}
+        {reveal && (
+          <p className="text-[12px] text-primary">
+            A = {String(reveal.labelMap ? (reveal.labelMap as Record<string, string>).A : "?")} · B ={" "}
+            {String(reveal.labelMap ? (reveal.labelMap as Record<string, string>).B : "?")} · verdict {String(reveal.verdict ?? "?")}
+          </p>
+        )}
+        {msg && <p className="text-[12px] text-secondary">{msg}</p>}
+      </div>
+    </details>
   );
 }
 

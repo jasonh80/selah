@@ -118,6 +118,16 @@ export async function triggerBackgroundPrepareProposal(
   return trigger("prepare", "prepare-proposal-background", slug, host, jobId);
 }
 
+/** Model Day blind A/B worker trigger (printing-press plan ritual). Same
+ * signed-token discipline; the claim is the inserted 'generating' run row. */
+export async function triggerBackgroundModelDay(
+  slug: string,
+  host: string,
+  jobId: string,
+): Promise<TriggerResult> {
+  return trigger("model-day", "model-day-background", slug, host, jobId);
+}
+
 export async function triggerBackgroundImageGeneration(
   slug: string,
   host: string,

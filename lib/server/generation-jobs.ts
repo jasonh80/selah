@@ -95,7 +95,7 @@ export function newJobId(): string {
 
 // ---------------- signed, expiring worker tokens ----------------
 
-export type JobPurpose = "text" | "image" | "prepare" | "published-image-redo";
+export type JobPurpose = "text" | "image" | "prepare" | "published-image-redo" | "model-day";
 
 // Reuses the existing admin secret when a dedicated one isn't configured.
 // FAIL-CLOSED: with neither set, tokens can't be signed and workers refuse all
