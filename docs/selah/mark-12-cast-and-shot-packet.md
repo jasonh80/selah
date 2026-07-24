@@ -86,10 +86,14 @@ work, and never send scene-only roles to casting. Four tiers:
   here is promoted to permanent.
 - **Chapter-local continuity** — one approved face/reference reused only WITHIN
   this chapter when a one-chapter person appears recognizably in more than one
-  image; not promoted into the canonical cast. *Mark 12:* the **poor widow**
-  (`mark12-widow-two-coins`) and the **scribe of the great commandment**
-  (`mark12-scribe-great-commandment`) — chapter-local representative references,
-  **not** recurring biblical identities.
+  image; not promoted into the canonical cast. *Mark 12 (owner's explicit
+  exception):* the **poor widow** (`mark12-widow-two-coins`) and the **scribe of
+  the great commandment** (`mark12-scribe-great-commandment`) are **retained as
+  approved chapter-local references for Mark 12 and its revisions**, even though
+  the current manifest shows each in a single image — they are already made and
+  kept. **Going forward**, a one-image equivalent is **scene-only** (next tier):
+  no audition, generated directly from a strong prompt. These are chapter-local
+  representative references, **not** recurring biblical identities.
 - **Scene / group references** — historically grounded archetype/scene refs, not
   individual casting. *Mark 12:* `mark12-sadducee`, `mark12-herodian`,
   `mark12-chief-priest`, and `mark12-temple-crowd` are scene/group references.
@@ -130,13 +134,16 @@ portrait registry in this repo.
 | wealthy donors | ✅ covered | folded into `mark12-temple-crowd` scene casting |
 | ordinary temple crowd | ✅ approved | `mark12-temple-crowd` — proportional crowd brief, per Eyes v1.2 |
 
-**Status (2026-07-24): all Twelve are visually complete — 12/12 LOCK.** The 12/12
-lock was Codex-verified byte-identical at Kelly `aff1d19`; the Mark 12 supporting
-assets and the John/Judas apostle portraits landed afterward, first committed at
-`bb4d3c3`, and the current Kelly head is **`ea8123f`**. John, Judas, and Simon are
-now locked, so a Mark 12 image may show the full Twelve honestly. The Mark 12
-supporting roles above are cast and approved (picks recorded in
-`Selah-Kelly/lib/characters/cast-picks.json`, portraits committed locally).
+**Status (2026-07-24): all Twelve are visually complete — 12/12 LOCK.**
+Reproducible commit state: the current clean Kelly head is **`ea8123f`**; the
+Mark 12 supporting assets and the John/Judas apostle portraits were first
+committed at **`bb4d3c3`**, and the picks are in
+`Selah-Kelly/lib/characters/cast-picks.json` (also committed). (An earlier
+read-only check verified the twelve canonical *portraits* byte-identical at
+`aff1d19`, but that tree predates the John/Judas/supporting assets, so cite
+`ea8123f`/`bb4d3c3` — not `aff1d19` and not an uncommitted working-tree
+observation — as the reproducible state.) John, Judas, and Simon are now locked,
+so a Mark 12 image may show the full Twelve honestly.
 
 **Sync gap (important): these references are Kelly-repo-local and are NOT ported
 into this Selah repo.** Selah has no copy of the `mark12-*` files or a portrait
@@ -172,11 +179,17 @@ assorted.
 ### `mark12-herodian` — group
 
 - **SAYS:** they exist and act with the Pharisees against Jesus (3:6, 12:13).
-- **SMART GUESS:** partisans of the Herodian house; more Greco-Roman in dress
-  and grooming than the Pharisees standing beside them — that visible contrast
-  is the point of the pairing.
+  Their defining, attested trait is a **political allegiance** to the Herodian
+  house — NOT a uniform or a documented look.
+- **SMART GUESS:** likely more Hellenised/Greco-Roman in bearing than the
+  Pharisees beside them.
+- **OPEN CASTING CHOICE (not evidence):** Herodian grooming and clothing are a
+  representative visual choice, not attested fact — do NOT invent a visible
+  "Herodian uniform." Any dress contrast is a legible casting device, labeled as
+  such, never presented as historical.
 - **UNKNOWN:** organisation, membership, everything else. Say so.
-- **Look:** trimmed beards, Hellenised cut of garment, a little Roman polish.
+- **Look:** a plausible, understated period option (e.g. a slightly more
+  Hellenised cut) — chosen for legibility, claimed as nothing.
 
 ### `mark12-chief-priest` — group (distinct from the serving priest)
 
@@ -214,10 +227,12 @@ assorted.
 
 ### `mark12-temple-crowd` (with wealthy donors folded in) — scene casting
 
-- Not recurring characters. Proportional crowd per Eyes v1.2: nearly all
-  bearded, natural Levantine range without an artificial spread, mostly
-  twenties to forties with a few genuinely older, lean to sturdy. The wealthy
-  read wealthy through cloth and bearing — **not** through fatness or sneering.
+- Not recurring characters. Proportional crowd per Eyes v1.2: a **mixed temple
+  crowd — men, women, and families** across the natural Levantine range, without
+  an artificial spread; adult men **generally bearded**; a real spread of ages,
+  lean to sturdy. Preserve the approved woman/donor background direction. The
+  wealthy read wealthy through cloth and bearing — **not** through fatness or
+  sneering.
 
 ---
 
@@ -267,7 +282,7 @@ staged, and deliberately not a row of Bible illustrations.
   `archetype-pharisee` and the new `mark12-herodian`.
 - **Guardrail:** **no villain coding.** These men are hostile and they are not
   monsters. Contrast them by dress and grooming, never by ugliness.
-- **Tooling:** ✅ now, once the Herodian brief is approved.
+- **Tooling:** ✅ now (references already approved; the only limitation is the Kelly→Selah reference/import path).
 
 ### Shot 4 — "Not Far From the Kingdom" (the intimate human moment)
 
@@ -280,7 +295,7 @@ staged, and deliberately not a row of Bible illustrations.
   `mark12-scribe-great-commandment`.
 - **Guardrail:** the scribe must read as a scholar being *met*, not corrected.
   This is the image where warmth is the accuracy requirement.
-- **Tooling:** ✅ now, once his brief is approved.
+- **Tooling:** ✅ now (reference already approved; the only limitation is the reference/import path).
 
 ### Shot 5 — "Two Small Coins" (the chapter's heart)
 
@@ -298,7 +313,7 @@ staged, and deliberately not a row of Bible illustrations.
   the reason. Reference-lock holds ~2–3 exact faces per frame; describe the rest.
 - **Guardrail:** the treasury chests are the temple's trumpet-shaped
   receptacles; she is dignified, not pitiable; the rich are not caricatured.
-- **Tooling:** ✅ now, once her brief is approved.
+- **Tooling:** ✅ now (reference already approved; the only limitation is the reference/import path).
 
 ### Deliberately NOT proposed
 
@@ -306,8 +321,10 @@ staged, and deliberately not a row of Bible illustrations.
   tenants as people risks them being read as historical, and Codex's rule is
   explicit. *If* an image is wanted for 12:1–12, propose instead an
   observational shot of a real Judean vineyard — terraced vines, a stone
-  winepress, a watchtower, **no figures at all**. It grounds the parable in the
-  actual agriculture Jesus' hearers knew, and claims nothing.
+  winepress, a watchtower, **no figures at all** — captioned as **"a
+  visualization of the vineyard Jesus describes"** (Codex ruling), not a scene
+  that happened. It grounds the parable in the actual agriculture Jesus' hearers
+  knew, and claims nothing.
 - **The seven brothers.** A hypothetical in an argument. Never depict.
 - **Caesar in person.** He is on the coin. That is the whole joke of the scene.
 
