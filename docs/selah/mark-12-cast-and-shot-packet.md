@@ -88,27 +88,34 @@ portrait registry in this repo.
 | Matthew | ✅ portrait approved (keep-face) | wardrobe simplifies in scenes (owner's arc: plain by now, one fine detail) |
 | Thomas | ✅ portrait approved (keep-face) | |
 | Philip · Bartholomew · James (Zebedee) | ✅ LOCKED | Codex certification |
-| James (Alphaeus) · Thaddaeus | ✅ portrait approved (keep-face) | ⚠ James-Alphaeus collides visually with Bartholomew |
-| **John (Zebedee)** | ❌ **profile only, NO portrait** | not castable in a Mark 12 image |
-| **Judas Iscariot** | ❌ **profile only, NO portrait** | not castable in a Mark 12 image |
-| **Simon the Zealot** | ⚠ portrait exists but **superseded** | true re-audition staged on the neutral brief; do not use the old face |
-| chief priests / elders | ⚠ partial | `archetype-high-priest` and `archetype-priest` exist, but neither is the **priestly aristocracy** who challenge Jesus. Needs a bounded distinction. |
+| James (Alphaeus) · Thaddaeus | ✅ LOCKED | James-Alphaeus **recast** older/plainer (~50, representative); the Bartholomew collision is RESOLVED |
+| **John (Zebedee)** | ✅ **LOCKED** | portrait approved and locked (`john-apostle`); castable in Mark 12 |
+| **Judas Iscariot** | ✅ **LOCKED** | portrait approved and locked; castable in Mark 12 |
+| **Simon the Zealot** | ✅ **LOCKED** | aged re-audition (~mid-40s) promoted; the James (Zebedee) collision is RESOLVED. Use the current face only |
+| chief priests / elders | ✅ approved | `mark12-chief-priest` — the priestly aristocracy who challenge Jesus, distinct from the serving priest |
 | scribes (group) | ✅ exists | `archetype-scribe` (temple scribe) |
 | Pharisees | ✅ exists | `archetype-pharisee` |
-| **Herodians** | ❌ needed | no archetype |
-| **Sadducees** | ❌ needed | casting board already flags this |
-| **the individual scribe (12:28–34)** | ❌ needed | the group archetype cannot carry an individual with a face and a moment |
-| **the poor widow** | ❌ needed | one-chapter representative profile |
-| wealthy donors | ❌ needed | scene casting, not recurring characters |
-| ordinary temple crowd | ❌ needed | proportional crowd brief, per Eyes v1.2 |
+| **Herodians** | ✅ approved | `mark12-herodian` |
+| **Sadducees** | ✅ approved | `mark12-sadducee` |
+| **the individual scribe (12:28–34)** | ✅ approved | `mark12-scribe-great-commandment` — an individual with a face and a moment |
+| **the poor widow** | ✅ approved | `mark12-widow-two-coins` — one-chapter representative depiction |
+| wealthy donors | ✅ covered | folded into `mark12-temple-crowd` scene casting |
+| ordinary temple crowd | ✅ approved | `mark12-temple-crowd` — proportional crowd brief, per Eyes v1.2 |
 
-**Explicit correction of an earlier claim:** the Twelve are **not** visually
-complete. Ten of twelve have portraits; John and Judas have none and Simon's is
-superseded. No Mark 12 image may imply a complete Twelve.
+**Status (2026-07-24): all Twelve are visually complete — 12/12 LOCK**, Codex-
+verified byte-identical at Kelly head `aff1d19`. John, Judas, and Simon are now
+locked, so a Mark 12 image may show the full Twelve honestly. The Mark 12
+supporting roles above are cast and approved (picks recorded in
+`Selah-Kelly/lib/characters/cast-picks.json`, portraits committed locally).
 
 ---
 
-## 3. The smallest missing casting work (prepared, NOT generated)
+## 3. The Mark 12 supporting briefs (now cast + approved)
+
+*As of 2026-07-24 these six briefs have been generated ChatGPT-side and
+approved (picks in `Selah-Kelly/lib/characters/cast-picks.json`, portraits
+committed locally). The briefs are retained below as the authored source of
+truth for each role.*
 
 Every entry uses **SAYS / SMART GUESS / UNKNOWN**. Guardrails from Eyes v1.2
 apply: no villain faces for opponents, no theatrical misery for the widow, no
@@ -243,12 +250,13 @@ staged, and deliberately not a row of Bible illustrations.
   the one most often illustrated badly.
 - **Shot language:** medium, observational, from Jesus' seated vantage across
   the court — we watch her the way he watched her. She does not perform.
-- **Visible cast IDs:** the new `widow-of-the-two-coins`; `wealthy-donors` and
-  `temple-crowd` as scene casting; optionally `jesus` plus **a clearly recorded
-  subset of disciples** for 12:43.
-- **Disciple subset if used:** Peter, Andrew, Matthew, Thomas — all four have
-  approved portraits. **Record exactly who is shown. Do not frame it as the
-  Twelve.** John, Judas, and Simon are unavailable.
+- **Visible cast IDs:** `mark12-widow-two-coins`; `mark12-temple-crowd` (with
+  wealthy donors folded in) as scene casting; optionally `jesus` plus **a
+  clearly recorded subset of disciples** for 12:43.
+- **Disciple subset if used:** all Twelve now have locked portraits, so any
+  subset is castable. **Still record exactly who is shown** rather than relying
+  on "the Twelve" as a label — honesty about who is depicted, not scarcity, is
+  the reason. Reference-lock holds ~2–3 exact faces per frame; describe the rest.
 - **Guardrail:** the treasury chests are the temple's trumpet-shaped
   receptacles; she is dignified, not pitiable; the rich are not caricatured.
 - **Tooling:** ✅ now, once her brief is approved.
@@ -306,18 +314,22 @@ parallel:**
 
 **Ready now:**
 - Role inventory with parable/hypothetical figures firewalled from the cast.
-- Database audit, including the correction that the Twelve are not complete.
+- Database audit — updated: all Twelve are complete (12/12 LOCK), and the six
+  Mark 12 supporting roles are cast and approved (portraits committed locally).
 - Five-shot manifest with cast IDs, references, and guardrails.
 - Bridge design using only existing machinery.
 
+**Done since first draft (2026-07-24):**
+- The six supporting briefs are cast and approved (`mark12-sadducee`,
+  `mark12-herodian`, `mark12-chief-priest`, `mark12-scribe-great-commandment`,
+  `mark12-widow-two-coins`, `mark12-temple-crowd`).
+- The James-Alphaeus recast is DONE (older/plainer) and Simon's aged
+  re-audition is promoted — both collisions resolved, 12/12 LOCK.
+
 **Needs Jason or Kelly:**
 - Approve the five-shot set (or cut/add).
-- Approve the six new briefs (Sadducee, Herodian, chief-priest, the scribe, the
-  widow, crowd/donors).
 - Decide whether the vineyard observational image is wanted for 12:1–12.
 - Approve the upload-script bridge, or say wait for IQ-026.
-- The James-Alphaeus recast decision still stands open from the differentiators
-  proposal.
 
 **Needs Codex:**
 - Review the six briefs for SAYS/SMART GUESS/UNKNOWN discipline.
