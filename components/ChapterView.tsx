@@ -2,6 +2,7 @@ import type { ChapterWorkup } from "@/lib/types";
 import { HeroImage } from "@/components/chapter/HeroImage";
 import { MetadataChips, jesusChipLine } from "@/components/chapter/MetadataChips";
 import { QuickSummaryCard } from "@/components/chapter/QuickSummaryCard";
+import { SetTheSceneCard } from "@/components/chapter/SetTheSceneCard";
 import { TimelineSection } from "@/components/chapter/TimelineSection";
 import { VisualChapterPath } from "@/components/chapter/VisualChapterPath";
 import { InsightCards } from "@/components/chapter/InsightCardGrid";
@@ -82,6 +83,12 @@ export function ChapterView({
 
         {/* 2 — First image bank: the hero with its caption + checks */}
         <HeroImage data={data} />
+
+        {/* 2b — Set the Scene: after the first image bank, before Big Idea
+            (Codex/owner 2026-07-23). Grounds the reader in the world they just
+            saw — season, weather, terrain, light, sound, texture — in hedged
+            Selah Voice. Renders only when the chapter carries it. */}
+        <SetTheSceneCard data={data} />
 
         {/* 3 — Quick Summary FIRST and always full size (owner ruling
             2026-07-23): what happens comes before what it means. */}

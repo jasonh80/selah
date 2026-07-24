@@ -175,6 +175,11 @@ export interface ChapterWorkup {
 
   quickSummary: string;
   summary: string;
+  /** "Set the Scene" — an optional immersive reader card (season/weather/
+   * terrain/light/sound/texture) shown after the first image bank and before
+   * Big Idea. Copy is hedged and bounded by the chapter's Season & Setting
+   * evidence; absent chapters simply don't render it. */
+  setTheScene?: { kicker?: string; body: string };
   context: string;
   whatHappens?: string;
   modernReadersMiss: string;

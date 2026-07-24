@@ -323,6 +323,20 @@ export const GeneratedChapterWorkupSchema = z
   sceneChecks: z.array(SceneCheckGenSchema).optional(),
   behindTheChapter: BehindTheChapterSchema.optional(),
 
+  // IQ — "Set the Scene": one optional reader-facing immersive card placed
+  // after the first image bank and before Big Idea (Codex/owner 2026-07-23). It
+  // grounds the reader in the physical world of the chapter — season, weather,
+  // terrain, light, sound, texture — in Selah Voice, using hedged language
+  // ("probably", "likely", "may have"). The evidence that BOUNDS this copy
+  // (SCRIPTURE SAYS / SMART GUESS / OPEN CHOICE) lives in the chapter's Season &
+  // Setting packet; the reader sentence must never outrun those sources.
+  setTheScene: z
+    .object({
+      kicker: z.string().optional(), // quiet lead, e.g. "What it may have felt like"
+      body: z.string(),
+    })
+    .optional(),
+
   // metadata placeholders
   bibleText: BibleTextSchema,
   cost: CostSchema,

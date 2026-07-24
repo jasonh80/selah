@@ -256,6 +256,7 @@ export function generatedToRenderWorkup(generated: GeneratedChapterWorkup): Chap
 
     quickSummary: g.summary,
     summary: g.sceneSetter,
+    setTheScene: g.setTheScene,
     context: g.historicalContext,
     whatHappens: g.whatHappens,
     modernReadersMiss: g.whatPeopleMiss,
