@@ -65,10 +65,15 @@ Rules that follow from it:
 - **Why they matter:** The disciple who did the math — his honest arithmetic at the feeding measures how far human resources fall short of what Jesus is about to do.
 
 ## Bartholomew (Nathanael) (`bartholomew`)
-- **Occupation:** **UNKNOWN.** The identification of Bartholomew with Nathanael is **SMART GUESS** — a traditional harmonization of the Synoptic lists with John's Gospel, not a statement of Scripture. Cana is Nathanael's town (SAYS, John 21:2).
+- **Conditional identity (Codex #105):** Bartholomew = Nathanael is a
+  **SMART GUESS** harmonization of the Synoptic lists with John's Gospel — not
+  Scripture. **Everything John tells us about *Nathanael* is therefore
+  CONDITIONAL on that guess when applied to Bartholomew**, and none of it may be
+  labeled unconditional SAYS for this cast member.
+- **Occupation:** **UNKNOWN.** Cana is *Nathanael's* town (John 21:2 — SAYS of Nathanael, conditional here).
 - **Build:** SMART GUESS (representative) — ordinary and unspecialized; nothing reads as a trade.
-- **Appearance:** SMART GUESS (representative) — an ordinary Galilean man with an open, unguarded face, following "an Israelite indeed, in whom there is no deceit" (SAYS, John 1:47).
-- **Life stages:** Called under the Fig Tree (SAYS) · One of the Twelve (SAYS) · Witness of the Risen Lord (SAYS) · Apostle to the East — **SMART GUESS (tradition; undated, and the martyrdom accounts are late).**
+- **Appearance:** SMART GUESS (representative) — an ordinary Galilean man with an open, unguarded face. The "an Israelite indeed, in whom there is no deceit" line (John 1:47) is Jesus' word about *Nathanael* and carries into the portrait only through the harmonization — a character note, not a physical description and not unconditional SAYS.
+- **Life stages:** Called under the Fig Tree (SAYS of *Nathanael*, conditional) · One of the Twelve (SAYS) · Witness of the Risen Lord (SAYS) · Apostle to the East — **SMART GUESS (tradition; undated, and the martyrdom accounts are late).**
 - **Why they matter:** The honest skeptic won in a single sentence — proof that Jesus knows a person completely before they ever approach him.
 
 ## James (son of Alphaeus) (`james-alphaeus`)
@@ -79,10 +84,14 @@ Rules that follow from it:
 - **Why they matter:** The quietest of the Twelve — not one recorded word or deed, yet named in every list and sent with the same authority.
 
 ## Thaddaeus (Judas son of James) (`thaddaeus`)
+- **Conditional identity (Codex #105):** Thaddaeus (Matthew/Mark) = Judas son
+  of James (Luke/John) is a **SMART GUESS** harmonization, not Scripture. Any
+  material drawn from the "Judas (not Iscariot)" texts is CONDITIONAL on that
+  guess and may not be labeled unconditional SAYS for this cast member. His
+  appearance is representative regardless.
 - **Occupation:** **UNKNOWN.**
-- **Whole profile is a SMART GUESS**, starting with the name: the identification of Thaddaeus (Matthew/Mark) with Judas son of James (Luke/John) is a traditional harmonization, not a statement of Scripture.
 - **Build / Appearance:** SMART GUESS (representative) — an ordinary Galilean man, deliberately unremarkable.
-- **Life stages:** Called into the Twelve (SAYS) · Disciple on the Road · The Question in the Upper Room (SAYS, John 14:22 — of Judas "not Iscariot") · Apostle — **death UNKNOWN; the c. AD 65 martyrdom is late tradition and must be labeled as such, never dated as fact.**
+- **Life stages:** Called into the Twelve (SAYS) · Disciple on the Road · The Question in the Upper Room (John 14:22 — SAYS of "Judas, not Iscariot," conditional on the identification) · Apostle — **death UNKNOWN; the c. AD 65 martyrdom is late tradition and must be labeled as such, never dated as fact.**
 - **Why they matter:** The quietest of the Twelve asked one question at the last supper — and drew out Jesus' promise to make his home with everyone who loves him.
 
 ## Simon the Zealot (`simon-zealot`)

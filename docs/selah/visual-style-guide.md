@@ -176,32 +176,49 @@ Owner ruling, 2026-07-23, after a first attempt over-corrected into what he
 called "diversity soup": *"we don't need an equal measure of everything. we
 need a proportionally accurate representation of what the population was."*
 
-A first-century Galilean crowd was demographically NARROW. Getting that wrong
-is an accuracy failure in the same way a wrong map pin is — the picture is
-making a claim about the world.
+A first-century crowd was demographically NARROWER than a modern one, but the
+answer is not a fixed formula — it is **the crowd this particular scene would
+actually hold** (Codex #105: replace absolutes with proportional,
+scene-dependent smart guesses). Getting it wrong is an accuracy failure like a
+wrong map pin; getting it *rigid* is the same failure the other direction.
 
+**First ask what scene it is.** The mix follows the setting, not a template:
+- **Who would be there?** A fishing shore skews to working men; a village or a
+  market or a temple court holds **women, children, and families**; a
+  synagogue, a road, a wedding, a tax booth each draw a different crowd. Do not
+  default every crowd to adult men.
+- **Class and occupation vary within the frame** — laborers, tradespeople, a
+  scribe or an official, the poor and the better-off — shown through cloth,
+  grooming, and bearing, never through caricature.
+
+**Then apply these as tendencies, not laws:**
 - **Vary structure and age, not ethnicity.** Face shape, hairline, hair
   texture and length, beard shape, grooming, bearing.
-- **Nearly all men bearded** — the period norm. Clean-shaven signals a Roman or
-  a Hellenized official and belongs only on one.
-- **Complexions in the natural Levantine range**, not an even spread across it.
-- **Young.** Most people did not get old. A group of eight is mostly twenties
-  and thirties with one clearly older, gray man — not one of each decade.
-- **Lean to sturdy from labor.** Real obesity was rare in a peasant population;
-  a heavyset extra is a period error, not variety.
-- **Vary the mix per scene.** The same six extras pasted into every chapter
-  just replaces one repeated man with one repeated crowd.
+- **Adult men were usually bearded** in this world, so most are — but "usually"
+  is not "all," and clean-shaven reads as a Roman or Hellenized figure.
+- **Women** wear historically plausible arranged hair and head coverings for
+  the setting; **children** are present wherever the scene would hold them.
+- **Complexions across the plausible Levantine range** for the locale — a broad
+  band, not an even rainbow and not a single tone.
+- **Age skews younger than today** (fewer people grew old), so a crowd leans
+  young with some genuinely older faces — a tendency to honor, not a quota to
+  fill.
+- **Builds are mostly lean-to-sturdy from labor**, with room for a
+  better-fed figure where class or role makes it plausible — not a blanket ban.
+- **Vary the mix per scene.** The same extras pasted into every chapter just
+  replaces one repeated man with one repeated crowd.
 
-Working paragraph (adapt per scene, do not paste verbatim everywhere):
+Working paragraph (adapt to the scene; never paste verbatim):
 
-> The figures behind must read as different individuals, not variations of one
-> man — but as a believable first-century Galilean group, not an assortment.
-> Nearly all are bearded, as was the norm; complexions sit in the natural
-> Levantine range without an artificial spread. Most are in their twenties and
-> thirties, with one man clearly older and gray. Vary them by face shape,
-> hairline, hair texture and length, beard shape, and grooming rather than by
-> ethnicity. Builds are lean to sturdy from daily labor — no soft or heavy
-> bodies in a working population.
+> The figures must read as different individuals and as the believable crowd
+> *this* place and moment would hold — [for the scene: e.g. working men on a
+> shore / families and women in a village or temple court]. Most adult men are
+> bearded, as was common; include women in plausible head coverings and
+> children where the setting fits. Complexions sit across the natural Levantine
+> range for the locale; ages lean younger with some older faces; builds are
+> mostly lean-to-sturdy from labor, with class shown through cloth and bearing.
+> Vary them by face shape, hairline, hair texture and length, beard shape, and
+> grooming rather than by ethnicity.
 
 ### Named cast: eleven axes, no two sharing more than two
 

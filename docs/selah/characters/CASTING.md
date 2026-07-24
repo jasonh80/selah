@@ -21,27 +21,27 @@ portrait.
 
 ### Roster status
 
-Status as of 2026-07-23 (corrected twice — first because the "to author" column
-contradicted the digest, then because **"12/12 cast" was wrong**: the twelve
-counted was the new-profile batch, not the Twelve. **Ten of the Twelve have
-portraits. John son of Zebedee and Judas Iscariot have none, and Mark cannot be
-finished without them** — John is in the inner circle at the transfiguration,
-Judas carries Mark 14):
+**Status as of 2026-07-24: ONE current status — all twelve are cast.** The
+owner ran the certified John / Judas / Simon auditions and recorded picks
+(`cast-picks.json`: John = B, Judas = C, Simon = A); their portraits are in the
+library. The earlier "ten of twelve / John & Judas have none" line is
+superseded. (Provenance is unchanged: no disciple's *appearance* is Scripture;
+every face is a representative casting choice.)
 
 | Disciple | Study profile | Portrait | Notes |
 |---|---|---|---|
-| Peter | ✅ drafted + reviewed | ✅ approved | corrected chronology 2026-07-21; NOT recast (Codex ruling 2026-07-23) |
-| John (son of Zebedee) | ✅ drafted + reviewed | ❌ **NO PORTRAIT** | john-apostle; inner circle — Mark 5, 9, 13, 14 all need him. **Must be cast to finish Mark.** |
-| Judas Iscariot | ✅ drafted + reviewed | ❌ **NO PORTRAIT** | Mark 14 needs him. **Must be cast to finish Mark.** |
-| Andrew | ✅ drafted + reviewed | ✅ approved (keep face) | profile text correction owed: drop the injury/hardship bio |
+| Peter | ✅ drafted + reviewed | ✅ approved | corrected chronology 2026-07-21; NOT recast, continuity PASSED + CLOSED (Codex 2026-07-24) |
+| John (son of Zebedee) | ✅ drafted + reviewed | ✅ cast (candidate B) | James's brother; family resemblance without a twin collision |
+| Judas Iscariot | ✅ drafted + reviewed | ✅ cast (candidate C) | ordinary, integrated, no villain coding |
+| Andrew | ✅ drafted + reviewed | ✅ approved (keep face) | profile-text correction (injury/hardship bio dropped) **APPLIED** in the digest |
 | James (son of Zebedee) | ✅ drafted + reviewed | ✅ approved | **LOCKED** (Codex cert, candidate A) |
-| Matthew (Levi) | ✅ drafted + reviewed | ✅ approved (keep face) | wardrobe simplified; Levi identification = smart guess |
+| Matthew (Levi) | ✅ drafted + reviewed | ✅ approved (keep face) | wardrobe simplifies in scenes; Levi identification = smart guess |
 | Thomas | ✅ drafted + reviewed | ✅ approved (keep face) | occupation → UNKNOWN; fringes corrected |
 | Philip | ✅ drafted + reviewed | ✅ approved | **LOCKED** (candidate B) |
-| Bartholomew (Nathanael) | ✅ drafted + reviewed | ✅ approved | **LOCKED** (candidate C, inference transparency kept) |
+| Bartholomew (Nathanael) | ✅ drafted + reviewed | ✅ approved | **LOCKED** (candidate C); Nathanael identification is a smart-guess harmonization — see digest |
 | James (son of Alphaeus) | ✅ drafted + reviewed | ✅ approved (keep face) | marked as smart guess throughout |
-| Thaddaeus (Judas son of James) | ✅ drafted + reviewed | ✅ approved (keep face) | marked as smart guess throughout |
-| Simon the Zealot | ✅ drafted + **corrected** | ⏳ re-audition staged | invented militant biography removed; neutral brief written, not yet run |
+| Thaddaeus (Judas son of James) | ✅ drafted + reviewed | ✅ approved (keep face) | Judas-son-of-James identification is a smart-guess harmonization — see digest |
+| Simon the Zealot | ✅ drafted + **corrected** | ✅ cast (candidate A, re-audition) | invented militant biography removed; aged grooming breaks the James collision |
 
 (Matthias, Judas's replacement — decide later whether he joins the cast.)
 
@@ -68,15 +68,18 @@ Judas carries Mark 14):
 4. ✅ **Mind + Eyes certification** (Codex, 2026-07-23, read-only): 4 locks,
    7 keep-face/provisional with the profile-text corrections now applied here,
    1 true re-audition (Simon, neutral brief). Peter preserved, not recast.
-5. ⏳ **Reference-lock test** (owner-run, gates everything visual): does
-   attaching an approved portrait actually pin that individual, or is the
-   prompt text doing the work? Protocol in the Kelly repo at
-   `docs/reference-lock-test.md`. **No scene generation at scale until it
-   passes.**
-6. ⏳ **Certified re-auditions**, one at a time on the owner's explicit go
-   (staged, deliberately not wired into the wall).
-7. **Portraits locked** → recurring faces feed chapter images and the
-   People pages.
+5. ✅ **Reference-lock test PASSED** (owner-run, 2026-07-23). What is actually
+   proven: attaching an approved portrait pins the individual in a **portrait**
+   (matched 6/7 features vs 0/7 without it), in a **portrait→scene**, in a
+   **two-face action scene** (Peter + Jesus both held), and with a **described
+   crowd**. The one remaining gate is **intimate close-ups — still unproven**;
+   treat those as check-by-eye until tested. Protocol + results in the Kelly
+   repo at `docs/reference-lock-test.md`.
+6. ✅ **Certified re-auditions run** — John, Judas, and Simon cast from the
+   certified prompts (picks recorded).
+7. ✅ **Portraits locked** → recurring faces feed chapter images and the
+   People pages. Remaining owner call: whether the Bartholomew ↔ James-Alphaeus
+   resemblance needs a paid re-audition (pending the free recognition board).
 
 Every visual follows Selah Eyes (house look) and the aging rule; no spend
 without the owner's explicit priced confirmation.
