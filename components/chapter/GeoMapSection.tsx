@@ -501,7 +501,7 @@ function NumberedCorridor({ n }: { n: number }) {
 // area, not a precise pin. Everything is added once (hidden) and toggled.
 // Ancient (Then) borders and modern (Today) borders are separate layer sets;
 // only one shows, and only while Borders is on.
-const ANCIENT_LAYERS = ["territory-wash", "territory-outline-casing", "territory-outline", "territory-disputed", "territory-labels", "rome-frame", "rome-label"];
+const ANCIENT_LAYERS = ["territory-wash", "territory-outline-casing", "territory-outline", "territory-disputed", "territory-labels"];
 const MODERN_LAYERS = ["modern-borders-casing", "modern-borders", "modern-labels"];
 
 function addTerritory(map: maplibregl.Map): void {
@@ -601,40 +601,8 @@ function addTerritory(map: maplibregl.Map): void {
     },
   });
 
-  // ---- Ancient: the "all under Rome" frame. Everything on THIS map — the
-  // provinces directly, the tetrarchies through client rulers — sat under
-  // Rome. A soft outer frame + banner says so without drawing the whole
-  // empire (owner ruling 2026-07-24). Not a territorial line, a reminder.
-  const rf: [number, number][] = [
-    [34.55, 31.0], [36.75, 31.0], [36.75, 33.55], [34.55, 33.55], [34.55, 31.0],
-  ];
-  map.addSource("rome-frame", {
-    type: "geojson",
-    data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: rf } },
-  });
-  map.addLayer({
-    id: "rome-frame",
-    type: "line",
-    source: "rome-frame",
-    layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": "#e6d9b8", "line-width": 2, "line-opacity": 0.55, "line-dasharray": [1.5, 2] },
-  });
-  {
-    const id = "rome-banner";
-    const img = textLabelImage("All under Rome", { color: "#f0e6cf", size: 13, weight: 800, upper: true });
-    if (map.hasImage(id)) map.removeImage(id);
-    map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
-    map.addSource("rome-label", {
-      type: "geojson",
-      data: { type: "Feature", properties: { icon: id }, geometry: { type: "Point", coordinates: [35.6, 33.42] } },
-    });
-    map.addLayer({
-      id: "rome-label",
-      type: "symbol",
-      source: "rome-label",
-      layout: { visibility: "none", "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-anchor": "center" },
-    });
-  }
+  // (The "all under Rome" point is a FOOTNOTE in the key text, not a drawn
+  // frame — owner ruling 2026-07-24. See TerritoryKey.)
 
   // ---- Modern (Today): real country boundary lines + country names ----
   map.addSource("modern-borders", {
