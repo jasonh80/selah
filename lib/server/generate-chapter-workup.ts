@@ -4,6 +4,11 @@
 import type { ChapterWorkup } from "../types";
 import { parseChapterWorkupJson } from "../ai/schemas/chapter-workup-schema";
 import { buildChapterWorkupPrompt } from "../ai/prompts/chapter-workup-prompt";
+import {
+  chapterRequiresDiscipleship,
+  checkWorkupDiscipleship,
+  DISCIPLESHIP_QUALITY_CODE,
+} from "../ai/quality/discipleship-gate";
 import { generatedToRenderWorkup } from "../ai/adapters/generated-to-workup";
 import { estimateChapterWorkupCost } from "../ai/costs";
 import { getOpenAI, isOpenAIConfigured, CHAPTER_WORKUP_TEXT_MODEL } from "./openai";
@@ -298,6 +303,22 @@ export async function generateAndStoreChapter(
     costLogged = true;
 
     const generated = parseChapterWorkupJson(content);
+
+    // IQ-019 Disciple It safety gate on the LIVE Mark 12+ save boundary. The
+    // protected quality lane ends at Mark 11; Mark 12 saves through here, so
+    // the gate must run HERE too or it would never protect the chapter it was
+    // built for. A forward chapter (Mark 12+) whose Disciple It is missing,
+    // coercive, ungrounded, off-chapter, duplicative, or generic is REFUSED
+    // before the draft is saved. Only the closed QUALITY codes are surfaced —
+    // never the authored copy.
+    if (chapterRequiresDiscipleship(book, chapter)) {
+      const violations = checkWorkupDiscipleship(generated, { enforcePresence: true });
+      if (violations.length) {
+        const codes = Array.from(new Set(violations.map((v) => DISCIPLESHIP_QUALITY_CODE[v.code]))).join(", ");
+        throw new Error(`Disciple It safety gate refused this draft before saving: ${codes}`);
+      }
+    }
+
     const render = generatedToRenderWorkup(generated);
     // Terminal save is pinned to status="generating" AND this exact job ID —
     // an older worker can never overwrite a newer run (zero rows = CONFLICT).

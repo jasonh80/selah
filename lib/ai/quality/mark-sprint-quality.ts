@@ -1,5 +1,10 @@
 import type { GeneratedChapterWorkup } from "../schemas/chapter-workup-schema";
 import contractJson from "./mark-sprint-acceptance.v1.json";
+import {
+  checkWorkupDiscipleship,
+  discipleshipEvidencePath,
+  DISCIPLESHIP_QUALITY_CODE,
+} from "./discipleship-gate";
 
 type Movement = { id: string; startVerse: number; endVerse: number };
 type ChapterContract = {
@@ -889,6 +894,23 @@ export function evaluateMarkSprintDraft(
         ["workup:/bibleText/source", "workup:/bibleText/note"],
       );
     }
+  }
+
+  // IQ-019 Disciple It safety gate (Codex ruling, 2026-07-24). Runs
+  // UNCONDITIONALLY — outside the acceptance-contract branch — so it protects
+  // newly prepared chapters even before they have an acceptance-contract entry.
+  // Uses the SAME shared checker as the live Mark 12 generate/save path, so
+  // both boundaries enforce identical rules (correct Live It source, accurate
+  // verse parsing, structure/genericity). Presence is required only for
+  // forward chapters (Mark 12+); a present section is always content-checked.
+  for (const violation of checkWorkupDiscipleship(workup)) {
+    add(
+      DISCIPLESHIP_QUALITY_CODE[violation.code],
+      violation.evidence
+        ? `${violation.message} (evidence: "${violation.evidence}")`
+        : violation.message,
+      [discipleshipEvidencePath(workup, violation.code)],
+    );
   }
 
   const blockers = stableFindings(
