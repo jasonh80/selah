@@ -75,6 +75,34 @@ Mark 12, scene by scene. The critical separation is between people who were
 
 ---
 
+## 1b. Role classification — "Cast for continuity. Prompt for the scene."
+
+Owner rule (board #29, 2026-07-24): classify every role BEFORE any audition
+work, and never send scene-only roles to casting. Four tiers:
+
+- **Permanent cast** — lock a recurring face only for people whose identity must
+  stay recognizable across chapters/updates/multiple substantial scenes or a
+  planned profile. *Mark 12:* Jesus and the Twelve (already locked). Nothing new
+  here is promoted to permanent.
+- **Chapter-local continuity** — one approved face/reference reused only WITHIN
+  this chapter when a one-chapter person appears recognizably in more than one
+  image; not promoted into the canonical cast. *Mark 12:* the **poor widow**
+  (`mark12-widow-two-coins`) and the **scribe of the great commandment**
+  (`mark12-scribe-great-commandment`) — chapter-local representative references,
+  **not** recurring biblical identities.
+- **Scene / group references** — historically grounded archetype/scene refs, not
+  individual casting. *Mark 12:* `mark12-sadducee`, `mark12-herodian`,
+  `mark12-chief-priest`, and `mark12-temple-crowd` are scene/group references.
+- **Scene-only person** — appears once in one image: no audition, no permanent
+  portrait; generate directly from a Scripture-first Selah Mind/Eyes prompt.
+
+The Mark 12 assets already made are kept — this is a classification, not a
+discard/regenerate. Going forward, this reclassification means a chapter like
+Mark 12 does not carry a miniature casting production: only true recurring
+identities audition.
+
+---
+
 ## 2. Database readiness audit
 
 Checked against the live library (`Selah-Kelly/lib/characters/`) and the ported
