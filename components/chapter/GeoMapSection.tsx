@@ -487,7 +487,7 @@ function NumberedCorridor({ n }: { n: number }) {
 // area, not a precise pin. Everything is added once (hidden) and toggled.
 // Ancient (Then) borders and modern (Today) borders are separate layer sets;
 // only one shows, and only while Borders is on.
-const ANCIENT_LAYERS = ["territory-wash", "territory-outline", "territory-disputed", "territory-labels"];
+const ANCIENT_LAYERS = ["territory-wash", "territory-outline-casing", "territory-outline", "territory-disputed", "territory-labels"];
 const MODERN_LAYERS = ["modern-borders-casing", "modern-borders", "modern-labels"];
 
 function addTerritory(map: maplibregl.Map): void {
@@ -508,14 +508,24 @@ function addTerritory(map: maplibregl.Map): void {
     type: "fill",
     source: "territory-regions",
     layout: { visibility: "none" },
-    paint: { "fill-color": ["get", "color"], "fill-opacity": 0.2 },
+    paint: { "fill-color": ["get", "color"], "fill-opacity": 0.24 },
+  });
+  // A dark casing under a BOLD colored outline — the outline is the primary
+  // identity signal, so a region still reads even where its wash washes out
+  // on tan desert (owner: "orange overlay does not work on desert scenes").
+  map.addLayer({
+    id: "territory-outline-casing",
+    type: "line",
+    source: "territory-regions",
+    layout: { visibility: "none" },
+    paint: { "line-color": "rgba(12,14,20,.55)", "line-width": 4.5 },
   });
   map.addLayer({
     id: "territory-outline",
     type: "line",
     source: "territory-regions",
     layout: { visibility: "none" },
-    paint: { "line-color": ["get", "color"], "line-width": 1.6, "line-opacity": 0.75, "line-blur": 0.5 },
+    paint: { "line-color": ["get", "color"], "line-width": 2.4, "line-opacity": 1 },
   });
 
   // Disputed exact site (Bethsaida) → a dashed ring: an area, not a point.
@@ -587,20 +597,22 @@ function addTerritory(map: maplibregl.Map): void {
       ),
     },
   });
-  // A dark casing under a bright dashed line so borders read on any terrain.
+  // Dashed border: a DASHED dark casing (so gaps show terrain and it reads as
+  // a dashed line, not a solid one) with a white dash on top for contrast.
+  const dash: [number, number] = [2.4, 1.9];
   map.addLayer({
     id: "modern-borders-casing",
     type: "line",
     source: "modern-borders",
-    layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": "rgba(12,14,20,.85)", "line-width": 5 },
+    layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
+    paint: { "line-color": "rgba(12,14,20,.8)", "line-width": 5, "line-dasharray": dash.map((d) => d * 0.92) as [number, number] },
   });
   map.addLayer({
     id: "modern-borders",
     type: "line",
     source: "modern-borders",
-    layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": MODERN_BORDER_COLOR, "line-width": 2.2, "line-opacity": 1, "line-dasharray": [2.5, 1.8] },
+    layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
+    paint: { "line-color": MODERN_BORDER_COLOR, "line-width": 2.4, "line-opacity": 1, "line-dasharray": dash },
   });
   MODERN_COUNTRIES.forEach((c, i) => {
     const id = `modern-label-${i}`;
@@ -794,6 +806,10 @@ export function GeoMapSection({
       return;
     }
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
+    // Scale reference (owner: "a scaled reference of miles or kilometers…").
+    // Both units so the reader gets a real sense of distance.
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 96, unit: "imperial" }), "bottom-left");
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 96, unit: "metric" }), "bottom-left");
     map.on("error", (e) => console.warn("[selah-map] error:", e.error?.message ?? e));
     map.on("load", () => {
       addOverlays(map, cfg);
@@ -976,6 +992,19 @@ export function GeoMapSection({
             </div>
           )}
         </div>
+
+        {/* Scale reference (owner request): the scale bar sits bottom-left on
+            the map; this line turns it into human terms. A day's walk in the
+            ancient world is usually put near 20 miles on level ground — less
+            in hills, with a family, or in heat. */}
+        {!failed && (
+          <p className="border-t px-3.5 py-2 text-[12px] leading-relaxed text-secondary" style={{ borderColor: "var(--line)" }}>
+            <span className="font-medium text-primary">Scale:</span> the bar at
+            the map&rsquo;s lower-left shows miles and kilometers. A day&rsquo;s
+            walk was roughly <span className="font-medium text-primary">20 miles (32 km)</span> on
+            level ground — less through hills, with children, or in heat.
+          </p>
+        )}
 
         {/* Borders key — who ruled where, with every city labeled by how we
             know its ruler (Codex audit). Renders only while Borders is on. */}

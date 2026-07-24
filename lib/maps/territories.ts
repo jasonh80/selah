@@ -193,37 +193,42 @@ export function territoryCities(includeContext: boolean): TerritoryCity[] {
  * Simplified international lines — enough to orient a reader who knows the
  * modern map, NOT survey data. Disputed areas are deliberately not drawn as
  * separate territories. */
-export const MODERN_BORDER_COLOR = "#e5e7eb";
+export const MODERN_BORDER_COLOR = "#f3f4f6";
+// Shared junction points so the segments CONNECT (owner: "a couple of spots
+// where the borders don't connect"). Two tripoints do the joining: HERMON
+// (Lebanon/Syria/Israel) and TRIPOINT (Israel/Jordan/Syria near the Yarmouk).
+const HERMON: [number, number] = [35.62, 33.25];
+const TRIPOINT: [number, number] = [35.6, 32.71];
 export const MODERN_COUNTRIES: ModernCountry[] = [
   {
     name: "LEBANON",
-    labelAt: [35.85, 33.75],
+    labelAt: [35.85, 33.8],
     borders: [
-      // Lebanon–Israel (south) then up the Anti-Lebanon toward Syria
-      [[35.1, 33.09], [35.35, 33.1], [35.6, 33.25], [35.85, 33.6], [36.0, 34.0]],
+      // Israel–Lebanon (from the coast) → Hermon → up the Anti-Lebanon (Lebanon–Syria)
+      [[35.1, 33.09], [35.32, 33.1], [35.5, 33.18], HERMON, [35.85, 33.62], [36.1, 34.0]],
     ],
   },
   {
     name: "SYRIA",
-    labelAt: [36.4, 33.3],
+    labelAt: [36.55, 33.15],
     borders: [
-      // Syria–Israel (Golan area, drawn as Israel's controlled line, unlabeled dispute)
-      [[35.78, 33.24], [35.86, 33.0], [35.83, 32.72]],
-      // Syria–Jordan (roughly the Yarmouk eastward)
-      [[35.83, 32.72], [36.2, 32.72], [36.8, 32.4]],
+      // Israel–Syria (Golan) from Hermon down to the tripoint
+      [HERMON, [35.82, 33.0], [35.86, 32.85], TRIPOINT],
+      // Syria–Jordan eastward from the tripoint
+      [TRIPOINT, [36.0, 32.6], [36.9, 32.4]],
     ],
   },
   {
     name: "JORDAN",
-    labelAt: [35.95, 31.8],
+    labelAt: [36.0, 31.6],
     borders: [
-      // Israel–Jordan down the Jordan rift: Sea of Galilee → Dead Sea → Arava
-      [[35.62, 32.72], [35.57, 32.4], [35.52, 32.0], [35.48, 31.75], [35.47, 31.5], [35.42, 31.2], [35.35, 30.9]],
+      // Israel–Jordan down the Jordan rift: tripoint → Sea of Galilee → Dead Sea → Arava
+      [TRIPOINT, [35.57, 32.4], [35.53, 32.0], [35.5, 31.75], [35.48, 31.55], [35.42, 31.1], [35.2, 30.6]],
     ],
   },
   {
     name: "ISRAEL",
-    labelAt: [34.95, 31.5],
+    labelAt: [34.95, 31.4],
     borders: [], // its edges are the neighboring countries' lines above
   },
 ];
