@@ -52,8 +52,14 @@ export const MODEL_DAY_SCHEMA_VERSION = "model-day.v1";
 export const MODEL_DAY_SYSTEM_MESSAGE = CHAPTER_WORKUP_SYSTEM_MESSAGE;
 
 // Past the 20-min job-token TTL + the worker's model budget + margin: no live
-// worker can still exist for a claim this old (two sequential 8-min calls).
+// worker can still exist for a claim this old.
 const STALE_CLAIM_MS = 45 * 60 * 1000;
+
+// ONE shared wall-clock deadline for the worker's concurrent model calls,
+// safely below Netlify's 15-minute background-function limit (Codex #103
+// correction 1): both calls are aborted together so the worker cannot be killed
+// mid-settlement past the platform ceiling.
+export const MODEL_DAY_WORKER_DEADLINE_MS = 13 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Bounded spend. The owner's Model Day budget is a TOTAL cap; both calls are
@@ -644,7 +650,7 @@ export function modelDayRequestBody(input: { model: string; prompt: string }): R
   };
 }
 
-async function callModel(input: { model: string; prompt: string }): Promise<{
+async function callModel(input: { model: string; prompt: string; signal?: AbortSignal }): Promise<{
   content: string;
   inputTokens: number | null;
   cachedInputTokens: number | null;
@@ -656,13 +662,17 @@ async function callModel(input: { model: string; prompt: string }): Promise<{
   }
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8 * 60 * 1000);
+  // The worker owns ONE shared deadline for both concurrent calls (Codex #103
+  // correction 1). If no signal is supplied, fall back to a local per-call
+  // timer so a direct caller is still bounded.
+  const local = input.signal ? null : new AbortController();
+  const timer = local ? setTimeout(() => local.abort(), 8 * 60 * 1000) : null;
+  const signal = input.signal ?? local!.signal;
   try {
     const resp = await client.chat.completions.create(
       modelDayRequestBody({ model: input.model, prompt: input.prompt }) as never,
       // maxRetries 0: "one request per model" must be literally true.
-      { signal: controller.signal, maxRetries: 0 },
+      { signal, maxRetries: 0 },
     );
     const r = resp as {
       choices: { message?: { content?: string | null } }[];
@@ -691,7 +701,7 @@ async function callModel(input: { model: string; prompt: string }): Promise<{
       outputTokens: usableTokenCount(r.usage?.completion_tokens),
     };
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -860,11 +870,13 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     );
   }
 
-  // ONE bounded request per model, incumbent first. Any post-dispatch failure
-  // records its possible spend durably before the row fails. All costs at the
-  // MODEL'S OWN priced rates (never another model's).
+  // ONE bounded request per model. Any post-dispatch failure records its
+  // possible spend durably before the row fails, so each candidate's outcome is
+  // settled before the run turns terminal. All costs at the MODEL'S OWN priced
+  // rates (never another model's). Both calls share ONE deadline (below).
   const runOne = async (
     model: string,
+    signal: AbortSignal,
   ): Promise<
     | { ok: true; workup: Record<string, unknown>; costUsd: number; inputTokens: number | null }
     | { ok: false; reason: string; costUsd: number }
@@ -880,7 +892,7 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     try {
       if (!modelCallForTesting && !getOpenAI()) throw new Error("OpenAI not configured");
       dispatched = true;
-      const result = await callModel({ model, prompt });
+      const result = await callModel({ model, prompt, signal });
       contentText = result.content;
       usage = {
         inputTokens: usableTokenCount(result.inputTokens),
@@ -948,33 +960,46 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     return { ok: true, workup, costUsd: cost, inputTokens: usageMissing ? null : usage.inputTokens };
   };
 
-  const first = await runOne(incumbent);
-  if (!first.ok) return failRow(first.reason, first.costUsd);
-
-  // Missing/partial usage STOPS THE RUN (owner choice "A" shape): with no
-  // trustworthy actual, the full reserved per-call maximum is already in the
-  // ledger and nothing further may dispatch under uncertainty.
-  if (first.inputTokens === null) {
-    return failRow(
-      `the ${incumbent} response carried absent or partial usage — the run stops here with the full reserved per-call maximum recorded; challenger NOT dispatched`,
-      first.costUsd,
-    );
+  // CONCURRENT DISPATCH under ONE shared deadline safely below Netlify's 15-min
+  // background limit (Codex #103 correction 1). Both calls' full worst case is
+  // already reserved (above), so there is no mid-run cap recheck to do — the two
+  // requests run together and the worker settles each outcome durably (each
+  // runOne records its own cost) before the run turns terminal. runOne never
+  // throws (it catches and records), so Promise.all cannot reject.
+  const deadline = new AbortController();
+  const deadlineTimer = setTimeout(() => deadline.abort(), MODEL_DAY_WORKER_DEADLINE_MS);
+  let first: Awaited<ReturnType<typeof runOne>>;
+  let second: Awaited<ReturnType<typeof runOne>>;
+  try {
+    [first, second] = await Promise.all([
+      runOne(incumbent, deadline.signal),
+      runOne(challenger, deadline.signal),
+    ]);
+  } finally {
+    clearTimeout(deadlineTimer);
   }
-
-  // Recheck before call two: call one's ACTUAL plus call two's FULL reserved
-  // worst case must still fit the cap. No cross-model estimate — the
-  // challenger's own complete ceiling is the reserve. (Protects against a
-  // billed input exceeding the counted bound, e.g. provider-side token
-  // accounting surprises.)
-  if (first.costUsd + challengerCeilingUsd > MODEL_DAY_TOTAL_CAP_USD) {
-    return failRow(
-      `the incumbent run cost $${first.costUsd.toFixed(4)}; adding the challenger's full reserve ($${challengerCeilingUsd.toFixed(2)}) would exceed the $${MODEL_DAY_TOTAL_CAP_USD.toFixed(2)} cap — challenger NOT dispatched`,
-      first.costUsd,
-    );
-  }
-  const second = await runOne(challenger);
-  if (!second.ok) return failRow(second.reason, first.costUsd + second.costUsd);
   const totalCost = Math.round((first.costUsd + second.costUsd) * 10000) / 10000;
+
+  // Either candidate failing (error, invalid workup, or a cost-record failure)
+  // fails the whole run — both possible spends are already recorded.
+  if (!first.ok || !second.ok) {
+    const reasons = [first.ok ? null : `incumbent: ${first.reason}`, second.ok ? null : `challenger: ${second.reason}`]
+      .filter(Boolean)
+      .join(" | ");
+    return failRow(reasons, totalCost);
+  }
+  // Missing/partial usage on EITHER candidate fails closed (Codex #103): with no
+  // trustworthy actual there is no judgeable A/B; both reserved maxima are in the
+  // ledger, and BOTH ledger entries are preserved.
+  if (first.inputTokens === null || second.inputTokens === null) {
+    const which = [first.inputTokens === null ? incumbent : null, second.inputTokens === null ? challenger : null]
+      .filter(Boolean)
+      .join(" and ");
+    return failRow(
+      `absent or partial usage from ${which} — failing closed with both reserved maxima recorded; no judgeable A/B under uncertainty`,
+      totalCost,
+    );
+  }
 
   // BLIND coin flip: which model is candidate A is decided here, stored in
   // the row, and never included in the judge packet.

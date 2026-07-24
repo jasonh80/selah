@@ -294,25 +294,23 @@ async function main(): Promise<void> {
   const replay = await runWorker("mark-9");
   ok(replay.status === 500 && modelCalls.length === 2 && mdCosts().length === 2, "E1 a replayed delivery dispatches nothing and spends nothing");
 
-  // F. The cap gates (owner choice "A": full pre-reservation + post-call-one
-  // recheck). A pathologically billed incumbent input (provider accounting
-  // exceeding the counted bound) must stop the challenger.
+  // F. Concurrent dispatch under ONE shared deadline (Codex #103 correction 1).
+  // The cap is guaranteed STRUCTURALLY by full two-call pre-reservation before
+  // any dispatch — there is no mid-run recheck because both calls run together.
   ok(
     modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.5"]) + modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.6-sol"]) <= MODEL_DAY_TOTAL_CAP_USD,
     "F0 both calls' full worst case fits the cap BEFORE any dispatch (structural pre-reservation)",
   );
   modelCalls = [];
-  modelBehavior = (model) =>
-    model === "gpt-5.5"
-      ? { content: VALID_WORKUP, inputTokens: 100_000, outputTokens: 4_000 } // pathological billed input
-      : { content: VALID_WORKUP, inputTokens: 5_000, outputTokens: 1_000 };
+  modelBehavior = () => ({ content: VALID_WORKUP, inputTokens: 5_000, outputTokens: 1_000 });
+  const costsBeforeF = mdCosts().length;
   lastTrigger = null;
   await createRun("mark-10");
   await runWorker("mark-10");
-  const capped = await readLatestModelDayRun("mark-10");
-  ok(capped?.status === "failed" && /challenger NOT dispatched/.test(capped.error ?? ""), "F1 the cap gate stops the challenger when the incumbent ran hot");
-  ok(modelCalls.length === 1 && modelCalls[0].model === "gpt-5.5", "F2 exactly one dispatch happened");
-  ok(mdCosts().length === 3, "F3 the hot incumbent's real spend is in the ledger");
+  const bothRan = await readLatestModelDayRun("mark-10");
+  ok(bothRan?.status === "done", "F1 concurrent dispatch: the run completes with both candidates settled");
+  ok(modelCalls.length === 2 && new Set(modelCalls.map((c) => c.model)).size === 2, "F2 both models dispatched concurrently — exactly one call each");
+  ok(mdCosts().length - costsBeforeF === 2, "F3 both candidates' spend is durably recorded before the run turns terminal");
 
   // F4/F5/F6 — usage missing OR PARTIAL fails the gate closed (Codex #103
   // P1): each variant records the conservative ceiling and never authorizes
@@ -333,13 +331,22 @@ async function main(): Promise<void> {
     await runWorker(slug);
     const row = await readLatestModelDayRun(slug);
     ok(
-      row?.status === "failed" && /challenger NOT dispatched/.test(row.error ?? "") && modelCalls.length === 1,
-      `F${4 + i} usage ${variant.name} fails closed — challenger never dispatched`,
+      row?.status === "failed" && /absent or partial usage|failing closed/.test(row.error ?? "") && modelCalls.length === 2,
+      `F${4 + i} usage ${variant.name} fails closed (both dispatched concurrently, no judgeable A/B)`,
     );
     const recorded = mdCosts().slice(before);
+    const ceilings: Record<string, number> = {
+      "gpt-5.5": modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.5"]),
+      "gpt-5.6-sol": modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.6-sol"]),
+    };
     ok(
-      recorded.length === 1 && recorded[0].estimatedCostUsd === modelDayCallCeilingUsd(MODEL_DAY_PRICED_MODELS["gpt-5.5"]) && (recorded[0].metadata as { billingUncertain?: boolean })?.billingUncertain === true,
-      `F${4 + i}b usage ${variant.name} records the conservative ceiling, never zero`,
+      recorded.length === 2 &&
+        recorded.every(
+          (r) =>
+            r.estimatedCostUsd === ceilings[String(r.model)] &&
+            (r.metadata as { billingUncertain?: boolean })?.billingUncertain === true,
+        ),
+      `F${4 + i}b both usage-missing calls record their conservative ceiling, never zero`,
     );
   }
   modelBehavior = () => ({ content: VALID_WORKUP, inputTokens: 5_000, outputTokens: 1_000 });
