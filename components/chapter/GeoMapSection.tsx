@@ -29,6 +29,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { ChapterWorkup } from "@/lib/types";
 import { getGeoChapterMap, type GeoChapterMap } from "@/lib/maps/geo-chapter-maps";
 import { labelsForView, type GeoLabelKind } from "@/lib/maps/geo-labels";
+import { MARK_TERRITORY, MARK_RULERS, territoryCities, type RulerId } from "@/lib/maps/territories";
 import { SectionCard } from "@/components/chapter/SectionCard";
 
 const IMAGERY_TILES =
@@ -309,6 +310,52 @@ function pinImage(color: string, num: number): { data: ImageData; pixelRatio: nu
 // same colour source, same number inside — so the legend entry IS the marker
 // rather than a generic symbol with a number typed beside it.
 
+/** The Borders key: rulers with their exact titles, the cities colored to each
+ * (labeled direct vs regional-inference), and the honest limit up top. */
+function TerritoryKey() {
+  const byRuler = (id: RulerId) => territoryCities(false).filter((c) => c.ruler === id);
+  return (
+    <div className="border-t px-3.5 py-3" style={{ borderColor: "var(--line)" }}>
+      <p className="text-[13px] font-semibold text-primary">Who ruled where · {MARK_TERRITORY.dateLabel}</p>
+      <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+        Ancient sources name the cities, regions, and rulers — not survey-grade
+        boundary lines. The colored washes show each ruler&rsquo;s general
+        territory, never an exact frontier. Decapolis and Phoenician cities were
+        self-governing under Roman Syria, so each is its own marker.
+      </p>
+      <ul className="mt-2.5 space-y-2">
+        {(Object.keys(MARK_RULERS) as RulerId[]).map((id) => {
+          const r = MARK_RULERS[id];
+          const cities = byRuler(id);
+          if (cities.length === 0) return null;
+          return (
+            <li key={id} className="text-[12.5px]">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded-[3px]" style={{ background: r.color }} aria-hidden />
+                <span className="font-semibold text-primary">{r.name}</span>
+              </span>
+              <span className="text-secondary">
+                {" — "}
+                {cities
+                  .map((c) => `${c.name}${c.disputedSite ? " (area — site disputed)" : ""}${c.provenance === "regional-inference" ? " (by region)" : ""}`)
+                  .join(" · ")}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2.5 text-[12px] leading-relaxed text-secondary">
+        <span className="font-medium text-primary">Named, but not territorial rulers:</span>{" "}
+        {MARK_TERRITORY.authorities.map((a) => `${a.name} — ${a.blurb}`).join("  ")}
+      </p>
+      <p className="mt-1 text-[11px] text-secondary">
+        &ldquo;By region&rdquo; = placed from the region&rsquo;s known jurisdiction rather than a
+        direct ancient assignment of that city.
+      </p>
+    </div>
+  );
+}
+
 /** Twin of `pinImage` — the where-it-happened teardrop. */
 function NumberedPin({ n }: { n: number }) {
   return (
@@ -369,6 +416,79 @@ function NumberedCorridor({ n }: { n: number }) {
       </text>
     </svg>
   );
+}
+
+// ---- "Borders" overlay (owner's word) — who ruled where, c. AD 29-30 -------
+// Codex ruler audit (2026-07-24): regions render as broad soft WASHES, never
+// hard boundary strokes; Decapolis and Phoenician cities are individual pins
+// under Roman Syria, never a bloc or a fade; the disputed Bethsaida site is an
+// area, not a precise pin. Everything is added once (hidden) and toggled.
+const TERRITORY_LAYERS = ["territory-wash", "territory-city", "territory-city-disputed"];
+
+function addTerritory(map: maplibregl.Map): void {
+  if (map.getSource("territory-regions")) return;
+  const regions = {
+    type: "FeatureCollection" as const,
+    features: MARK_TERRITORY.regions.map((r) => ({
+      type: "Feature" as const,
+      properties: { color: MARK_RULERS[r.ruler].color },
+      geometry: { type: "Polygon" as const, coordinates: [[...r.polygon, r.polygon[0]]] },
+    })),
+  };
+  map.addSource("territory-regions", { type: "geojson", data: regions });
+  // Soft wash only — no hard frontier. A faint same-hue edge keeps the wash
+  // legible on satellite without reading as a surveyed border.
+  map.addLayer({
+    id: "territory-wash",
+    type: "fill",
+    source: "territory-regions",
+    layout: { visibility: "none" },
+    paint: { "fill-color": ["get", "color"], "fill-opacity": 0.22 },
+  });
+
+  const cities = territoryCities(false);
+  const pt = (list: typeof cities) => ({
+    type: "FeatureCollection" as const,
+    features: list.map((c) => ({
+      type: "Feature" as const,
+      properties: { color: MARK_RULERS[c.ruler].color },
+      geometry: { type: "Point" as const, coordinates: c.at },
+    })),
+  });
+  map.addSource("territory-cities", { type: "geojson", data: pt(cities.filter((c) => !c.disputedSite)) });
+  map.addLayer({
+    id: "territory-city",
+    type: "circle",
+    source: "territory-cities",
+    layout: { visibility: "none" },
+    paint: {
+      "circle-radius": 5,
+      "circle-color": ["get", "color"],
+      "circle-stroke-width": 1.5,
+      "circle-stroke-color": "rgba(255,255,255,.9)",
+    },
+  });
+  // Disputed exact site → a larger dashed ring (an area, not a precise point).
+  map.addSource("territory-cities-disputed", { type: "geojson", data: pt(cities.filter((c) => c.disputedSite)) });
+  map.addLayer({
+    id: "territory-city-disputed",
+    type: "circle",
+    source: "territory-cities-disputed",
+    layout: { visibility: "none" },
+    paint: {
+      "circle-radius": 11,
+      "circle-color": ["get", "color"],
+      "circle-opacity": 0.22,
+      "circle-stroke-width": 1.5,
+      "circle-stroke-color": ["get", "color"],
+    },
+  });
+}
+
+function setTerritoryVisible(map: maplibregl.Map, on: boolean): void {
+  for (const id of TERRITORY_LAYERS) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+  }
 }
 
 /** All overlay geometry as native layers — areas, corridors, and pins. No
@@ -491,6 +611,11 @@ export function GeoMapSection({
   const tourTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [threeD, setThreeD] = useState(false);
   const [view, setView] = useState<MapView>("chapter");
+  const [borders, setBorders] = useState(false);
+  // Only chapters in the Mark era carry the territory data for now (owner
+  // scoped borders to Mark first). getGeoChapterMap already base-resolves
+  // revision-preview slugs.
+  const hasBorders = /^mark-/.test(data.slug.replace(/-revision-preview$/u, ""));
   // The map's load handler runs once; it reads the CURRENT view through a
   // ref so a toggle before first paint is never lost.
   const viewRef = useRef<MapView>("chapter");
@@ -527,6 +652,7 @@ export function GeoMapSection({
     map.on("load", () => {
       addOverlays(map, cfg);
       addLabels(map, viewRef.current, markerNames(cfg));
+      if (hasBorders) addTerritory(map);
       map.resize();
       setReady(true);
     });
@@ -551,6 +677,13 @@ export function GeoMapSection({
     if (!map || !ready || !cfg) return;
     addLabels(map, view, markerNames(cfg));
   }, [view, ready, cfg]);
+
+  // Borders: show/hide the who-ruled-where washes and ruler-colored city dots.
+  useEffect(() => {
+    const map = mapObj.current;
+    if (!map || !ready || !hasBorders) return;
+    setTerritoryVisible(map, borders);
+  }, [borders, ready, hasBorders]);
 
   // Pin colors follow the ACTIVE theme: when <html data-theme> changes, the
   // pin bitmaps are rebuilt from the new --accent-strong so the map and the
@@ -639,6 +772,16 @@ export function GeoMapSection({
           >
             {view === "today" ? "Today" : "Then"}
           </button>
+          {hasBorders && (
+            <button
+              className={chip(borders)}
+              aria-pressed={borders}
+              aria-label="Show who ruled where, around AD 29-30"
+              onClick={() => setBorders((b) => !b)}
+            >
+              Borders
+            </button>
+          )}
           <button className={chip(threeD)} aria-pressed={threeD} aria-label="3-D terrain" onClick={() => setThreeD((t) => !t)}>
             3-D
           </button>
@@ -687,6 +830,10 @@ export function GeoMapSection({
             </div>
           )}
         </div>
+
+        {/* Borders key — who ruled where, with every city labeled by how we
+            know its ruler (Codex audit). Renders only while Borders is on. */}
+        {hasBorders && borders && !failed && <TerritoryKey />}
 
         {/* Legend: names + honesty qualifiers live HERE, not on the map.
             Every label string (including "· debated" style qualifiers) renders
