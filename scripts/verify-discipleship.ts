@@ -141,5 +141,32 @@ const QUOTED =
   "In 12:30-31 Jesus quotes the command, ‘You shall love the Lord your God’ and ‘love your neighbor as yourself’. Explaining that command to a friend — only if it would help them — is one gentle way this chapter's truth can travel. No pressure, nothing owed.";
 log(clean(base(QUOTED)), "quoted biblical command NOT falsely flagged", JSON.stringify(codes(base(QUOTED))));
 
+// ===== Codex round-3 adversarial probes =====
+
+// 1. A permitted earlier phrase must not hide a LATER bare command.
+log(has(base("If it would help, you might reflect quietly. Then contact three friends about 12:17."), "ASSIGNMENT_LANGUAGE"), "later bare command not hidden by an earlier permitted phrase", JSON.stringify(codes(base("If it would help, you might reflect quietly. Then contact three friends about 12:17."))));
+// A loose earlier "no pressure" must not exempt a later command.
+log(has(base("There is no pressure, but you must contact a friend about 12:17."), "ASSIGNMENT_LANGUAGE"), "loose ‘no pressure’ does not exempt a later obligation");
+// "him", "her", "your sister" objects.
+log(has(base("Tell him about how Jesus answers in 12:17."), "ASSIGNMENT_LANGUAGE"), "‘Tell him’ (pronoun object) flagged", JSON.stringify(codes(base("Tell him about how Jesus answers in 12:17."))));
+log(has(base("Teach your sister the lesson of 12:17."), "ASSIGNMENT_LANGUAGE"), "‘Teach your sister’ flagged");
+
+// The safe optional invitation must STILL pass (governing modal close by).
+log(clean(base("If it would help, you might contact a friend and share this chapter with them (12:17) — only if it feels natural.")), "governed optional invitation still passes", JSON.stringify(codes(base("If it would help, you might contact a friend and share this chapter with them (12:17)."))));
+
+// 2. Chapter-accurate verse bound: Mark 12 ends at 44.
+log(has(base(GOOD, { section: { verseRefs: ["12:99"] } }), "VERSE_REF_OFF_CHAPTER"), "12:99 rejected (beyond Mark 12's 44 verses)");
+log(!has(base(GOOD, { section: { verseRefs: ["12:44"] } }), "VERSE_REF_OFF_CHAPTER"), "12:44 accepted (Mark 12's last verse)");
+// Numbered book must not be read as no-book.
+log(has(base("His point echoes what Paul writes in 1 Corinthians 12:3 elsewhere.", { section: { verseRefs: [] } }), "VERSE_REF_OFF_CHAPTER"), "inline ‘1 Corinthians 12:3’ not mistaken for Mark 12");
+
+// 3. One incidental shared word must not defeat genericity.
+const ONE_WORD_SHARE = "Following Jesus means pursuing the greatest good you can imagine in ordinary living.";
+log(has(base(ONE_WORD_SHARE, { section: { verseRefs: [] } }), "GENERIC_COPY"), "single incidental shared word still GENERIC", JSON.stringify(codes(base(ONE_WORD_SHARE, { section: { verseRefs: [] } }))));
+
+// 4. Person-as-project bypasses closed.
+log(has(base("Do not hesitate to make them your project until they come around (12:31)."), "PERSON_AS_PROJECT"), "‘do not hesitate to make them your project’ flagged", JSON.stringify(codes(base("Do not hesitate to make them your project until they come around (12:31)."))));
+log(has(base("Treat your friend as a project to fix, gently, over time (12:31)."), "PERSON_AS_PROJECT"), "‘treat your friend as a project to fix’ flagged", JSON.stringify(codes(base("Treat your friend as a project to fix, gently, over time (12:31)."))));
+
 console.log(failures === 0 ? "\nverify:discipleship ✓ all checks passed" : `\nverify:discipleship ✗ ${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);
