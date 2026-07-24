@@ -465,20 +465,19 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
     });
   }
 
-  // Genericity by SUBSTANCE, not length, and NOT rescued by a token citation
-  // (Codex: reusable-anywhere prose can add a verseRefs token and evade this).
-  // Grounding must come from chapter SUBSTANCE, never a citation alone: neither
-  // an inline verse nor a single incidental shared word establishes it (Codex).
-  // Grounded = TWO+ specific words shared with the chapter's material, OR an
-  // inline chapter verse PLUS at least one specific shared word (so a concise
-  // verse-anchored card that also names something from the chapter passes, while
-  // reusable prose + "(12:17)" and raw two-incidental-word overlap both fail).
+  // Genericity by SUBSTANCE. Grounding requires the substantive anchor of an
+  // INLINE in-chapter verse in the prose (a declared verseRefs token does NOT
+  // count) PLUS chapter-specific vocabulary. The raw word-count path is removed
+  // (Codex: "replace raw token-count grounding with a substantive chapter
+  // anchor"), so reusable prose that name-drops chapter words next to only a
+  // declared/decoy citation fails; an inline citation with no chapter substance
+  // fails; and two scattered chapter words with no inline anchor fail.
   const specificShared = input.chapterContext ? sharedSpecificCount(body, input.chapterContext) : 0;
-  const grounded = specificShared >= 2 || (inlineInChapter > 0 && specificShared >= 1);
+  const grounded = inlineInChapter > 0 && specificShared >= 1;
   if (!grounded) {
     v.push({
       code: "GENERIC_COPY",
-      message: "Generic/reusable-anywhere copy — not grounded in this chapter's material (a bare verse citation is not enough).",
+      message: "Generic/reusable-anywhere copy — not grounded in this chapter (needs an inline chapter verse anchored to this chapter's own content, not a bare citation).",
     });
   }
 

@@ -125,10 +125,26 @@ log(
 
 // Genericity is by SUBSTANCE: a concise card grounded in the chapter's own
 // material is NOT generic (it still needs a verse ref → only NO_VERSE_REF here).
-const GROUNDED_NO_VERSE =
+// A card that never anchors a chapter verse is NOT grounded, even if it name-
+// drops chapter nouns — grounding needs the verse-in-a-sentence anchor (Codex).
+const NO_ANCHOR =
   "The widow gives her last two coins while the rich give from plenty. Following Jesus can look like that quiet, unnoticed trust — and a friend watching your own small, unshowy generosity may catch it too.";
-const groundedCodes = codes(base(GROUNDED_NO_VERSE, { section: { verseRefs: [] }, chapterContext: "A poor widow puts in two copper coins, all she had to live on, while rich donors give large sums from their surplus." }));
-log(!groundedCodes.includes("GENERIC_COPY") && groundedCodes.includes("NO_VERSE_REF"), "grounded-by-context is not GENERIC (only NO_VERSE_REF)", JSON.stringify(groundedCodes));
+const noAnchorCodes = codes(base(NO_ANCHOR, { section: { verseRefs: [] }, chapterContext: "A poor widow puts in two copper coins, all she had to live on, while rich donors give large sums from their surplus." }));
+log(noAnchorCodes.includes("GENERIC_COPY") && noAnchorCodes.includes("NO_VERSE_REF"), "no verse anchor at all → NOT grounded (GENERIC + NO_VERSE_REF)", JSON.stringify(noAnchorCodes));
+
+// Codex's exact two-incidental-word probe: chapter nouns name-dropped in a decoy
+// sentence, generic invitation, with only a DECLARED verse → still GENERIC.
+const DECOY =
+  "Coins and widow appear here. Following Jesus means helping other people follow Jesus too.";
+log(has(base(DECOY, { section: { verseRefs: ["12:17"] } }), "GENERIC_COPY"), "decoy chapter-noun sentence + declared verse still GENERIC", JSON.stringify(codes(base(DECOY, { section: { verseRefs: ["12:17"] } }))));
+// DETERMINISTIC BOUNDARY (documented honestly): a sentence that genuinely cites
+// a chapter verse AND names this chapter's content ("…a widow… in 12:44") makes
+// the card chapter-SPECIFIC, so the reusability gate does NOT fire — even if the
+// invitation itself is weak. Judging invitation strength is the senior semantic
+// reviewer's call, not this deterministic reusability check.
+const CHAPTER_SPECIFIC_WEAK =
+  "Following Jesus means helping other people follow him too. The widow's two coins in 12:44 show what wholehearted trust looks like.";
+log(!has(base(CHAPTER_SPECIFIC_WEAK, { section: { verseRefs: [] } }), "GENERIC_COPY"), "a sentence anchoring a verse to chapter content is chapter-specific (not GENERIC)", JSON.stringify(codes(base(CHAPTER_SPECIFIC_WEAK, { section: { verseRefs: [] } }))));
 
 // --- SAFE COPY must NOT false-positive ---
 const SAFE_SHOULD =
