@@ -185,44 +185,49 @@ function overlapRatio(a: string, b: string): number {
   for (const w of A) if (B.has(w)) shared++;
   return shared / Math.min(A.size, B.size);
 }
-/** Ultra-generic gospel words that appear in almost any chapter — they must NOT
- * count as evidence a card is grounded in THIS chapter (Codex: a token citation
- * on reusable prose is not grounding). */
+/** Words that appear in almost any chapter's discipleship copy — generic gospel
+ * vocabulary AND ordinary function/filler words — so they must NOT count as
+ * evidence a card is grounded in THIS chapter (Codex: neither a token citation
+ * nor a couple of incidental words is grounding). Chapter-CONTENT words (coin,
+ * widow, resurrection, neighbour, commandment, …) are deliberately absent. */
 const GROUNDING_STOPWORDS = new Set([
-  "jesus",
-  "christ",
-  "follow",
-  "following",
-  "followers",
-  "disciple",
-  "disciples",
-  "discipleship",
-  "gospel",
-  "chapter",
-  "verse",
-  "verses",
-  "people",
-  "someone",
-  "friend",
-  "friends",
-  "others",
-  "share",
-  "sharing",
-  "helping",
-  "faith",
-  "believe",
-  "church",
-  "kingdom",
-  "truth",
-  "notice",
-  "invite",
+  // generic gospel / inspirational
+  "jesus", "christ", "lord", "follow", "following", "followers", "disciple",
+  "disciples", "discipleship", "gospel", "chapter", "verse", "verses", "people",
+  "someone", "somebody", "friend", "friends", "others", "share", "sharing",
+  "shared", "help", "helps", "helping", "faith", "believe", "church", "kingdom",
+  "truth", "notice", "invite", "love", "loves", "loving", "loved", "good", "life",
+  "live", "lives", "living", "world", "great", "greatest", "grace", "hope",
+  "heart", "hearts", "everyone", "everything", "anyone", "anything", "ordinary",
+  "imagine", "pursuing", "pursue", "become", "together", "spirit", "prayer",
+  "praying", "reflect", "reflection", "gently", "gentle", "quietly",
+  // ordinary function / filler (4+ letters)
+  "them", "they", "their", "that", "this", "these", "those", "with", "from",
+  "your", "will", "have", "been", "were", "when", "what", "then", "than", "some",
+  "more", "most", "only", "even", "over", "just", "like", "well", "make", "made",
+  "does", "done", "need", "want", "know", "knows", "feel", "give", "take", "come",
+  "came", "back", "away", "each", "both", "here", "there", "said", "says", "tell",
+  "told", "into", "also", "thing", "things", "about", "would", "could", "should",
+  "might", "still", "other", "another", "being", "doing", "going", "very", "much",
+  "such", "many", "ever", "else", "upon", "whom", "whose", "while", "where",
+  "which", "means", "meant", "toward", "without", "because", "through", "little",
 ]);
-/** Count of specific (non-stopword, 5+ char) words the prose shares with the
+/** Words used for grounding — 4+ letters, minus the generic/filler stopwords. */
+function groundingWords(s: string): Set<string> {
+  return new Set(
+    s
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 3 && !GROUNDING_STOPWORDS.has(w)),
+  );
+}
+/** Count of specific (non-stopword, 4+ char) words the prose shares with the
  * chapter's own material — the substance-grounding signal for genericity. */
 function sharedSpecificCount(body: string, context: string): number {
-  const B = new Set([...contentWords(context)].filter((w) => !GROUNDING_STOPWORDS.has(w)));
+  const B = groundingWords(context);
   let shared = 0;
-  for (const w of contentWords(body)) if (!GROUNDING_STOPWORDS.has(w) && B.has(w)) shared++;
+  for (const w of groundingWords(body)) if (B.has(w)) shared++;
   return shared;
 }
 
@@ -231,7 +236,9 @@ function sharedSpecificCount(body: string, context: string): number {
  * ordinary preceding word like "in" is never mistaken for a book. */
 const BOOK_NAMES = new Set(
   (
-    "genesis exodus leviticus numbers deuteronomy joshua judges ruth samuel kings chronicles ezra nehemiah esther job psalm psalms proverbs ecclesiastes song isaiah jeremiah lamentations ezekiel daniel hosea joel amos obadiah jonah micah nahum habakkuk zephaniah haggai zechariah malachi matthew mark luke john acts romans corinthians galatians ephesians philippians colossians thessalonians timothy titus philemon hebrews james peter jude revelation"
+    "genesis exodus leviticus numbers deuteronomy joshua judges ruth samuel kings chronicles ezra nehemiah esther job psalm psalms proverbs ecclesiastes song isaiah jeremiah lamentations ezekiel daniel hosea joel amos obadiah jonah micah nahum habakkuk zephaniah haggai zechariah malachi matthew mark luke john acts romans corinthians galatians ephesians philippians colossians thessalonians timothy titus philemon hebrews james peter jude revelation " +
+    // common abbreviations, so "1 Cor 12:3" is recognized as a numbered book
+    "gen exod exo lev num deut deu josh judg sam kgs chron chr neh esth ps pss prov prv eccl eccles song isa jer lam ezek eze dan hos obad jon mic nah hab zeph hag zech zec mal matt mt mk mrk lk jn rom cor gal eph phil php col thess thes tim tit phlm phm heb jas pet jhn rev rv"
   ).split(" "),
 );
 
@@ -349,22 +356,29 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
   // within a short window before the match AND inside the same sentence, so a
   // loose earlier "maybe"/"no pressure" never licenses a later bare command
   // (Codex round-3). Quota/guilt/project are checked below and are NOT exempted.
-  const permissionGoverned = (matchIndex: number): boolean => {
-    const sentenceStart = Math.max(
-      text.lastIndexOf(".", matchIndex - 1),
-      text.lastIndexOf("!", matchIndex - 1),
-      text.lastIndexOf("?", matchIndex - 1),
-      text.lastIndexOf("\n", matchIndex - 1),
+  // The modal must govern the COMMAND CLAUSE — scoped from the verb, not the
+  // punctuation anchor. Otherwise "You might pray. Contact a friend." would let
+  // the earlier "might" (in a different sentence) license "Contact" (Codex).
+  const permissionGoverned = (verbPos: number): boolean => {
+    const clauseStart = Math.max(
+      text.lastIndexOf(".", verbPos - 1),
+      text.lastIndexOf("!", verbPos - 1),
+      text.lastIndexOf("?", verbPos - 1),
+      text.lastIndexOf(";", verbPos - 1),
+      text.lastIndexOf("\n", verbPos - 1),
       -1,
     );
-    const windowStart = Math.max(sentenceStart + 1, matchIndex - PERMISSION_WINDOW);
-    return PERMISSION_GOVERN.test(text.slice(windowStart, matchIndex));
+    const windowStart = Math.max(clauseStart + 1, verbPos - PERMISSION_WINDOW);
+    return PERMISSION_GOVERN.test(text.slice(windowStart, verbPos));
   };
   // EVERY match of EVERY pattern (global regexes) — a permitted earlier phrase
-  // cannot hide a later bare command.
+  // cannot hide a later bare command. The permission check is scoped from the
+  // VERB (first letter of the match), so a modal ends at the sentence boundary.
   for (const { re, label } of ASSIGNMENT_PATTERNS) {
     for (const m of text.matchAll(re)) {
-      if (m.index === undefined || permissionGoverned(m.index)) continue;
+      if (m.index === undefined) continue;
+      const verbPos = m.index + Math.max(0, m[0].search(/[A-Za-z]/));
+      if (permissionGoverned(verbPos)) continue;
       v.push({
         code: "ASSIGNMENT_LANGUAGE",
         message: `Reads as an assignment (${label}) — Disciple It must be an invitation.`,
@@ -381,7 +395,18 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
   // a real one later in the copy.
   for (const pm of text.matchAll(PERSON_AS_PROJECT)) {
     if (pm.index === undefined) continue;
-    if (!genuinelyNegated(text.slice(0, pm.index))) {
+    // The negation must sit in the project phrase's OWN clause — a negation in
+    // a different clause ("Do not shame them; make them your project") does not
+    // negate the project language (Codex).
+    const clauseStart = Math.max(
+      text.lastIndexOf(".", pm.index - 1),
+      text.lastIndexOf("!", pm.index - 1),
+      text.lastIndexOf("?", pm.index - 1),
+      text.lastIndexOf(";", pm.index - 1),
+      text.lastIndexOf("\n", pm.index - 1),
+      -1,
+    );
+    if (!genuinelyNegated(text.slice(clauseStart + 1, pm.index))) {
       v.push({ code: "PERSON_AS_PROJECT", message: "Treats another person as a project/target.", evidence: pm[0] });
       break;
     }
@@ -405,9 +430,10 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
     } else if (chap) v.push({ code: "VERSE_REF_OFF_CHAPTER", message: `Verse ref "${r}" is not in ${input.chapterRef}.`, evidence: r });
   }
   // Inline chapter:verse references in the body must also belong to this
-  // chapter. An optional leading BOOK name is honored ("John 12:17" is
-  // off-chapter for Mark 12) but an ordinary preceding word ("in 12:17") is
-  // not treated as a book. Impossible ranges are ignored, not counted.
+  // chapter. An optional leading BOOK name (incl. numbered abbreviations like
+  // "1 Cor") is honored; an ordinary preceding word ("in 12:17") is not a book.
+  // A MALFORMED inline ref ("12:0", "12:34-28", "12:999") is REJECTED, not
+  // silently skipped (Codex).
   const body = section.fullContent ?? "";
   const inlineRe = /\b(?:([1-3]?\s?[A-Za-z][A-Za-z.]*)\s+)?(\d+):(\d+)(?:\s*[-–—]\s*(\d+))?\b/g;
   let im: RegExpExecArray | null;
@@ -417,14 +443,13 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
     const inlineChapter = Number(im[2]);
     const vStart = Number(im[3]);
     const vEnd = im[4] ? Number(im[4]) : vStart;
-    if (!validVerseRange(vStart, vEnd)) continue; // "12:0", "12:34-28", "12:999"
     const sameBook = !inlineBook || !chap?.book || inlineBook === chap.book;
-    const withinChapter = chap ? vEnd <= chapterVerseMax(chap) : true;
-    if (chap && inlineChapter === chap.chapter && sameBook && withinChapter) inlineInChapter++;
+    const wellFormed = validVerseRange(vStart, vEnd) && (chap ? vEnd <= chapterVerseMax(chap) : true);
+    if (chap && inlineChapter === chap.chapter && sameBook && wellFormed) inlineInChapter++;
     else if (chap) {
       v.push({
         code: "VERSE_REF_OFF_CHAPTER",
-        message: `Inline reference "${im[0].trim()}" is not in ${input.chapterRef}.`,
+        message: `Inline reference "${im[0].trim()}" is not a valid ${input.chapterRef} reference.`,
         evidence: im[0].trim(),
       });
     }
@@ -442,16 +467,14 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
 
   // Genericity by SUBSTANCE, not length, and NOT rescued by a token citation
   // (Codex: reusable-anywhere prose can add a verseRefs token and evade this).
-  // A card is grounded only when the PROSE points at a specific verse of this
-  // chapter (inline c:v) or shares specific, non-generic vocabulary with the
-  // chapter's own material.
-  // Grounding requires an inline chapter verse in the prose OR at least TWO
-  // specific words shared with the chapter's material — one incidental shared
-  // word (e.g. "greatest") does not prove the invitation grows from this
-  // chapter (Codex round-3).
-  const grounded =
-    inlineInChapter > 0 ||
-    (input.chapterContext ? sharedSpecificCount(body, input.chapterContext) >= 2 : false);
+  // Grounding must come from chapter SUBSTANCE, never a citation alone: neither
+  // an inline verse nor a single incidental shared word establishes it (Codex).
+  // Grounded = TWO+ specific words shared with the chapter's material, OR an
+  // inline chapter verse PLUS at least one specific shared word (so a concise
+  // verse-anchored card that also names something from the chapter passes, while
+  // reusable prose + "(12:17)" and raw two-incidental-word overlap both fail).
+  const specificShared = input.chapterContext ? sharedSpecificCount(body, input.chapterContext) : 0;
+  const grounded = specificShared >= 2 || (inlineInChapter > 0 && specificShared >= 1);
   if (!grounded) {
     v.push({
       code: "GENERIC_COPY",

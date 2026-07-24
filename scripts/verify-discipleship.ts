@@ -16,8 +16,10 @@ const log = (ok: boolean, name: string, detail = "") => {
 // Production always supplies chapter context (summary + what-happens + big idea),
 // so the fixtures do too — that is the path where genericity is judged by
 // substance rather than a bare citation.
+// Representative of the production chapter context (summary + what-happens + big
+// idea) so genericity is judged against the chapter's real vocabulary.
 const MARK12_CONTEXT =
-  "Jesus faces trap after trap in the temple courts — the wicked tenants, the tax coin and Caesar, the Sadducees and resurrection, the greatest commandment, and a poor widow's two copper coins.";
+  "Jesus faces trap after trap in the temple courts — the wicked tenants who kill the beloved son, the tax coin bearing Caesar's likeness, the Sadducees denying the resurrection, and the scribe who asks the greatest commandment. Jesus answers: love the Lord your God with all your heart, soul, mind, and strength, and love your neighbor as yourself. He warns against the scribes and praises a poor widow who gives two copper coins, all she had to live on. The chapter turns on allegiance, loyalty, and where the reader's ultimate trust belongs.";
 
 const base = (fullContent: string, over: Partial<DiscipleshipInput> = {}): DiscipleshipInput => ({
   section: { title: "Disciple It", cardSummary: "A gentle invitation.", fullContent, verseRefs: ["12:17"], ...(over.section ?? {}) },
@@ -43,7 +45,7 @@ log(clean(base(SHORT_GOOD)), "short verse-grounded invitation passes (no length 
 // The safe OPTIONAL invitation across coordinated verbs must pass — the "might /
 // if it would help" modal governs both "contact" and "share".
 const SAFE_OPTIONAL =
-  "If it would help, you might contact a friend and share this chapter with them (12:17) — only if it feels natural, with nothing owed.";
+  "If it would help, you might contact a friend and share how Jesus answers the coin trap in 12:15-17 with them — only if it feels natural, with nothing owed.";
 log(clean(base(SAFE_OPTIONAL)), "optional invitation across coordinated verbs passes", JSON.stringify(codes(base(SAFE_OPTIONAL))));
 
 // --- MISSING (only when presence is enforced) ---
@@ -152,7 +154,7 @@ log(has(base("Tell him about how Jesus answers in 12:17."), "ASSIGNMENT_LANGUAGE
 log(has(base("Teach your sister the lesson of 12:17."), "ASSIGNMENT_LANGUAGE"), "‘Teach your sister’ flagged");
 
 // The safe optional invitation must STILL pass (governing modal close by).
-log(clean(base("If it would help, you might contact a friend and share this chapter with them (12:17) — only if it feels natural.")), "governed optional invitation still passes", JSON.stringify(codes(base("If it would help, you might contact a friend and share this chapter with them (12:17)."))));
+log(clean(base("If it would help, you might contact a friend and walk through the coin trap in 12:15-17 with them — only if it feels natural.")), "governed optional invitation still passes", JSON.stringify(codes(base("If it would help, you might contact a friend and walk through the coin trap in 12:15-17 with them."))));
 
 // 2. Chapter-accurate verse bound: Mark 12 ends at 44.
 log(has(base(GOOD, { section: { verseRefs: ["12:99"] } }), "VERSE_REF_OFF_CHAPTER"), "12:99 rejected (beyond Mark 12's 44 verses)");
@@ -167,6 +169,26 @@ log(has(base(ONE_WORD_SHARE, { section: { verseRefs: [] } }), "GENERIC_COPY"), "
 // 4. Person-as-project bypasses closed.
 log(has(base("Do not hesitate to make them your project until they come around (12:31)."), "PERSON_AS_PROJECT"), "‘do not hesitate to make them your project’ flagged", JSON.stringify(codes(base("Do not hesitate to make them your project until they come around (12:31)."))));
 log(has(base("Treat your friend as a project to fix, gently, over time (12:31)."), "PERSON_AS_PROJECT"), "‘treat your friend as a project to fix’ flagged", JSON.stringify(codes(base("Treat your friend as a project to fix, gently, over time (12:31)."))));
+
+// ===== Codex round-4 adversarial probes =====
+
+// 1. A modal in a PRIOR sentence must not license a later command.
+log(has(base("You might pray. Contact a friend about 12:17."), "ASSIGNMENT_LANGUAGE"), "permission does not leak across a sentence boundary", JSON.stringify(codes(base("You might pray. Contact a friend about 12:17."))));
+
+// 2. Numbered abbreviation + malformed inline refs are rejected, even when a
+// valid declared ref is present.
+log(has(base("His point echoes 1 Cor 12:3 elsewhere.", { section: { verseRefs: ["12:17"] } }), "VERSE_REF_OFF_CHAPTER"), "‘1 Cor 12:3’ recognized as off-chapter");
+for (const bad of ["12:0", "12:34-28", "12:999"]) {
+  log(has(base(`A note about ${bad} appears here, though 12:17 is the real anchor.`, { section: { verseRefs: ["12:17"] } }), "VERSE_REF_OFF_CHAPTER"), `malformed inline ${bad} rejected (not skipped)`, JSON.stringify(codes(base(`A note about ${bad} appears here, though 12:17 is the real anchor.`, { section: { verseRefs: ["12:17"] } }))));
+}
+
+// 3. An inline citation on reusable prose, and two incidental words, cannot
+// alone establish chapter substance.
+log(has(base("Following Jesus means loving him with your whole heart (12:17).", { section: { verseRefs: [] } }), "GENERIC_COPY"), "reusable prose + inline (12:17) still GENERIC", JSON.stringify(codes(base("Following Jesus means loving him with your whole heart (12:17).", { section: { verseRefs: [] } }))));
+
+// 4. Unrelated nearby negation (different clause) must not hide project language.
+log(has(base("Do not shame them; make them your project until they come around (12:31)."), "PERSON_AS_PROJECT"), "negation in a different clause does not hide project language", JSON.stringify(codes(base("Do not shame them; make them your project until they come around (12:31)."))));
+log(has(base("Never pressure her; treat her as a project to win over time (12:31)."), "PERSON_AS_PROJECT"), "‘Never pressure her; treat her as a project’ flagged");
 
 console.log(failures === 0 ? "\nverify:discipleship ✓ all checks passed" : `\nverify:discipleship ✗ ${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);
