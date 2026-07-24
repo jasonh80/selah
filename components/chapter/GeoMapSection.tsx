@@ -32,6 +32,14 @@ import { labelsForView, type GeoLabelKind } from "@/lib/maps/geo-labels";
 import { MARK_TERRITORY, MARK_RULERS, territoryCities, MODERN_COUNTRIES, MODERN_BORDER_COLOR, type RulerId } from "@/lib/maps/territories";
 import { SectionCard } from "@/components/chapter/SectionCard";
 
+// The "biblical world (Levant)" clamp — [[west,south],[east,north]]. Generous
+// enough for every Mark scene (and Judea/Sinai), tight enough that a reader
+// can never pan out to the whole planet.
+const BIBLICAL_WORLD_BOUNDS: [[number, number], [number, number]] = [
+  [32.0, 28.5],
+  [40.0, 35.6],
+];
+
 const IMAGERY_TILES =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const REFERENCE_TILES =
@@ -407,6 +415,12 @@ function TerritoryKey({ view }: { view: MapView }) {
         })}
       </ul>
       <p className="mt-2.5 text-[12px] leading-relaxed text-secondary">
+        <span className="font-medium text-primary">All under Rome:</span> every
+        territory on this map answered to Rome — the provinces directly, the
+        tetrarchies through client rulers. (This is the Rome of the region
+        shown, not the whole empire, which stretched around the Mediterranean.)
+      </p>
+      <p className="mt-2.5 text-[12px] leading-relaxed text-secondary">
         <span className="font-medium text-primary">Named, but not territorial rulers:</span>{" "}
         {MARK_TERRITORY.authorities.map((a) => `${a.name} — ${a.blurb}`).join("  ")}
       </p>
@@ -487,7 +501,7 @@ function NumberedCorridor({ n }: { n: number }) {
 // area, not a precise pin. Everything is added once (hidden) and toggled.
 // Ancient (Then) borders and modern (Today) borders are separate layer sets;
 // only one shows, and only while Borders is on.
-const ANCIENT_LAYERS = ["territory-wash", "territory-outline-casing", "territory-outline", "territory-disputed", "territory-labels"];
+const ANCIENT_LAYERS = ["territory-wash", "territory-outline-casing", "territory-outline", "territory-disputed", "territory-labels", "rome-frame", "rome-label"];
 const MODERN_LAYERS = ["modern-borders-casing", "modern-borders", "modern-labels"];
 
 function addTerritory(map: maplibregl.Map): void {
@@ -586,6 +600,41 @@ function addTerritory(map: maplibregl.Map): void {
       "symbol-sort-key": ["get", "pri"],
     },
   });
+
+  // ---- Ancient: the "all under Rome" frame. Everything on THIS map — the
+  // provinces directly, the tetrarchies through client rulers — sat under
+  // Rome. A soft outer frame + banner says so without drawing the whole
+  // empire (owner ruling 2026-07-24). Not a territorial line, a reminder.
+  const rf: [number, number][] = [
+    [34.55, 31.0], [36.75, 31.0], [36.75, 33.55], [34.55, 33.55], [34.55, 31.0],
+  ];
+  map.addSource("rome-frame", {
+    type: "geojson",
+    data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: rf } },
+  });
+  map.addLayer({
+    id: "rome-frame",
+    type: "line",
+    source: "rome-frame",
+    layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#e6d9b8", "line-width": 2, "line-opacity": 0.55, "line-dasharray": [1.5, 2] },
+  });
+  {
+    const id = "rome-banner";
+    const img = textLabelImage("All under Rome", { color: "#f0e6cf", size: 13, weight: 800, upper: true });
+    if (map.hasImage(id)) map.removeImage(id);
+    map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+    map.addSource("rome-label", {
+      type: "geojson",
+      data: { type: "Feature", properties: { icon: id }, geometry: { type: "Point", coordinates: [35.6, 33.42] } },
+    });
+    map.addLayer({
+      id: "rome-label",
+      type: "symbol",
+      source: "rome-label",
+      layout: { visibility: "none", "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-anchor": "center" },
+    });
+  }
 
   // ---- Modern (Today): real country boundary lines + country names ----
   map.addSource("modern-borders", {
@@ -766,7 +815,6 @@ export function GeoMapSection({
   const cfg = getGeoChapterMap(data.slug);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<maplibregl.Map | null>(null);
-  const tourTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [threeD, setThreeD] = useState(false);
   const [view, setView] = useState<MapView>("chapter");
   const [borders, setBorders] = useState(false);
@@ -792,6 +840,11 @@ export function GeoMapSection({
         style: baseStyle(),
         bounds: sceneBounds(cfg),
         fitBoundsOptions: { padding: 56, maxZoom: 11 },
+        // Owner ruling 2026-07-24: never let the map wander to the whole globe.
+        // Clamp to the "biblical world (Levant)" box — Cyprus/coast to the
+        // Syrian desert, Lebanon to Sinai. Widens per testament later.
+        maxBounds: BIBLICAL_WORLD_BOUNDS,
+        minZoom: 5.2,
         // One-finger page scrolling stays with the PAGE; the map asks for two
         // fingers (touch) or ctrl+scroll (desktop) — no scroll trap on a
         // full-width mobile map (PR #43 review, P1-4).
@@ -897,10 +950,8 @@ export function GeoMapSection({
     const opts = { center: stop.center, zoom: stop.zoom, pitch: stop.pitch ?? 0, bearing: stop.bearing ?? 0 };
     if (reduced) map.jumpTo(opts);
     else map.flyTo({ ...opts, duration: 2600 });
-    tourTimer.current = setTimeout(() => setTourIdx((i) => (i === null ? null : i + 1)), reduced ? 4500 : 7000);
-    return () => {
-      if (tourTimer.current) clearTimeout(tourTimer.current);
-    };
+    // Owner ruling 2026-07-24: the Journey is SELF-PACED — it flies to each
+    // stop and waits. The reader taps Next/Back to move; no auto-advance.
   }, [tourIdx, ready, cfg]);
 
   if (!cfg) return null;
@@ -984,11 +1035,46 @@ export function GeoMapSection({
             {ATTRIBUTION}
           </span>
           {activeTour && (
-            <div role="status" aria-live="polite" className="absolute inset-x-3 bottom-8 z-10 rounded-md bg-[rgba(12,14,20,0.78)] px-3.5 py-2.5 text-white backdrop-blur-sm">
+            <div role="status" aria-live="polite" className="absolute inset-x-3 bottom-8 z-10 rounded-md bg-[rgba(12,14,20,0.82)] px-3.5 py-2.5 text-white backdrop-blur-sm">
               <p className="text-[12px] font-semibold">
                 {tourIdx! + 1} / {cfg.tour.length} · {activeTour.title}
               </p>
               <p className="mt-0.5 text-[12px] leading-relaxed text-white/85">{activeTour.caption}</p>
+              {/* Self-paced controls — the reader advances the Journey. */}
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTourIdx((i) => (i === null || i <= 0 ? i : i - 1))}
+                  disabled={tourIdx === 0}
+                  className="rounded-full border border-white/30 px-3 py-1 text-[12px] font-medium text-white disabled:opacity-40"
+                >
+                  ‹ Back
+                </button>
+                {tourIdx! < cfg.tour.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setTourIdx((i) => (i === null ? null : i + 1))}
+                    className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-[rgba(12,14,20,1)]"
+                  >
+                    Next ›
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setTourIdx(null)}
+                    className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-[rgba(12,14,20,1)]"
+                  >
+                    Done
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setTourIdx(null)}
+                  className="ml-auto text-[12px] font-medium text-white/70"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           )}
         </div>
