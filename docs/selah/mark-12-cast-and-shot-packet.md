@@ -167,11 +167,14 @@ assorted.
 
 ### `mark12-sadducee` — group
 
-- **SAYS:** they say there is no resurrection (12:18). Josephus and Acts 23:8
-  place them among the priestly/aristocratic establishment.
-- **SMART GUESS:** wealthier, better-dressed than the scribes; connected to the
-  temple establishment; older skew.
-- **UNKNOWN:** any individual's appearance.
+- **SAYS:** they say there is no resurrection (12:18; Acts 23:8 confirms the
+  resurrection denial — NOT a social class).
+- **SMART GUESS:** an ASSOCIATION with high status and the high-priestly circle
+  (Josephus on their aristocratic standing; Acts 5:17 links the high priest with
+  "the party of the Sadducees") — an association, **not** universal priesthood or
+  wealth. Possibly better-dressed than the scribes; older skew.
+- **UNKNOWN:** any individual's appearance; whether any given Sadducee here is a
+  priest; exact status.
 - **Look:** well-made but not ostentatious linen and wool; grooming that reads
   as means; assured public bearing. **Not sneering, not corpulent, not
   villain-lit.** They are wrong in this scene and they are still men.
@@ -193,9 +196,13 @@ assorted.
 
 ### `mark12-chief-priest` — group (distinct from the serving priest)
 
-- **SAYS:** chief priests act against Jesus throughout.
-- **SMART GUESS:** the priestly aristocracy; older, prosperous, publicly
-  composed. Distinct from `archetype-priest`, who is the working temple priest.
+- **SAYS:** chief priests act against Jesus throughout (the office exists and
+  opposes him).
+- **SMART GUESS:** likely older, prosperous, publicly composed; carrying temple
+  authority. Distinct from `archetype-priest`, the working temple priest.
+- **UNKNOWN:** the exact person and office, age, and appearance of any chief
+  priest shown here; and any Sadducean affiliation (association is plausible but
+  not established for a given individual). Keep all of these representative.
 - **Look:** authority carried in bearing and cloth, not in a scowl.
 
 ### `mark12-scribe-great-commandment` — one-chapter individual
@@ -222,17 +229,23 @@ assorted.
   misery, no moralised ugliness. Poverty shows in the wear of good-enough
   clothing and in her hands, not in degradation. **Jesus draws the disciples'
   attention to her gift (12:43–44); the image must let the reader regard her with
-  dignity, not pity.** Dignity is the whole point of the scene.
+  dignity, not pity.** Dignity is the visual guardrail.
 - **Representation label:** representative depiction.
 
 ### `mark12-temple-crowd` (with wealthy donors folded in) — scene casting
 
-- Not recurring characters. Proportional crowd per Eyes v1.2: a **mixed temple
-  crowd — men, women, and families** across the natural Levantine range, without
-  an artificial spread; adult men **generally bearded**; a real spread of ages,
-  lean to sturdy. Preserve the approved woman/donor background direction. The
-  wealthy read wealthy through cloth and bearing — **not** through fatness or
-  sneering.
+- Not recurring characters.
+- **SAYS:** a crowd is present in the temple and listens — "the great throng
+  heard him gladly" (12:37); many rich people put large sums into the treasury
+  and a poor widow puts in two copper coins (12:41–44). So: a **mixed public
+  crowd at the treasury**, including both wealthy givers and the poor.
+- **SMART GUESS / open art direction:** a mixed crowd — **men, women, and
+  families** across the natural Levantine range; adult men generally bearded; a
+  real spread of ages, head coverings, fabric, and bearing. The wealthy read
+  wealthy through cloth and bearing, **not** fatness or sneering.
+- **UNKNOWN:** exact proportions, individual faces, and specific clothing — all
+  representative choices, none attested. Preserve the approved woman/donor
+  background direction as art direction, not fact.
 
 ---
 
@@ -272,10 +285,13 @@ staged, and deliberately not a row of Bible illustrations.
 
 ### Shot 3 — "The Question and the Trap" (the confrontation)
 
-- **Scene / verses:** 12:13–17
-- **Why it earns its place:** one image carries all three challenge scenes.
-  Pharisees and Herodians side by side is visually legible in a way the text
-  alone is not — two different kinds of men against one.
+- **Scene / verses:** 12:13–17 (the tax question ONLY)
+- **Why it earns its place:** it depicts the **tax-to-Caesar question** and
+  establishes the chapter's **confrontation pattern** — Pharisees and Herodians
+  side by side against one, visually legible in a way the text alone is not.
+  **It does NOT carry the separate Sadducee resurrection question (12:18–27) or
+  the sincere scribe exchange (12:28–34, Shot 4)** — those are distinct scenes
+  with a different tone and must not be collapsed into this one image.
 - **Shot language:** medium, slightly low, tension in the spacing rather than
   in faces.
 - **Visible cast IDs:** `jesus` (**attach `jesus/ministry-late`**), plus
