@@ -29,7 +29,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { ChapterWorkup } from "@/lib/types";
 import { getGeoChapterMap, type GeoChapterMap } from "@/lib/maps/geo-chapter-maps";
 import { labelsForView, type GeoLabelKind } from "@/lib/maps/geo-labels";
-import { MARK_TERRITORY, MARK_RULERS, territoryCities, MODERN_COUNTRIES, MODERN_BORDER_COLOR, type RulerId } from "@/lib/maps/territories";
+import { MARK_TERRITORY, MARK_RULERS, territoryCities, MODERN_COUNTRIES, MODERN_CONTESTED, MODERN_BORDER_COLOR, type RulerId } from "@/lib/maps/territories";
 import { SectionCard } from "@/components/chapter/SectionCard";
 
 // The "biblical world (Levant)" clamp — [[west,south],[east,north]]. Generous
@@ -373,11 +373,15 @@ function TerritoryKey({ view }: { view: MapView }) {
       <div className="border-t px-3.5 py-3" style={{ borderColor: "var(--line)" }}>
         <p className="text-[13px] font-semibold text-primary">Today&rsquo;s countries</p>
         <p className="mt-1 text-[12px] leading-relaxed text-secondary">
-          The dashed lines are the modern international borders (simplified),
-          shown to orient the same ground you see in the chapter:{" "}
-          {MODERN_COUNTRIES.map((c) => c.name.charAt(0) + c.name.slice(1).toLowerCase()).join(" · ")}.
-          Contested areas are left unlabeled rather than taking a side. Switch
-          to <b>Then</b> for who ruled this land in Jesus&rsquo; day.
+          Modern borders (simplified), to orient the same ground you see in the
+          chapter: {MODERN_COUNTRIES.map((c) => c.name.charAt(0) + c.name.slice(1).toLowerCase()).join(" · ")}.
+          {" "}
+          <span className="font-medium text-primary">Solid lines</span> are
+          recognized international borders;{" "}
+          <span className="font-medium text-primary">dashed lines</span> mark
+          contested areas ({MODERN_CONTESTED.map((t) => t.name).join(", ")}),
+          named in gray without assigning them to any country. Switch to{" "}
+          <b>Then</b> for who ruled this land in Jesus&rsquo; day.
         </p>
       </div>
     );
@@ -502,7 +506,7 @@ function NumberedCorridor({ n }: { n: number }) {
 // Ancient (Then) borders and modern (Today) borders are separate layer sets;
 // only one shows, and only while Borders is on.
 const ANCIENT_LAYERS = ["territory-wash", "territory-outline-casing", "territory-outline", "territory-disputed", "territory-disputed-line", "territory-candidate-labels", "territory-labels"];
-const MODERN_LAYERS = ["modern-borders-casing", "modern-borders", "modern-labels"];
+const MODERN_LAYERS = ["modern-borders-casing", "modern-borders", "contested-borders-casing", "contested-borders", "modern-labels"];
 
 function addTerritory(map: maplibregl.Map): void {
   if (map.getSource("territory-regions")) return;
@@ -643,7 +647,14 @@ function addTerritory(map: maplibregl.Map): void {
   // (The "all under Rome" point is a FOOTNOTE in the key text, not a drawn
   // frame — owner ruling 2026-07-24. See TerritoryKey.)
 
-  // ---- Modern (Today): real country boundary lines + country names ----
+  // ---- Modern (Today) ----
+  // Mapping-service convention (owner 2026-07-24): recognized borders are
+  // SOLID; contested boundaries are DASHED; contested territories carry a
+  // neutral gray name and no sovereign.
+  const casing = "rgba(12,14,20,.8)";
+  const dash: [number, number] = [2.4, 1.9];
+
+  // Recognized international borders → SOLID (dark casing + white line).
   map.addSource("modern-borders", {
     type: "geojson",
     data: {
@@ -653,26 +664,56 @@ function addTerritory(map: maplibregl.Map): void {
       ),
     },
   });
-  // Dashed border: a DASHED dark casing (so gaps show terrain and it reads as
-  // a dashed line, not a solid one) with a white dash on top for contrast.
-  const dash: [number, number] = [2.4, 1.9];
   map.addLayer({
     id: "modern-borders-casing",
     type: "line",
     source: "modern-borders",
-    layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
-    paint: { "line-color": "rgba(12,14,20,.8)", "line-width": 5, "line-dasharray": dash.map((d) => d * 0.92) as [number, number] },
+    layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": casing, "line-width": 5 },
   });
   map.addLayer({
     id: "modern-borders",
     type: "line",
     source: "modern-borders",
-    layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
-    paint: { "line-color": MODERN_BORDER_COLOR, "line-width": 2.4, "line-opacity": 1, "line-dasharray": dash },
+    layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": MODERN_BORDER_COLOR, "line-width": 2.4, "line-opacity": 1 },
   });
+
+  // Contested boundaries → DASHED (dashed casing so gaps show terrain).
+  map.addSource("contested-borders", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: MODERN_CONTESTED.flatMap((t) =>
+        t.boundary.map((line) => ({ type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates: line } })),
+      ),
+    },
+  });
+  map.addLayer({
+    id: "contested-borders-casing",
+    type: "line",
+    source: "contested-borders",
+    layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
+    paint: { "line-color": casing, "line-width": 4.5, "line-dasharray": dash.map((d) => d * 0.92) as [number, number] },
+  });
+  map.addLayer({
+    id: "contested-borders",
+    type: "line",
+    source: "contested-borders",
+    layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
+    paint: { "line-color": "#d1d5db", "line-width": 2, "line-opacity": 1, "line-dasharray": dash },
+  });
+
+  // Country names (white) + contested territory names (neutral gray).
   MODERN_COUNTRIES.forEach((c, i) => {
     const id = `modern-label-${i}`;
     const img = textLabelImage(c.name, { color: "#ffffff", size: 13, weight: 800, upper: true });
+    if (map.hasImage(id)) map.removeImage(id);
+    map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+  });
+  MODERN_CONTESTED.forEach((t, i) => {
+    const id = `contested-label-${i}`;
+    const img = textLabelImage(t.name, { color: "#b6bcc6", size: 11, weight: 600 });
     if (map.hasImage(id)) map.removeImage(id);
     map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
   });
@@ -680,7 +721,10 @@ function addTerritory(map: maplibregl.Map): void {
     type: "geojson",
     data: {
       type: "FeatureCollection",
-      features: MODERN_COUNTRIES.map((c, i) => ({ type: "Feature" as const, properties: { icon: `modern-label-${i}` }, geometry: { type: "Point" as const, coordinates: c.labelAt } })),
+      features: [
+        ...MODERN_COUNTRIES.map((c, i) => ({ type: "Feature" as const, properties: { icon: `modern-label-${i}` }, geometry: { type: "Point" as const, coordinates: c.labelAt } })),
+        ...MODERN_CONTESTED.map((t, i) => ({ type: "Feature" as const, properties: { icon: `contested-label-${i}` }, geometry: { type: "Point" as const, coordinates: t.labelAt } })),
+      ],
     },
   });
   map.addLayer({

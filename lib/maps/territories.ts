@@ -107,6 +107,16 @@ export interface ModernCountry {
   borders: [number, number][][];
 }
 
+/** A contested territory (Google-Maps convention, owner ruling 2026-07-24):
+ * name the place neutrally in gray, draw its boundary DASHED (vs the solid
+ * recognized borders), and assign it to no sovereign. */
+export interface ContestedArea {
+  name: string;
+  labelAt: [number, number];
+  /** Dashed boundary polyline(s) [lon,lat][]. Simplified, not survey data. */
+  boundary: [number, number][][];
+}
+
 export interface TerritoryMap {
   dateLabel: string;
   cities: TerritoryCity[];
@@ -232,9 +242,8 @@ export const MODERN_COUNTRIES: ModernCountry[] = [
     name: "SYRIA",
     labelAt: [36.55, 33.15],
     borders: [
-      // Israel–Syria (Golan) from Hermon down to the tripoint
-      [HERMON, [35.82, 33.0], [35.86, 32.85], TRIPOINT],
-      // Syria–Jordan eastward from the tripoint
+      // Syria–Jordan eastward from the tripoint (recognized → solid). The
+      // Israel–Syria (Golan) line is CONTESTED and moves to MODERN_CONTESTED.
       [TRIPOINT, [36.0, 32.6], [36.9, 32.4]],
     ],
   },
@@ -248,7 +257,30 @@ export const MODERN_COUNTRIES: ModernCountry[] = [
   },
   {
     name: "ISRAEL",
-    labelAt: [34.95, 31.4],
+    labelAt: [34.85, 31.25],
     borders: [], // its edges are the neighboring countries' lines above
+  },
+];
+
+// Contested territories — dashed boundary, gray neutral label, no sovereign
+// assigned (owner ruling 2026-07-24, matching how mapping services show them).
+// Boundaries are deliberately simplified approximations.
+export const MODERN_CONTESTED: ContestedArea[] = [
+  {
+    name: "Golan Heights",
+    labelAt: [35.75, 32.98],
+    boundary: [[HERMON, [35.82, 33.0], [35.86, 32.85], TRIPOINT]],
+  },
+  {
+    name: "West Bank",
+    labelAt: [35.27, 31.95],
+    // The western boundary (armistice line); the eastern edge follows the
+    // Jordan/Dead Sea, already drawn as the recognized Israel–Jordan border.
+    boundary: [[[35.0, 32.52], [34.95, 32.15], [35.02, 31.86], [35.18, 31.72], [35.4, 31.36]]],
+  },
+  {
+    name: "Gaza Strip",
+    labelAt: [34.38, 31.35],
+    boundary: [[[34.56, 31.6], [34.22, 31.22], [34.32, 31.18], [34.57, 31.55]]],
   },
 ];
