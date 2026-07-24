@@ -57,33 +57,49 @@ export type DiscipleshipViolation = {
 // to contact, teach, share with, recruit, or report to anyone." An imperative
 // built on one of these turns the invitation into an assignment.
 const OUTREACH_VERB =
-  "ask|tell|text|message|dm|email|call|contact|reach|reach out|invite|share|teach|disciple|recruit|confront|report|forward|post|bring|lead|witness|evangeli[sz]e";
+  "ask|tell|text|message|dm|email|call|contact|reach|reach out|invite|share|teach|disciple|recruit|confront|report|forward|post|bring|lead|witness|send|talk|speak|mention|introduce|evangeli[sz]e";
 
 // Objects/targets that mark an outreach verb as pointed at another person
-// (rather than, say, "share in the joy" or "ask yourself").
+// (rather than, say, "share in the joy" or "ask yourself"). Includes bare
+// person nouns AND prepositional targets ("talk WITH a friend", "send this TO
+// a friend").
 const OUTREACH_OBJECT =
-  "someone|somebody|a friend|friends|a neighbou?r|people|them|others|anyone|everyone|your (?:friend|family|neighbou?r|co-?worker|group|kids|children|spouse|small group)|this (?:chapter|passage|with|to)|it (?:with|to)|the (?:gospel|good news|chapter|passage|word)|three|3|two|2|five|5|back\\b";
+  "someone|somebody|a friend|friends|a neighbou?r|people|them|others|anyone|everyone|your (?:friend|family|neighbou?r|co-?worker|colleague|group|kids|children|spouse|small group)|this (?:chapter|passage|with|to)|it (?:with|to)|the (?:gospel|good news|chapter|passage|word)|(?:with|to)\\s+(?:a\\s+)?(?:friend|friends|neighbou?r|someone|somebody|them|people|others|your\\s+\\w+)|three|3|two|2|four|4|five|5|back\\b";
 
 // A command position: start of string/sentence, or after a joining connective
-// ("and report back", "then tell three people"). Deliberately does NOT include
-// a bare mid-sentence comma, so softened forms — "you might invite…", "one
-// gentle way is to invite…", "if it would help, you might share…" — are never
-// sentence-initial for their verb and therefore pass.
+// ("and report back", "then tell three people"). An optional polite/lead word
+// ("please …", "go tell", "go and share") is absorbed. Deliberately does NOT
+// include a bare mid-sentence comma, so softened forms are never
+// sentence-initial for their verb; softening is handled by the permission-modal
+// exemption below.
 const IMPERATIVE_ANCHOR =
   "(?:^|[.!?][\"')\\]]?\\s+|\\n\\s*|\\b(?:and|then|so|now|next|also|first|second|third|finally|today)\\s+,?\\s*)";
+const IMPERATIVE_LEAD = "(?:please\\s+|kindly\\s+|go\\s+(?:and\\s+)?|be\\s+sure\\s+to\\s+|make\\s+sure\\s+to\\s+)?";
+
+// Proper-name objects ("Teach Jordan", "Tell Sarah") — case-SENSITIVE so a real
+// name is required, excluding the divine names a card legitimately addresses.
+const NAME_OBJECT = "(?!Jesus|God|Christ|Lord|Him|Holy|Father|Spirit)[A-Z][a-z]+";
 
 const ASSIGNMENT_PATTERNS: { re: RegExp; label: string }[] = [
   // Sentence-initial (or connector-led) outreach command with a person object.
   {
     re: new RegExp(
-      `${IMPERATIVE_ANCHOR}(${OUTREACH_VERB})\\b(?:\\s+\\S+){0,3}?\\s+(?:${OUTREACH_OBJECT})`,
+      `${IMPERATIVE_ANCHOR}${IMPERATIVE_LEAD}(${OUTREACH_VERB})\\b(?:\\s+\\S+){0,3}?\\s+(?:${OUTREACH_OBJECT})`,
       "i",
     ),
     label: "commanded outreach",
   },
+  // Outreach command aimed at a named person ("Teach Jordan …"). Case-sensitive
+  // object, so the leading verb match is case-sensitive too (no `i`).
+  {
+    re: new RegExp(
+      `${IMPERATIVE_ANCHOR}${IMPERATIVE_LEAD}(?:[Aa]sk|[Tt]ell|[Tt]each|[Ii]nvite|[Cc]ontact|[Tt]ext|[Mm]essage|[Ee]mail|[Cc]all|[Bb]ring|[Ss]end|[Ww]arn|[Tt]alk to|[Ss]peak to|[Mm]ention (?:it |this )?to)\\s+${NAME_OBJECT}\\b`,
+    ),
+    label: "commanded outreach (named person)",
+  },
   // "report back" / "reach out" as a bare imperative even without a later object.
   {
-    re: new RegExp(`${IMPERATIVE_ANCHOR}(report back|reach out|pass it on|spread the word)\\b`, "i"),
+    re: new RegExp(`${IMPERATIVE_ANCHOR}${IMPERATIVE_LEAD}(report back|reach out|pass it on|spread the word)\\b`, "i"),
     label: "commanded outreach",
   },
   // Obligation on the reader, but ONLY when aimed at outreach — "you should
@@ -103,16 +119,38 @@ const ASSIGNMENT_PATTERNS: { re: RegExp; label: string }[] = [
   },
 ];
 
-const QUOTA_DEADLINE =
-  /\b(by (today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|end of (the )?(day|week))|within \d+ (day|week|hour)|every day this week|each day this week|\d+\s+(people|friends|souls|others)\s+(this|per|a|each)\b)/i;
+// A permission modal that GOVERNS a whole sentence turns a command into a
+// genuine invitation ("If it would help, you MIGHT contact a friend AND share
+// this chapter…"). When such a cue appears before an assignment match in the
+// same sentence, the ASSIGNMENT check is exempted — but QUOTA/DEADLINE, GUILT,
+// and PERSON_AS_PROJECT are NOT, so a softened quota still fails.
+const PERMISSION_CUE =
+  /\b(you\s+(?:might|may|could|can)|if\s+(?:it\s+would\s+help|it\s+helps|you\s+(?:want|wish|would\s+like|like|feel|choose)|helpful)|one\s+(?:gentle|good|simple|natural|quiet)?\s*way|feel\s+free|you(?:'re| are)\s+welcome\s+to|perhaps|maybe|consider\s+(?:whether|gently)|no\s+pressure)\b/i;
+
+// Word- or digit-numbers before a person noun, so a SOFTENED quota
+// ("you might invite three friends this week") still fails even when the
+// command itself is exempted.
+const COUNT = "(?:\\d+|one|two|three|four|five|six|seven|several|a\\s+few|a\\s+couple)";
+const QUOTA_DEADLINE = new RegExp(
+  "\\b(" +
+    "by (today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|end of (the )?(day|week))|" +
+    "within \\d+ (day|week|hour)|" +
+    "(?:every|each) day(?: this week)?|" +
+    `${COUNT}\\s+(people|friends|souls|others|neighbou?rs)\\s+(this|per|a|each|every|by|before)\\b|` +
+    `${COUNT}\\s+(people|friends|souls|others|neighbou?rs)\\b[^.!?]*\\bthis\\s+week` +
+    ")",
+  "i",
+);
 const GUILT_SCORE =
   /\b(if you don'?t,? you|failing to|you owe|prove (your|you're|you are)|track your|keep a (streak|count|log|tally)|how many (people|souls|friends)|obedience score|spiritual (scorecard|score)|real christians?|good christians? (share|tell|witness))\b/i;
 
 // Person-as-project language, but NOT when negated ("a friend is not your
-// project"). The negation guard scans a short window before the match.
+// project"). Scanned with matchAll so a negated instance never hides a real
+// one later in the copy. The negation guard scans a short window before EACH
+// match.
 const PERSON_AS_PROJECT =
-  /\b(your (project|target|prospect)|work on (him|her|them)|close the deal|get them (saved|to convert)|until they (convert|believe)|fix (him|her|them))\b/i;
-const NEGATION_BEFORE = /\b(not|never|no|isn'?t|aren'?t|do ?n'?t|do not|nobody is|no one is|not a)\b[^.!?]{0,20}$/i;
+  /\b(your (project|target|prospect)|work on (him|her|them)|close the deal|get them (saved|to convert)|until they (convert|believe)|fix (him|her|them))\b/gi;
+const NEGATION_BEFORE = /\b(not|never|no|isn'?t|aren'?t|do ?n'?t|do not|nobody is|no one is|not a)\b[^.!?]{0,24}$/i;
 
 /** Jaccard word overlap — cheap "is this basically that text reworded" check. */
 function contentWords(s: string): Set<string> {
@@ -132,16 +170,70 @@ function overlapRatio(a: string, b: string): number {
   for (const w of A) if (B.has(w)) shared++;
   return shared / Math.min(A.size, B.size);
 }
-function sharedWordCount(a: string, b: string): number {
-  const A = contentWords(a);
-  const B = contentWords(b);
+/** Ultra-generic gospel words that appear in almost any chapter — they must NOT
+ * count as evidence a card is grounded in THIS chapter (Codex: a token citation
+ * on reusable prose is not grounding). */
+const GROUNDING_STOPWORDS = new Set([
+  "jesus",
+  "christ",
+  "follow",
+  "following",
+  "followers",
+  "disciple",
+  "disciples",
+  "discipleship",
+  "gospel",
+  "chapter",
+  "verse",
+  "verses",
+  "people",
+  "someone",
+  "friend",
+  "friends",
+  "others",
+  "share",
+  "sharing",
+  "helping",
+  "faith",
+  "believe",
+  "church",
+  "kingdom",
+  "truth",
+  "notice",
+  "invite",
+]);
+/** Count of specific (non-stopword, 5+ char) words the prose shares with the
+ * chapter's own material — the substance-grounding signal for genericity. */
+function sharedSpecificCount(body: string, context: string): number {
+  const B = new Set([...contentWords(context)].filter((w) => !GROUNDING_STOPWORDS.has(w)));
   let shared = 0;
-  for (const w of A) if (B.has(w)) shared++;
+  for (const w of contentWords(body)) if (!GROUNDING_STOPWORDS.has(w) && B.has(w)) shared++;
   return shared;
 }
 
+/** Canonical book names (lowercased) — used to tell an INLINE off-chapter
+ * reference ("John 12:17") from a bare in-chapter one ("in 12:17"), so an
+ * ordinary preceding word like "in" is never mistaken for a book. */
+const BOOK_NAMES = new Set(
+  (
+    "genesis exodus leviticus numbers deuteronomy joshua judges ruth samuel kings chronicles ezra nehemiah esther job psalm psalms proverbs ecclesiastes song isaiah jeremiah lamentations ezekiel daniel hosea joel amos obadiah jonah micah nahum habakkuk zephaniah haggai zechariah malachi matthew mark luke john acts romans corinthians galatians ephesians philippians colossians thessalonians timothy titus philemon hebrews james peter jude revelation"
+  ).split(" "),
+);
+
+const MAX_VERSE = 176; // longest chapter in Scripture (Psalm 119)
+function validVerseRange(vStart: number, vEnd: number): boolean {
+  return (
+    Number.isInteger(vStart) &&
+    Number.isInteger(vEnd) &&
+    vStart >= 1 &&
+    vEnd >= vStart &&
+    vEnd <= MAX_VERSE
+  );
+}
+
 /** A scripture reference parsed into structured parts. Accepts "12:17",
- * "12:15-17", "12:15–20", "Mark 12:17", "1 Cor 3:6", "Mark 12:15-17". */
+ * "12:15-17", "12:15–20", "Mark 12:17", "1 Cor 3:6", "Mark 12:15-17". Returns
+ * null for impossible ranges ("12:0", "12:34-28", "12:999"). */
 type ParsedRef = { book?: string; chapter: number; vStart: number; vEnd: number };
 function parseRef(raw: string): ParsedRef | null {
   const t = raw.trim().toLowerCase();
@@ -151,18 +243,35 @@ function parseRef(raw: string): ParsedRef | null {
   const chapter = Number(m[2]);
   const vStart = Number(m[3]);
   const vEnd = m[4] ? Number(m[4]) : vStart;
-  if (!Number.isFinite(chapter) || !Number.isFinite(vStart)) return null;
+  if (!Number.isFinite(chapter) || chapter < 1 || !validVerseRange(vStart, vEnd)) return null;
   return { book, chapter, vStart, vEnd };
 }
 function parseChapterRef(chapterRef: string): { book?: string; chapter: number } | null {
   const m = chapterRef.trim().toLowerCase().match(/^([1-3]?\s?[a-z][a-z.]*(?:\s+[a-z]+)?)\s+(\d+)$/);
   if (!m) return null;
-  return { book: m[1].replace(/\s+/g, " ").trim(), chapter: Number(m[2]) };
+  // Reduce a multi-word book to its last token ("song of solomon" → "solomon"
+  // isn't a book; keep the recognizable token). Compare on the canonical name.
+  const bookRaw = m[1].replace(/\s+/g, " ").trim();
+  const bookToken = bookRaw.split(" ").find((w) => BOOK_NAMES.has(w)) ?? bookRaw;
+  return { book: bookToken, chapter: Number(m[2]) };
 }
 function refInChapter(ref: ParsedRef, chap: { book?: string; chapter: number }): boolean {
   if (ref.chapter !== chap.chapter) return false;
   if (ref.book && chap.book && ref.book !== chap.book) return false;
   return true;
+}
+
+/** The sentence (…terminated by . ! ? or a blank line) that contains `index`. */
+function enclosingSentence(text: string, index: number): string {
+  const start = Math.max(
+    text.lastIndexOf(".", index - 1),
+    text.lastIndexOf("!", index - 1),
+    text.lastIndexOf("?", index - 1),
+    text.lastIndexOf("\n", index - 1),
+  );
+  const rel = text.slice(start + 1).search(/[.!?]|\n/);
+  const end = rel === -1 ? text.length : start + 1 + rel;
+  return text.slice(start + 1, end);
 }
 
 export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolation[] {
@@ -199,9 +308,22 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
 
   const text = `${section.cardSummary ?? ""}\n${section.fullContent ?? ""}`;
 
+  // A permission modal governing the match's sentence ("if it would help, you
+  // might contact a friend and share…") makes it an invitation — exempt the
+  // COMMAND. (Quota/guilt/project are checked below and are NOT exempted.)
+  const permissionGoverned = (matchIndex: number): boolean => {
+    const start = Math.max(
+      text.lastIndexOf(".", matchIndex - 1),
+      text.lastIndexOf("!", matchIndex - 1),
+      text.lastIndexOf("?", matchIndex - 1),
+      text.lastIndexOf("\n", matchIndex - 1),
+      -1,
+    );
+    return PERMISSION_CUE.test(text.slice(start + 1, matchIndex));
+  };
   for (const { re, label } of ASSIGNMENT_PATTERNS) {
-    const m = text.match(re);
-    if (m) {
+    const m = re.exec(text);
+    if (m && m.index !== undefined && !permissionGoverned(m.index)) {
       v.push({
         code: "ASSIGNMENT_LANGUAGE",
         message: `Reads as an assignment (${label}) — Disciple It must be an invitation.`,
@@ -213,11 +335,13 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
   if (q) v.push({ code: "QUOTA_OR_DEADLINE", message: "Contains a quota or deadline; invitations carry neither.", evidence: q[0] });
   const g = text.match(GUILT_SCORE);
   if (g) v.push({ code: "GUILT_OR_SCORE", message: "Contains guilt or a spiritual score.", evidence: g[0] });
-  const p = text.match(PERSON_AS_PROJECT);
-  if (p && p.index !== undefined) {
-    const before = text.slice(0, p.index);
-    if (!NEGATION_BEFORE.test(before)) {
-      v.push({ code: "PERSON_AS_PROJECT", message: "Treats another person as a project/target.", evidence: p[0] });
+  // matchAll so a negated instance ("a friend is not your project") never hides
+  // a real one later in the copy.
+  for (const pm of text.matchAll(PERSON_AS_PROJECT)) {
+    if (pm.index === undefined) continue;
+    if (!NEGATION_BEFORE.test(text.slice(0, pm.index))) {
+      v.push({ code: "PERSON_AS_PROJECT", message: "Treats another person as a project/target.", evidence: pm[0] });
+      break;
     }
   }
 
@@ -235,19 +359,28 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
     if (chap && refInChapter(parsed, chap)) inChapterCount++;
     else if (chap) v.push({ code: "VERSE_REF_OFF_CHAPTER", message: `Verse ref "${r}" is not in ${input.chapterRef}.`, evidence: r });
   }
-  // Inline chapter:verse references in the body must also belong to this chapter.
+  // Inline chapter:verse references in the body must also belong to this
+  // chapter. An optional leading BOOK name is honored ("John 12:17" is
+  // off-chapter for Mark 12) but an ordinary preceding word ("in 12:17") is
+  // not treated as a book. Impossible ranges are ignored, not counted.
   const body = section.fullContent ?? "";
-  const inlineRe = /\b(\d+):(\d+)(?:\s*[-–—]\s*\d+)?\b/g;
+  const inlineRe = /\b(?:([1-3]?\s?[A-Za-z][A-Za-z.]*)\s+)?(\d+):(\d+)(?:\s*[-–—]\s*(\d+))?\b/g;
   let im: RegExpExecArray | null;
   let inlineInChapter = 0;
   while ((im = inlineRe.exec(body)) !== null) {
-    const inlineChapter = Number(im[1]);
-    if (chap && inlineChapter === chap.chapter) inlineInChapter++;
+    const rawBook = im[1]?.replace(/\./g, "").trim().toLowerCase();
+    const inlineBook = rawBook && BOOK_NAMES.has(rawBook) ? rawBook : undefined;
+    const inlineChapter = Number(im[2]);
+    const vStart = Number(im[3]);
+    const vEnd = im[4] ? Number(im[4]) : vStart;
+    if (!validVerseRange(vStart, vEnd)) continue; // "12:0", "12:34-28", "12:999"
+    const sameBook = !inlineBook || !chap?.book || inlineBook === chap.book;
+    if (chap && inlineChapter === chap.chapter && sameBook) inlineInChapter++;
     else if (chap) {
       v.push({
         code: "VERSE_REF_OFF_CHAPTER",
-        message: `Inline reference "${im[0]}" is not in ${input.chapterRef}.`,
-        evidence: im[0],
+        message: `Inline reference "${im[0].trim()}" is not in ${input.chapterRef}.`,
+        evidence: im[0].trim(),
       });
     }
   }
@@ -262,17 +395,18 @@ export function checkDiscipleship(input: DiscipleshipInput): DiscipleshipViolati
     });
   }
 
-  // Genericity by SUBSTANCE, not length (owner: no minimum-count padding). A
-  // card is generic only if it is neither verse-grounded in this chapter nor
-  // demonstrably drawn from this chapter's own material.
-  const hasInChapterVerse = inChapterCount > 0 || inlineInChapter > 0;
+  // Genericity by SUBSTANCE, not length, and NOT rescued by a token citation
+  // (Codex: reusable-anywhere prose can add a verseRefs token and evade this).
+  // A card is grounded only when the PROSE points at a specific verse of this
+  // chapter (inline c:v) or shares specific, non-generic vocabulary with the
+  // chapter's own material.
   const grounded =
-    hasInChapterVerse ||
-    (input.chapterContext ? sharedWordCount(body, input.chapterContext) >= 3 : false);
+    inlineInChapter > 0 ||
+    (input.chapterContext ? sharedSpecificCount(body, input.chapterContext) >= 1 : false);
   if (!grounded) {
     v.push({
       code: "GENERIC_COPY",
-      message: "Generic/reusable-anywhere copy — not grounded in this chapter's verses or material.",
+      message: "Generic/reusable-anywhere copy — not grounded in this chapter's material (a bare verse citation is not enough).",
     });
   }
 
