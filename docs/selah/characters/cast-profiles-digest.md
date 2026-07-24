@@ -74,7 +74,7 @@ Rules that follow from it:
 - **Build:** SMART GUESS (representative) — ordinary and unspecialized; nothing reads as a trade.
 - **Appearance:** SMART GUESS (representative) — an ordinary Galilean man with an open, unguarded face. The "an Israelite indeed, in whom there is no deceit" line (John 1:47) is Jesus' word about *Nathanael* and carries into the portrait only through the harmonization — a character note, not a physical description and not unconditional SAYS.
 - **Life stages:** Called under the Fig Tree (SAYS of *Nathanael*, conditional) · One of the Twelve (SAYS) · Witness of the Risen Lord (SAYS) · Apostle to the East — **SMART GUESS (tradition; undated, and the martyrdom accounts are late).**
-- **Why they matter:** The honest skeptic won in a single sentence — proof that Jesus knows a person completely before they ever approach him.
+- **Why they matter:** *If* Bartholomew is the Nathanael of John's Gospel (a traditional identification, not stated in Scripture), then he is the honest skeptic won in a single sentence — proof that Jesus knows a person completely before they ever approach him. What Scripture says unconditionally of Bartholomew is only that he was one of the Twelve.
 
 ## James (son of Alphaeus) (`james-alphaeus`)
 - **Occupation:** **UNKNOWN.**
@@ -92,7 +92,7 @@ Rules that follow from it:
 - **Occupation:** **UNKNOWN.**
 - **Build / Appearance:** SMART GUESS (representative) — an ordinary Galilean man, deliberately unremarkable.
 - **Life stages:** Called into the Twelve (SAYS) · Disciple on the Road · The Question in the Upper Room (John 14:22 — SAYS of "Judas, not Iscariot," conditional on the identification) · Apostle — **death UNKNOWN; the c. AD 65 martyrdom is late tradition and must be labeled as such, never dated as fact.**
-- **Why they matter:** The quietest of the Twelve asked one question at the last supper — and drew out Jesus' promise to make his home with everyone who loves him.
+- **Why they matter:** *If* Thaddaeus is the "Judas (not Iscariot)" of John's Gospel (a traditional identification, not stated in Scripture), then he is the disciple whose one question at the last supper drew out Jesus' promise to make his home with everyone who loves him. What Scripture says unconditionally of Thaddaeus is only that he was one of the Twelve.
 
 ## Simon the Zealot (`simon-zealot`)
 - **Occupation:** **UNKNOWN.** Scripture gives only the designation "the Zealot" / "the Cananaean" (SAYS, Luke 6:15; Mark 3:18). **That word does not give us a life story.** It may describe zeal for the law rather than membership in an armed movement, and the organized Zealot party as such is generally dated to the revolt of AD 66 — after his call. **Corrected 2026-07-23: the former "armed nationalist / hill fugitive / freedom fighter who would have targeted Matthew" biography is removed from the canon. It was invention.**

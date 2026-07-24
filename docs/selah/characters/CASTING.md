@@ -58,16 +58,19 @@ every face is a representative casting choice.)
 
 ## Sequence (what happens in what order)
 
-1. ✅ **Study profiles** (free, Kelly-reviewed): the 12 profiles above, each
-   following the aging rule (AGING-MODEL.md, v1.3) and the era clock (~75).
-   Drafted and reviewed in the 2026-07-21 session.
+1. ✅ **Study profiles** (free, Kelly-reviewed): the **12-profile batch of
+   2026-07-21** — which is **9 disciples plus Herod Antipas, Herodias, and the
+   Syrophoenician woman**, NOT the twelve apostles — each following the aging
+   rule (AGING-MODEL.md, v1.3) and the era clock (~75).
 2. ✅ **Audition wall + candidate prompts** built locally; prompts hand-run in
    the owner's ChatGPT (ChatGPT-side path costs $0). The paid API lane still
    waits on the Codex IQ-026 spec with exact per-audition prices.
 3. ✅ **Casting** — 12/12 cast by the owner, portraits promoted.
-4. ✅ **Mind + Eyes certification** (Codex, 2026-07-23, read-only): 4 locks,
-   7 keep-face/provisional with the profile-text corrections now applied here,
-   1 true re-audition (Simon, neutral brief). Peter preserved, not recast.
+4. ✅ **Mind + Eyes certification** (Codex, 2026-07-23, read-only) — graded
+   the same **2026-07-21 mixed batch** (the 9 disciples + Herod + Herodias +
+   Syrophoenician woman, NOT the Twelve): 4 locks, 7 keep-face/provisional with
+   the profile-text corrections now applied here, 1 true re-audition (Simon,
+   neutral brief). Peter preserved, not recast.
 5. ✅ **Reference-lock test PASSED** (owner-run, 2026-07-23). What is actually
    proven: attaching an approved portrait pins the individual in a **portrait**
    (matched 6/7 features vs 0/7 without it), in a **portrait→scene**, in a
