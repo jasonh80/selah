@@ -37,7 +37,7 @@ Mark 12, scene by scene. The critical separation is between people who were
 | Figure | Class |
 |---|---|
 | Jesus | recurring canonical |
-| Sadducees | named group — **archetype does not exist yet** |
+| Sadducees | named group — cast as `mark12-sadducee` (approved) |
 | the seven brothers and the woman | **HYPOTHETICAL — an argument, not history. Never cast, never depicted as real people.** |
 
 ### 12:28–34 — The scribe who asked well
@@ -102,11 +102,19 @@ portrait registry in this repo.
 | wealthy donors | ✅ covered | folded into `mark12-temple-crowd` scene casting |
 | ordinary temple crowd | ✅ approved | `mark12-temple-crowd` — proportional crowd brief, per Eyes v1.2 |
 
-**Status (2026-07-24): all Twelve are visually complete — 12/12 LOCK**, Codex-
-verified byte-identical at Kelly head `aff1d19`. John, Judas, and Simon are now
-locked, so a Mark 12 image may show the full Twelve honestly. The Mark 12
+**Status (2026-07-24): all Twelve are visually complete — 12/12 LOCK.** The 12/12
+lock was Codex-verified byte-identical at Kelly `aff1d19`; the Mark 12 supporting
+assets and the John/Judas apostle portraits landed afterward, first committed at
+`bb4d3c3`, and the current Kelly head is **`ea8123f`**. John, Judas, and Simon are
+now locked, so a Mark 12 image may show the full Twelve honestly. The Mark 12
 supporting roles above are cast and approved (picks recorded in
 `Selah-Kelly/lib/characters/cast-picks.json`, portraits committed locally).
+
+**Sync gap (important): these references are Kelly-repo-local and are NOT ported
+into this Selah repo.** Selah has no copy of the `mark12-*` files or a portrait
+registry entry for them; the Kelly-local references remain required until the
+approved reference-image upload bridge (or the permanent IQ-026 pipeline) exists.
+No Mark 12 image generation can resolve these faces from Selah alone today.
 
 ---
 
@@ -122,7 +130,7 @@ apply: no villain faces for opponents, no theatrical misery for the widow, no
 moral verdict carried in a face or body, crowds proportional rather than
 assorted.
 
-### `archetype-sadducee` — group
+### `mark12-sadducee` — group
 
 - **SAYS:** they say there is no resurrection (12:18). Josephus and Acts 23:8
   place them among the priestly/aristocratic establishment.
@@ -133,7 +141,7 @@ assorted.
   as means; assured public bearing. **Not sneering, not corpulent, not
   villain-lit.** They are wrong in this scene and they are still men.
 
-### `archetype-herodian` — group
+### `mark12-herodian` — group
 
 - **SAYS:** they exist and act with the Pharisees against Jesus (3:6, 12:13).
 - **SMART GUESS:** partisans of the Herodian house; more Greco-Roman in dress
@@ -142,25 +150,28 @@ assorted.
 - **UNKNOWN:** organisation, membership, everything else. Say so.
 - **Look:** trimmed beards, Hellenised cut of garment, a little Roman polish.
 
-### `archetype-chief-priest` — group (distinct from the serving priest)
+### `mark12-chief-priest` — group (distinct from the serving priest)
 
 - **SAYS:** chief priests act against Jesus throughout.
 - **SMART GUESS:** the priestly aristocracy; older, prosperous, publicly
   composed. Distinct from `archetype-priest`, who is the working temple priest.
 - **Look:** authority carried in bearing and cloth, not in a scowl.
 
-### `scribe-of-the-great-commandment` — one-chapter individual
+### `mark12-scribe-great-commandment` — one-chapter individual
 
 - **SAYS:** he asks which commandment is first, answers wisely, and Jesus tells
   him he is not far from the kingdom of God (12:28–34).
 - **SMART GUESS:** middle-aged, a lifetime of study, attentive rather than
   hostile.
 - **UNKNOWN:** name, age, everything after this exchange.
-- **Look:** the ONE authority in Mark 12 who must read as genuinely searching.
-  Warmth is correct here. He is the chapter's counter-example.
+- **Look:** the ONE authority figure in Mark 12 the text treats sympathetically —
+  Jesus tells him he is "not far from the kingdom" (12:34). Render him attentive
+  and open rather than hostile; the interpretive read of his inner heart stays
+  the text's, not the image's. Warmth is correct here; he is the chapter's
+  counter-example.
 - **Representation label:** representative depiction.
 
-### `widow-of-the-two-coins` — one-chapter individual
+### `mark12-widow-two-coins` — one-chapter individual
 
 - **SAYS:** a poor widow puts in two small copper coins, everything she had to
   live on (12:42–44).
@@ -168,12 +179,12 @@ assorted.
 - **UNKNOWN:** age, name, appearance, circumstances.
 - **HARD GUARDRAIL (Codex, and I agree):** no dirt, no rags, no theatrical
   misery, no moralised ugliness. Poverty shows in the wear of good-enough
-  clothing and in her hands, not in degradation. **Jesus praises her; the image
-  must let the reader admire her, not pity her.** Dignity is the whole point of
-  the scene.
+  clothing and in her hands, not in degradation. **Jesus draws the disciples'
+  attention to her gift (12:43–44); the image must let the reader regard her with
+  dignity, not pity.** Dignity is the whole point of the scene.
 - **Representation label:** representative depiction.
 
-### `wealthy-donors` + `temple-crowd` — scene casting
+### `mark12-temple-crowd` (with wealthy donors folded in) — scene casting
 
 - Not recurring characters. Proportional crowd per Eyes v1.2: nearly all
   bearded, natural Levantine range without an artificial spread, mostly
@@ -225,7 +236,7 @@ staged, and deliberately not a row of Bible illustrations.
 - **Shot language:** medium, slightly low, tension in the spacing rather than
   in faces.
 - **Visible cast IDs:** `jesus` (**attach `jesus/ministry-late`**), plus
-  `archetype-pharisee` and the new `archetype-herodian`.
+  `archetype-pharisee` and the new `mark12-herodian`.
 - **Guardrail:** **no villain coding.** These men are hostile and they are not
   monsters. Contrast them by dress and grooming, never by ugliness.
 - **Tooling:** ✅ now, once the Herodian brief is approved.
@@ -238,7 +249,7 @@ staged, and deliberately not a row of Bible illustrations.
   conflict we misrepresent Mark 12.
 - **Shot language:** close two-shot, quiet, the crowd fallen away.
 - **Visible cast IDs:** `jesus` (**attach `jesus/ministry-late`**) and the new
-  `scribe-of-the-great-commandment`.
+  `mark12-scribe-great-commandment`.
 - **Guardrail:** the scribe must read as a scholar being *met*, not corrected.
   This is the image where warmth is the accuracy requirement.
 - **Tooling:** ✅ now, once his brief is approved.
@@ -289,10 +300,13 @@ parallel:**
    per shot: verses, visible cast IDs, exact portrait asset paths to attach,
    representative-role briefs, and guardrails. One artifact, ingestible later
    by the permanent pipeline without rewriting.
-2. **Generate ChatGPT-side using the proven reference-lock method** — the same
-   path validated today (portrait→portrait, portrait→scene, two faces in one
-   scene, authored crowd). $0, and it is the only path that supports references
-   at all right now.
+2. **Generate ChatGPT-side using the reference-lock method** — the path
+   validated today: portrait→portrait, portrait→scene, and **two** exact locked
+   faces held simultaneously in one scene, plus an authored crowd. **What is NOT
+   yet proven: three or more exact faces held at once, and direct intimate
+   close-ups** — treat those as unvalidated and frame around them (2–3 exact
+   faces, the rest described) until they are tested. $0, and it is the only path
+   that supports references at all right now.
 3. **Import the approved output** through the storage bucket the image lane
    already uses, bound through the **existing published-image-redo claim →
    candidate → apply flow**. That lane already handles digest binding, owner
