@@ -38,25 +38,25 @@ export const MARK_RULERS: Record<RulerId, Ruler> = {
     id: "antipas",
     name: "Herod Antipas — tetrarch of Galilee & Perea",
     blurb: "A son of Herod the Great, ruling Galilee and Perea for Rome (4 BC – AD 39). Not a king — a tetrarch.",
-    color: "#5aa9e6",
+    color: "#3b82f6", // blue
   },
   philip: {
     id: "philip",
     name: "Philip the Tetrarch",
     blurb: "Antipas's half-brother, tetrarch of the territories north and east of the Sea of Galilee (4 BC – AD 34).",
-    color: "#8e7dd8",
+    color: "#c026d3", // magenta
   },
   prefect: {
     id: "prefect",
     name: "Pontius Pilate — Roman prefect of Judea",
     blurb: "Judea, Samaria and Idumea were a Roman province under a prefect; Pilate held the post AD 26–36.",
-    color: "#d98a4a",
+    color: "#f59e0b", // amber
   },
   "roman-syria": {
     id: "roman-syria",
     name: "Roman province of Syria",
     blurb: "The Greek cities of the Decapolis and the Phoenician coast were self-governing under the wider province of Syria.",
-    color: "#6bbf8a",
+    color: "#14b8a6", // teal
   },
 };
 
@@ -86,6 +86,20 @@ export interface RegionWash {
   name: string;
   /** Loose polygon [lon,lat]; intentionally not a claimed frontier. */
   polygon: [number, number][];
+  /** Where the region NAME sits (an interior point, not a centroid claim). */
+  labelAt: [number, number];
+}
+
+/** A modern country, for the "Today" borders view. Unlike the ancient washes,
+ * modern borders ARE known lines — so we draw them as lines. Owner ruling
+ * 2026-07-24: countries only, neutral; disputed areas (Golan, West Bank) are
+ * left unlabeled rather than adjudicated. Lines are simplified, not survey
+ * data, and the key says so. */
+export interface ModernCountry {
+  name: string;
+  labelAt: [number, number];
+  /** Simplified boundary polyline segments [lon,lat][]. */
+  borders: [number, number][][];
 }
 
 export interface TerritoryMap {
@@ -103,6 +117,7 @@ export const MARK_TERRITORY: TerritoryMap = {
     {
       ruler: "antipas",
       name: "Galilee",
+      labelAt: [35.28, 32.82],
       polygon: [
         [35.1, 33.08], [35.62, 33.02], [35.72, 32.72], [35.55, 32.5],
         [35.2, 32.55], [35.0, 32.78],
@@ -111,6 +126,7 @@ export const MARK_TERRITORY: TerritoryMap = {
     {
       ruler: "antipas",
       name: "Perea",
+      labelAt: [35.68, 31.85],
       polygon: [
         [35.55, 32.15], [35.9, 32.1], [35.85, 31.55], [35.62, 31.5],
         [35.5, 31.8],
@@ -119,6 +135,7 @@ export const MARK_TERRITORY: TerritoryMap = {
     {
       ruler: "philip",
       name: "Philip's tetrarchy",
+      labelAt: [35.95, 33.0],
       polygon: [
         [35.6, 33.3], [36.2, 33.25], [36.25, 32.75], [35.72, 32.72],
         [35.62, 33.02],
@@ -126,7 +143,8 @@ export const MARK_TERRITORY: TerritoryMap = {
     },
     {
       ruler: "prefect",
-      name: "Judea & Samaria (Roman province)",
+      name: "Judea & Samaria",
+      labelAt: [35.05, 31.72],
       polygon: [
         [34.9, 32.4], [35.35, 32.4], [35.5, 31.7], [35.4, 31.35],
         [34.95, 31.5], [34.9, 31.9],
@@ -170,3 +188,42 @@ export const MARK_TERRITORY: TerritoryMap = {
 export function territoryCities(includeContext: boolean): TerritoryCity[] {
   return MARK_TERRITORY.cities.filter((c) => includeContext || !c.contextOnly);
 }
+
+/** MODERN borders for the "Today" view (owner: countries only, neutral).
+ * Simplified international lines — enough to orient a reader who knows the
+ * modern map, NOT survey data. Disputed areas are deliberately not drawn as
+ * separate territories. */
+export const MODERN_BORDER_COLOR = "#e5e7eb";
+export const MODERN_COUNTRIES: ModernCountry[] = [
+  {
+    name: "LEBANON",
+    labelAt: [35.85, 33.75],
+    borders: [
+      // Lebanon–Israel (south) then up the Anti-Lebanon toward Syria
+      [[35.1, 33.09], [35.35, 33.1], [35.6, 33.25], [35.85, 33.6], [36.0, 34.0]],
+    ],
+  },
+  {
+    name: "SYRIA",
+    labelAt: [36.4, 33.3],
+    borders: [
+      // Syria–Israel (Golan area, drawn as Israel's controlled line, unlabeled dispute)
+      [[35.78, 33.24], [35.86, 33.0], [35.83, 32.72]],
+      // Syria–Jordan (roughly the Yarmouk eastward)
+      [[35.83, 32.72], [36.2, 32.72], [36.8, 32.4]],
+    ],
+  },
+  {
+    name: "JORDAN",
+    labelAt: [35.95, 31.8],
+    borders: [
+      // Israel–Jordan down the Jordan rift: Sea of Galilee → Dead Sea → Arava
+      [[35.62, 32.72], [35.57, 32.4], [35.52, 32.0], [35.48, 31.75], [35.47, 31.5], [35.42, 31.2], [35.35, 30.9]],
+    ],
+  },
+  {
+    name: "ISRAEL",
+    labelAt: [34.95, 31.5],
+    borders: [], // its edges are the neighboring countries' lines above
+  },
+];

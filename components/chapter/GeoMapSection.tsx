@@ -29,7 +29,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { ChapterWorkup } from "@/lib/types";
 import { getGeoChapterMap, type GeoChapterMap } from "@/lib/maps/geo-chapter-maps";
 import { labelsForView, type GeoLabelKind } from "@/lib/maps/geo-labels";
-import { MARK_TERRITORY, MARK_RULERS, territoryCities, type RulerId } from "@/lib/maps/territories";
+import { MARK_TERRITORY, MARK_RULERS, territoryCities, MODERN_COUNTRIES, MODERN_BORDER_COLOR, type RulerId } from "@/lib/maps/territories";
 import { SectionCard } from "@/components/chapter/SectionCard";
 
 const IMAGERY_TILES =
@@ -242,6 +242,52 @@ function ringImage(color: string, num: number): { data: ImageData; pixelRatio: n
   return { data: ctx.getImageData(0, 0, size, size), pixelRatio: ratio };
 }
 
+/** A free-form text label bitmap in an arbitrary color, with an optional
+ * filled color dot to its left. Used by the Borders overlay so a city NAME
+ * carries its ruler's color (no anonymous dots to decode) and region names
+ * read in the ruler hue. */
+function textLabelImage(
+  text: string,
+  opts: { color: string; size: number; weight: number; upper?: boolean; dot?: string },
+): { data: ImageData; pixelRatio: number } {
+  const ratio = Math.min(3, Math.ceil(window.devicePixelRatio || 1));
+  const label = opts.upper ? text.toUpperCase() : text;
+  const font = `${opts.weight} ${opts.size}px system-ui, -apple-system, sans-serif`;
+  const pad = 6;
+  const dotW = opts.dot ? opts.size * 0.7 + 4 : 0;
+  const measure = document.createElement("canvas").getContext("2d")!;
+  measure.font = font;
+  const textW = Math.ceil(measure.measureText(label).width);
+  const w = textW + dotW + pad * 2;
+  const h = opts.size + pad * 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = w * ratio;
+  canvas.height = h * ratio;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(ratio, ratio);
+  ctx.font = font;
+  ctx.textBaseline = "middle";
+  if (opts.dot) {
+    const r = opts.size * 0.32;
+    ctx.beginPath();
+    ctx.arc(pad + r, h / 2, r, 0, Math.PI * 2);
+    ctx.fillStyle = opts.dot;
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "rgba(255,255,255,.9)";
+    ctx.stroke();
+  }
+  const tx = pad + dotW;
+  ctx.textAlign = "left";
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = "rgba(12,14,20,.9)";
+  ctx.lineJoin = "round";
+  ctx.strokeText(label, tx, h / 2);
+  ctx.fillStyle = opts.color;
+  ctx.fillText(label, tx, h / 2);
+  return { data: ctx.getImageData(0, 0, canvas.width, canvas.height), pixelRatio: ratio };
+}
+
 /** A numbered disc for an AREA or CORRIDOR — square-ish (areas) or pill
  * (corridors) so shape alone separates them from point markers. */
 function badgeImage(color: string, num: number, shape: "square" | "pill"): { data: ImageData; pixelRatio: number } {
@@ -312,16 +358,32 @@ function pinImage(color: string, num: number): { data: ImageData; pixelRatio: nu
 
 /** The Borders key: rulers with their exact titles, the cities colored to each
  * (labeled direct vs regional-inference), and the honest limit up top. */
-function TerritoryKey() {
+function TerritoryKey({ view }: { view: MapView }) {
   const byRuler = (id: RulerId) => territoryCities(false).filter((c) => c.ruler === id);
+  if (view === "today") {
+    return (
+      <div className="border-t px-3.5 py-3" style={{ borderColor: "var(--line)" }}>
+        <p className="text-[13px] font-semibold text-primary">Today&rsquo;s countries</p>
+        <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+          The dashed lines are the modern international borders (simplified),
+          shown to orient the same ground you see in the chapter:{" "}
+          {MODERN_COUNTRIES.map((c) => c.name.charAt(0) + c.name.slice(1).toLowerCase()).join(" · ")}.
+          Contested areas are left unlabeled rather than taking a side. Switch
+          to <b>Then</b> for who ruled this land in Jesus&rsquo; day.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="border-t px-3.5 py-3" style={{ borderColor: "var(--line)" }}>
       <p className="text-[13px] font-semibold text-primary">Who ruled where · {MARK_TERRITORY.dateLabel}</p>
       <p className="mt-1 text-[12px] leading-relaxed text-secondary">
         Ancient sources name the cities, regions, and rulers — not survey-grade
-        boundary lines. The colored washes show each ruler&rsquo;s general
-        territory, never an exact frontier. Decapolis and Phoenician cities were
-        self-governing under Roman Syria, so each is its own marker.
+        boundary lines. Each ruler has a color; a city&rsquo;s name is printed in
+        its ruler&rsquo;s color, and the soft wash shows that ruler&rsquo;s general
+        territory — never an exact frontier. Decapolis and Phoenician cities were
+        self-governing under Roman Syria. Switch to <b>Today</b> for modern
+        country borders.
       </p>
       <ul className="mt-2.5 space-y-2">
         {(Object.keys(MARK_RULERS) as RulerId[]).map((id) => {
@@ -423,10 +485,15 @@ function NumberedCorridor({ n }: { n: number }) {
 // hard boundary strokes; Decapolis and Phoenician cities are individual pins
 // under Roman Syria, never a bloc or a fade; the disputed Bethsaida site is an
 // area, not a precise pin. Everything is added once (hidden) and toggled.
-const TERRITORY_LAYERS = ["territory-wash", "territory-city", "territory-city-disputed"];
+// Ancient (Then) borders and modern (Today) borders are separate layer sets;
+// only one shows, and only while Borders is on.
+const ANCIENT_LAYERS = ["territory-wash", "territory-outline", "territory-disputed", "territory-labels"];
+const MODERN_LAYERS = ["modern-borders-casing", "modern-borders", "modern-labels"];
 
 function addTerritory(map: maplibregl.Map): void {
   if (map.getSource("territory-regions")) return;
+
+  // ---- Ancient: region washes + soft matching outlines ----
   const regions = {
     type: "FeatureCollection" as const,
     features: MARK_TERRITORY.regions.map((r) => ({
@@ -436,59 +503,138 @@ function addTerritory(map: maplibregl.Map): void {
     })),
   };
   map.addSource("territory-regions", { type: "geojson", data: regions });
-  // Soft wash only — no hard frontier. A faint same-hue edge keeps the wash
-  // legible on satellite without reading as a surveyed border.
   map.addLayer({
     id: "territory-wash",
     type: "fill",
     source: "territory-regions",
     layout: { visibility: "none" },
-    paint: { "fill-color": ["get", "color"], "fill-opacity": 0.22 },
+    paint: { "fill-color": ["get", "color"], "fill-opacity": 0.2 },
+  });
+  map.addLayer({
+    id: "territory-outline",
+    type: "line",
+    source: "territory-regions",
+    layout: { visibility: "none" },
+    paint: { "line-color": ["get", "color"], "line-width": 1.6, "line-opacity": 0.75, "line-blur": 0.5 },
   });
 
-  const cities = territoryCities(false);
-  const pt = (list: typeof cities) => ({
-    type: "FeatureCollection" as const,
-    features: list.map((c) => ({
-      type: "Feature" as const,
-      properties: { color: MARK_RULERS[c.ruler].color },
-      geometry: { type: "Point" as const, coordinates: c.at },
-    })),
-  });
-  map.addSource("territory-cities", { type: "geojson", data: pt(cities.filter((c) => !c.disputedSite)) });
-  map.addLayer({
-    id: "territory-city",
-    type: "circle",
-    source: "territory-cities",
-    layout: { visibility: "none" },
-    paint: {
-      "circle-radius": 5,
-      "circle-color": ["get", "color"],
-      "circle-stroke-width": 1.5,
-      "circle-stroke-color": "rgba(255,255,255,.9)",
+  // Disputed exact site (Bethsaida) → a dashed ring: an area, not a point.
+  const disputed = territoryCities(false).filter((c) => c.disputedSite);
+  map.addSource("territory-disputed", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: disputed.map((c) => ({
+        type: "Feature" as const,
+        properties: { color: MARK_RULERS[c.ruler].color },
+        geometry: { type: "Point" as const, coordinates: c.at },
+      })),
     },
   });
-  // Disputed exact site → a larger dashed ring (an area, not a precise point).
-  map.addSource("territory-cities-disputed", { type: "geojson", data: pt(cities.filter((c) => c.disputedSite)) });
   map.addLayer({
-    id: "territory-city-disputed",
+    id: "territory-disputed",
     type: "circle",
-    source: "territory-cities-disputed",
+    source: "territory-disputed",
     layout: { visibility: "none" },
     paint: {
-      "circle-radius": 11,
+      "circle-radius": 12,
       "circle-color": ["get", "color"],
-      "circle-opacity": 0.22,
+      "circle-opacity": 0.18,
       "circle-stroke-width": 1.5,
       "circle-stroke-color": ["get", "color"],
     },
   });
+
+  // ---- Ancient: labels — region NAMES + city NAMES colored by ruler.
+  // The color IS the key: a name in blue is Antipas's, in teal is Roman Syria.
+  // No anonymous dots to decode, and the names replace them entirely.
+  const labelFeatures: GeoJSON.Feature[] = [];
+  MARK_TERRITORY.regions.forEach((r, i) => {
+    const id = `terr-region-${i}`;
+    const img = textLabelImage(r.name, { color: MARK_RULERS[r.ruler].color, size: 12, weight: 800, upper: true });
+    if (map.hasImage(id)) map.removeImage(id);
+    map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+    labelFeatures.push({ type: "Feature", properties: { icon: id, pri: 0 }, geometry: { type: "Point", coordinates: r.labelAt } });
+  });
+  territoryCities(false).forEach((c, i) => {
+    const id = `terr-city-${i}`;
+    const img = textLabelImage(c.name, { color: MARK_RULERS[c.ruler].color, size: 12, weight: 700, dot: MARK_RULERS[c.ruler].color });
+    if (map.hasImage(id)) map.removeImage(id);
+    map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+    labelFeatures.push({ type: "Feature", properties: { icon: id, pri: 1 }, geometry: { type: "Point", coordinates: c.at } });
+  });
+  map.addSource("territory-labels", { type: "geojson", data: { type: "FeatureCollection", features: labelFeatures } });
+  map.addLayer({
+    id: "territory-labels",
+    type: "symbol",
+    source: "territory-labels",
+    layout: {
+      visibility: "none",
+      "icon-image": ["get", "icon"],
+      "icon-allow-overlap": false,
+      "icon-anchor": "center",
+      "symbol-sort-key": ["get", "pri"],
+    },
+  });
+
+  // ---- Modern (Today): real country boundary lines + country names ----
+  map.addSource("modern-borders", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: MODERN_COUNTRIES.flatMap((c) =>
+        c.borders.map((line) => ({ type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates: line } })),
+      ),
+    },
+  });
+  // A dark casing under a bright dashed line so borders read on any terrain.
+  map.addLayer({
+    id: "modern-borders-casing",
+    type: "line",
+    source: "modern-borders",
+    layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "rgba(12,14,20,.85)", "line-width": 5 },
+  });
+  map.addLayer({
+    id: "modern-borders",
+    type: "line",
+    source: "modern-borders",
+    layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": MODERN_BORDER_COLOR, "line-width": 2.2, "line-opacity": 1, "line-dasharray": [2.5, 1.8] },
+  });
+  MODERN_COUNTRIES.forEach((c, i) => {
+    const id = `modern-label-${i}`;
+    const img = textLabelImage(c.name, { color: "#ffffff", size: 13, weight: 800, upper: true });
+    if (map.hasImage(id)) map.removeImage(id);
+    map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+  });
+  map.addSource("modern-labels", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: MODERN_COUNTRIES.map((c, i) => ({ type: "Feature" as const, properties: { icon: `modern-label-${i}` }, geometry: { type: "Point" as const, coordinates: c.labelAt } })),
+    },
+  });
+  map.addLayer({
+    id: "modern-labels",
+    type: "symbol",
+    source: "modern-labels",
+    layout: { visibility: "none", "icon-image": ["get", "icon"], "icon-allow-overlap": true, "icon-anchor": "center" },
+  });
 }
 
-function setTerritoryVisible(map: maplibregl.Map, on: boolean): void {
-  for (const id of TERRITORY_LAYERS) {
-    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
-  }
+/** Show the right border set for the current view, and get the base map out of
+ * its own way while borders are on. */
+function setTerritoryVisible(map: maplibregl.Map, on: boolean, view: MapView): void {
+  const ancientOn = on && view === "chapter";
+  const modernOn = on && view === "today";
+  for (const id of ANCIENT_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", ancientOn ? "visible" : "none");
+  for (const id of MODERN_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", modernOn ? "visible" : "none");
+  // The chapter's own place-labels would double up with the ancient ruler
+  // labels — hide them while ancient borders show. Dim the numbered pins so
+  // the borders read as the foreground.
+  if (map.getLayer("place-labels")) map.setLayoutProperty("place-labels", "visibility", ancientOn ? "none" : "visible");
+  if (map.getLayer("pins")) map.setPaintProperty("pins", "icon-opacity", on ? 0.35 : 1);
 }
 
 /** All overlay geometry as native layers — areas, corridors, and pins. No
@@ -682,8 +828,8 @@ export function GeoMapSection({
   useEffect(() => {
     const map = mapObj.current;
     if (!map || !ready || !hasBorders) return;
-    setTerritoryVisible(map, borders);
-  }, [borders, ready, hasBorders]);
+    setTerritoryVisible(map, borders, view);
+  }, [borders, view, ready, hasBorders]);
 
   // Pin colors follow the ACTIVE theme: when <html data-theme> changes, the
   // pin bitmaps are rebuilt from the new --accent-strong so the map and the
@@ -833,7 +979,7 @@ export function GeoMapSection({
 
         {/* Borders key — who ruled where, with every city labeled by how we
             know its ruler (Codex audit). Renders only while Borders is on. */}
-        {hasBorders && borders && !failed && <TerritoryKey />}
+        {hasBorders && borders && !failed && <TerritoryKey view={view} />}
 
         {/* Legend: names + honesty qualifiers live HERE, not on the map.
             Every label string (including "· debated" style qualifiers) renders
