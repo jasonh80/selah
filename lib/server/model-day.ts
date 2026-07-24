@@ -30,6 +30,11 @@ import { getSupabaseAdmin } from "./supabase";
 import { getOpenAI, CHAPTER_WORKUP_TEXT_MODEL } from "./openai";
 import { countTokens } from "gpt-tokenizer/encoding/o200k_base";
 import { buildChapterWorkupPrompt } from "../ai/prompts/chapter-workup-prompt";
+import {
+  buildChapterWorkupRequestBody,
+  CHAPTER_WORKUP_SYSTEM_MESSAGE,
+} from "./generate-chapter-workup";
+import { loadProposalGuidanceOrFail } from "./prepare-proposals";
 import { parseChapterWorkupJson } from "../ai/schemas/chapter-workup-schema";
 import { sha256Canonical } from "./generation-manifest";
 import { recordCostEventStrict } from "./cost-events-repository";
@@ -42,8 +47,9 @@ const TABLE = "model_day_runs";
 export const MODEL_DAY_SCHEMA_VERSION = "model-day.v1";
 
 // The exact system message both calls send — part of the counted input bound.
-export const MODEL_DAY_SYSTEM_MESSAGE =
-  "You output ONLY valid JSON matching the requested schema. No markdown, no code fences, no commentary. Do not include copyrighted Bible verse text.";
+// Aliased to the shared production constant (Codex #103 correction 2) so the
+// counted bound and the dispatched request can never drift from the press.
+export const MODEL_DAY_SYSTEM_MESSAGE = CHAPTER_WORKUP_SYSTEM_MESSAGE;
 
 // Past the 20-min job-token TTL + the worker's model budget + margin: no live
 // worker can still exist for a claim this old (two sequential 8-min calls).
@@ -629,32 +635,43 @@ async function callModel(input: { model: string; prompt: string }): Promise<{
   }
   const client = getOpenAI();
   if (!client) throw new Error("OpenAI not configured");
-  const isReasoningModel = /^(gpt-5|o\d)/i.test(input.model);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8 * 60 * 1000);
   try {
+    // Byte-for-byte the production writing request (Codex #103 correction 2:
+    // ONE shared builder) plus the TWO declared Model-Day-only spend-safety
+    // exceptions: `service_tier: "default"` pins the priced tier (an omitted
+    // tier means "auto", which Project settings could reprice), and
+    // `prompt_cache_options: { mode: "explicit" }` disables the implicit
+    // cache-write breakpoint so no unbudgeted cache-write charge can undermine
+    // the cap. Everything else equals the press's request except model id.
+    const base = buildChapterWorkupRequestBody({ model: input.model, prompt: input.prompt });
     const resp = await client.chat.completions.create(
       {
-        model: input.model,
-        messages: [
-          { role: "system", content: MODEL_DAY_SYSTEM_MESSAGE },
-          { role: "user", content: input.prompt },
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: MODEL_DAY_MAX_COMPLETION_TOKENS,
-        ...(isReasoningModel ? { reasoning_effort: "low" } : {}),
+        ...base,
+        service_tier: "default",
+        prompt_cache_options: { mode: "explicit" },
       } as never,
       // maxRetries 0: "one request per model" must be literally true.
       { signal: controller.signal, maxRetries: 0 },
     );
     const r = resp as {
       choices: { message?: { content?: string | null } }[];
+      service_tier?: unknown;
       usage?: {
         prompt_tokens?: unknown;
         completion_tokens?: unknown;
         prompt_tokens_details?: { cached_tokens?: unknown };
       };
     };
+    // Validate the served tier before any cost is priced (Codex #103): if the
+    // provider echoes a tier other than the pinned "default", the price
+    // assumptions are void — fail so the caller records the conservative
+    // ceiling as possible spend rather than pricing against the wrong tier.
+    const servedTier = typeof r.service_tier === "string" ? r.service_tier : undefined;
+    if (servedTier !== undefined && servedTier !== "default") {
+      throw new Error(`provider served tier "${servedTier}", not the pinned "default" — pricing assumptions void`);
+    }
     return {
       content: r.choices[0]?.message?.content ?? "",
       // Each REQUIRED field independently: absent/invalid = null, never zero.
@@ -785,12 +802,26 @@ export async function runModelDayJob(slug: string, jobId: string): Promise<Model
     return failRow("the Selah Brain returned no rules — an A/B without the press's quality guidance is unrepresentative, refusing (nothing was spent)");
   }
 
+  // The press folds the chapter's APPROVED preparation proposal into its notes
+  // (generate-chapter-workup). Model Day must too, or it compares under
+  // different instructions than the printing path (Codex #103 correction 2).
+  // Fail-closed exactly as production does — a prepared chapter with a
+  // missing/unapproved/drifted proposal must not run an unrepresentative A/B.
+  let proposalGuidance: string[];
+  try {
+    proposalGuidance = promptContextForTesting ? [] : await loadProposalGuidanceOrFail(slug);
+  } catch (e) {
+    return failRow(
+      `the approved preparation proposal could not be loaded (${String((e as Error).message).slice(0, 160)}) — refusing an unrepresentative A/B (nothing was spent)`,
+    );
+  }
+
   const prompt = buildChapterWorkupPrompt({
     book: identity.book,
     chapter: identity.chapter,
     bibleVersion: "ESV",
     globalRules: context.globalRules,
-    chapterNotes: context.chapterNotes,
+    chapterNotes: [...context.chapterNotes, ...proposalGuidance],
     examples: context.examples,
   });
   // Coarse char pre-check, then the ENFORCED bound: an EXACT o200k token
