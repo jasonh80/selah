@@ -86,6 +86,42 @@ interface GenOutput {
   outputTokens: number;
 }
 
+// SINGLE SOURCE OF TRUTH for the chapter-writing request (Codex #103 correction
+// 2): the production press AND the Model Day A/B lane both build their request
+// here, so the comparison is byte-for-byte the printing path except model
+// identity (the Model Day lane adds only its two declared spend-safety fields,
+// service_tier + prompt_cache_options, on top of this base).
+export const CHAPTER_WORKUP_SYSTEM_MESSAGE =
+  "You output ONLY valid JSON matching the requested schema. No markdown, no code fences, no commentary. Do not include copyrighted Bible verse text.";
+export const CHAPTER_WORKUP_MAX_COMPLETION_TOKENS = 12000;
+
+/** The exact chat-completions request body the press sends, given a model and
+ * an already-assembled prompt (the prompt must include the same rules, notes,
+ * approved proposal guidance, and examples the press uses). Pure — no network,
+ * no settings reads — so the byte-equality regression can compare it directly. */
+export function buildChapterWorkupRequestBody(input: { model: string; prompt: string }): {
+  model: string;
+  messages: { role: "system" | "user"; content: string }[];
+  response_format: { type: "json_object" };
+  max_completion_tokens: number;
+  reasoning_effort?: "low";
+} {
+  // GPT-5 series only support the default temperature, so we don't set it.
+  // "low" reasoning keeps the call inside the window (gpt-5.5 rejects "minimal";
+  // it accepts none/low/medium/high/xhigh). Low suits content writing.
+  const isReasoningModel = /^(gpt-5|o\d)/i.test(input.model);
+  return {
+    model: input.model,
+    messages: [
+      { role: "system", content: CHAPTER_WORKUP_SYSTEM_MESSAGE },
+      { role: "user", content: input.prompt },
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: CHAPTER_WORKUP_MAX_COMPLETION_TOKENS,
+    ...(isReasoningModel ? { reasoning_effort: "low" as const } : {}),
+  };
+}
+
 export function assertGenericChapterGenerationAllowed(input: {
   slug: string;
   book: string;
@@ -142,24 +178,7 @@ export async function generateChapterWorkup(input: {
   // content writing, not hard reasoning — or they burn minutes of reasoning on
   // the large prompt. Cap output tokens to avoid runaway. Built as a loose object
   // + cast so it compiles across SDK versions that may not type these fields yet.
-  const isReasoningModel = /^(gpt-5|o\d)/i.test(model);
-  const body = {
-    model,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You output ONLY valid JSON matching the requested schema. No markdown, no code fences, no commentary. Do not include copyrighted Bible verse text.",
-      },
-      { role: "user", content: prompt },
-    ],
-    response_format: { type: "json_object" },
-    max_completion_tokens: 12000,
-    // GPT-5 series only support the default temperature, so we don't set it.
-    // "low" reasoning keeps the call inside the window (gpt-5.5 rejects "minimal";
-    // it accepts none/low/medium/high/xhigh). Low suits content writing.
-    ...(isReasoningModel ? { reasoning_effort: "low" } : {}),
-  };
+  const body = buildChapterWorkupRequestBody({ model, prompt });
 
   // HARD wall-clock abort — the SDK timeout alone didn't reliably stop a slow
   // reasoning call, which once left a job zombied past the function limit.
